@@ -1,17 +1,21 @@
-## My Project
+## AWS Crypto Tools Commons
 
-TODO: Fill this README out!
+📣 Note: This repository contains all common references used to build
+the following projects owned by the @aws/aws-crypto-tools team.
 
-Be sure to:
+- [aws/aws-crypto-tools-java](https://github.com/aws/aws-crypto-tools-java)
+- [aws/aws-crypto-tools-rust](https://github.com/aws/aws-crypto-tools-rust)
+- [aws/aws-crypto-tools-go](https://github.com/aws/aws-crypto-tools-go)
 
-* Change the title in this README
-* Edit your repository description on GitHub
+[Security issue notifications](./CONTRIBUTING.md#security-issue-notifications)
 
 ## Security
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+If you discover a potential security issue in this project
+we ask that you notify AWS/Amazon Security via our
+[vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/).
+Please **do not** create a public GitHub issue.
 
 ## License
 
 This project is licensed under the Apache-2.0 License.
-
