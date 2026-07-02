@@ -17,6 +17,16 @@ plugins {
 }
 
 repositories {
+    // mavenLocal() is listed FIRST so that when the live ESDK Java working tree
+    // has been installed to the local Maven repository (by the aws-crypto-tools-
+    // java `esdk/test-server/Makefile` `build-live-esdk` target, task 11.1), a
+    // matching `com.amazonaws:aws-encryption-sdk-java:<esdkVersion>` there is
+    // consumed as the LIVE source in place of the published GA artifact. The
+    // live flow installs a DISTINCT version (e.g. 3.0.2-LIVE-SNAPSHOT) and
+    // passes `-PesdkVersion=<that version>`, so head/default runs still resolve
+    // the published artifact from Maven Central below and only an explicit live
+    // run picks up the local build (Requirements 11.1, 11.2, 12.1).
+    mavenLocal()
     mavenCentral()
 }
 
@@ -69,11 +79,17 @@ dependencies {
     // construct keyrings and CMMs. This is aligned with the version the live
     // product source declares (aws-crypto-tools-java/esdk/pom.xml -> 3.0.2).
     //
-    // KNOWN LIMITATION (revisit when wiring live source in task 11): this uses
-    // the PUBLISHED artifact rather than the local live ESDK source tree, whose
-    // build depends on a heavy Dafny/Smithy-Dafny MaterialProviders transpile.
-    // The published artifact proves the harness end-to-end today; task 11 swaps
-    // in the live working tree as the Java source.
+    // LIVE-SOURCE MODE (task 11): `esdkVersion` is overridable via
+    // `-PesdkVersion=<v>`. Default runs resolve the published GA artifact from
+    // Maven Central. A live run installs THIS repo's working tree to the local
+    // Maven repository under a distinct version (e.g. 3.0.2-LIVE-SNAPSHOT) and
+    // passes `-PesdkVersion=3.0.2-LIVE-SNAPSHOT`; combined with mavenLocal()
+    // above, the server then delegates to the LIVE ESDK Java build rather than
+    // the published artifact. The ESDK Java `mvn install` consumes the AWS
+    // Cryptographic Material Providers library as a published artifact (the
+    // esdk/pom.xml declares aws-cryptographic-material-providers:<v> from Maven
+    // Central), so no heavy Dafny/Smithy-Dafny transpile is required to build
+    // the live Java source.
     implementation("com.amazonaws:aws-encryption-sdk-java:$esdkVersion")
     // The handlers/config factory import the Material Providers keyring & CMM
     // types directly, so declare the library explicitly (rather than leaning on
