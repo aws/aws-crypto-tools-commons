@@ -24,6 +24,15 @@ plugins {
 }
 
 repositories {
+    // mavenLocal() FIRST so a live ESDK build installed to the local Maven repo
+    // (task 11: aws-crypto-tools-java `build-live-esdk`, version e.g.
+    // 3.0.2-LIVE-SNAPSHOT passed via -PesdkVersion) is consumed here as the
+    // effective Java source in live mode. The orchestrator's runtimeClasspath
+    // pulls the ESDK transitively from the included servers/java build, and that
+    // resolution uses THIS project's repositories, so mavenLocal must be present
+    // here as well as in servers/java. Default/head runs resolve the published
+    // GA artifact from Maven Central below (Requirements 11.1, 11.2, 12.1).
+    mavenLocal()
     mavenCentral()
 }
 
