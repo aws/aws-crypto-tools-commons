@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "The ESDK TestServer Configuration_Set: one Configuration_Entry per",
+    "Language_Server (Requirement 9.1). Each entry carries a non-empty branch and",
+    "repository, a major version >= 1, and a port in 1..65535 that is unique",
+    "across the set (Requirements 9.2, 9.3).",
+    "",
+    "FIRST-PASS SCOPE: only Java is available/ready; the other language servers",
+    "are parked (tasks 9-10) and are added to this set with unique ports in task",
+    "12.1. Keeping only the Java entry here means an end-to-end orchestrator run",
+    "launches only the Java Language_Server (task 7 / checkpoint 8)."
+  ],
+  "entries": [
+    {
+      "language": "java",
+      "branch": "main",
+      "repository": "aws-crypto-tools-java",
+      "majorVersion": 3,
+      "port": 8091
+    }
+  ]
+}
