@@ -1,0 +1,138 @@
+# ============================================================================
+# ESDK TestServer CI
+# ----------------------------------------------------------------------------
+# LOCATION MATTERS: this file lives FLAT, directly under `.github/workflows/`.
+# GitHub Actions only discovers workflow files that sit directly in
+# `.github/workflows/` — a nested file such as `.github/workflows/esdk/...`
+# would NEVER be triggered. Because this repo (aws-crypto-tools-commons) hosts
+# tooling for multiple products, we namespace per product with a filename
+# prefix instead of a subdirectory: `esdk-` marks this as the ESDK TestServer
+# workflow. Future products get e.g. `s3ec-test-server.yml`, and so on.
+#
+# WHAT THIS RUNS: the commons ESDK TestServer is currently JAVA-ONLY. Its blob
+# round-trip uses an OFFLINE Raw-AES keyring — no AWS account, no KMS, no
+# network. The root Makefile's orchestrator already does build + launch + run +
+# report in one shot, so this workflow stays simple and self-contained: set up
+# a JDK, validate the model, build the modules, and run the orchestrated
+# end-to-end round trip. Contrast this with the multi-language S3EC reusable
+# workflow (Ruby/PHP/Go/C++ + AWS creds + KMS orchestrated via make
+# build/start/wait/run/stop) that inspired the shape here.
+#
+# AWS/KMS (FUTURE): no credentials are needed today. Once KMS keyrings are
+# exercised (real AWS round trips), add an OIDC-based auth step mirroring S3EC:
+#   permissions: { id-token: write }  # in addition to contents: read
+#   - uses: aws-actions/configure-aws-credentials@v4
+#       with: { role-to-assume: <OIDC role ARN>, aws-region: us-west-2 }
+# and pass any bucket/key ARNs via repo vars/secrets. Left out on purpose now.
+# ============================================================================
+
+name: ESDK TestServer
+
+on:
+  pull_request:
+    paths:
+      - "esdk/test-server/**"
+      - ".github/workflows/esdk-test-server.yml"
+  push:
+    paths:
+      - "esdk/test-server/**"
+      - ".github/workflows/esdk-test-server.yml"
+  # Manual trigger from the Actions tab.
+  workflow_dispatch:
+  # Allow an aggregate/parent CI workflow to reuse this one.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  esdk-test-server:
+    # Pure-JVM build; ubuntu is sufficient (no macOS runner needed).
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        # No submodules needed for the commons Java-only path.
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        # smithy-java requires JDK 21+. setup-java exports JAVA_HOME to this
+        # JDK; the Makefile honors an already-set JAVA_HOME (`JAVA_HOME ?=`), so
+        # its macOS-only /usr/libexec/java_home probing is bypassed in CI.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Gradle caches and wrappers
+        # Four independent Gradle builds live under esdk/test-server
+        # (client-java, servers/java, tests, orchestrator). Key on every
+        # gradle build script + wrapper descriptor beneath that tree so the
+        # cache invalidates when any module's build config changes.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ runner.os }}-gradle-${{ hashFiles(
+              'esdk/test-server/**/*.gradle*',
+              'esdk/test-server/**/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Install Smithy CLI
+        # `make validate` runs `smithy validate` on the model before the pure
+        # bash smoke checks. The Smithy CLI is NOT preinstalled on ubuntu-latest,
+        # so we install it from the official Smithy release using the installer
+        # bundled in the release archive. We pin the version (1.58.0) to match
+        # the model's smithy-protocol-traits:1.58.0 dependency for deterministic
+        # builds. This is preferred over skipping `smithy validate` because it
+        # keeps full model-validation coverage in CI; the install is a single
+        # deterministic download + bundled `install` script (no third-party
+        # action, no supply-chain surface beyond the official Smithy release).
+        run: |
+          set -euo pipefail
+          SMITHY_VERSION="1.58.0"
+          url="https://github.com/smithy-lang/smithy/releases/download/${SMITHY_VERSION}/smithy-cli-linux-x86_64.zip"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/smithy-cli.zip"
+          unzip -q "$tmp/smithy-cli.zip" -d "$tmp"
+          sudo "$tmp/smithy-cli-linux-x86_64/install"
+          smithy --version
+
+      - name: Validate model (smithy validate + model smoke checks)
+        working-directory: esdk/test-server
+        run: make validate
+
+      - name: Build all modules (compile/codegen, tests skipped)
+        working-directory: esdk/test-server
+        run: make build
+
+      - name: Orchestrate end-to-end round trip (headline check)
+        # The orchestrator boots the Java Language_Server on its configured
+        # Configuration_Set port and runs the single Tests suite to a fail-open
+        # SUCCESS. This is the most representative end-to-end check, so it is
+        # the headline. (An in-process `make test` is also available; the
+        # orchestrated path supersedes it here.)
+        working-directory: esdk/test-server
+        run: make orchestrate
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: esdk-test-server-reports
+          # JUnit HTML (reports/tests) and XML (test-results) for the three
+          # modules that run tests. client-java builds with `-x test` and emits
+          # no reports, so it is intentionally omitted. `if: always()` uploads
+          # even when an earlier step failed, to aid debugging.
+          path: |
+            esdk/test-server/servers/java/build/reports/tests
+            esdk/test-server/servers/java/build/test-results
+            esdk/test-server/tests/build/reports/tests
+            esdk/test-server/tests/build/test-results
+            esdk/test-server/orchestrator/build/reports/tests
+            esdk/test-server/orchestrator/build/test-results
+          if-no-files-found: ignore
