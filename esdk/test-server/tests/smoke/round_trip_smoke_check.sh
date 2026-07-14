@@ -61,6 +61,20 @@ else
     fail "blob round-trip does not drive both Encrypt and Decrypt (Req 4.8)"
 fi
 
+# --- Task 14.3: deterministic per-scenario config coverage --------------------
+# Per-scenario keyring/CMM/algorithm-suite coverage is guaranteed by a
+# deterministic JUnit 5 parameterized Test (one named execution per scenario via
+# @MethodSource over EsdkClientConfigs.scenarios()); the jqwik Property 1 test
+# complements it for arbitrary-plaintext breadth but is not the coverage
+# guarantee (design "Per-scenario config coverage for the Java hardening pass").
+if [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripScenariosTest.java" ]] \
+    && grep -q '@ParameterizedTest' "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripScenariosTest.java" \
+    && grep -q 'EsdkClientConfigs.scenarios' "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripScenariosTest.java"; then
+    pass "deterministic per-scenario blob round-trip coverage exists (parameterized) (Req 4.4)"
+else
+    fail "per-scenario parameterized blob round-trip coverage missing (Req 4.4)"
+fi
+
 # --- Req 4.9: a single-server stream round-trip Test exists -------------------
 # The offline Java hardening pass adds a single-server stream round-trip Test:
 # the stream variants (encryptStream/decryptStream) are exercised on the same

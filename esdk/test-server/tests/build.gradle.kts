@@ -54,6 +54,10 @@ dependencies {
     // jqwik: property-based testing (Property 1). JUnit 5: example-based tests.
     testImplementation("net.jqwik:jqwik:$jqwikVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    // junit-jupiter-params powers the deterministic per-scenario parameterized
+    // blob round-trip Test (Task 14.3): one named execution per keyring/CMM/
+    // algorithm-suite scenario.
+    testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
 }
 
