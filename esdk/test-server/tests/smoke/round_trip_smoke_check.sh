@@ -7,7 +7,8 @@
 #   - exactly one `Tests` definition exists under the ESDK TestServer directory,
 #     with zero per-language duplicate copies (Req 7.1)
 #   - the blob round-trip Test exists (Req 4.8)
-#   - no stream round-trip Test exists for the first pass (Req 4.9)
+#   - a single-server stream round-trip Test exists (Req 4.9) while a
+#     cross-language stream round-trip Test does not yet exist (Req 4.10)
 #
 # Exit code 0 means all checks passed; non-zero means a check failed.
 set -euo pipefail
@@ -60,14 +61,45 @@ else
     fail "blob round-trip does not drive both Encrypt and Decrypt (Req 4.8)"
 fi
 
-# --- Req 4.9: no stream round-trip Test for the first pass --------------------
-# No test source may invoke the stream variants (encryptStream/decryptStream).
-stream_calls="$(grep -rlE '\.(encryptStream|decryptStream)\(' "$SRC_DIR" 2>/dev/null | sort || true)"
-stream_call_count="$(printf '%s\n' "$stream_calls" | grep -c . || true)"
-if [[ "$stream_call_count" == "0" ]]; then
-    pass "no stream round-trip Test exists for the first pass (Req 4.9)"
+# --- Req 4.9: a single-server stream round-trip Test exists -------------------
+# The offline Java hardening pass adds a single-server stream round-trip Test:
+# the stream variants (encryptStream/decryptStream) are exercised on the same
+# Streaming_Capable Java server.
+if [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/StreamRoundTripTest.java" ]] \
+    && [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/StreamRoundTripPropertyTest.java" ]]; then
+    pass "single-server stream round-trip Tests exist (example + property) (Req 4.9)"
 else
-    fail "found stream-variant usage in Tests (Req 4.9): ${stream_calls}"
+    fail "single-server stream round-trip Test file(s) missing (Req 4.9)"
+fi
+
+# There must be exactly one stream round-trip Test body definition
+# (StreamRoundTrip.run), i.e. defined once and not duplicated per language.
+stream_roundtrip_defs="$(grep -rlE 'class[[:space:]]+StreamRoundTrip\b' "$SRC_DIR" 2>/dev/null | sort || true)"
+stream_roundtrip_def_count="$(printf '%s\n' "$stream_roundtrip_defs" | grep -c . || true)"
+if [[ "$stream_roundtrip_def_count" == "1" ]]; then
+    pass "exactly one stream round-trip definition (no per-language duplicates) (Req 7.1)"
+else
+    fail "expected exactly 1 StreamRoundTrip definition, found $stream_roundtrip_def_count (Req 7.1)"
+fi
+
+# The stream round-trip must actually exercise both stream variants.
+if grep -q '\.encryptStream(' "$SRC_DIR/aws/cryptography/esdk/testserver/tests/StreamRoundTrip.java" \
+    && grep -q '\.decryptStream(' "$SRC_DIR/aws/cryptography/esdk/testserver/tests/StreamRoundTrip.java"; then
+    pass "stream round-trip drives both EncryptStream and DecryptStream (Req 4.9)"
+else
+    fail "stream round-trip does not drive both EncryptStream and DecryptStream (Req 4.9)"
+fi
+
+# --- Req 4.10: no cross-language stream round-trip Test yet --------------------
+# A cross-language stream round-trip (spanning two distinct Streaming_Capable
+# languages) is out of scope until at least two Streaming_Capable servers exist.
+# No such Test may be present yet.
+cross_stream="$(grep -rlE 'CrossLanguage.*Stream|Stream.*CrossLanguage' "$SRC_DIR" 2>/dev/null | sort || true)"
+cross_stream_count="$(printf '%s\n' "$cross_stream" | grep -c . || true)"
+if [[ "$cross_stream_count" == "0" ]]; then
+    pass "no cross-language stream round-trip Test exists yet (Req 4.10)"
+else
+    fail "found a cross-language stream round-trip Test (Req 4.10): ${cross_stream}"
 fi
 
 # --- Summary ------------------------------------------------------------------

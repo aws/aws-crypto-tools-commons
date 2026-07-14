@@ -20,7 +20,6 @@ import net.jqwik.api.ForAll;
 import net.jqwik.api.GenerationMode;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
-import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * Property-based test for the ClientId guard on non-CreateClient operations,
@@ -71,10 +70,10 @@ class ClientIdGuardPropertyTest {
                     DecryptInput.builder().clientId(id).ciphertext(ByteBuffer.wrap(payload)).build(),
                     null);
                 case ENCRYPT_STREAM -> new EncryptStreamHandler(guard, wrapper).encryptStream(
-                    EncryptStreamInput.builder().clientId(id).plaintext(DataStream.ofBytes(payload)).build(),
+                    EncryptStreamInput.builder().clientId(id).plaintext(ByteBuffer.wrap(payload)).build(),
                     null);
                 case DECRYPT_STREAM -> new DecryptStreamHandler(guard, wrapper).decryptStream(
-                    DecryptStreamInput.builder().clientId(id).ciphertext(DataStream.ofBytes(payload)).build(),
+                    DecryptStreamInput.builder().clientId(id).ciphertext(ByteBuffer.wrap(payload)).build(),
                     null);
                 default -> fail("unhandled op");
             }

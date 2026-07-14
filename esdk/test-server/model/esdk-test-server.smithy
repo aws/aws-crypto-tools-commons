@@ -166,9 +166,14 @@ structure EncryptStreamRequest {
     @required
     clientId: ClientId
 
-    /// The plaintext processed as a stream (Stream_Variant, Requirement 4.5).
+    /// The plaintext for the Stream_Variant of encrypt. It is carried as a plain
+    /// Blob on the wire (NOT a Smithy `@streaming` member) because the rpcv2-CBOR
+    /// protocol this service declares does not transmit `@streaming` members with
+    /// stock smithy-java 1.4.0. The Stream_Variant is distinguished from the
+    /// Blob_Variant by the Language_Server driving the ESDK streaming API
+    /// internally, not by the wire encoding (Requirements 4.1, 4.5).
     @required
-    plaintext: StreamingBlob
+    plaintext: Blob
 
     encryptionContext: EncryptionContext
 
@@ -179,8 +184,10 @@ structure EncryptStreamRequest {
 
 @output
 structure EncryptStreamResponse {
+    /// Ciphertext produced by the server driving the ESDK streaming encrypt API;
+    /// carried as a plain Blob on the wire (Requirements 4.1, 4.5).
     @required
-    ciphertext: StreamingBlob
+    ciphertext: Blob
 }
 
 @input
@@ -188,17 +195,24 @@ structure DecryptStreamRequest {
     @required
     clientId: ClientId
 
-    /// The ciphertext processed as a stream (Stream_Variant, Requirement 4.6).
+    /// The ciphertext for the Stream_Variant of decrypt. It is carried as a plain
+    /// Blob on the wire (NOT a Smithy `@streaming` member) because the rpcv2-CBOR
+    /// protocol this service declares does not transmit `@streaming` members with
+    /// stock smithy-java 1.4.0. The Stream_Variant is distinguished from the
+    /// Blob_Variant by the Language_Server driving the ESDK streaming API
+    /// internally, not by the wire encoding (Requirements 4.1, 4.6).
     @required
-    ciphertext: StreamingBlob
+    ciphertext: Blob
 
     encryptionContext: EncryptionContext
 }
 
 @output
 structure DecryptStreamResponse {
+    /// Plaintext produced by the server driving the ESDK streaming decrypt API;
+    /// carried as a plain Blob on the wire (Requirements 4.1, 4.6).
     @required
-    plaintext: StreamingBlob
+    plaintext: Blob
 }
 
 // ===========================================================================
@@ -238,11 +252,14 @@ map EncryptionContext {
     value: String
 }
 
-/// Plaintext or ciphertext processed as a stream (Stream_Variant). Modeled now
-/// for wire-contract completeness even though streaming is not exercised in the
-/// first pass (Requirement 4.1).
-@streaming
-blob StreamingBlob
+// The Stream_Variant operations carry their payloads as the built-in `Blob`
+// shape (see EncryptStreamRequest/DecryptStreamRequest and their responses).
+// There is deliberately NO `@streaming` blob shape: stock smithy-java 1.4.0 does
+// not transmit `@streaming` members over the rpcv2-CBOR protocol this service
+// declares, so the streaming semantics live entirely server-side — the
+// Language_Server wraps the received blob in a stream, drives the ESDK streaming
+// encrypt/decrypt API, and collects the streamed output back into a blob
+// (Requirement 4.1).
 
 // ===========================================================================
 // ESDK client configuration (mirrors the real ESDK config at the lowest
