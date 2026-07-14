@@ -93,7 +93,14 @@ public final class RealEsdkClient implements EsdkClient {
                               Map<String, String> encryptionContext) throws EsdkClientException {
         try {
             AwsCrypto crypto = buildCrypto(null, null);
-            try (CryptoInputStream<?> decrypting = crypto.createDecryptingStream(cmm, ciphertext)) {
+            Map<String, String> ec = nonNull(encryptionContext);
+            // Supply the reproduced encryption context on decrypt when present, so a
+            // Required-Encryption-Context CMM (which drops the required keys from the
+            // message header) can reconstruct them — mirroring the blob decrypt path.
+            // Both drive the real ESDK streaming decrypt API (Requirement 4.6).
+            try (CryptoInputStream<?> decrypting = ec.isEmpty()
+                     ? crypto.createDecryptingStream(cmm, ciphertext)
+                     : crypto.createDecryptingStream(cmm, ciphertext, ec)) {
                 decrypting.transferTo(plaintext);
             }
         } catch (Exception esdkFailure) {

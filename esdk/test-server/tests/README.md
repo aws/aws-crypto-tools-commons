@@ -37,9 +37,13 @@ With no endpoint configured, the suite boots one Java `Language_Server` in-proce
 ephemeral port (real Netty HTTP + rpcv2Cbor) and uses it as **both** the encrypt and decrypt
 endpoint of the pair, then performs the real over-HTTP round trip. This runs:
 
-- `BlobRoundTripTest` — example + empty-plaintext round trips (Task 5.2)
+- `MaterialsRoundTripTests` — the single per-configuration class; a blob (`blob[...]`) and a
+  stream (`stream[...]`) `@ParameterizedTest`, each run against every offline scenario in
+  `EsdkClientConfigs.scenarios()` as its own named execution (Tasks 14.1, 14.3)
 - `BlobRoundTripPropertyTest` — Property 1, jqwik, 100 iterations, arbitrary/empty/binary/large
   plaintext (Task 5.3)
+- `StreamRoundTripPropertyTest` — Property 15, jqwik, 100 iterations, arbitrary/empty/binary/large
+  plaintext (Task 14.2)
 
 ## Option B — Manual two-step: start the Java server, then run the Tests against it
 

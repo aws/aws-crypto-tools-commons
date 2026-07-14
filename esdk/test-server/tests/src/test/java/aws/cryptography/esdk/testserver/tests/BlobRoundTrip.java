@@ -15,9 +15,9 @@ import java.util.Map;
  * plaintext (Requirements 4.2, 4.3, 4.4). Exercises the Blob_Variant only, over
  * the real wire protocol via the ONE generated Java Test_Client.
  *
- * <p>Both the example-based Test (5.2) and the property-based Test (5.3, Property
- * 1) drive this single body, so there is exactly one definition of the round
- * trip.
+ * <p>Both the per-configuration {@code MaterialsRoundTripTests#blobRoundTrip}
+ * (one named execution per scenario) and the property-based Test (Property 1)
+ * drive this single body, so there is exactly one definition of the round trip.
  */
 public final class BlobRoundTrip {
 

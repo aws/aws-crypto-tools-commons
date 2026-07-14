@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
  * shape id and the generated client's error deserializer maps it back to the
  * matching modeled type via the operation's type registry. No client/server wiring
  * change was required for the error path (unlike the {@code @streaming} blob
- * transport, which the same codec does not support — see {@link StreamRoundTripTest}).
+ * transport, which the same codec does not support — see {@link StreamRoundTrip}).
  */
 class ModeledErrorTransmissionTest {
 
