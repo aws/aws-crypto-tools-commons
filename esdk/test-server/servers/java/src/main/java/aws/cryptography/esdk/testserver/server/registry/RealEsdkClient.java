@@ -5,7 +5,6 @@ import com.amazonaws.encryptionsdk.AwsCrypto;
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import com.amazonaws.encryptionsdk.CryptoAlgorithm;
 import com.amazonaws.encryptionsdk.CryptoInputStream;
-import com.amazonaws.encryptionsdk.CryptoOutputStream;
 import com.amazonaws.encryptionsdk.CryptoResult;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -73,9 +72,16 @@ public final class RealEsdkClient implements EsdkClient {
                               String algorithmSuiteId, Long frameLength) throws EsdkClientException {
         try {
             AwsCrypto crypto = buildCrypto(algorithmSuiteId, frameLength);
-            try (CryptoOutputStream<?> encrypting =
-                     crypto.createEncryptingStream(cmm, ciphertext, nonNull(encryptionContext))) {
-                plaintext.transferTo(encrypting);
+            // Use the READ-side encrypting stream (source InputStream -> CryptoInputStream
+            // producing ciphertext) rather than the write-side CryptoOutputStream. The
+            // write-side form in ESDK Java 3.0.2 emits a malformed message for zero-byte
+            // input (it never finalizes a valid header), which breaks the empty-plaintext
+            // stream round trip (Requirement 4.9); the read-side form finalizes correctly
+            // for all inputs including empty. Both drive the real ESDK streaming encrypt
+            // API (Requirement 4.5).
+            try (CryptoInputStream<?> encrypting =
+                     crypto.createEncryptingStream(cmm, plaintext, nonNull(encryptionContext))) {
+                encrypting.transferTo(ciphertext);
             }
         } catch (Exception esdkFailure) {
             throw new EsdkClientException(esdkFailure);

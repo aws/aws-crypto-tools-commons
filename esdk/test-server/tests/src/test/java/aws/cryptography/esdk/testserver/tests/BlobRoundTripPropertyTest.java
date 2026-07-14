@@ -2,6 +2,9 @@ package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs.Scenario;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.ForAll;
@@ -44,11 +47,50 @@ class BlobRoundTripPropertyTest {
     }
 
     // Feature: esdk-test-server, Property 1: Blob round-trip preserves plaintext byte-for-byte
+    //
+    // Task 14.3 broadens the generators feeding this property (the statement is
+    // unchanged): in addition to arbitrary plaintext, it varies the offline ESDK
+    // configuration — Raw-AES and Raw-RSA keyrings, multi-keyrings, the Default and
+    // Required-Encryption-Context CMMs, and committing / non-committing / no-KDF
+    // algorithm-suite selection — and the encryption context, so decrypt(encrypt(x))
+    // == x is exercised across the config surface the Java ESDK supports offline
+    // (Requirements 2.1, 2.2, 2.5, 4.2, 4.3, 4.4).
     @Property(tries = 100)
-    void blobRoundTripPreservesPlaintextByteForByte(@ForAll("plaintexts") byte[] plaintext) {
-        byte[] recovered = BlobRoundTrip.run(pair, plaintext);
+    void blobRoundTripPreservesPlaintextByteForByte(
+            @ForAll("plaintexts") byte[] plaintext,
+            @ForAll("scenarios") Scenario scenario,
+            @ForAll("encryptionContexts") Map<String, String> encryptionContext) {
+        // Ensure every key the scenario's CMM requires is present in the encryption
+        // context (a Required-Encryption-Context CMM drops these from the header and
+        // demands them again on decrypt); the same context is used on encrypt and
+        // decrypt so the round trip is well-formed.
+        Map<String, String> ec = new LinkedHashMap<>(encryptionContext);
+        for (String requiredKey : scenario.requiredEncryptionContextKeys()) {
+            ec.putIfAbsent(requiredKey, "required-value-for-" + requiredKey);
+        }
+
+        byte[] recovered = BlobRoundTrip.run(pair, plaintext, scenario, ec);
         assertArrayEquals(plaintext, recovered,
-            "decrypt(encrypt(plaintext)) must equal the original plaintext for all inputs");
+            "decrypt(encrypt(plaintext)) must equal the original plaintext for all inputs "
+                + "(scenario: " + scenario.label() + ")");
+    }
+
+    /** The offline, round-trip-compatible ESDK configurations to exercise. */
+    @Provide
+    Arbitrary<Scenario> scenarios() {
+        return Arbitraries.of(EsdkClientConfigs.scenarios());
+    }
+
+    /**
+     * Arbitrary small encryption contexts. Keys and values are lowercase-letter
+     * strings so they never collide with ESDK-reserved keys (for example the
+     * {@code aws-crypto-public-key} added by signed suites) or with the scenarios'
+     * required keys.
+     */
+    @Provide
+    Arbitrary<Map<String, String>> encryptionContexts() {
+        Arbitrary<String> tokens = Arbitraries.strings().withCharRange('a', 'z').ofMinLength(1).ofMaxLength(8);
+        return Arbitraries.maps(tokens, tokens).ofMinSize(0).ofMaxSize(3);
     }
 
     /**
