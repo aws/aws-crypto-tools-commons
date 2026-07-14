@@ -4,7 +4,9 @@ import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
 import aws.cryptography.esdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.esdk.testserver.client.model.DecryptStreamInput;
 import aws.cryptography.esdk.testserver.client.model.EncryptStreamInput;
+import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs.Scenario;
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 /**
  * The shared single-server stream round-trip: {@code CreateClient} on the
@@ -31,8 +33,10 @@ import java.nio.ByteBuffer;
  * cross-language stream round-trip across a compatible pair (Requirement 4.10)
  * with no change here.
  *
- * <p>Both the example-based Test and the property-based Test (Property 15) drive
- * this single body, so there is exactly one definition of the stream round trip.
+ * <p>Both the per-configuration {@code MaterialsRoundTripTests#streamRoundTrip}
+ * (one named execution per scenario) and the property-based Test (Property 15)
+ * drive this single body, so there is exactly one definition of the stream round
+ * trip.
  */
 public final class StreamRoundTrip {
 
@@ -71,6 +75,57 @@ public final class StreamRoundTrip {
                 .ciphertext(ciphertext)
                 .build())
             .getPlaintext();
+
+        return toArray(recovered);
+    }
+
+    /**
+     * Broadened stream round-trip: the same single body as {@link
+     * #run(EndpointPair, byte[])}, but driven by an offline {@link Scenario}
+     * (arbitrary supported keyring/CMM/algorithm-suite combination) and an
+     * encryption context, mirroring {@link BlobRoundTrip#run(EndpointPair, byte[],
+     * Scenario, Map)}. The scenario's single config builds BOTH the encrypt and
+     * decrypt client, so the material is compatible and {@code
+     * decryptStream(encryptStream(x)) == x} holds byte-for-byte (Requirements 4.5,
+     * 4.6, 4.9).
+     *
+     * <p>As with the blob variant, the {@code encryptionContext} is applied on
+     * {@code EncryptStream} and supplied again on {@code DecryptStream} (so a
+     * Required-Encryption-Context CMM can reconstruct its required keys); the
+     * scenario's optional algorithm-suite override is applied on encrypt only
+     * (decrypt derives the suite from the message header). The payload still rides
+     * as a plain blob on the wire; the Java server drives the ESDK streaming API
+     * internally (wrap-bytes → streaming encrypt/decrypt → collect-bytes) on both
+     * legs.
+     */
+    public static byte[] run(EndpointPair pair, byte[] plaintext, Scenario scenario,
+                             Map<String, String> encryptionContext) {
+        ESDKTestServerClient encryptClient = TestServerClients.forEndpoint(pair.encryptEndpoint());
+        ESDKTestServerClient decryptClient = TestServerClients.forEndpoint(pair.decryptEndpoint());
+
+        String encryptClientId = encryptClient.createClient(
+            CreateClientInput.builder().config(scenario.config()).build()).getClientId();
+        String decryptClientId = decryptClient.createClient(
+            CreateClientInput.builder().config(scenario.config()).build()).getClientId();
+
+        EncryptStreamInput.Builder encryptInput = EncryptStreamInput.builder()
+            .clientId(encryptClientId)
+            .plaintext(ByteBuffer.wrap(plaintext));
+        if (!encryptionContext.isEmpty()) {
+            encryptInput.encryptionContext(encryptionContext);
+        }
+        if (scenario.algorithmSuiteId() != null) {
+            encryptInput.algorithmSuiteId(scenario.algorithmSuiteId());
+        }
+        ByteBuffer ciphertext = encryptClient.encryptStream(encryptInput.build()).getCiphertext();
+
+        DecryptStreamInput.Builder decryptInput = DecryptStreamInput.builder()
+            .clientId(decryptClientId)
+            .ciphertext(ciphertext);
+        if (!encryptionContext.isEmpty()) {
+            decryptInput.encryptionContext(encryptionContext);
+        }
+        ByteBuffer recovered = decryptClient.decryptStream(decryptInput.build()).getPlaintext();
 
         return toArray(recovered);
     }

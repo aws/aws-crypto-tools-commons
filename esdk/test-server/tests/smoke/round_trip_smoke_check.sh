@@ -6,9 +6,11 @@
 # property tests (see the design's Testing Strategy):
 #   - exactly one `Tests` definition exists under the ESDK TestServer directory,
 #     with zero per-language duplicate copies (Req 7.1)
-#   - the blob round-trip Test exists (Req 4.8)
-#   - a single-server stream round-trip Test exists (Req 4.9) while a
-#     cross-language stream round-trip Test does not yet exist (Req 4.10)
+#   - the single per-configuration class `MaterialsRoundTripTests` exists and holds
+#     BOTH a blob (`blob[...]`) and a stream (`stream[...]`) `@ParameterizedTest`
+#     over `EsdkClientConfigs.scenarios()` (Req 4.8, 4.9, 4.4)
+#   - there is exactly one BlobRoundTrip and one StreamRoundTrip shared body (Req 7.1)
+#   - a cross-language stream round-trip Test does not yet exist (Req 4.10)
 #
 # Exit code 0 means all checks passed; non-zero means a check failed.
 set -euo pipefail
@@ -46,9 +48,12 @@ else
 fi
 
 # --- Req 4.8: the blob round-trip Test exists ---------------------------------
-if [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripTest.java" ]] \
+# The per-configuration blob round-trip lives in the single MaterialsRoundTripTests
+# class; the arbitrary-plaintext breadth lives in the jqwik Property 1 test.
+MATERIALS_TESTS="$SRC_DIR/aws/cryptography/esdk/testserver/tests/MaterialsRoundTripTests.java"
+if [[ -f "$MATERIALS_TESTS" ]] \
     && [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripPropertyTest.java" ]]; then
-    pass "blob round-trip Tests exist (example + property) (Req 4.8)"
+    pass "blob round-trip Tests exist (MaterialsRoundTripTests + Property 1) (Req 4.8)"
 else
     fail "blob round-trip Test file(s) missing (Req 4.8)"
 fi
@@ -61,29 +66,40 @@ else
     fail "blob round-trip does not drive both Encrypt and Decrypt (Req 4.8)"
 fi
 
-# --- Task 14.3: deterministic per-scenario config coverage --------------------
-# Per-scenario keyring/CMM/algorithm-suite coverage is guaranteed by a
-# deterministic JUnit 5 parameterized Test (one named execution per scenario via
-# @MethodSource over EsdkClientConfigs.scenarios()); the jqwik Property 1 test
-# complements it for arbitrary-plaintext breadth but is not the coverage
-# guarantee (design "Per-scenario config coverage for the Java hardening pass").
-if [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripScenariosTest.java" ]] \
-    && grep -q '@ParameterizedTest' "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripScenariosTest.java" \
-    && grep -q 'EsdkClientConfigs.scenarios' "$SRC_DIR/aws/cryptography/esdk/testserver/tests/BlobRoundTripScenariosTest.java"; then
-    pass "deterministic per-scenario blob round-trip coverage exists (parameterized) (Req 4.4)"
+# --- Per-scenario config coverage: the single MaterialsRoundTripTests class ---
+# Per-scenario keyring/CMM/algorithm-suite coverage is guaranteed by the single
+# per-configuration class MaterialsRoundTripTests, which holds BOTH a blob and a
+# stream round-trip test, each a deterministic JUnit 5 parameterized test (one
+# named execution per scenario via @MethodSource over EsdkClientConfigs.scenarios()).
+# The jqwik Property 1 / Property 15 tests complement it for arbitrary-plaintext
+# breadth but are not the coverage guarantee (design "Per-scenario config coverage
+# for the Java hardening pass").
+if [[ -f "$MATERIALS_TESTS" ]] \
+    && grep -q 'EsdkClientConfigs.scenarios' "$MATERIALS_TESTS"; then
+    pass "single per-configuration class MaterialsRoundTripTests exists over EsdkClientConfigs.scenarios() (Req 4.4)"
 else
-    fail "per-scenario parameterized blob round-trip coverage missing (Req 4.4)"
+    fail "MaterialsRoundTripTests (per-configuration class over EsdkClientConfigs.scenarios()) missing (Req 4.4)"
+fi
+
+# It must contain a blob round-trip parameterized test named blob[...] over the scenarios.
+if [[ -f "$MATERIALS_TESTS" ]] \
+    && grep -qE '@ParameterizedTest\(name = "blob\[\{0\}\]"\)' "$MATERIALS_TESTS"; then
+    pass "MaterialsRoundTripTests contains a blob[...] parameterized round-trip over every scenario (Req 4.4)"
+else
+    fail "MaterialsRoundTripTests missing the blob[...] parameterized round-trip (Req 4.4)"
 fi
 
 # --- Req 4.9: a single-server stream round-trip Test exists -------------------
-# The offline Java hardening pass adds a single-server stream round-trip Test:
-# the stream variants (encryptStream/decryptStream) are exercised on the same
-# Streaming_Capable Java server.
-if [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/StreamRoundTripTest.java" ]] \
+# The stream round-trip also lives in MaterialsRoundTripTests as a parameterized
+# test named stream[...] over every scenario (the stream variants
+# encryptStream/decryptStream on the same Streaming_Capable Java server); the
+# arbitrary-plaintext breadth lives in the jqwik Property 15 test.
+if [[ -f "$MATERIALS_TESTS" ]] \
+    && grep -qE '@ParameterizedTest\(name = "stream\[\{0\}\]"\)' "$MATERIALS_TESTS" \
     && [[ -f "$SRC_DIR/aws/cryptography/esdk/testserver/tests/StreamRoundTripPropertyTest.java" ]]; then
-    pass "single-server stream round-trip Tests exist (example + property) (Req 4.9)"
+    pass "single-server stream round-trip Tests exist (MaterialsRoundTripTests stream[...] + Property 15) (Req 4.9)"
 else
-    fail "single-server stream round-trip Test file(s) missing (Req 4.9)"
+    fail "single-server stream round-trip Test(s) missing (Req 4.9)"
 fi
 
 # There must be exactly one stream round-trip Test body definition
