@@ -1,14 +1,11 @@
 package aws.cryptography.esdk.testserver.tests;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Optional;
 
 /**
  * Resolves the AWS KMS runtime configuration — the {@code KMS_Test_Resources}
- * key ARNs and the AWS region — for the online, credential-gated KMS round-trip
- * scenarios from <em>runtime configuration only</em> (Requirement 14.7),
+ * key ARNs and the AWS region — for the online, <strong>required</strong> KMS
+ * round-trip scenarios from <em>runtime configuration only</em> (Requirement 14.7),
  * consistent with the runtime-configuration-only principle (Requirement 7.3) and
  * mirroring {@link RuntimeEndpointConfig}. Each value resolves from a system
  * property, then an environment variable, and finally falls back to the
@@ -34,12 +31,14 @@ import java.util.Optional;
  *       complete but no region was supplied)</li>
  * </ul>
  *
- * <p>The gate {@link #isKmsAvailable()} is satisfied only when a
- * <strong>complete</strong> {@link KmsRuntimeConfig} (all three key ARNs) is
- * present <em>and</em> AWS credentials are resolvable (Requirements 14.8, 14.9).
- * When either is absent the KMS scenarios are omitted from
- * {@link EsdkClientConfigs#scenarios()} so {@code MaterialsRoundTripTests} skips
- * them and the offline suite still passes with no AWS access.
+ * <p>Because the ARNs default, the KMS scenarios always resolve a complete
+ * configuration and are <strong>required</strong>: {@link
+ * EsdkClientConfigs#scenarios()} always contributes them and a run does not pass
+ * unless they run and pass (Requirements 14.8, 14.9). AWS credentials therefore
+ * must be present — developer credentials locally, GitHub OIDC in CI — and
+ * {@link #configureAwsRegion()} applies the resolved region to the ambient AWS
+ * region provider chain so the in-process Language_Server's {@code KmsClient}
+ * targets it.
  */
 public final class KmsRuntimeConfig {
 
@@ -104,20 +103,6 @@ public final class KmsRuntimeConfig {
         return Optional.empty();
     }
 
-    /**
-     * @return {@code true} when all three KMS key ARNs are present. Since each
-     *     ARN now falls back to a built-in default (the deployed {@code
-     *     KMS_Test_Resources}), a config resolved via {@link #fromRuntime()} is
-     *     always complete; this stays {@code false} only for a config
-     *     deliberately constructed with a missing ARN. A complete config is one
-     *     half of the KMS gate; the other half is resolvable AWS credentials (see
-     *     {@link #isKmsAvailable()}), so the offline suite (no credentials) still
-     *     skips the KMS scenarios and passes.
-     */
-    public boolean isComplete() {
-        return symmetricKeyArn != null && mrkArn != null && rsaKeyArn != null;
-    }
-
     public String symmetricKeyArn() {
         return symmetricKeyArn;
     }
@@ -135,53 +120,11 @@ public final class KmsRuntimeConfig {
     }
 
     /**
-     * The KMS gate (Requirements 14.8, 14.9): KMS round-trip scenarios run only
-     * when a complete {@link KmsRuntimeConfig} is present <em>and</em> AWS
-     * credentials are resolvable. Absence of either => the scenarios are omitted
-     * and the offline suite runs to a pass without AWS access.
-     *
-     * @return {@code true} when the KMS scenarios should be contributed and run.
-     */
-    public static boolean isKmsAvailable() {
-        return fromRuntime().isComplete() && credentialsResolvable();
-    }
-
-    /**
-     * Lightweight, non-network credentials check. Rather than call STS (which the
-     * gate must not do), this inspects the standard AWS credential sources the
-     * default provider chain would consult: explicit access-key env vars, an OIDC
-     * web-identity token file (how the CI_Workflow's assumed role surfaces),
-     * container/instance credential env hints, a named profile, or an
-     * {@code ~/.aws} credentials/config file. Any one present => credentials are
-     * considered resolvable; none present => skip (robust absence => skip).
-     *
-     * @return {@code true} when AWS credentials appear resolvable without a
-     *     network call.
-     */
-    public static boolean credentialsResolvable() {
-        if (envPresent("AWS_ACCESS_KEY_ID") || envPresent("AWS_SECRET_ACCESS_KEY")) {
-            return true;
-        }
-        if (envPresent("AWS_WEB_IDENTITY_TOKEN_FILE") && envPresent("AWS_ROLE_ARN")) {
-            return true;
-        }
-        if (envPresent("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI")
-            || envPresent("AWS_CONTAINER_CREDENTIALS_FULL_URI")) {
-            return true;
-        }
-        if (envPresent("AWS_PROFILE")) {
-            return true;
-        }
-        return awsSharedConfigFilePresent();
-    }
-
-    /**
      * Apply the resolved region to the ambient AWS region provider chain (the
      * {@code aws.region} system property) unless a region is already configured,
      * so an in-process Language_Server's {@code KmsClient.create()} — which reads
      * the ambient region — resolves the region the Tests were given. A no-op when
-     * {@code AWS_REGION} / {@code aws.region} is already set. Only intended to be
-     * called once the gate is satisfied.
+     * {@code AWS_REGION} / {@code aws.region} is already set.
      */
     public void configureAwsRegion() {
         boolean alreadyConfigured =
@@ -195,15 +138,5 @@ public final class KmsRuntimeConfig {
     private static boolean envPresent(String name) {
         String value = System.getenv(name);
         return value != null && !value.isBlank();
-    }
-
-    private static boolean awsSharedConfigFilePresent() {
-        String home = System.getProperty("user.home");
-        if (home == null || home.isBlank()) {
-            return false;
-        }
-        Path awsDir = Paths.get(home, ".aws");
-        return Files.isRegularFile(awsDir.resolve("credentials"))
-            || Files.isRegularFile(awsDir.resolve("config"));
     }
 }

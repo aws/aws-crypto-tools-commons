@@ -75,10 +75,16 @@ class BlobRoundTripPropertyTest {
                 + "(scenario: " + scenario.label() + ")");
     }
 
-    /** The offline, round-trip-compatible ESDK configurations to exercise. */
+    /**
+     * The offline, round-trip-compatible ESDK configurations to exercise. This
+     * property is arbitrary-plaintext <em>offline</em> breadth, so it draws only
+     * from {@link EsdkClientConfigs#offlineScenarios()} — the online, credential-
+     * gated KMS scenarios are exercised (and skipped when unavailable) by
+     * {@code MaterialsRoundTripTests}, not repeated here across 100 iterations.
+     */
     @Provide
     Arbitrary<Scenario> scenarios() {
-        return Arbitraries.of(EsdkClientConfigs.scenarios());
+        return Arbitraries.of(EsdkClientConfigs.offlineScenarios());
     }
 
     /**
