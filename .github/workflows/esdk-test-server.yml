@@ -26,12 +26,13 @@
 # (Requirements 14.8, 14.9). This workflow must therefore supply AWS credentials
 # for the run to pass:
 #   * permissions: { id-token: write }  — for the GitHub OIDC token exchange.
-#   * a fail-fast guard that stops the run early with an actionable message when
-#     the `ESDK_TEST_SERVER_KMS_ROLE_ARN` repo VARIABLE is missing (rather than a
-#     deep "Unable to load credentials" error from inside the server), followed by
-#     a `configure-aws-credentials@v4` step and an `aws sts get-caller-identity`
-#     sanity check. If the role variable is absent (e.g. a fork PR, or a repo that
-#     has not configured it) the run FAILS — there is no offline-only green path.
+#   * a `configure-aws-credentials@v4` step that assumes KMS_CI_ROLE_ARN, which
+#     DEFAULTS to the shared role (its CDK `roleArn` CfnOutput) so NO repo
+#     variable is needed to run against the shared KMS_Test_Resources; the key
+#     ARNs likewise default in KmsRuntimeConfig. The step is continue-on-error and
+#     is followed by an `aws sts get-caller-identity` check that fails GRACEFULLY
+#     with an actionable message when credentials cannot be obtained (e.g. a fork
+#     PR with no id-token) — the required KMS scenarios cannot pass without creds.
 #   * GRADLE_OPTS=-Dorg.gradle.daemon=false (job env) so Gradle never reuses a
 #     daemon with a stale, credential-free environment; every Gradle invocation
 #     (and the in-process server JVM it forks) uses the live step environment.
@@ -42,19 +43,17 @@
 #     nested JVM the orchestrator launches, which inherits the parent ENVIRONMENT
 #     but not the make process's system properties.
 #
-# REQUIRED REPO VARIABLE (configure under Settings → Secrets and variables →
-# Actions → Variables) for the required KMS scenarios to pass:
-#   * vars.ESDK_TEST_SERVER_KMS_ROLE_ARN           — IAM role ARN from the CDK
-#         EsdkTestServerKmsStack (the OIDC role); its presence enables the creds
-#         step. Without it, no credentials are available and the required KMS
-#         scenarios FAIL the run.
-# OPTIONAL repo variables to target a NON-default key set (otherwise the built-in
-# default ARNs for the shared KMS_Test_Resources are used):
+# REPO VARIABLES ARE OPTIONAL. By default this workflow targets the shared
+# KMS_Test_Resources: the OIDC role defaults to the CDK stack's `roleArn` and the
+# key ARNs default in KmsRuntimeConfig, so a run needs only OIDC access to that
+# role (granted to workflows in the ESDK repositories). To target a DIFFERENT
+# account/role or key set, override under Settings → Secrets and variables →
+# Actions → Variables (all are non-secret ARNs from the CDK CfnOutputs, 14.13):
+#   * vars.ESDK_TEST_SERVER_KMS_ROLE_ARN           — OIDC IAM role ARN to assume.
 #   * vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN  — symmetric KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_MRK_ARN            — multi-region KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN        — asymmetric RSA KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_REGION             — AWS region (default us-west-2).
-# All come from the CDK stack's CfnOutputs (Requirement 14.13).
 # ============================================================================
 
 name: ESDK TestServer
@@ -102,6 +101,13 @@ jobs:
       # invocation (and the server JVM it forks) use the live step environment,
       # which has the credentials.
       GRADLE_OPTS: -Dorg.gradle.daemon=false
+      # The OIDC role to assume for the required KMS scenarios. DEFAULTS to the
+      # role the CDK EsdkTestServerKmsStack created for the shared
+      # KMS_Test_Resources (its `roleArn` CfnOutput), so CI runs against the
+      # shared keys with NO repo variables configured. Override with the repo
+      # variable ESDK_TEST_SERVER_KMS_ROLE_ARN to target a different account/role.
+      # This is an IAM role ARN, not a secret.
+      KMS_CI_ROLE_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
 
     steps:
       - name: Checkout
@@ -155,44 +161,47 @@ jobs:
           sudo "$tmp/smithy-cli-linux-x86_64/install"
           smithy --version
 
-      - name: Require the KMS OIDC role variable (KMS scenarios are required)
-        # The KMS keyring scenarios are REQUIRED (Requirements 14.8, 14.9), so a
-        # run cannot pass without AWS credentials. Fail fast with an actionable
-        # message when the role variable is missing, instead of surfacing a deep
-        # "Unable to load credentials" error from inside the server later.
-        #
-        # NOTE: this reads a repository VARIABLE (`vars.`), not a secret. Set it
-        # under Settings → Secrets and variables → Actions → **Variables**.
-        if: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN == '' }}
-        run: |
-          echo "::error::ESDK_TEST_SERVER_KMS_ROLE_ARN repository VARIABLE is not set." >&2
-          echo "The KMS keyring scenarios are required and need AWS credentials via GitHub OIDC." >&2
-          echo "Set ESDK_TEST_SERVER_KMS_ROLE_ARN (and optionally the KMS key ARN vars) under" >&2
-          echo "Settings -> Secrets and variables -> Actions -> Variables, using the CDK stack's" >&2
-          echo "EsdkTestServerKmsStack CfnOutput 'roleArn'. It must be a VARIABLE, not a secret." >&2
-          exit 1
-
       - name: Configure AWS credentials via OIDC
-        # Assumes the CDK-created OIDC role (least-privilege KMS on the three
-        # keys) and exports short-lived AWS_* credentials + AWS_REGION as
-        # environment variables for the subsequent steps (Requirements 14.11,
+        # Assumes the KMS OIDC role (KMS_CI_ROLE_ARN, which DEFAULTS to the shared
+        # role — no repo variable required) and exports short-lived AWS_*
+        # credentials + AWS_REGION for the subsequent steps (Requirements 14.11,
         # 14.12).
         #
         # ORDER MATTERS: this runs BEFORE the first Gradle invocation (Build all
         # modules) so the credentials are present in the environment every Gradle
-        # invocation (and the server JVM it forks) inherits. Combined with the
-        # daemon-less GRADLE_OPTS above, the in-process server's KMS client always
+        # invocation (and the in-process server JVM it forks) inherits. Combined
+        # with the daemon-less GRADLE_OPTS above, the server's KMS client always
         # sees these credentials.
+        #
+        # continue-on-error: a failure here (e.g. a fork PR with no id-token, or a
+        # repo without OIDC access to the role) does NOT abruptly end the job with
+        # a generic action error; the next step reports a clear, actionable message.
+        id: aws-credentials
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN }}
+          role-to-assume: ${{ env.KMS_CI_ROLE_ARN }}
           aws-region: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
 
-      - name: Verify AWS credentials are active (sanity check)
-        # Confirms the assumed-role credentials resolve before the build/run, so a
-        # later KMS failure can be attributed to the code path rather than to
-        # missing credentials. Prints the assumed role ARN / account (not secrets).
-        run: aws sts get-caller-identity
+      - name: Verify AWS credentials are active
+        # The KMS keyring scenarios are REQUIRED and call real AWS KMS, so the run
+        # cannot pass without usable credentials. Confirm they resolve before the
+        # build/run and, if not, fail GRACEFULLY with an actionable message rather
+        # than surfacing a deep "Unable to load credentials" error from inside the
+        # server later. Prints the assumed role ARN / account (not secrets).
+        run: |
+          if ! aws sts get-caller-identity; then
+            echo "::error::No usable AWS credentials for the required KMS keyring scenarios." >&2
+            echo "The ESDK TestServer KMS scenarios are required and call real AWS KMS, so this" >&2
+            echo "run needs GitHub OIDC credentials for the role:" >&2
+            echo "    ${KMS_CI_ROLE_ARN}" >&2
+            echo "That role is assumable by workflows in the ESDK repositories. Runs without OIDC" >&2
+            echo "access to it (for example a pull request from a fork) cannot exercise the KMS" >&2
+            echo "scenarios and therefore cannot pass. To target a different account/role, set the" >&2
+            echo "ESDK_TEST_SERVER_KMS_ROLE_ARN repository variable (Settings -> Secrets and" >&2
+            echo "variables -> Actions -> Variables)." >&2
+            exit 1
+          fi
 
       - name: Validate model (smithy validate + model smoke checks)
         working-directory: esdk/test-server
