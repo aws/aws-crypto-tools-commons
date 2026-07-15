@@ -288,10 +288,15 @@ public final class EsdkClientConfigs {
                     kms.symmetricKeyArn(), List.of(kms.mrkArn())))), null, List.of()),
 
             // AwsKmsRsa: asymmetric RSA KMS key with RSAES-OAEP-SHA-256 padding.
+            // The AwsKmsRsaKeyring rejects algorithm suites with asymmetric
+            // (ECDSA) signing, so pin a committing, NON-signing suite rather than
+            // the client-default committing+ECDSA suite (still commitment-capable,
+            // so REQUIRE_ENCRYPT_REQUIRE_DECRYPT is satisfied).
             new Scenario("awsKmsRsa",
                 require(defaultCmm(awsKmsRsaKeyring(
                     kms.rsaKeyArn(), KmsRsaEncryptionAlgorithm.RSAES_OAEP_SHA_256))),
-                null, List.of()),
+                ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY,
+                List.of()),
 
             // AwsKmsDiscovery: encrypt with the symmetric KMS keyring, decrypt with
             // a KMS discovery keyring over the same region (distinct decryptConfig).

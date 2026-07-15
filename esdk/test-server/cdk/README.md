@@ -76,7 +76,20 @@ npx cdk deploy -c createOidcProvider=false
 
 which makes the stack **look up** the existing provider (by its well-known ARN
 `arn:aws:iam::<account>:oidc-provider/token.actions.githubusercontent.com`)
-instead of creating a conflicting one.
+instead of creating a conflicting one. This is a read-only import — it does
+**not** modify or delete the shared provider that other CI roles in the account
+may already trust.
+
+The `make deploy-kms-cdk` target **defaults to `createOidcProvider=false`**
+(import the existing provider), since the CI-resources account already has a
+GitHub OIDC provider. Deploying into a brand-new account with no provider yet?
+Run it once with `make deploy-kms-cdk CREATE_OIDC_PROVIDER=true`.
+
+> If a prior deploy left the stack in `ROLLBACK_COMPLETE` (e.g. the
+> `EntityAlreadyExistsException` failure from trying to create a second OIDC
+> provider), CloudFormation cannot update it — delete the failed stack first
+> with `npx cdk destroy` (or `aws cloudformation delete-stack --stack-name
+> EsdkTestServerKmsStack`), then re-run the deploy.
 
 ## Outputs
 

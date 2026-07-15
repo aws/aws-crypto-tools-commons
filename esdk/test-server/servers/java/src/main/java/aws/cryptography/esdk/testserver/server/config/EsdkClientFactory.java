@@ -19,7 +19,9 @@ import aws.cryptography.esdk.testserver.server.registry.EsdkClient;
 import aws.cryptography.esdk.testserver.server.registry.RealEsdkClient;
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import software.amazon.awssdk.services.kms.KmsClient;
 import software.amazon.awssdk.services.kms.model.EncryptionAlgorithmSpec;
@@ -237,15 +239,41 @@ public final class EsdkClientFactory {
                 .publicKey()
                 .asByteBuffer();
         }
+        // The ESDK's CreateAwsKmsRsaKeyring expects the public key as PEM, but KMS
+        // GetPublicKey returns it as DER (X.509 SubjectPublicKeyInfo). Wrap DER as
+        // a PEM "PUBLIC KEY" block (pass through if it is already PEM).
         CreateAwsKmsRsaKeyringInput.Builder builder = CreateAwsKmsRsaKeyringInput.builder()
             .kmsKeyId(config.getKmsKeyId())
-            .publicKey(publicKey)
+            .publicKey(toPublicKeyPem(publicKey))
             .encryptionAlgorithm(toEncryptionAlgorithmSpec(config.getEncryptionAlgorithm()))
             .kmsClient(kmsClient);
         if (config.hasGrantTokens() && !config.getGrantTokens().isEmpty()) {
             builder.grantTokens(new ArrayList<>(config.getGrantTokens()));
         }
         return materialProviders.CreateAwsKmsRsaKeyring(builder.build());
+    }
+
+    /**
+     * Normalize an RSA public key to PEM, as required by {@code
+     * CreateAwsKmsRsaKeyring}. KMS {@code GetPublicKey} returns the key as DER
+     * (X.509 {@code SubjectPublicKeyInfo}); this base64-wraps those bytes in a
+     * {@code -----BEGIN PUBLIC KEY-----} block. If the input already looks like
+     * PEM it is returned unchanged, so a caller-supplied PEM public key works too.
+     */
+    private static ByteBuffer toPublicKeyPem(ByteBuffer publicKey) {
+        byte[] bytes = new byte[publicKey.remaining()];
+        publicKey.duplicate().get(bytes);
+        String head = new String(bytes, 0, Math.min(bytes.length, 11), StandardCharsets.US_ASCII);
+        if (head.startsWith("-----BEGIN")) {
+            return ByteBuffer.wrap(bytes);
+        }
+        String base64 = Base64.getEncoder().encodeToString(bytes);
+        StringBuilder pem = new StringBuilder("-----BEGIN PUBLIC KEY-----\n");
+        for (int i = 0; i < base64.length(); i += 64) {
+            pem.append(base64, i, Math.min(i + 64, base64.length())).append('\n');
+        }
+        pem.append("-----END PUBLIC KEY-----\n");
+        return ByteBuffer.wrap(pem.toString().getBytes(StandardCharsets.US_ASCII));
     }
 
     /**
