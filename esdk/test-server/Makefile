@@ -39,6 +39,19 @@ CLIENT_DIR := $(MAKEFILE_DIR)/client-java
 SERVER_DIR := $(MAKEFILE_DIR)/servers/java
 TESTS_DIR  := $(MAKEFILE_DIR)/tests
 ORCH_DIR   := $(MAKEFILE_DIR)/orchestrator
+CDK_DIR    := $(MAKEFILE_DIR)/cdk
+
+# ----------------------------------------------------------------------------
+# KMS_Test_Resources coordinates for the ONLINE, credential-gated KMS Tests
+# (task 15.8). These are read from the environment so a developer can export
+# them once (from the CDK stack's CfnOutputs) and run `make test-kms`. The
+# region defaults to us-west-2. They map 1:1 to the runtime-config keys the
+# Tests read (esdk.testserver.kms.*) via KmsRuntimeConfig.
+#   ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN -> esdk.testserver.kms.symmetricKeyArn
+#   ESDK_TESTSERVER_KMS_MRK_ARN           -> esdk.testserver.kms.mrkArn
+#   ESDK_TESTSERVER_KMS_RSA_KEY_ARN       -> esdk.testserver.kms.rsaKeyArn
+#   ESDK_TESTSERVER_KMS_REGION            -> esdk.testserver.kms.region
+ESDK_TESTSERVER_KMS_REGION ?= us-west-2
 
 # Makefile-owned scratch directory for temp files (server log for test-live).
 # Kept separate from the per-module Gradle `build/` dirs to avoid confusion,
@@ -76,7 +89,8 @@ endif
 .DEFAULT_GOAL := help
 
 .PHONY: help check-java validate smoke build build-client build-server build-tests \
-        test run-server test-live roundtrip orchestrate orchestrate-test clean
+        test run-server test-live roundtrip orchestrate orchestrate-test \
+        deploy-kms-cdk test-kms clean
 
 # ----------------------------------------------------------------------------
 help: ## Show this help
@@ -221,6 +235,58 @@ orchestrate: check-java ## Run the orchestrator end-to-end (launch Java server o
 orchestrate-test: check-java ## Run the orchestrator's property + integration tests (Properties 11-14, port binding/conflict, error paths)
 	@echo "==> Running orchestrator tests (orchestrator/)"
 	@cd "$(ORCH_DIR)" && ./gradlew --console=plain test
+
+# ----------------------------------------------------------------------------
+# ONLINE AWS KMS keyring coverage (task 15, credential-gated).
+# ----------------------------------------------------------------------------
+# The KMS keyring scenarios (AwsKms / AwsKmsMrk / AwsKmsMultiKeyring / AwsKmsRsa
+# / AwsKmsDiscovery) are ONLINE: they make real AWS KMS calls on encrypt/decrypt
+# and therefore need AWS credentials AND the KMS_Test_Resources ARNs. They are
+# contributed to the Tests ONLY when both are present (the KmsRuntimeConfig
+# gate); without them the Tests SKIP the KMS scenarios and the offline suite
+# still passes — so `make test` / `make orchestrate` never require AWS access.
+#
+# Local flow to run the KMS Tests:
+#   1. Obtain developer AWS credentials for the CI resources account (Amazon:
+#      run `creds` / `ada credentials update ...` / `aws sso login` — whatever
+#      your environment uses so `aws sts get-caller-identity` succeeds).
+#   2. `make deploy-kms-cdk`  (once) to provision the keys; note the CfnOutputs.
+#   3. export the three key ARNs (and optionally the region) into your env.
+#   4. `make test-kms`        to run the Tests WITH the KMS scenarios included.
+
+deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via `creds`); prints key/role ARNs
+	@echo "==> Deploying EsdkTestServerKmsStack from cdk/ (region $(ESDK_TESTSERVER_KMS_REGION))"
+	@echo "    Requires developer AWS credentials for the target account."
+	@echo "    Obtain them first (e.g. run \`creds\`) so \`aws sts get-caller-identity\` works."
+	@echo "    On success, CDK prints the CfnOutputs: symmetricKeyArn, mrkArn, rsaKeyArn, roleArn."
+	@echo "    Export them for \`make test-kms\`:"
+	@echo "      export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<symmetricKeyArn>"
+	@echo "      export ESDK_TESTSERVER_KMS_MRK_ARN=<mrkArn>"
+	@echo "      export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<rsaKeyArn>"
+	@cd "$(CDK_DIR)" && npm install && \
+		AWS_REGION="$(ESDK_TESTSERVER_KMS_REGION)" npx cdk deploy --require-approval never
+
+test-kms: check-java ## Run the Tests INCLUDING online KMS scenarios (needs `creds` + exported KMS ARNs)
+	@if [ -z "$${ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN:-}" ] || \
+		[ -z "$${ESDK_TESTSERVER_KMS_MRK_ARN:-}" ] || \
+		[ -z "$${ESDK_TESTSERVER_KMS_RSA_KEY_ARN:-}" ]; then \
+		echo "ERROR: the KMS_Test_Resources ARNs are not set in the environment." >&2; \
+		echo "       KMS Tests are ONLINE and are skipped without them (and without AWS creds)." >&2; \
+		echo "       First obtain AWS credentials (e.g. run \`creds\`), then export:" >&2; \
+		echo "         export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<arn>" >&2; \
+		echo "         export ESDK_TESTSERVER_KMS_MRK_ARN=<arn>" >&2; \
+		echo "         export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<arn>" >&2; \
+		echo "         export ESDK_TESTSERVER_KMS_REGION=$(ESDK_TESTSERVER_KMS_REGION)  # optional" >&2; \
+		echo "       (Get the ARNs from \`make deploy-kms-cdk\`.) Then re-run \`make test-kms\`." >&2; \
+		exit 1; \
+	fi
+	@echo "==> Running Tests WITH online KMS scenarios (region $${ESDK_TESTSERVER_KMS_REGION:-$(ESDK_TESTSERVER_KMS_REGION)})"
+	@echo "    (real AWS KMS calls happen on encrypt/decrypt; requires valid AWS credentials.)"
+	@cd "$(TESTS_DIR)" && ./gradlew test \
+		-Desdk.testserver.kms.symmetricKeyArn="$$ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN" \
+		-Desdk.testserver.kms.mrkArn="$$ESDK_TESTSERVER_KMS_MRK_ARN" \
+		-Desdk.testserver.kms.rsaKeyArn="$$ESDK_TESTSERVER_KMS_RSA_KEY_ARN" \
+		-Desdk.testserver.kms.region="$${ESDK_TESTSERVER_KMS_REGION:-$(ESDK_TESTSERVER_KMS_REGION)}"
 
 # ----------------------------------------------------------------------------
 clean: ## gradle clean in every module + remove Makefile temp files

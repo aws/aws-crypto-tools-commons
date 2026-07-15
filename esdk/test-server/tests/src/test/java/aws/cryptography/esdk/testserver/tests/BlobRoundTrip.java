@@ -62,9 +62,11 @@ public final class BlobRoundTrip {
      * Broadened blob round-trip (Task 14.3): the same single body as {@link
      * #run(EndpointPair, byte[])}, but driven by an offline {@link Scenario}
      * (arbitrary supported keyring/CMM/algorithm-suite combination) and an
-     * encryption context. The scenario's single config builds BOTH the encrypt
-     * and decrypt client, so the material is compatible and {@code
-     * decrypt(encrypt(x)) == x} holds byte-for-byte (Requirements 4.2, 4.3, 4.4).
+     * encryption context. The scenario's {@code config} builds the encrypt client
+     * and {@link Scenario#decryptConfigOrDefault()} builds the decrypt client
+     * (usually the same config, but distinct for the {@code AwsKmsDiscovery}
+     * scenario), so the material is compatible and {@code decrypt(encrypt(x)) == x}
+     * holds byte-for-byte (Requirements 4.2, 4.3, 4.4).
      *
      * <p>The {@code encryptionContext} is applied on encrypt and supplied again on
      * decrypt (so a Required-Encryption-Context CMM can reconstruct its required
@@ -79,7 +81,8 @@ public final class BlobRoundTrip {
         String encryptClientId = encryptClient.createClient(
             CreateClientInput.builder().config(scenario.config()).build()).getClientId();
         String decryptClientId = decryptClient.createClient(
-            CreateClientInput.builder().config(scenario.config()).build()).getClientId();
+            CreateClientInput.builder().config(scenario.decryptConfigOrDefault()).build())
+            .getClientId();
 
         EncryptInput.Builder encryptInput = EncryptInput.builder()
             .clientId(encryptClientId)

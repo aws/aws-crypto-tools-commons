@@ -1,0 +1,17 @@
+# Node dependencies
+node_modules/
+
+# CDK synth output
+cdk.out/
+cdk.context.json
+
+# Compiled TypeScript outputs
+*.js
+*.d.ts
+!jest.config.js
+
+# Test / coverage
+coverage/
+
+# Logs
+*.log

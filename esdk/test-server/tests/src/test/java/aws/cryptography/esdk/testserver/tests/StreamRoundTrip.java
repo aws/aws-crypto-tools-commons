@@ -84,8 +84,9 @@ public final class StreamRoundTrip {
      * #run(EndpointPair, byte[])}, but driven by an offline {@link Scenario}
      * (arbitrary supported keyring/CMM/algorithm-suite combination) and an
      * encryption context, mirroring {@link BlobRoundTrip#run(EndpointPair, byte[],
-     * Scenario, Map)}. The scenario's single config builds BOTH the encrypt and
-     * decrypt client, so the material is compatible and {@code
+     * Scenario, Map)}. The scenario's {@code config} builds the encrypt client and
+     * {@link Scenario#decryptConfigOrDefault()} builds the decrypt client (usually
+     * the same config), so the material is compatible and {@code
      * decryptStream(encryptStream(x)) == x} holds byte-for-byte (Requirements 4.5,
      * 4.6, 4.9).
      *
@@ -106,7 +107,8 @@ public final class StreamRoundTrip {
         String encryptClientId = encryptClient.createClient(
             CreateClientInput.builder().config(scenario.config()).build()).getClientId();
         String decryptClientId = decryptClient.createClient(
-            CreateClientInput.builder().config(scenario.config()).build()).getClientId();
+            CreateClientInput.builder().config(scenario.decryptConfigOrDefault()).build())
+            .getClientId();
 
         EncryptStreamInput.Builder encryptInput = EncryptStreamInput.builder()
             .clientId(encryptClientId)

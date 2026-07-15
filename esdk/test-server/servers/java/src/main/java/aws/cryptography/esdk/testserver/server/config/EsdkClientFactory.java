@@ -1,13 +1,16 @@
 package aws.cryptography.esdk.testserver.server.config;
 
+import aws.cryptography.esdk.testserver.server.model.AwsKmsDiscoveryKeyringConfig;
 import aws.cryptography.esdk.testserver.server.model.AwsKmsKeyringConfig;
 import aws.cryptography.esdk.testserver.server.model.AwsKmsMrkKeyringConfig;
 import aws.cryptography.esdk.testserver.server.model.AwsKmsMultiKeyringConfig;
+import aws.cryptography.esdk.testserver.server.model.AwsKmsRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.server.model.CachingCmmConfig;
 import aws.cryptography.esdk.testserver.server.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.server.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.server.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.server.model.Keyring;
+import aws.cryptography.esdk.testserver.server.model.KmsRsaEncryptionAlgorithm;
 import aws.cryptography.esdk.testserver.server.model.MultiKeyringConfig;
 import aws.cryptography.esdk.testserver.server.model.RawAesKeyringConfig;
 import aws.cryptography.esdk.testserver.server.model.RawRsaKeyringConfig;
@@ -15,14 +18,21 @@ import aws.cryptography.esdk.testserver.server.model.RequiredEncryptionContextCm
 import aws.cryptography.esdk.testserver.server.registry.EsdkClient;
 import aws.cryptography.esdk.testserver.server.registry.RealEsdkClient;
 import com.amazonaws.encryptionsdk.CommitmentPolicy;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.kms.model.EncryptionAlgorithmSpec;
+import software.amazon.awssdk.services.kms.model.GetPublicKeyRequest;
 import software.amazon.cryptography.materialproviders.ICryptographicMaterialsManager;
 import software.amazon.cryptography.materialproviders.IKeyring;
 import software.amazon.cryptography.materialproviders.MaterialProviders;
 import software.amazon.cryptography.materialproviders.model.AesWrappingAlg;
-import software.amazon.cryptography.materialproviders.model.CreateAwsKmsMrkMultiKeyringInput;
+import software.amazon.cryptography.materialproviders.model.CreateAwsKmsDiscoveryKeyringInput;
+import software.amazon.cryptography.materialproviders.model.CreateAwsKmsKeyringInput;
+import software.amazon.cryptography.materialproviders.model.CreateAwsKmsMrkKeyringInput;
 import software.amazon.cryptography.materialproviders.model.CreateAwsKmsMultiKeyringInput;
+import software.amazon.cryptography.materialproviders.model.CreateAwsKmsRsaKeyringInput;
 import software.amazon.cryptography.materialproviders.model.CreateDefaultCryptographicMaterialsManagerInput;
 import software.amazon.cryptography.materialproviders.model.CreateMultiKeyringInput;
 import software.amazon.cryptography.materialproviders.model.CreateRawAesKeyringInput;
@@ -46,12 +56,22 @@ import software.amazon.cryptography.materialproviders.model.PaddingScheme;
  * {@code CreateClient} handler maps that to a {@code GenericServerError} and
  * leaves the registry unchanged (Requirement 3.6).
  *
- * <p>Scope note (this pass): the offline-capable variants used by the round-trip
+ * <p>Scope note: the offline-capable variants used by the offline round-trip
  * tests — Raw AES, Raw RSA, Multi, and the Default / RequiredEncryptionContext
- * CMMs — are fully wired. The AWS KMS keyrings are constructed (no network at
- * construction; network only on encrypt/decrypt). The Caching CMM and the KMS
- * RSA / discovery keyrings are not wired in this pass and cause a construction
- * failure (GenericServerError) if requested.
+ * CMMs — are fully wired. All five AWS KMS keyring variants are also fully wired
+ * (task 15.3): {@code AwsKms} (single symmetric key), {@code AwsKmsMrk} (single
+ * multi-region key), {@code AwsKmsMultiKeyring} (generator + child keys),
+ * {@code AwsKmsRsa} (asymmetric RSA key), and {@code AwsKmsDiscovery} (discovery
+ * keyring). Every KMS keyring is <em>constructed</em> without a network call —
+ * the KMS client is built eagerly but is not invoked — so {@code CreateClient}
+ * stays offline; the real AWS KMS calls happen only on {@code Encrypt}/{@code
+ * Decrypt} (Requirements 14.1, 14.3, 14.4, 14.14). The single exception is the
+ * {@code AwsKmsRsa} keyring when the modeled config omits the RSA public key: in
+ * that case the factory fetches it once via {@code kms:GetPublicKey} at
+ * construction (a network call the design explicitly permits at
+ * {@code CreateClient} time); supplying {@code publicKey} in the config keeps
+ * construction fully offline. The Caching CMM remains unwired and causes a
+ * construction failure (GenericServerError) if requested (Requirement 3.6).
  */
 public final class EsdkClientFactory {
 
@@ -114,6 +134,8 @@ public final class EsdkClientFactory {
         AwsKmsKeyringConfig awsKms = keyring.getAwsKms();
         AwsKmsMrkKeyringConfig awsKmsMrk = keyring.getAwsKmsMrk();
         AwsKmsMultiKeyringConfig awsKmsMulti = keyring.getAwsKmsMultiKeyring();
+        AwsKmsRsaKeyringConfig awsKmsRsa = keyring.getAwsKmsRsa();
+        AwsKmsDiscoveryKeyringConfig awsKmsDiscovery = keyring.getAwsKmsDiscovery();
 
         if (rawAes != null) {
             return materialProviders.CreateRawAesKeyring(
@@ -150,13 +172,26 @@ public final class EsdkClientFactory {
             return materialProviders.CreateMultiKeyring(builder.build());
         }
         if (awsKms != null) {
-            // Constructs the KMS client but performs no network call until use.
-            return materialProviders.CreateAwsKmsMultiKeyring(
-                CreateAwsKmsMultiKeyringInput.builder().generator(awsKms.getKmsKeyId()).build());
+            // Single symmetric KMS key -> the single-key KMS keyring (the faithful
+            // mapping for one symmetric key). The KMS client is built eagerly; no
+            // network call happens until Encrypt/Decrypt (Requirement 14.1, 14.14).
+            CreateAwsKmsKeyringInput.Builder builder = CreateAwsKmsKeyringInput.builder()
+                .kmsKeyId(awsKms.getKmsKeyId())
+                .kmsClient(kmsClient());
+            if (awsKms.hasGrantTokens() && !awsKms.getGrantTokens().isEmpty()) {
+                builder.grantTokens(new ArrayList<>(awsKms.getGrantTokens()));
+            }
+            return materialProviders.CreateAwsKmsKeyring(builder.build());
         }
         if (awsKmsMrk != null) {
-            return materialProviders.CreateAwsKmsMrkMultiKeyring(
-                CreateAwsKmsMrkMultiKeyringInput.builder().generator(awsKmsMrk.getKmsKeyId()).build());
+            // Single multi-region key -> the single-key MRK-aware KMS keyring.
+            CreateAwsKmsMrkKeyringInput.Builder builder = CreateAwsKmsMrkKeyringInput.builder()
+                .kmsKeyId(awsKmsMrk.getKmsKeyId())
+                .kmsClient(kmsClient());
+            if (awsKmsMrk.hasGrantTokens() && !awsKmsMrk.getGrantTokens().isEmpty()) {
+                builder.grantTokens(new ArrayList<>(awsKmsMrk.getGrantTokens()));
+            }
+            return materialProviders.CreateAwsKmsMrkKeyring(builder.build());
         }
         if (awsKmsMulti != null) {
             CreateAwsKmsMultiKeyringInput.Builder builder = CreateAwsKmsMultiKeyringInput.builder();
@@ -166,10 +201,102 @@ public final class EsdkClientFactory {
             if (awsKmsMulti.hasKmsKeyIds()) {
                 builder.kmsKeyIds(new ArrayList<>(awsKmsMulti.getKmsKeyIds()));
             }
+            if (awsKmsMulti.hasGrantTokens() && !awsKmsMulti.getGrantTokens().isEmpty()) {
+                builder.grantTokens(new ArrayList<>(awsKmsMulti.getGrantTokens()));
+            }
             return materialProviders.CreateAwsKmsMultiKeyring(builder.build());
         }
-        throw new UnsupportedOperationException(
-            "Keyring variant is not wired in this pass of the ESDK TestServer");
+        if (awsKmsRsa != null) {
+            return buildAwsKmsRsaKeyring(awsKmsRsa);
+        }
+        if (awsKmsDiscovery != null) {
+            return buildAwsKmsDiscoveryKeyring(awsKmsDiscovery);
+        }
+        throw new IllegalArgumentException("Keyring had no variant member set");
+    }
+
+    /**
+     * Build the AWS KMS RSA keyring (Requirement 14.3, 14.4). The keyring needs
+     * the RSA <em>public key</em> bytes (for encrypt), the KMS key id/ARN and a KMS
+     * client (for decrypt, which calls {@code kms:Decrypt}), and an RSAES-OAEP
+     * encryption algorithm mapped from the modeled {@link KmsRsaEncryptionAlgorithm}.
+     *
+     * <p>Public-key sourcing: if the modeled config carries {@code publicKey}, it
+     * is used and construction stays fully offline. Otherwise the factory fetches
+     * it once via {@code kms:GetPublicKey} — a network call the design permits at
+     * {@code CreateClient} time (KMS scenarios only run when credentials are
+     * present). Either way, no encrypt/decrypt happens at construction.
+     */
+    private IKeyring buildAwsKmsRsaKeyring(AwsKmsRsaKeyringConfig config) {
+        KmsClient kmsClient = kmsClient();
+        ByteBuffer publicKey = config.getPublicKey();
+        if (publicKey == null) {
+            // Fetch the RSA public key once from KMS (network call at construction).
+            publicKey = kmsClient.getPublicKey(
+                    GetPublicKeyRequest.builder().keyId(config.getKmsKeyId()).build())
+                .publicKey()
+                .asByteBuffer();
+        }
+        CreateAwsKmsRsaKeyringInput.Builder builder = CreateAwsKmsRsaKeyringInput.builder()
+            .kmsKeyId(config.getKmsKeyId())
+            .publicKey(publicKey)
+            .encryptionAlgorithm(toEncryptionAlgorithmSpec(config.getEncryptionAlgorithm()))
+            .kmsClient(kmsClient);
+        if (config.hasGrantTokens() && !config.getGrantTokens().isEmpty()) {
+            builder.grantTokens(new ArrayList<>(config.getGrantTokens()));
+        }
+        return materialProviders.CreateAwsKmsRsaKeyring(builder.build());
+    }
+
+    /**
+     * Build the AWS KMS discovery keyring (Requirement 14.3, 14.4). A discovery
+     * keyring is decrypt-only: it needs a KMS client (its region comes from the
+     * ambient AWS region / credentials the online Tests supply) and, optionally, a
+     * discovery filter scoping decrypt to a partition + account ids. On the
+     * round-trip it pairs with an encrypting KMS keyring on the encrypt leg.
+     */
+    private IKeyring buildAwsKmsDiscoveryKeyring(AwsKmsDiscoveryKeyringConfig config) {
+        CreateAwsKmsDiscoveryKeyringInput.Builder builder = CreateAwsKmsDiscoveryKeyringInput.builder()
+            .kmsClient(kmsClient());
+        aws.cryptography.esdk.testserver.server.model.DiscoveryFilter modeledFilter =
+            config.getDiscoveryFilter();
+        if (modeledFilter != null) {
+            builder.discoveryFilter(
+                software.amazon.cryptography.materialproviders.model.DiscoveryFilter.builder()
+                    .partition(modeledFilter.getPartition())
+                    .accountIds(new ArrayList<>(modeledFilter.getAccountIds()))
+                    .build());
+        }
+        if (config.hasGrantTokens() && !config.getGrantTokens().isEmpty()) {
+            builder.grantTokens(new ArrayList<>(config.getGrantTokens()));
+        }
+        return materialProviders.CreateAwsKmsDiscoveryKeyring(builder.build());
+    }
+
+    /**
+     * Construct an AWS KMS client. Building the client performs no network call;
+     * the region is resolved from the ambient AWS region provider chain (the
+     * {@code AWS_REGION} / configured region the online KMS Tests supply). Key-ARN
+     * based keyrings encode their own region, but the client is supplied so
+     * discovery (which has no key ARN) and RSA (GetPublicKey) can reach KMS.
+     */
+    private static KmsClient kmsClient() {
+        return KmsClient.create();
+    }
+
+    private static EncryptionAlgorithmSpec toEncryptionAlgorithmSpec(
+        KmsRsaEncryptionAlgorithm algorithm) {
+        if (algorithm == null) {
+            throw new IllegalArgumentException(
+                "AwsKmsRsa keyring requires an encryptionAlgorithm (RSAES_OAEP_SHA_1 "
+                    + "or RSAES_OAEP_SHA_256)");
+        }
+        return switch (algorithm.getValue()) {
+            case "RSAES_OAEP_SHA_1" -> EncryptionAlgorithmSpec.RSAES_OAEP_SHA_1;
+            case "RSAES_OAEP_SHA_256" -> EncryptionAlgorithmSpec.RSAES_OAEP_SHA_256;
+            default -> throw new IllegalArgumentException(
+                "Unknown KMS RSA encryption algorithm: " + algorithm.getValue());
+        };
     }
 
     private static CommitmentPolicy toCommitmentPolicy(String value) {
