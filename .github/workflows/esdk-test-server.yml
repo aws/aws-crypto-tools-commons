@@ -26,11 +26,15 @@
 # (Requirements 14.8, 14.9). This workflow must therefore supply AWS credentials
 # for the run to pass:
 #   * permissions: { id-token: write }  — for the GitHub OIDC token exchange.
-#   * a `configure-aws-credentials@v4` step guarded by the repo variable
-#     `ESDK_TEST_SERVER_KMS_ROLE_ARN` (so it does not error confusingly when
-#     unset). If the role variable is absent (e.g. a fork PR, or a repo that has
-#     not configured it) NO credentials are available and the required KMS
-#     scenarios FAIL — there is no offline-only green path for a full run.
+#   * a fail-fast guard that stops the run early with an actionable message when
+#     the `ESDK_TEST_SERVER_KMS_ROLE_ARN` repo VARIABLE is missing (rather than a
+#     deep "Unable to load credentials" error from inside the server), followed by
+#     a `configure-aws-credentials@v4` step and an `aws sts get-caller-identity`
+#     sanity check. If the role variable is absent (e.g. a fork PR, or a repo that
+#     has not configured it) the run FAILS — there is no offline-only green path.
+#   * GRADLE_OPTS=-Dorg.gradle.daemon=false (job env) so Gradle never reuses a
+#     daemon with a stale, credential-free environment; every Gradle invocation
+#     (and the in-process server JVM it forks) uses the live step environment.
 #   * OPTIONAL KMS_Test_Resources ARN overrides exported as `ESDK_TESTSERVER_KMS_*`
 #     environment variables (read by KmsRuntimeConfig); omitted, the built-in
 #     default ARNs (the shared keys) are used. Env vars are used rather than
@@ -91,6 +95,13 @@ jobs:
     env:
       AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      # Disable the Gradle daemon for the whole job. A daemon captures its
+      # environment at start and reuses it across builds, so short-lived OIDC
+      # AWS_* credentials configured by an earlier step would NOT reach the
+      # daemon-forked server/Tests JVMs. Running daemon-less makes every Gradle
+      # invocation (and the server JVM it forks) use the live step environment,
+      # which has the credentials.
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
 
     steps:
       - name: Checkout
@@ -144,28 +155,44 @@ jobs:
           sudo "$tmp/smithy-cli-linux-x86_64/install"
           smithy --version
 
-      - name: Configure AWS credentials via OIDC (gated — only when KMS role is set)
-        # Runs ONLY when the repo variable ESDK_TEST_SERVER_KMS_ROLE_ARN is
-        # configured. Assumes the CDK-created OIDC role (least-privilege KMS on
-        # the three keys) and exports short-lived AWS_* credentials + AWS_REGION
-        # as environment variables for the subsequent steps (Requirements 14.11,
-        # 14.12). The KMS scenarios are REQUIRED, so when the variable is absent
-        # (e.g. a fork PR) this step is skipped, no credentials are present, and
-        # the required KMS scenarios FAIL the run (Requirements 14.8, 14.9) —
-        # configure the role variable for the run to pass.
+      - name: Require the KMS OIDC role variable (KMS scenarios are required)
+        # The KMS keyring scenarios are REQUIRED (Requirements 14.8, 14.9), so a
+        # run cannot pass without AWS credentials. Fail fast with an actionable
+        # message when the role variable is missing, instead of surfacing a deep
+        # "Unable to load credentials" error from inside the server later.
+        #
+        # NOTE: this reads a repository VARIABLE (`vars.`), not a secret. Set it
+        # under Settings → Secrets and variables → Actions → **Variables**.
+        if: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN == '' }}
+        run: |
+          echo "::error::ESDK_TEST_SERVER_KMS_ROLE_ARN repository VARIABLE is not set." >&2
+          echo "The KMS keyring scenarios are required and need AWS credentials via GitHub OIDC." >&2
+          echo "Set ESDK_TEST_SERVER_KMS_ROLE_ARN (and optionally the KMS key ARN vars) under" >&2
+          echo "Settings -> Secrets and variables -> Actions -> Variables, using the CDK stack's" >&2
+          echo "EsdkTestServerKmsStack CfnOutput 'roleArn'. It must be a VARIABLE, not a secret." >&2
+          exit 1
+
+      - name: Configure AWS credentials via OIDC
+        # Assumes the CDK-created OIDC role (least-privilege KMS on the three
+        # keys) and exports short-lived AWS_* credentials + AWS_REGION as
+        # environment variables for the subsequent steps (Requirements 14.11,
+        # 14.12).
         #
         # ORDER MATTERS: this runs BEFORE the first Gradle invocation (Build all
-        # modules) so that the long-lived Gradle daemon — and every server/Tests
-        # JVM it later forks — starts with the AWS_* credentials and region in its
-        # environment. A Gradle daemon captures its environment at start and does
-        # not pick up variables exported by later steps, so configuring
-        # credentials after the build would leave the nested server JVM without
-        # them.
-        if: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN != '' }}
+        # modules) so the credentials are present in the environment every Gradle
+        # invocation (and the server JVM it forks) inherits. Combined with the
+        # daemon-less GRADLE_OPTS above, the in-process server's KMS client always
+        # sees these credentials.
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN }}
           aws-region: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+
+      - name: Verify AWS credentials are active (sanity check)
+        # Confirms the assumed-role credentials resolve before the build/run, so a
+        # later KMS failure can be attributed to the code path rather than to
+        # missing credentials. Prints the assumed role ARN / account (not secrets).
+        run: aws sts get-caller-identity
 
       - name: Validate model (smithy validate + model smoke checks)
         working-directory: esdk/test-server
