@@ -97,17 +97,26 @@ named `blob[awsKms]` / `stream[awsKmsMrk]` / … execution. Unlike the offline R
 scenarios, these are **online**: they make real AWS KMS calls on encrypt/decrypt, so they
 require **AWS credentials** and network access.
 
-They are **credential-gated** (`KmsRuntimeConfig.isKmsAvailable()`): the KMS scenarios are
-contributed to `EsdkClientConfigs.scenarios()` **only** when a complete KMS runtime config
-(all three key ARNs) **and** resolvable AWS credentials are present. When either is absent —
-the default for `./gradlew test`, CI without the KMS repo vars, or a fork PR — the KMS
-scenarios are **skipped** (not failed) and the offline suite runs to a pass with no AWS
-access (Requirements 14.8, 14.9).
+They are **required**: the KMS scenarios are always contributed to
+`EsdkClientConfigs.scenarios()` and always run against the `KMS_Test_Resources` (whose ARNs
+default — see below — so no configuration is needed to target the shared keys). They appear
+in the report as `blob[awsKms]`, `stream[awsKmsMrk]`, … , and **a run does not pass unless
+they run and pass** (Requirements 14.8, 14.9). There is no offline skip: `make test`,
+`make orchestrate`, and CI all require **AWS credentials** (developer credentials locally,
+GitHub OIDC in CI). Without usable credentials the KMS scenarios fail and the run fails.
+
+Only the arbitrary-plaintext property tests (`BlobRoundTripPropertyTest`,
+`StreamRoundTripPropertyTest`) are credential-free: they draw from
+`EsdkClientConfigs.offlineScenarios()` and never touch KMS.
 
 ### KMS runtime configuration (Requirement 14.7)
 
-The KMS key ARNs and region are read from runtime configuration only (never hardcoded), in
-precedence order system property, then environment variable:
+The KMS key ARNs and region are read in precedence order system property, then environment
+variable, then a **built-in default** — the ARNs of the shared `KMS_Test_Resources` the
+`cdk/` stack deploys into the CI-resources account. Those defaults are KMS key ARNs, not
+secrets (their use is still gated by AWS credentials), so a developer or CI job with
+credentials for that account needs no extra configuration; override them when deploying the
+stack into a different account:
 
 | System property | Environment variable | Meaning |
 |---|---|---|
@@ -116,28 +125,34 @@ precedence order system property, then environment variable:
 | `esdk.testserver.kms.rsaKeyArn` | `ESDK_TESTSERVER_KMS_RSA_KEY_ARN` | asymmetric RSA KMS key → `AwsKmsRsa` |
 | `esdk.testserver.kms.region` | `ESDK_TESTSERVER_KMS_REGION` | AWS region (default `us-west-2`) |
 
-These values come from the CDK `EsdkTestServerKmsStack` `CfnOutput`s (`symmetricKeyArn`,
-`mrkArn`, `rsaKeyArn`).
+The default ARNs are the CDK `EsdkTestServerKmsStack` `CfnOutput`s (`symmetricKeyArn`,
+`mrkArn`, `rsaKeyArn`); a fresh deploy into another account prints new ones to override with.
 
-### Enabling the KMS scenarios locally
+### Running the KMS scenarios locally
 
-From the TestServer root (`esdk/test-server`), using the Makefile targets (Task 15.8):
+The KMS scenarios are required, so `make test` runs them against the default
+`KMS_Test_Resources` — you only need valid AWS credentials for the account that owns those
+keys. From the TestServer root (`esdk/test-server`):
 
 ```bash
-# 1. Obtain developer AWS credentials for the target account so that
-#    `aws sts get-caller-identity` succeeds (Amazon: run `creds`).
+# 1. Obtain developer AWS credentials for the account that owns the default
+#    KMS_Test_Resources so that `aws sts get-caller-identity` succeeds
+#    (Amazon: run `creds`).
 creds   # or your environment's equivalent (ada / aws sso login)
 
-# 2. Provision the KMS_Test_Resources once and note the printed CfnOutputs.
-make deploy-kms-cdk
+# 2. Run the full suite — the KMS scenarios run against the default ARNs.
+make test
+```
 
-# 3. Export the three key ARNs (region optional; defaults to us-west-2).
+If the shared keys have not been provisioned yet (fresh account), deploy them once with
+`make deploy-kms-cdk` and note the printed `CfnOutput`s. To target a **different** set of
+keys (e.g. a stack deployed into another account), override the ARNs and run `make test-kms`:
+
+```bash
 export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<symmetricKeyArn>
 export ESDK_TESTSERVER_KMS_MRK_ARN=<mrkArn>
 export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<rsaKeyArn>
 export ESDK_TESTSERVER_KMS_REGION=us-west-2   # optional
-
-# 4. Run the Tests WITH the online KMS scenarios included.
 make test-kms
 ```
 

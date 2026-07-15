@@ -159,8 +159,11 @@ build-tests: check-java ## Build the Tests suite (tests, skips tests)
 	@cd "$(TESTS_DIR)" && ./gradlew build -x test
 
 # ----------------------------------------------------------------------------
-test: check-java ## Run the Tests; harness boots the server in-process (recommended)
+test: check-java ## Run the Tests (boots the server in-process). KMS scenarios are REQUIRED: needs AWS creds
 	@echo "==> Running in-process round trip (tests/)"
+	@echo "    NOTE: the KMS keyring scenarios are required and run against the default"
+	@echo "    KMS_Test_Resources, so valid AWS credentials must be present (e.g. run \`creds\`)."
+	@echo "    Override the default key ARNs with ESDK_TESTSERVER_KMS_* (see test-kms)."
 	@cd "$(TESTS_DIR)" && ./gradlew test
 
 # ----------------------------------------------------------------------------
@@ -246,16 +249,18 @@ orchestrate-test: check-java ## Run the orchestrator's property + integration te
 	@cd "$(ORCH_DIR)" && ./gradlew --console=plain test
 
 # ----------------------------------------------------------------------------
-# ONLINE AWS KMS keyring coverage (task 15, credential-gated).
+# ONLINE AWS KMS keyring coverage (task 15) — REQUIRED.
 # ----------------------------------------------------------------------------
 # The KMS keyring scenarios (AwsKms / AwsKmsMrk / AwsKmsMultiKeyring / AwsKmsRsa
-# / AwsKmsDiscovery) are ONLINE: they make real AWS KMS calls on encrypt/decrypt
-# and therefore need AWS credentials AND the KMS_Test_Resources ARNs. They are
-# contributed to the Tests ONLY when both are present (the KmsRuntimeConfig
-# gate); without them the Tests SKIP the KMS scenarios and the offline suite
-# still passes — so `make test` / `make orchestrate` never require AWS access.
+# / AwsKmsDiscovery) are ONLINE: they make real AWS KMS calls on encrypt/decrypt.
+# They are REQUIRED and ALWAYS run against the KMS_Test_Resources, whose ARNs
+# default in KmsRuntimeConfig — so `make test` / `make orchestrate` need valid
+# AWS credentials (e.g. run `creds`) and a run does NOT pass unless the KMS
+# scenarios run and pass. `test-kms` below is a convenience for pointing the
+# Tests at a DIFFERENT set of keys by exporting the ESDK_TESTSERVER_KMS_* ARNs;
+# for the default keys, plain `make test` already includes the KMS scenarios.
 #
-# Local flow to run the KMS Tests:
+# Local flow to run the KMS Tests against a non-default key set:
 #   1. Obtain developer AWS credentials for the CI resources account (Amazon:
 #      run `creds` / `ada credentials update ...` / `aws sso login` — whatever
 #      your environment uses so `aws sts get-caller-identity` succeeds).

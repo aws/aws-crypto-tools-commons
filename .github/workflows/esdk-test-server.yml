@@ -9,45 +9,48 @@
 # prefix instead of a subdirectory: `esdk-` marks this as the ESDK TestServer
 # workflow. Future products get e.g. `s3ec-test-server.yml`, and so on.
 #
-# WHAT THIS RUNS: the commons ESDK TestServer is currently JAVA-ONLY. Its blob
-# round-trip uses an OFFLINE Raw-AES keyring — no AWS account, no KMS, no
-# network. The root Makefile's orchestrator already does build + launch + run +
-# report in one shot, so this workflow stays simple and self-contained: set up
-# a JDK, validate the model, build the modules, and run the orchestrated
-# end-to-end round trip. Contrast this with the multi-language S3EC reusable
+# WHAT THIS RUNS: the commons ESDK TestServer is currently JAVA-ONLY. It runs
+# offline Raw-AES/Raw-RSA round-trips AND the required online AWS KMS keyring
+# round-trips (which need AWS credentials — see AWS/KMS below). The root
+# Makefile's orchestrator already does build + launch + run + report in one shot,
+# so this workflow stays simple and self-contained: set up a JDK, validate the
+# model, build the modules, configure AWS credentials via OIDC, and run the
+# orchestrated end-to-end round trip. Contrast this with the multi-language S3EC reusable
 # workflow (Ruby/PHP/Go/C++ + AWS creds + KMS orchestrated via make
 # build/start/wait/run/stop) that inspired the shape here.
 #
-# AWS/KMS (ONLINE, CREDENTIAL-GATED — task 15.7): the offline Raw-AES/Raw-RSA
-# blob & stream round trips always run with NO AWS access. The KMS keyring
-# scenarios (AwsKms/AwsKmsMrk/AwsKmsMultiKeyring/AwsKmsRsa/AwsKmsDiscovery) are
-# ONLINE and are contributed to the Tests only when a complete KMS runtime
-# config AND resolvable AWS credentials are present (the KmsRuntimeConfig gate,
-# Requirements 14.8, 14.9). This workflow wires those in, GATED so the offline
-# path is untouched when the repo has no KMS role/vars configured:
+# AWS/KMS (ONLINE, REQUIRED — task 15.7): the KMS keyring scenarios
+# (AwsKms/AwsKmsMrk/AwsKmsMultiKeyring/AwsKmsRsa/AwsKmsDiscovery) are ONLINE and
+# REQUIRED — they always run against the KMS_Test_Resources (whose ARNs default
+# in KmsRuntimeConfig) and a run does NOT pass unless they run and pass
+# (Requirements 14.8, 14.9). This workflow must therefore supply AWS credentials
+# for the run to pass:
 #   * permissions: { id-token: write }  — for the GitHub OIDC token exchange.
-#   * a `configure-aws-credentials@v4` step that runs ONLY when the repo
-#     variable `ESDK_TEST_SERVER_KMS_ROLE_ARN` is set (otherwise no creds → the
-#     gate is not satisfied → KMS scenarios are skipped, offline suite passes).
-#   * the KMS_Test_Resources coordinates exported as `ESDK_TESTSERVER_KMS_*`
-#     environment variables (read by KmsRuntimeConfig). Env vars are used rather
-#     than `-Desdk.testserver.kms.*` on the make process because the KMS Tests
-#     run in a nested JVM the orchestrator launches, which inherits the parent
-#     ENVIRONMENT but not the make process's system properties.
+#   * a `configure-aws-credentials@v4` step guarded by the repo variable
+#     `ESDK_TEST_SERVER_KMS_ROLE_ARN` (so it does not error confusingly when
+#     unset). If the role variable is absent (e.g. a fork PR, or a repo that has
+#     not configured it) NO credentials are available and the required KMS
+#     scenarios FAIL — there is no offline-only green path for a full run.
+#   * OPTIONAL KMS_Test_Resources ARN overrides exported as `ESDK_TESTSERVER_KMS_*`
+#     environment variables (read by KmsRuntimeConfig); omitted, the built-in
+#     default ARNs (the shared keys) are used. Env vars are used rather than
+#     `-Desdk.testserver.kms.*` on the make process because the KMS Tests run in a
+#     nested JVM the orchestrator launches, which inherits the parent ENVIRONMENT
+#     but not the make process's system properties.
 #
-# REQUIRED REPO VARIABLES/SECRETS (configure under Settings → Secrets and
-# variables → Actions → Variables) to enable the KMS scenarios:
+# REQUIRED REPO VARIABLE (configure under Settings → Secrets and variables →
+# Actions → Variables) for the required KMS scenarios to pass:
 #   * vars.ESDK_TEST_SERVER_KMS_ROLE_ARN           — IAM role ARN from the CDK
-#         EsdkTestServerKmsStack (the OIDC role); its presence GATES the creds
-#         step and the whole KMS path.
+#         EsdkTestServerKmsStack (the OIDC role); its presence enables the creds
+#         step. Without it, no credentials are available and the required KMS
+#         scenarios FAIL the run.
+# OPTIONAL repo variables to target a NON-default key set (otherwise the built-in
+# default ARNs for the shared KMS_Test_Resources are used):
 #   * vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN  — symmetric KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_MRK_ARN            — multi-region KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN        — asymmetric RSA KMS key ARN.
-#   * vars.ESDK_TEST_SERVER_KMS_REGION             — AWS region (optional;
-#         defaults to us-west-2).
-# All five come from the CDK stack's CfnOutputs (Requirement 14.13). When they
-# are absent (e.g. a fork PR), the creds step is skipped and only the offline
-# suite runs.
+#   * vars.ESDK_TEST_SERVER_KMS_REGION             — AWS region (default us-west-2).
+# All come from the CDK stack's CfnOutputs (Requirement 14.13).
 # ============================================================================
 
 name: ESDK TestServer
@@ -143,9 +146,10 @@ jobs:
         # configured. Assumes the CDK-created OIDC role (least-privilege KMS on
         # the three keys) and exports short-lived AWS_* credentials + AWS_REGION
         # as environment variables for the subsequent steps (Requirements 14.11,
-        # 14.12). When the variable is absent (e.g. a fork PR), this step is
-        # skipped, no credentials are present, and the KMS scenarios are skipped
-        # so the offline suite still runs (Requirements 14.8, 14.9).
+        # 14.12). The KMS scenarios are REQUIRED, so when the variable is absent
+        # (e.g. a fork PR) this step is skipped, no credentials are present, and
+        # the required KMS scenarios FAIL the run (Requirements 14.8, 14.9) —
+        # configure the role variable for the run to pass.
         if: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -159,12 +163,12 @@ jobs:
         # the headline. (An in-process `make test` is also available; the
         # orchestrated path supersedes it here.)
         #
-        # The ESDK_TESTSERVER_KMS_* environment variables carry the
-        # KMS_Test_Resources coordinates to the nested Tests JVM (read by
-        # KmsRuntimeConfig, Requirement 14.13). They resolve to EMPTY when the
-        # repo variables are unset, so the KMS gate is not satisfied and only the
-        # offline scenarios run; combined with the (skipped) creds step above,
-        # the offline path is completely untouched when KMS is not configured.
+        # The ESDK_TESTSERVER_KMS_* environment variables OPTIONALLY override the
+        # KMS_Test_Resources coordinates for the nested Tests JVM (read by
+        # KmsRuntimeConfig, Requirement 14.13). When the repo variables are unset
+        # they resolve to EMPTY and KmsRuntimeConfig falls back to the built-in
+        # default ARNs for the shared keys, so the required KMS scenarios still run
+        # (against the defaults) as long as the creds step above provided credentials.
         working-directory: esdk/test-server
         env:
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}

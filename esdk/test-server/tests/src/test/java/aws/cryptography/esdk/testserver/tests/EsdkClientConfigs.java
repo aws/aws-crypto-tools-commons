@@ -45,11 +45,14 @@ import java.util.List;
  * Tests dependent only on the one generated Test_Client.
  *
  * <p><strong>AWS KMS keyrings</strong> are contributed to {@link #scenarios()} as
- * online, credential-gated scenarios (task 15.5): they are added ONLY when a
- * complete {@link KmsRuntimeConfig} and resolvable AWS credentials are present
- * (the {@link KmsRuntimeConfig#isKmsAvailable()} gate), and omitted otherwise so
- * the offline suite still runs to a pass without AWS access (Requirements 14.8,
- * 14.9). The <strong>Caching CMM</strong> remains excluded from these round-trip
+ * online, <strong>required</strong> scenarios (task 15.5): they are always
+ * contributed and always run against the {@code KMS_Test_Resources}, whose ARNs
+ * default in {@link KmsRuntimeConfig} so no environment variables are needed to
+ * target the shared keys. A run does not pass unless these scenarios run and
+ * pass, so AWS credentials (developer credentials locally, GitHub OIDC in CI)
+ * must be present — there is no offline skip. Only {@link #offlineScenarios()} is
+ * credential-free; it feeds the arbitrary-plaintext property tests, which stay
+ * offline. The <strong>Caching CMM</strong> remains excluded from these round-trip
  * scenarios entirely:
  * the AWS Encryption SDK for Java 3.x + Material Providers Library 1.x expose no
  * MPL caching CMM over MPL keyrings offline (the legacy
@@ -187,17 +190,17 @@ public final class EsdkClientConfigs {
      */
     public static List<Scenario> scenarios() {
         List<Scenario> scenarios = new ArrayList<>(offlineScenarios());
-        // Online, credential-gated KMS scenarios (Requirements 14.1, 14.2, 14.8,
-        // 14.9). Contributed ONLY when a complete KmsRuntimeConfig and resolvable
-        // AWS credentials are present; otherwise omitted so MaterialsRoundTripTests
-        // simply does not include them (no failure) and the offline suite passes.
-        if (KmsRuntimeConfig.isKmsAvailable()) {
-            KmsRuntimeConfig kms = KmsRuntimeConfig.fromRuntime();
-            // Ensure the in-process Language_Server's KmsClient resolves the region
-            // the Tests were given (design: KMS runtime configuration).
-            kms.configureAwsRegion();
-            scenarios.addAll(kmsScenarios(kms));
-        }
+        // Online KMS scenarios (Requirements 14.1, 14.2). These are REQUIRED: they
+        // are always contributed and always run against the KMS_Test_Resources —
+        // whose ARNs default in KmsRuntimeConfig, so no environment variables are
+        // needed to target the shared keys — and a run does not pass unless they
+        // run and pass. AWS credentials (developer creds locally, OIDC in CI) must
+        // therefore be present; there is no offline skip.
+        KmsRuntimeConfig kms = KmsRuntimeConfig.fromRuntime();
+        // Ensure the in-process Language_Server's KmsClient resolves the configured
+        // region (design: KMS runtime configuration).
+        kms.configureAwsRegion();
+        scenarios.addAll(kmsScenarios(kms));
         return List.copyOf(scenarios);
     }
 
@@ -207,7 +210,7 @@ public final class EsdkClientConfigs {
      *     Default and Required-Encryption-Context CMMs, and committing /
      *     non-committing / no-KDF algorithm-suite selection. Always contributed.
      */
-    private static List<Scenario> offlineScenarios() {
+    public static List<Scenario> offlineScenarios() {
         return List.of(
             // Raw-AES + Default CMM (the baseline), client-default suite.
             new Scenario("rawAes+default",
