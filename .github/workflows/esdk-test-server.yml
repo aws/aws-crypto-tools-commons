@@ -81,6 +81,17 @@ jobs:
     # Pure-JVM build; ubuntu is sufficient (no macOS runner needed).
     runs-on: ubuntu-latest
 
+    # Default AWS region for the whole job so EVERY step — including the first
+    # Gradle invocation that starts the long-lived Gradle daemon — has AWS_REGION
+    # in its environment. Without this, the daemon (started by "Build all modules"
+    # BEFORE the credentials step) would spawn the nested server JVM with no
+    # region, and the server's KmsClient would fail region resolution. The OIDC
+    # credentials step may still override this with the same value; the server
+    # also defaults to us-west-2 as a final fallback (EsdkClientFactory).
+    env:
+      AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+
     steps:
       - name: Checkout
         # No submodules needed for the commons Java-only path.
@@ -133,14 +144,6 @@ jobs:
           sudo "$tmp/smithy-cli-linux-x86_64/install"
           smithy --version
 
-      - name: Validate model (smithy validate + model smoke checks)
-        working-directory: esdk/test-server
-        run: make validate
-
-      - name: Build all modules (compile/codegen, tests skipped)
-        working-directory: esdk/test-server
-        run: make build
-
       - name: Configure AWS credentials via OIDC (gated — only when KMS role is set)
         # Runs ONLY when the repo variable ESDK_TEST_SERVER_KMS_ROLE_ARN is
         # configured. Assumes the CDK-created OIDC role (least-privilege KMS on
@@ -150,11 +153,27 @@ jobs:
         # (e.g. a fork PR) this step is skipped, no credentials are present, and
         # the required KMS scenarios FAIL the run (Requirements 14.8, 14.9) —
         # configure the role variable for the run to pass.
+        #
+        # ORDER MATTERS: this runs BEFORE the first Gradle invocation (Build all
+        # modules) so that the long-lived Gradle daemon — and every server/Tests
+        # JVM it later forks — starts with the AWS_* credentials and region in its
+        # environment. A Gradle daemon captures its environment at start and does
+        # not pick up variables exported by later steps, so configuring
+        # credentials after the build would leave the nested server JVM without
+        # them.
         if: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN }}
           aws-region: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+
+      - name: Validate model (smithy validate + model smoke checks)
+        working-directory: esdk/test-server
+        run: make validate
+
+      - name: Build all modules (compile/codegen, tests skipped)
+        working-directory: esdk/test-server
+        run: make build
 
       - name: Orchestrate end-to-end round trip (headline check)
         # The orchestrator boots the Java Language_Server on its configured
