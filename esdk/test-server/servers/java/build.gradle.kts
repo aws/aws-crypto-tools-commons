@@ -40,6 +40,7 @@ val smithyJavaVersion: String by project
 val smithyProtocolTraitsVersion: String by project
 val esdkVersion: String by project
 val materialProvidersVersion: String by project
+val awsSdkKmsVersion: String by project
 val jqwikVersion: String by project
 val junitVersion: String by project
 
@@ -95,6 +96,14 @@ dependencies {
     // types directly, so declare the library explicitly (rather than leaning on
     // the ESDK's transitive compile scope). Version aligned with the ESDK.
     implementation("software.amazon.cryptography:aws-cryptographic-material-providers:$materialProvidersVersion")
+    // The AWS SDK KMS client. The Material Providers library above declares this
+    // only at `runtime` scope, but the EsdkClientFactory references KmsClient,
+    // EncryptionAlgorithmSpec, and GetPublicKeyRequest directly to fully wire the
+    // five KMS keyring variants (AwsKms/AwsKmsMrk/AwsKmsMultiKeyring/AwsKmsRsa/
+    // AwsKmsDiscovery, task 15.3), so it must be on the compile classpath. Pinned
+    // to the version the Material Providers BOM (2.26.3) resolves. Construction of
+    // a KMS keyring performs no network call; only Encrypt/Decrypt reach AWS KMS.
+    implementation("software.amazon.awssdk:kms:$awsSdkKmsVersion")
 
     // --- Test dependencies ---
     // jqwik: the established Java property-based testing library used for the

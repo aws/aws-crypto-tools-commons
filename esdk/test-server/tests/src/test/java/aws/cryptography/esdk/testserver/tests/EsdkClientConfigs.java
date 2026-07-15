@@ -1,12 +1,18 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsDiscoveryKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsMultiKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.Keyring;
+import aws.cryptography.esdk.testserver.client.model.KmsRsaEncryptionAlgorithm;
 import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
@@ -16,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
@@ -37,9 +44,13 @@ import java.util.List;
  * <p>These builders use the generated <em>client</em> model shapes, keeping the
  * Tests dependent only on the one generated Test_Client.
  *
- * <p><strong>AWS KMS keyrings</strong> are excluded (they require AWS
- * credentials/OIDC; deferred to a future credentialed pass). The
- * <strong>Caching CMM</strong> is also excluded from these round-trip scenarios:
+ * <p><strong>AWS KMS keyrings</strong> are contributed to {@link #scenarios()} as
+ * online, credential-gated scenarios (task 15.5): they are added ONLY when a
+ * complete {@link KmsRuntimeConfig} and resolvable AWS credentials are present
+ * (the {@link KmsRuntimeConfig#isKmsAvailable()} gate), and omitted otherwise so
+ * the offline suite still runs to a pass without AWS access (Requirements 14.8,
+ * 14.9). The <strong>Caching CMM</strong> remains excluded from these round-trip
+ * scenarios entirely:
  * the AWS Encryption SDK for Java 3.x + Material Providers Library 1.x expose no
  * MPL caching CMM over MPL keyrings offline (the legacy
  * {@code CachingCryptoMaterialsManager} only wraps a legacy
@@ -113,24 +124,52 @@ public final class EsdkClientConfigs {
     // -----------------------------------------------------------------------
 
     /**
-     * A single round-trip scenario: one ESDK config (used to build BOTH the
-     * encrypt and the decrypt client, so the material is guaranteed compatible),
-     * an optional algorithm-suite override applied on encrypt, and the required
-     * encryption-context keys the config's CMM demands (empty unless the CMM is a
-     * Required-Encryption-Context CMM).
+     * A single round-trip scenario. {@code config} builds the <em>encrypt</em>
+     * client; {@code decryptConfig} builds the <em>decrypt</em> client. For most
+     * scenarios {@code decryptConfig} is {@code null} and {@code config} is used
+     * for BOTH legs, so the material is guaranteed compatible. A distinct
+     * {@code decryptConfig} is only needed when the encrypt and decrypt legs must
+     * use different keyrings for the same round trip — notably the
+     * {@code AwsKmsDiscovery} scenario, where encrypt uses an encrypting KMS
+     * keyring and decrypt uses a decrypt-only discovery keyring over the same
+     * account/region (design "KMS Keyring Coverage (Online)").
      *
      * @param label human-readable scenario name (diagnostics only).
-     * @param config the offline ESDK client configuration.
+     * @param config the ESDK client configuration for the encrypt leg (and, when
+     *     {@code decryptConfig} is {@code null}, the decrypt leg too).
      * @param algorithmSuiteId optional algorithm-suite override for encrypt, or
      *     {@code null} to use the client default.
      * @param requiredEncryptionContextKeys keys the CMM requires to be present in
      *     the encryption context on encrypt and supplied again on decrypt.
+     * @param decryptConfig optional distinct config for the decrypt leg, or
+     *     {@code null} to reuse {@code config} on both legs.
      */
     public record Scenario(
         String label,
         ESDKClientConfig config,
         ESDKAlgorithmSuiteId algorithmSuiteId,
-        List<String> requiredEncryptionContextKeys) {
+        List<String> requiredEncryptionContextKeys,
+        ESDKClientConfig decryptConfig) {
+
+        /**
+         * Convenience constructor for the common case where one config builds both
+         * the encrypt and decrypt client (no distinct decrypt config).
+         */
+        public Scenario(
+            String label,
+            ESDKClientConfig config,
+            ESDKAlgorithmSuiteId algorithmSuiteId,
+            List<String> requiredEncryptionContextKeys) {
+            this(label, config, algorithmSuiteId, requiredEncryptionContextKeys, null);
+        }
+
+        /**
+         * @return the config to build the decrypt client with: the distinct
+         *     {@link #decryptConfig()} when present, otherwise {@link #config()}.
+         */
+        public ESDKClientConfig decryptConfigOrDefault() {
+            return decryptConfig != null ? decryptConfig : config;
+        }
 
         @Override
         public String toString() {
@@ -147,6 +186,28 @@ public final class EsdkClientConfigs {
      *     decrypt material compatible so {@code decrypt(encrypt(x)) == x} holds.
      */
     public static List<Scenario> scenarios() {
+        List<Scenario> scenarios = new ArrayList<>(offlineScenarios());
+        // Online, credential-gated KMS scenarios (Requirements 14.1, 14.2, 14.8,
+        // 14.9). Contributed ONLY when a complete KmsRuntimeConfig and resolvable
+        // AWS credentials are present; otherwise omitted so MaterialsRoundTripTests
+        // simply does not include them (no failure) and the offline suite passes.
+        if (KmsRuntimeConfig.isKmsAvailable()) {
+            KmsRuntimeConfig kms = KmsRuntimeConfig.fromRuntime();
+            // Ensure the in-process Language_Server's KmsClient resolves the region
+            // the Tests were given (design: KMS runtime configuration).
+            kms.configureAwsRegion();
+            scenarios.addAll(kmsScenarios(kms));
+        }
+        return List.copyOf(scenarios);
+    }
+
+    /**
+     * @return the fully-offline, round-trip-compatible scenarios (no AWS access):
+     *     Raw-AES and Raw-RSA keyrings, multi-keyrings combining raw keyrings, the
+     *     Default and Required-Encryption-Context CMMs, and committing /
+     *     non-committing / no-KDF algorithm-suite selection. Always contributed.
+     */
+    private static List<Scenario> offlineScenarios() {
         return List.of(
             // Raw-AES + Default CMM (the baseline), client-default suite.
             new Scenario("rawAes+default",
@@ -191,6 +252,94 @@ public final class EsdkClientConfigs {
                 forbid(defaultCmm(rawAesKeyring())),
                 ESDKAlgorithmSuiteId.ALG_AES_128_GCM_IV12_TAG16_NO_KDF,
                 List.of()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Task 15.5: online, credential-gated KMS scenarios.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Build the online KMS round-trip scenarios from a complete {@link
+     * KmsRuntimeConfig} (Requirements 14.1, 14.2). Each is round-trip-compatible:
+     * the same key material decrypts what it encrypted, EXCEPT the discovery
+     * scenario, which encrypts with the symmetric KMS keyring and decrypts with a
+     * KMS discovery keyring over the same account/region (via the Scenario's
+     * distinct {@code decryptConfig}). All use the client-default committing suite
+     * under {@code REQUIRE_ENCRYPT_REQUIRE_DECRYPT}; the RSA keyring supplies its
+     * KMS key id + RSAES-OAEP-SHA-256 padding (the server fetches the public key
+     * from KMS at construction when the config omits it).
+     *
+     * @param kms the resolved, complete KMS runtime configuration.
+     * @return the KMS scenarios contributed to {@link #scenarios()} when gated on.
+     */
+    private static List<Scenario> kmsScenarios(KmsRuntimeConfig kms) {
+        return List.of(
+            // AwsKms: single symmetric KMS key on both legs.
+            new Scenario("awsKms",
+                require(defaultCmm(awsKmsKeyring(kms.symmetricKeyArn()))), null, List.of()),
+
+            // AwsKmsMrk: single multi-region KMS key on both legs.
+            new Scenario("awsKmsMrk",
+                require(defaultCmm(awsKmsMrkKeyring(kms.mrkArn()))), null, List.of()),
+
+            // AwsKmsMultiKeyring: symmetric key as generator (+ MRK as a child key).
+            new Scenario("awsKmsMultiKeyring",
+                require(defaultCmm(awsKmsMultiKeyring(
+                    kms.symmetricKeyArn(), List.of(kms.mrkArn())))), null, List.of()),
+
+            // AwsKmsRsa: asymmetric RSA KMS key with RSAES-OAEP-SHA-256 padding.
+            new Scenario("awsKmsRsa",
+                require(defaultCmm(awsKmsRsaKeyring(
+                    kms.rsaKeyArn(), KmsRsaEncryptionAlgorithm.RSAES_OAEP_SHA_256))),
+                null, List.of()),
+
+            // AwsKmsDiscovery: encrypt with the symmetric KMS keyring, decrypt with
+            // a KMS discovery keyring over the same region (distinct decryptConfig).
+            new Scenario("awsKmsDiscovery",
+                require(defaultCmm(awsKmsKeyring(kms.symmetricKeyArn()))),
+                null,
+                List.of(),
+                require(defaultCmm(awsKmsDiscoveryKeyring()))));
+    }
+
+    private static Keyring awsKmsKeyring(String kmsKeyId) {
+        return Keyring.builder()
+            .awsKms(AwsKmsKeyringConfig.builder().kmsKeyId(kmsKeyId).build())
+            .build();
+    }
+
+    private static Keyring awsKmsMrkKeyring(String kmsKeyId) {
+        return Keyring.builder()
+            .awsKmsMrk(AwsKmsMrkKeyringConfig.builder().kmsKeyId(kmsKeyId).build())
+            .build();
+    }
+
+    private static Keyring awsKmsMultiKeyring(String generator, List<String> childKeyIds) {
+        return Keyring.builder()
+            .awsKmsMultiKeyring(AwsKmsMultiKeyringConfig.builder()
+                .generator(generator)
+                .kmsKeyIds(childKeyIds)
+                .build())
+            .build();
+    }
+
+    private static Keyring awsKmsRsaKeyring(String kmsKeyId, KmsRsaEncryptionAlgorithm algorithm) {
+        // No publicKey supplied: the Language_Server fetches it once from KMS via
+        // kms:GetPublicKey at construction (design "KMS keyring wiring").
+        return Keyring.builder()
+            .awsKmsRsa(AwsKmsRsaKeyringConfig.builder()
+                .kmsKeyId(kmsKeyId)
+                .encryptionAlgorithm(algorithm)
+                .build())
+            .build();
+    }
+
+    private static Keyring awsKmsDiscoveryKeyring() {
+        // A plain discovery keyring (no discovery filter): decrypt-only, region
+        // resolved from the ambient AWS region the Tests configured.
+        return Keyring.builder()
+            .awsKmsDiscovery(AwsKmsDiscoveryKeyringConfig.builder().build())
+            .build();
     }
 
     // -----------------------------------------------------------------------
