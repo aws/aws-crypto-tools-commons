@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kms.KmsClient;
 import software.amazon.awssdk.services.kms.model.EncryptionAlgorithmSpec;
 import software.amazon.awssdk.services.kms.model.GetPublicKeyRequest;
@@ -309,7 +310,32 @@ public final class EsdkClientFactory {
      * discovery (which has no key ARN) and RSA (GetPublicKey) can reach KMS.
      */
     private static KmsClient kmsClient() {
-        return KmsClient.create();
+        // Resolve the region explicitly with a safe default so the KMS client
+        // never fails region resolution when the ambient provider chain is empty
+        // (e.g. a nested server JVM that did not inherit AWS_REGION). The ambient
+        // AWS_REGION / aws.region still takes precedence; us-west-2 (where the
+        // KMS_Test_Resources live) is the fallback.
+        return KmsClient.builder().region(Region.of(resolveRegion())).build();
+    }
+
+    /**
+     * @return the AWS region for the KMS client: {@code aws.region} system
+     *     property, then {@code AWS_REGION} / {@code AWS_DEFAULT_REGION}
+     *     environment, then the {@code us-west-2} default.
+     */
+    private static String resolveRegion() {
+        String region = System.getProperty("aws.region");
+        if (isBlank(region)) {
+            region = System.getenv("AWS_REGION");
+        }
+        if (isBlank(region)) {
+            region = System.getenv("AWS_DEFAULT_REGION");
+        }
+        return isBlank(region) ? "us-west-2" : region.trim();
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private static EncryptionAlgorithmSpec toEncryptionAlgorithmSpec(
