@@ -10,12 +10,18 @@ import java.util.Optional;
  * key ARNs and the AWS region — for the online, credential-gated KMS round-trip
  * scenarios from <em>runtime configuration only</em> (Requirement 14.7),
  * consistent with the runtime-configuration-only principle (Requirement 7.3) and
- * mirroring {@link RuntimeEndpointConfig}. Values are never hardcoded; they
- * originate from the CDK stack's {@code CfnOutput}s and are supplied to the Tests
- * by CI (from repo variables/secrets) or by a developer's environment.
+ * mirroring {@link RuntimeEndpointConfig}. Each value resolves from a system
+ * property, then an environment variable, and finally falls back to the
+ * <em>built-in default</em> for the shared {@code KMS_Test_Resources} deployed by
+ * the {@code cdk/} stack ({@code EsdkTestServerKmsStack}) into the CI-resources
+ * account. Those defaults (the deployed {@code CfnOutput} ARNs) are not secrets —
+ * they are KMS key ARNs whose use is still authorized by AWS credentials — so a
+ * developer or CI job with credentials for that account can run the KMS scenarios
+ * with no extra configuration, while any deployment into a different account
+ * overrides them via the property/env keys below.
  *
- * <p>Configuration keys (system property, then environment variable), matching
- * the design's Data Models: KMS runtime configuration:
+ * <p>Configuration keys (system property, then environment variable, then the
+ * built-in default), matching the design's Data Models: KMS runtime configuration:
  * <ul>
  *   <li>{@code esdk.testserver.kms.symmetricKeyArn} / {@code ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN}
  *       — the symmetric KMS key ({@code AwsKms})</li>
@@ -40,6 +46,22 @@ public final class KmsRuntimeConfig {
     /** Default AWS region when the KMS config is complete but no region is given. */
     public static final String DEFAULT_REGION = "us-west-2";
 
+    /**
+     * Built-in default ARNs for the shared {@code KMS_Test_Resources} deployed by
+     * {@code cdk/} ({@code EsdkTestServerKmsStack}) into the CI-resources account
+     * ({@code 370957321024}, region {@value #DEFAULT_REGION}). These are the
+     * stack's {@code CfnOutput}s; they are KMS key ARNs (not secrets — their use
+     * is still gated by AWS credentials). Override any of them via the
+     * corresponding system property or environment variable when deploying the
+     * stack into a different account/region.
+     */
+    public static final String DEFAULT_SYMMETRIC_KEY_ARN =
+        "arn:aws:kms:us-west-2:370957321024:key/d3c7fc4c-5e03-4186-9d8e-ac95a6dc2f34";
+    public static final String DEFAULT_MRK_ARN =
+        "arn:aws:kms:us-west-2:370957321024:key/mrk-8cc58a2e31cd40d79acb422a2c6faac0";
+    public static final String DEFAULT_RSA_KEY_ARN =
+        "arn:aws:kms:us-west-2:370957321024:key/7dc78563-40d1-46be-b406-865d8893cee9";
+
     public static final String SYMMETRIC_KEY_ARN_PROPERTY = "esdk.testserver.kms.symmetricKeyArn";
     public static final String SYMMETRIC_KEY_ARN_ENV = "ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN";
     public static final String MRK_ARN_PROPERTY = "esdk.testserver.kms.mrkArn";
@@ -63,9 +85,9 @@ public final class KmsRuntimeConfig {
 
     /** Resolve the KMS configuration from the current runtime (system property / env). */
     public static KmsRuntimeConfig fromRuntime() {
-        String symmetric = resolve(SYMMETRIC_KEY_ARN_PROPERTY, SYMMETRIC_KEY_ARN_ENV).orElse(null);
-        String mrk = resolve(MRK_ARN_PROPERTY, MRK_ARN_ENV).orElse(null);
-        String rsa = resolve(RSA_KEY_ARN_PROPERTY, RSA_KEY_ARN_ENV).orElse(null);
+        String symmetric = resolve(SYMMETRIC_KEY_ARN_PROPERTY, SYMMETRIC_KEY_ARN_ENV).orElse(DEFAULT_SYMMETRIC_KEY_ARN);
+        String mrk = resolve(MRK_ARN_PROPERTY, MRK_ARN_ENV).orElse(DEFAULT_MRK_ARN);
+        String rsa = resolve(RSA_KEY_ARN_PROPERTY, RSA_KEY_ARN_ENV).orElse(DEFAULT_RSA_KEY_ARN);
         String region = resolve(REGION_PROPERTY, REGION_ENV).orElse(DEFAULT_REGION);
         return new KmsRuntimeConfig(symmetric, mrk, rsa, region);
     }
@@ -83,10 +105,14 @@ public final class KmsRuntimeConfig {
     }
 
     /**
-     * @return {@code true} when all three KMS key ARNs are present (the region
-     *     always has a default). A complete config is one half of the KMS gate;
-     *     the other half is resolvable AWS credentials (see {@link
-     *     #isKmsAvailable()}).
+     * @return {@code true} when all three KMS key ARNs are present. Since each
+     *     ARN now falls back to a built-in default (the deployed {@code
+     *     KMS_Test_Resources}), a config resolved via {@link #fromRuntime()} is
+     *     always complete; this stays {@code false} only for a config
+     *     deliberately constructed with a missing ARN. A complete config is one
+     *     half of the KMS gate; the other half is resolvable AWS credentials (see
+     *     {@link #isKmsAvailable()}), so the offline suite (no credentials) still
+     *     skips the KMS scenarios and passes.
      */
     public boolean isComplete() {
         return symmetricKeyArn != null && mrkArn != null && rsaKeyArn != null;

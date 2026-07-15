@@ -53,6 +53,15 @@ CDK_DIR    := $(MAKEFILE_DIR)/cdk
 #   ESDK_TESTSERVER_KMS_REGION            -> esdk.testserver.kms.region
 ESDK_TESTSERVER_KMS_REGION ?= us-west-2
 
+# Whether `deploy-kms-cdk` should CREATE the GitHub OIDC provider or import the
+# existing one. An AWS account may hold only one OIDC provider per URL
+# (token.actions.githubusercontent.com); if one already exists, creating another
+# fails with EntityAlreadyExistsException. Defaults to `false` so the stack looks
+# up the pre-existing provider by ARN (non-destructive — it does NOT touch the
+# shared provider). Set `CREATE_OIDC_PROVIDER=true` the FIRST time you deploy
+# into a brand-new account that has no GitHub OIDC provider yet.
+CREATE_OIDC_PROVIDER ?= false
+
 # Makefile-owned scratch directory for temp files (server log for test-live).
 # Kept separate from the per-module Gradle `build/` dirs to avoid confusion,
 # and ignored via the sibling .gitignore.
@@ -258,13 +267,15 @@ deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via 
 	@echo "==> Deploying EsdkTestServerKmsStack from cdk/ (region $(ESDK_TESTSERVER_KMS_REGION))"
 	@echo "    Requires developer AWS credentials for the target account."
 	@echo "    Obtain them first (e.g. run \`creds\`) so \`aws sts get-caller-identity\` works."
+	@echo "    createOidcProvider=$(CREATE_OIDC_PROVIDER) (import existing GitHub OIDC provider unless =true)."
 	@echo "    On success, CDK prints the CfnOutputs: symmetricKeyArn, mrkArn, rsaKeyArn, roleArn."
 	@echo "    Export them for \`make test-kms\`:"
 	@echo "      export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<symmetricKeyArn>"
 	@echo "      export ESDK_TESTSERVER_KMS_MRK_ARN=<mrkArn>"
 	@echo "      export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<rsaKeyArn>"
 	@cd "$(CDK_DIR)" && npm install && \
-		AWS_REGION="$(ESDK_TESTSERVER_KMS_REGION)" npx cdk deploy --require-approval never
+		AWS_REGION="$(ESDK_TESTSERVER_KMS_REGION)" npx cdk deploy --require-approval never \
+			-c createOidcProvider=$(CREATE_OIDC_PROVIDER)
 
 test-kms: check-java ## Run the Tests INCLUDING online KMS scenarios (needs `creds` + exported KMS ARNs)
 	@if [ -z "$${ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN:-}" ] || \
