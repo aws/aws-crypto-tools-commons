@@ -16,7 +16,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -75,14 +74,9 @@ class KeyCommitmentTests {
 
     @BeforeAll
     static void bootEndpoints() {
-        pair = EndpointPair.resolve(RuntimeEndpointConfig.fromRuntime());
-    }
-
-    @AfterAll
-    static void shutdownEndpoints() {
-        if (pair != null) {
-            pair.close();
-        }
+        // Key-commitment behavior is per-server, so exercise it on the primary
+        // target paired with itself (managed Java server in the offline checkpoint).
+        pair = LanguageServerRegistry.shared().selfPair();
     }
 
     // -----------------------------------------------------------------------

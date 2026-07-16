@@ -7,7 +7,6 @@ import net.jqwik.api.Arbitrary;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
-import net.jqwik.api.lifecycle.AfterContainer;
 import net.jqwik.api.lifecycle.BeforeContainer;
 
 /**
@@ -45,14 +44,10 @@ class StreamRoundTripPropertyTest {
 
     @BeforeContainer
     static void bootEndpoints() {
-        pair = EndpointPair.resolve(RuntimeEndpointConfig.fromRuntime());
-    }
-
-    @AfterContainer
-    static void shutdownEndpoints() {
-        if (pair != null) {
-            pair.close();
-        }
+        // Single-server stream plaintext-breadth property on the primary target's
+        // self-pair (Requirement 4.9); cross-language stream breadth lives in
+        // MaterialsRoundTripTests over Streaming_Capable pairs.
+        pair = LanguageServerRegistry.shared().selfPair();
     }
 
     // Feature: esdk-test-server, Property 15: Stream round-trip preserves plaintext byte-for-byte
