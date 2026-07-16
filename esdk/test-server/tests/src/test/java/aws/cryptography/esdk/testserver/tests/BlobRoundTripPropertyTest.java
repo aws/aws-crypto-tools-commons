@@ -10,7 +10,6 @@ import net.jqwik.api.Arbitrary;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
-import net.jqwik.api.lifecycle.AfterContainer;
 import net.jqwik.api.lifecycle.BeforeContainer;
 
 /**
@@ -36,14 +35,9 @@ class BlobRoundTripPropertyTest {
 
     @BeforeContainer
     static void bootEndpoints() {
-        pair = EndpointPair.resolve(RuntimeEndpointConfig.fromRuntime());
-    }
-
-    @AfterContainer
-    static void shutdownEndpoints() {
-        if (pair != null) {
-            pair.close();
-        }
+        // Plaintext-breadth property on a single server (the primary target's
+        // self-pair); cross-language breadth is covered by MaterialsRoundTripTests.
+        pair = LanguageServerRegistry.shared().selfPair();
     }
 
     // Feature: esdk-test-server, Property 1: Blob round-trip preserves plaintext byte-for-byte
