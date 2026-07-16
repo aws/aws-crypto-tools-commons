@@ -122,6 +122,21 @@ public final class EsdkClientConfigs {
             .build();
     }
 
+    /**
+     * @return a Raw-AES / Default-CMM config carrying the given commitment
+     *     {@code policy}. Used by {@code KeyCommitmentTests} to exercise all three
+     *     commitment policies against the full algorithm-suite set; the suite is
+     *     selected per-{@code Encrypt} via {@code EncryptInput.algorithmSuiteId}.
+     *     Fully offline (Raw-AES); the same keyring works for every suite,
+     *     including signing suites.
+     */
+    public static ESDKClientConfig rawAesWithCommitmentPolicy(ESDKCommitmentPolicy policy) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(policy)
+            .cmm(defaultCmm(rawAesKeyring()))
+            .build();
+    }
+
     // -----------------------------------------------------------------------
     // Task 14.3: broadened, round-trip-compatible scenarios for Property 1.
     // -----------------------------------------------------------------------
