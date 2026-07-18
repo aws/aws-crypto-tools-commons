@@ -73,6 +73,28 @@ SERVER_LOG := $(TMP_DIR)/roundtrip-server.log
 PORT ?= 9090
 
 # ----------------------------------------------------------------------------
+# Cross-language (Java + Python) coordinates for `setup-python` / `test-cross-language`.
+# ----------------------------------------------------------------------------
+# The Python Language_Server is hand-implemented and delegates to the real AWS
+# Encryption SDK for Python, installed from a clone of its repository (the repo
+# URL is part of the Configuration — there is no aws-crypto-tools-python repo yet,
+# so its current home is used). Python needs no compile step, so `setup-python`
+# just clones + creates a venv + installs the ESDK editable from the relative path.
+PYTHON3        ?= python3
+PY_SERVER_DIR  := $(MAKEFILE_DIR)/servers/python
+PY_ESDK_REPO   ?= https://github.com/aws/aws-encryption-sdk-python
+PY_ESDK_DIR    := $(PY_SERVER_DIR)/.deps/aws-encryption-sdk-python
+PY_VENV        := $(PY_SERVER_DIR)/.venv
+PY_PYTHON      := $(PY_VENV)/bin/python
+# Language-major-version target ports for the cross-language matrix.
+JAVA_PORT      ?= 8080
+PYTHON_PORT    ?= 8091
+JAVA_MAJOR     ?= 3
+PYTHON_MAJOR   ?= 4
+JAVA_SERVER_LOG   := $(TMP_DIR)/cross-java-server.log
+PYTHON_SERVER_LOG := $(TMP_DIR)/cross-python-server.log
+
+# ----------------------------------------------------------------------------
 # JDK resolution
 # ----------------------------------------------------------------------------
 # smithy-java 1.4.0 requires JDK 21+. The shell default here is often Corretto
@@ -99,7 +121,7 @@ endif
 
 .PHONY: help check-java validate smoke build build-client build-server build-tests \
         test run-server test-live roundtrip orchestrate orchestrate-test \
-        deploy-kms-cdk test-kms clean
+        deploy-kms-cdk test-kms setup-python run-python-server test-cross-language clean
 
 # ----------------------------------------------------------------------------
 help: ## Show this help
@@ -303,6 +325,102 @@ test-kms: check-java ## Run the Tests INCLUDING online KMS scenarios (needs `cre
 		-Desdk.testserver.kms.mrkArn="$$ESDK_TESTSERVER_KMS_MRK_ARN" \
 		-Desdk.testserver.kms.rsaKeyArn="$$ESDK_TESTSERVER_KMS_RSA_KEY_ARN" \
 		-Desdk.testserver.kms.region="$${ESDK_TESTSERVER_KMS_REGION:-$(ESDK_TESTSERVER_KMS_REGION)}"
+
+# ----------------------------------------------------------------------------
+# Cross-language (Java + Python) round trip. `setup-python` prepares the Python
+# server's environment (clone the ESDK, create the venv, install); it is Python,
+# so there is no compile step. `test-cross-language` launches BOTH the Java and
+# Python servers and runs the single Tests suite over the pairwise matrix of
+# (java-vN, python-vM) targets via the esdk.testserver.targets runtime property.
+# ----------------------------------------------------------------------------
+setup-python: ## Clone the Python ESDK, create the venv, and install the Python server deps
+	@echo "==> Preparing the Python Language_Server environment"
+	@if [ ! -d "$(PY_ESDK_DIR)/.git" ]; then \
+		echo "==> Cloning $(PY_ESDK_REPO) -> $(PY_ESDK_DIR)"; \
+		git clone --depth 1 "$(PY_ESDK_REPO)" "$(PY_ESDK_DIR)"; \
+	else \
+		echo "==> Python ESDK already cloned at $(PY_ESDK_DIR)"; \
+	fi
+	@if [ ! -x "$(PY_PYTHON)" ]; then \
+		echo "==> Creating venv at $(PY_VENV)"; \
+		"$(PYTHON3)" -m venv "$(PY_VENV)"; \
+	fi
+	@echo "==> Installing the Python ESDK (editable) + MPL + the server package"
+	@"$(PY_VENV)/bin/pip" install --quiet --upgrade pip
+	@"$(PY_VENV)/bin/pip" install --quiet \
+		-e "$(PY_ESDK_DIR)" \
+		'aws-cryptographic-material-providers>=1.7.4,<=1.11.2' \
+		-e "$(PY_SERVER_DIR)"
+	@echo "==> Python server environment ready ($(PY_PYTHON))"
+
+run-python-server: ## Start the Python server in the FOREGROUND on PYTHON_PORT (needs setup-python first)
+	@echo "==> Starting Python Language_Server on port $(PYTHON_PORT) (foreground; Ctrl-C to stop)"
+	@cd "$(PY_SERVER_DIR)" && "$(PY_PYTHON)" -m esdk_test_server "$(PYTHON_PORT)"
+
+# Launch the Java server (background) AND the Python server (background), wait for
+# both, run the single Tests over the pairwise (java, python) target matrix, then
+# ALWAYS stop both servers. One `bash -c` so PIDs/trap share a shell (make 3.81).
+define RUN_CROSS
+set -eo pipefail
+mkdir -p "$(TMP_DIR)"
+echo "==> test-cross-language: java:$(JAVA_MAJOR)@$(JAVA_PORT), python:$(PYTHON_MAJOR)@$(PYTHON_PORT)"
+
+if [ ! -x "$(PY_PYTHON)" ]; then
+	echo "ERROR: Python venv not found at $(PY_PYTHON). Run 'make setup-python' first." >&2
+	exit 1
+fi
+
+( cd "$(SERVER_DIR)" && exec ./gradlew --console=plain -q runServer --args="$(JAVA_PORT)" ) >"$(JAVA_SERVER_LOG)" 2>&1 &
+JAVA_PID=$$!
+( cd "$(PY_SERVER_DIR)" && exec "$(PY_PYTHON)" -m esdk_test_server "$(PYTHON_PORT)" ) >"$(PYTHON_SERVER_LOG)" 2>&1 &
+PYTHON_PID=$$!
+
+cleanup() {
+	trap - EXIT INT TERM
+	echo "==> Stopping servers and freeing ports $(JAVA_PORT), $(PYTHON_PORT)"
+	for pid in "$$JAVA_PID" "$$PYTHON_PID"; do pkill -P "$$pid" 2>/dev/null || true; kill "$$pid" 2>/dev/null || true; done
+	for port in $(JAVA_PORT) $(PYTHON_PORT); do
+		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); if [ -n "$$pids" ]; then kill $$pids 2>/dev/null || true; fi
+	done
+	sleep 1
+	for port in $(JAVA_PORT) $(PYTHON_PORT); do
+		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
+	done
+}
+trap cleanup EXIT INT TERM
+
+wait_for() {
+	name="$$1"; port="$$2"; pid="$$3"; log="$$4"
+	echo "==> Waiting for $$name on 127.0.0.1:$$port"
+	attempts=0; max_attempts=180
+	until nc -z 127.0.0.1 "$$port" >/dev/null 2>&1; do
+		if ! kill -0 "$$pid" 2>/dev/null && ! lsof -ti tcp:$$port >/dev/null 2>&1; then
+			echo "ERROR: $$name exited before becoming ready. Last log lines:" >&2; tail -n 40 "$$log" >&2 || true; exit 1
+		fi
+		attempts=$$((attempts + 1))
+		if [ "$$attempts" -ge "$$max_attempts" ]; then
+			echo "ERROR: timed out waiting for $$name. Last log lines:" >&2; tail -n 40 "$$log" >&2 || true; exit 1
+		fi
+		sleep 1
+	done
+	echo "==> $$name is up"
+}
+wait_for "java server" "$(JAVA_PORT)" "$$JAVA_PID" "$(JAVA_SERVER_LOG)"
+wait_for "python server" "$(PYTHON_PORT)" "$$PYTHON_PID" "$(PYTHON_SERVER_LOG)"
+
+TARGETS="java:$(JAVA_MAJOR)=http://127.0.0.1:$(JAVA_PORT),python:$(PYTHON_MAJOR)=http://127.0.0.1:$(PYTHON_PORT)"
+echo "==> Running Tests over the cross-language matrix: $$TARGETS"
+set +e
+( cd "$(TESTS_DIR)" && ./gradlew --console=plain cleanTest test -Desdk.testserver.targets="$$TARGETS" )
+rc=$$?
+set -e
+echo "==> Tests exit code: $$rc"
+exit $$rc
+endef
+export RUN_CROSS
+
+test-cross-language: check-java ## Launch Java + Python servers and run the Tests over the (java, python) matrix
+	@bash -c "$$RUN_CROSS"
 
 # ----------------------------------------------------------------------------
 clean: ## gradle clean in every module + remove Makefile temp files
