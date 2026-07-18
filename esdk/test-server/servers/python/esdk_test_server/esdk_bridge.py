@@ -143,12 +143,20 @@ def _build_keyring(keyring):
             )
         )
     if name == "AwsKmsRsa":
+        kms_client = _kms_client()
+        public_key = cfg.get("publicKey")
+        if public_key is None:
+            # Fetch the RSA public key from KMS (as the Java server does) so the
+            # keyring can OnEncrypt. KMS GetPublicKey returns DER (X.509
+            # SubjectPublicKeyInfo); CreateAwsKmsRsaKeyring expects PEM.
+            der = kms_client.get_public_key(KeyId=cfg["kmsKeyId"])["PublicKey"]
+            public_key = _der_to_public_key_pem(der)
         return _MATERIAL_PROVIDERS.create_aws_kms_rsa_keyring(
             input=mpl.CreateAwsKmsRsaKeyringInput(
                 kms_key_id=cfg["kmsKeyId"],
                 encryption_algorithm=cfg.get("encryptionAlgorithm"),
-                public_key=cfg.get("publicKey"),
-                kms_client=_kms_client(),
+                public_key=public_key,
+                kms_client=kms_client,
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
@@ -165,6 +173,21 @@ def _discovery_filter(filt):
     if not filt:
         return None
     return mpl.DiscoveryFilter(partition=filt["partition"], account_ids=filt["accountIds"])
+
+
+def _der_to_public_key_pem(der_bytes):
+    """Wrap DER (X.509 SubjectPublicKeyInfo) bytes as a PEM ``PUBLIC KEY`` block.
+
+    Pass through unchanged if the bytes already look like PEM.
+    """
+    if der_bytes[:11] == b"-----BEGIN ":
+        return der_bytes
+    import base64
+
+    b64 = base64.b64encode(der_bytes).decode("ascii")
+    lines = [b64[i:i + 64] for i in range(0, len(b64), 64)]
+    pem = "-----BEGIN PUBLIC KEY-----\n" + "\n".join(lines) + "\n-----END PUBLIC KEY-----\n"
+    return pem.encode("ascii")
 
 
 # ---------------------------------------------------------------------------
