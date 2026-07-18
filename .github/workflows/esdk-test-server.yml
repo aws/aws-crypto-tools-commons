@@ -123,6 +123,13 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Python 3.11
+        # For the hand-implemented Python Language_Server (cross-language matrix).
+        # `make setup-python` clones the Python ESDK and installs it into a venv.
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Cache Gradle caches and wrappers
         # Four independent Gradle builds live under esdk/test-server
         # (client-java, servers/java, tests, orchestrator). Key on every
@@ -211,7 +218,14 @@ jobs:
         working-directory: esdk/test-server
         run: make build
 
-      - name: Orchestrate end-to-end round trip (headline check)
+      - name: Set up the Python Language_Server (clone ESDK + venv + install)
+        # Clones the Python ESDK (repo URL is part of the Configuration), creates
+        # the venv, and installs the ESDK editable + MPL + the server package.
+        # No compile step — it is Python.
+        working-directory: esdk/test-server
+        run: make setup-python
+
+      - name: Orchestrate end-to-end round trip (Java, headline check)
         # The orchestrator boots the Java Language_Server on its configured
         # Configuration_Set port and runs the single Tests suite to a fail-open
         # SUCCESS. This is the most representative end-to-end check, so it is
@@ -231,6 +245,21 @@ jobs:
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
         run: make orchestrate
+
+      - name: Cross-language round trip (Java + Python matrix)
+        # Launch BOTH the Java and Python Language_Servers and run the single Tests
+        # suite over the pairwise (java-v3, python-v4) matrix — every scenario
+        # encrypt-on-one / decrypt-on-the-other, including the required KMS
+        # scenarios. The Python server subprocess inherits the AWS_* credentials
+        # and region from this step's environment for its KMS calls. The KMS ARN
+        # env vars OPTIONALLY override the defaults baked into KmsRuntimeConfig.
+        working-directory: esdk/test-server
+        env:
+          ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
+          ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
+          ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
+          ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+        run: make test-cross-language
 
       - name: Upload test reports
         if: always()
