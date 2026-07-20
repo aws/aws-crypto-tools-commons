@@ -1,4 +1,4 @@
-package aws.cryptography.esdk.testserver.tests;
+package aws.cryptography.esdk.testserver.tests.meta;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,15 +10,24 @@ import aws.cryptography.esdk.testserver.client.model.DecryptInput;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.EncryptInput;
 import aws.cryptography.esdk.testserver.client.model.GenericServerError;
+import aws.cryptography.esdk.testserver.tests.EndpointPair;
+import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs;
+import aws.cryptography.esdk.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.esdk.testserver.tests.TestServerClients;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Over-the-wire modeled-error transmission Tests (Task 14.4). Driven by the real
- * Java {@code Test_Client} over the real rpcv2Cbor HTTP hop, these confirm that
- * the TWO modeled error shapes actually transmit and stay <em>distinguishable</em>
+ * <strong>Meta</strong> Test (see this subpackage's {@code package-info}): it
+ * verifies the TestServer's own wire/error plumbing rather than ESDK behavior, so
+ * it is NOT parameterized over the cross-language target matrix — it runs against
+ * the primary target only.
+ *
+ * <p>Over-the-wire modeled-error transmission (Task 14.4). Driven by the real Java
+ * {@code Test_Client} over the real rpcv2Cbor HTTP hop, these confirm that the TWO
+ * modeled error shapes actually transmit and stay <em>distinguishable</em>
  * end-to-end — directly exercising the smithy-java rpcv2-CBOR modeled-error
  * transmission caveat called out in the design's Error Handling section:
  *
@@ -31,18 +40,8 @@ import org.junit.jupiter.api.Test;
  * </ul>
  *
  * <p>These assert the client receives the correct <em>modeled</em> type (not a
- * bare {@code CallException}/HTTP error, Requirements 6.1–6.4) and that the two
- * shapes are distinct — an {@link ESDKClientError} is never a
- * {@link GenericServerError} and vice versa. Fully offline: Raw-AES configs, no
- * AWS/KMS/network.
- *
- * <p>Findings (bring-up over rpcv2Cbor): with smithy-java 1.4.0 the two modeled
- * errors <strong>do</strong> serialize and deserialize distinctly over rpcv2Cbor
- * — the generated Java server encodes each {@code @error("client")} shape with its
- * shape id and the generated client's error deserializer maps it back to the
- * matching modeled type via the operation's type registry. No client/server wiring
- * change was required for the error path (unlike the {@code @streaming} blob
- * transport, which the same codec does not support — see {@link StreamRoundTrip}).
+ * bare {@code CallException}/HTTP error, Requirements 6.1-6.4) and that the two
+ * shapes are distinct. Fully offline: Raw-AES configs, no AWS/KMS/network.
  */
 class ModeledErrorTransmissionTest {
 
@@ -79,11 +78,9 @@ class ModeledErrorTransmissionTest {
                 .ciphertext(ciphertext)
                 .build()));
 
-        // The ESDK exception message is forwarded (non-empty), and the shape is
-        // distinct from GenericServerError. assertThrows above already proves the
-        // wire error deserialized to the EXACT modeled type ESDKClientError (a
-        // distinct final class from GenericServerError), not a bare CallException —
-        // so the two shapes are distinguishable end-to-end. Also confirm the message.
+        // assertThrows already proves the wire error deserialized to the EXACT
+        // modeled type ESDKClientError (distinct from GenericServerError), not a
+        // bare CallException. Also confirm the forwarded ESDK message is present.
         assertNotNull(error.getMessage());
         assertFalse(error.getMessage().isEmpty(),
             "ESDKClientError must forward the (non-empty) ESDK exception message");
@@ -104,9 +101,6 @@ class ModeledErrorTransmissionTest {
                 .ciphertext(ByteBuffer.wrap(new byte[] {1, 2, 3, 4}))
                 .build()));
 
-        // assertThrows above already proves the wire error deserialized to the
-        // EXACT modeled type GenericServerError (distinct from ESDKClientError),
-        // not a bare CallException.
         assertNotNull(error.getMessage());
         assertFalse(error.getMessage().isEmpty(),
             "GenericServerError must carry a non-empty message");
