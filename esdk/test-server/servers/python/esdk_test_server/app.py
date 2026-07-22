@@ -130,6 +130,14 @@ _OPERATIONS = {
 
 def _make_handler(registry):
     class RpcV2CborHandler(BaseHTTPRequestHandler):
+        # Speak HTTP/1.1 with keep-alive so the smithy-java client's pooled
+        # connections stay valid across the many requests the Tests make. Every
+        # response carries a Content-Length (see _send_cbor), which is what lets
+        # the base handler keep the connection open rather than closing it after
+        # each response (the HTTP/1.0 default, which caused intermittent
+        # "received no bytes" transport errors on reused connections).
+        protocol_version = "HTTP/1.1"
+
         # Quiet the default per-request stderr logging.
         def log_message(self, *args):  # noqa: D401
             pass
@@ -170,10 +178,21 @@ def _make_handler(registry):
     return RpcV2CborHandler
 
 
+class _EsdkTestThreadingHTTPServer(ThreadingHTTPServer):
+    # A generous listen backlog so bursts of new connections from the
+    # heavily-parameterized Tests are not reset (the socketserver default of 5 is
+    # far too small and manifested as intermittent "received no bytes" errors).
+    request_queue_size = 128
+    # Do not let a lingering worker thread block process shutdown.
+    daemon_threads = True
+    # Free the port immediately on restart.
+    allow_reuse_address = True
+
+
 def serve(port, host="127.0.0.1"):
     """Start the Python Language_Server on ``host:port`` and serve until stopped."""
     registry = ClientRegistry()
-    server = ThreadingHTTPServer((host, port), _make_handler(registry))
+    server = _EsdkTestThreadingHTTPServer((host, port), _make_handler(registry))
     print(f"esdk-test-server (python) listening at http://{host}:{port}", flush=True)
     try:
         server.serve_forever()
