@@ -30,25 +30,12 @@ dependencies {
     // the Tests use.
     testImplementation("aws.cryptography.esdk.testserver:esdk-test-server-client-java")
 
-    // --- The Java Language_Server (booted in-process for the checkpoint) -----
-    // Provides EsdkTestServerHandlers.service(), wired to the real ESDK. The
-    // Tests target it over the wire; later phases target remote endpoints via
-    // runtime config with no change to the Tests (Requirements 7.2, 7.3).
-    testImplementation("aws.cryptography.esdk.testserver:esdk-test-server-java")
-
     // --- Client runtime: rpcv2Cbor protocol + JDK HTTP transport ------------
     // client-java exposes these as `implementation`, so declare them here for
     // compile access to the client builder, protocol, and transport types.
     testImplementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     testImplementation("software.amazon.smithy.java:client-rpcv2-cbor:$smithyJavaVersion")
     testImplementation("software.amazon.smithy.java:client-http:$smithyJavaVersion")
-
-    // --- Server runtime: the Netty HTTP server that hosts the service -------
-    // server-api provides Server/ServerBuilder (compile); server-netty provides
-    // the ServerProvider SPI implementation (runtime); server-rpcv2-cbor (pulled
-    // transitively via the server module) provides the wire protocol.
-    testImplementation("software.amazon.smithy.java:server-api:$smithyJavaVersion")
-    testRuntimeOnly("software.amazon.smithy.java:server-netty:$smithyJavaVersion")
 
     // --- Test frameworks ----------------------------------------------------
     // jqwik: property-based testing (Property 1). JUnit 5: example-based tests.

@@ -25,17 +25,12 @@ generated Java Test_Client  ──HTTP (rpcv2Cbor)──▶  Java Language_Serve
   ```
   (A default Corretto 17 will fail to build smithy-java.)
 
-## Option A — Automated (recommended): the test harness boots the server for you
+## Option A — Orchestrated (recommended): the orchestrator launches the servers
 
-From this `tests/` directory:
-
-```bash
-JAVA_HOME=<jdk21+> ./gradlew test
-```
-
-With no endpoint configured, the suite boots one Java `Language_Server` in-process on an
-ephemeral port (real Netty HTTP + rpcv2Cbor) and uses it as **both** the encrypt and decrypt
-endpoint of the pair, then performs the real over-HTTP round trip. This runs:
+The Tests are **endpoint-only** (Requirement 10.2): they never boot a server themselves.
+The orchestrated entry point (`make orchestrate`, from the TestServer root) launches every
+configured `Language_Server` as a subprocess and runs the Tests with the
+`esdk.testserver.targets` property set. With targets configured, the suite runs:
 
 - `MaterialsRoundTripTests` — the single per-configuration class; a blob (`blob[...]`) and a
   stream (`stream[...]`) `@ParameterizedTest`, each run against every offline scenario in
@@ -45,48 +40,34 @@ endpoint of the pair, then performs the real over-HTTP round trip. This runs:
 - `StreamRoundTripPropertyTest` — Property 15, jqwik, 100 iterations, arbitrary/empty/binary/large
   plaintext (Task 14.2)
 
-## Option B — Manual two-step: start the Java server, then run the Tests against it
+## Option B — Manual two-step: start Language_Server(s), then run the Tests against them
 
-Start the server (Terminal 1), from `../servers/java`:
-
-```bash
-# default port 8080
-JAVA_HOME=<jdk21+> ./gradlew runServer
-# or pick a port (any of the three forms works):
-JAVA_HOME=<jdk21+> ./gradlew runServer --args="9090"
-JAVA_HOME=<jdk21+> ./gradlew runServer -Pport=9090
-```
-
-It prints, e.g.:
-
-```
-ESDK TestServer (Java) listening at http://127.0.0.1:9090
-Point the Tests at it with: -Desdk.testserver.endpoints=http://127.0.0.1:9090
-```
-
-Run the Tests against that endpoint (Terminal 2), from this `tests/` directory:
+Start each server yourself (for example the Java server via `./gradlew runServer
+--args="9090"` in its server directory, or the Python server via
+`python -m esdk_test_server 9092`), then run the Tests from this `tests/` directory,
+pointing them at the running endpoints:
 
 ```bash
-JAVA_HOME=<jdk21+> ./gradlew test -Desdk.testserver.endpoints=http://127.0.0.1:9090
+JAVA_HOME=<jdk21+> ./gradlew test \
+  -Desdk.testserver.targets=java:3=http://127.0.0.1:9090,python:4=http://127.0.0.1:9092
 ```
 
-Stop the server with Ctrl-C when done.
+Stop the servers with Ctrl-C when done.
 
-### Runtime endpoint configuration (Requirement 7.3)
+### Runtime target configuration (Requirements 7.3, 10.2)
 
-The suite reads endpoints, in precedence order, from:
+The suite reads its targets, in precedence order, from:
 
-1. system property `esdk.testserver.endpoints`
-2. environment variable `ESDK_TESTSERVER_ENDPOINTS`
+1. system property `esdk.testserver.targets`
+2. environment variable `ESDK_TESTSERVER_TARGETS`
 
-The value is a comma-separated list of base URLs. The **first** is the encrypt endpoint and
-the **second** (if present) is the decrypt endpoint; a single entry is used for both sides of
-the round trip. This is how later multi-language pairs are exercised — by changing config
-only, e.g. `-Desdk.testserver.endpoints=http://127.0.0.1:9090,http://127.0.0.1:9091`.
-
-The server launcher (`../servers/java runServer`) reads its port from the first CLI arg, the
-`-Pport=<n>` Gradle property, the system property `esdk.testserver.port`, or the
-`ESDK_TESTSERVER_PORT` env var, defaulting to `8080`.
+The value is a comma-separated list of `<language>:<majorVersion>=<endpointUrl>` entries,
+e.g. `java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092`. The cross-language
+matrix is the full pairwise (encrypt, decrypt) product of the targets, including
+same-target pairs. **When no targets are configured the Tests fail with an actionable
+message** — there is no managed (in-process) fallback and no legacy
+`esdk.testserver.endpoints` property. Meta (harness-plumbing) tests run against the
+primary (first) configured target.
 
 ## Online AWS KMS keyring scenarios (credential-gated, Requirement 14)
 

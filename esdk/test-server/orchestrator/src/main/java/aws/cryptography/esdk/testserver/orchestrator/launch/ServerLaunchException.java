@@ -1,23 +1,26 @@
 package aws.cryptography.esdk.testserver.orchestrator.launch;
 
 /**
- * An abort raised while building or launching a {@code Language_Server}. Every
- * instance names the offending language so the orchestrator can report a
- * fail-open failure that identifies the cause (Requirements 9.6, 10.4, 11.4,
- * 12.8) before any {@code Tests} run.
+ * An abort raised while resolving, building, or launching a
+ * {@code Language_Server}. Every instance names the offending language and a
+ * {@link Category}, so the orchestrator can run zero {@code Tests} and report a
+ * failure identifying the language and the cause (Requirement 2.5).
  */
 public class ServerLaunchException extends Exception {
 
-    /** The class of launch abort, so the reporter can describe the cause precisely. */
+    /** The class of launch abort (design "Launcher contract": RESOLVE | BUILD | PORT | TIMEOUT). */
     public enum Category {
-        /** The resolved reference (commit/artifact/head) could not be resolved (Req 10.4, 12.8). */
-        UNRESOLVABLE_SOURCE,
-        /** Live/submodule source could not be built (Req 11.4, 12.8). */
-        BUILD_FAILURE,
-        /** The configured port was already in use when binding (Req 9.6). */
-        PORT_CONFLICT,
-        /** No server implementation exists for this language yet (parked; tasks 9-10). */
-        UNSUPPORTED_LANGUAGE
+        /** The resolved sources this launch needs are missing or unusable (Req 2.5). */
+        RESOLVE,
+        /** Building the server/library, or spawning the server process, failed (Req 2.5). */
+        BUILD,
+        /**
+         * The configured port was already bound before launch — a pre-existing
+         * binder is a launch failure, not flaky readiness (Req 2.5).
+         */
+        PORT,
+        /** The server did not accept a TCP connection within the readiness window (Req 2.5, 2.9). */
+        TIMEOUT
     }
 
     private final String language;

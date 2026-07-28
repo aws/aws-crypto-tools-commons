@@ -24,10 +24,11 @@ import net.jqwik.api.lifecycle.BeforeContainer;
  *
  * <p>Validates: Requirements 4.2, 4.3, 4.4
  *
- * <p>The endpoint pair is resolved once from runtime configuration and reused
- * across all generated examples. For the Java-only checkpoint that pair is one
- * in-process Java Language_Server (encrypt endpoint == decrypt endpoint), driven
- * over the real rpcv2Cbor wire protocol by the ONE generated Java Test_Client.
+ * <p>The endpoint pair is resolved once from runtime configuration
+ * ({@code esdk.testserver.targets}) and reused across all generated examples:
+ * the primary configured target's self-pair (encrypt endpoint == decrypt
+ * endpoint), driven over the real rpcv2Cbor wire protocol by the ONE generated
+ * Java Test_Client.
  */
 class BlobRoundTripPropertyTest {
 

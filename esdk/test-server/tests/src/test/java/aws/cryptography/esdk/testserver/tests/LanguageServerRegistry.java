@@ -6,32 +6,27 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The set of Language_Server {@link LanguageServerTarget}s the {@code Tests} drive,
- * resolved once from <em>runtime configuration only</em> (Requirement 7.3) and
- * shared across every test class as a process-wide singleton.
+ * resolved once from <em>runtime configuration only</em> and shared across every
+ * test class as a process-wide singleton.
  *
- * <p>Resolution precedence:
- * <ol>
- *   <li><b>{@code esdk.testserver.targets} / {@code ESDK_TESTSERVER_TARGETS}</b> — a
- *       comma-separated list of {@code <language>:<majorVersion>=<endpointUrl>}
- *       entries (e.g. {@code java:3=http://127.0.0.1:8080,python:4=http://127.0.0.1:8081}).
- *       This is what the orchestrator supplies when it launches multiple servers.</li>
- *   <li><b>{@code esdk.testserver.endpoints}</b> (legacy, {@link RuntimeEndpointConfig}) —
- *       one or more bare URLs, mapped to {@code (java, 3, url)} targets so the
- *       existing single-endpoint {@code make test-live} flow keeps working.</li>
- *   <li><b>Managed</b> — nothing configured: boot ONE Java Language_Server
- *       in-process on an ephemeral port and expose it as the single {@code
- *       (java, 3)} target. A JVM shutdown hook stops it.</li>
- * </ol>
+ * <p>The Tests are <strong>endpoint-only</strong> (Requirement 10.2): each Target
+ * is located exclusively through the endpoint supplied at run time via
+ * <b>{@code esdk.testserver.targets}</b> (system property) or
+ * <b>{@code ESDK_TESTSERVER_TARGETS}</b> (environment variable) — a
+ * comma-separated list of {@code <language>:<majorVersion>=<endpointUrl>} entries
+ * (e.g. {@code java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092}).
+ * The orchestrator launches every configured Language_Server and supplies this
+ * property; there is no managed (in-process) fallback and no legacy endpoint
+ * property. When nothing is configured, resolution fails with an actionable
+ * message rather than assuming any server.
  *
  * <p>The cross-language matrix ({@link #pairs()}) is the full pairwise product of
  * targets on the encrypt and decrypt legs, <em>including</em> same-target pairs
- * (e.g. {@code java-v3 -> java-v3}) for completeness. With only Java configured
- * (managed / legacy) the matrix is the single {@code java-v3 -> java-v3} pair, so
- * the existing Tests reduce to their previous behavior.
+ * (e.g. {@code java-v3 -> java-v3}) for completeness. Meta (harness-plumbing)
+ * Tests run against the {@link #primary()} configured target only.
  */
 public final class LanguageServerRegistry {
 
@@ -39,33 +34,20 @@ public final class LanguageServerRegistry {
     public static final String TARGETS_PROPERTY = "esdk.testserver.targets";
     public static final String TARGETS_ENV = "ESDK_TESTSERVER_TARGETS";
 
-    /** Default language/major version for the managed and legacy-endpoint modes. */
-    private static final String DEFAULT_LANGUAGE = "java";
-    private static final int DEFAULT_MAJOR_VERSION = 3;
-
-    /**
-     * Languages whose Language_Server drives the ESDK <em>streaming</em> API
-     * (Streaming_Capable). The stream round-trip only runs over a pair when BOTH
-     * endpoints are streaming-capable (Requirements 4.9, 4.10). Java is
-     * streaming-capable; the hand-implemented Python server is too.
-     */
-    private static final Set<String> STREAMING_CAPABLE_LANGUAGES = Set.of("java", "python");
-
     private static volatile LanguageServerRegistry instance;
 
     private final List<LanguageServerTarget> targets;
-    private final LocalJavaLanguageServer managedServer; // null unless managed mode booted one
 
-    private LanguageServerRegistry(List<LanguageServerTarget> targets, LocalJavaLanguageServer managedServer) {
+    private LanguageServerRegistry(List<LanguageServerTarget> targets) {
         this.targets = List.copyOf(targets);
-        this.managedServer = managedServer;
     }
 
     /**
-     * @return the process-wide registry, resolving configuration (and booting a
-     *     managed Java server if nothing is configured) on first access. Safe to
-     *     call from a static {@code @MethodSource} — it does not depend on JUnit
-     *     lifecycle callbacks.
+     * @return the process-wide registry, resolving the configured targets on
+     *     first access. Safe to call from a static {@code @MethodSource} — it
+     *     does not depend on JUnit lifecycle callbacks.
+     * @throws IllegalStateException when no targets are configured (the Tests
+     *     are endpoint-only; there is no managed fallback)
      */
     public static LanguageServerRegistry shared() {
         LanguageServerRegistry local = instance;
@@ -82,26 +64,27 @@ public final class LanguageServerRegistry {
     }
 
     private static LanguageServerRegistry resolve() {
-        Optional<String> configured = configuredTargets();
-        if (configured.isPresent()) {
-            return new LanguageServerRegistry(parseTargets(configured.get()), null);
-        }
-        List<String> legacyEndpoints = RuntimeEndpointConfig.fromRuntime().endpoints();
-        if (!legacyEndpoints.isEmpty()) {
-            // Legacy single-language mode: map the configured endpoint(s) to the
-            // default (java, 3) target. Only the first distinct endpoint is used as
-            // the java-v3 target; the historical enc/dec split collapses to one
-            // server target (matching how make test-live points at one server).
-            URI endpoint = URI.create(legacyEndpoints.get(0));
-            return new LanguageServerRegistry(
-                List.of(new LanguageServerTarget(DEFAULT_LANGUAGE, DEFAULT_MAJOR_VERSION, endpoint)), null);
-        }
-        // Managed mode: boot one Java server in-process and stop it at JVM exit.
-        LocalJavaLanguageServer server = LocalJavaLanguageServer.start();
-        LanguageServerTarget target =
-            new LanguageServerTarget(DEFAULT_LANGUAGE, DEFAULT_MAJOR_VERSION, server.endpoint());
-        Runtime.getRuntime().addShutdownHook(new Thread(server::close, "esdk-managed-server-shutdown"));
-        return new LanguageServerRegistry(List.of(target), server);
+        String configured = configuredTargets().orElseThrow(() -> new IllegalStateException(
+            "No Language_Server targets configured. The Tests are endpoint-only "
+                + "(Requirement 10.2): supply the targets via the -D" + TARGETS_PROPERTY
+                + " system property or the " + TARGETS_ENV + " environment variable as a "
+                + "comma-separated list of <language>:<majorVersion>=<endpointUrl> entries, "
+                + "e.g. -D" + TARGETS_PROPERTY
+                + "=java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092. "
+                + "Run the Tests through the orchestrated entry point (`make orchestrate`), "
+                + "which launches every configured Language_Server and supplies this property."));
+        return new LanguageServerRegistry(parseTargets(configured));
+    }
+
+    /**
+     * Parse a raw {@code esdk.testserver.targets} value into a registry without
+     * touching the process-wide singleton, system properties, or the
+     * environment. Package-private test seam: the Property 12 jqwik test
+     * exercises the format-then-parse round trip and the pairwise matrix
+     * through it.
+     */
+    static LanguageServerRegistry parse(String raw) {
+        return new LanguageServerRegistry(parseTargets(raw));
     }
 
     private static Optional<String> configuredTargets() {
@@ -163,7 +146,10 @@ public final class LanguageServerRegistry {
         return targets;
     }
 
-    /** @return the first configured target (used by single-server Tests). */
+    /**
+     * @return the first configured target — the primary. Meta (harness-plumbing)
+     *     Tests run against this target only.
+     */
     public LanguageServerTarget primary() {
         return targets.get(0);
     }
@@ -187,10 +173,5 @@ public final class LanguageServerRegistry {
             }
         }
         return pairs;
-    }
-
-    /** @return {@code true} when {@code target}'s language drives the ESDK streaming API. */
-    public static boolean isStreamingCapable(LanguageServerTarget target) {
-        return STREAMING_CAPABLE_LANGUAGES.contains(target.language());
     }
 }

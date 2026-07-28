@@ -1,26 +1,40 @@
 # ============================================================================
 # ESDK TestServer — developer convenience Makefile
 # ----------------------------------------------------------------------------
-# The ESDK TestServer is split into FOUR INDEPENDENT Gradle builds (not a
-# composite build), each with its own wrapper:
+# The ESDK TestServer is split into SEPARATE Gradle builds (not a composite
+# build), each with its own wrapper:
 #
 #   model/         the single Smithy model (validated with the smithy CLI)
 #   client-java/   the generated Java Test_Client   (root: esdk-test-server-client-java)
-#   servers/java/  the Java Language_Server         (root: esdk-test-server-java)
+#   servers/python/ the Python Language_Server      (hand-implemented, no build)
 #   tests/         the single Java Tests suite       (root: esdk-test-server-tests)
+#   orchestrator/  the Orchestrator core            (root: esdk-test-server-orchestrator)
 #
-# Because they are separate builds, you cannot (for example) run the server's
-# `runServer` task from the tests module. This Makefile hides that by cd-ing
-# into the correct module for each target.
+# The Java Language_Server is NOT hosted here: it lives in the
+# aws-crypto-tools-java Language_Repository at esdk/test-server/server
+# (Requirement 1.2), and the orchestrated run resolves it from the java
+# entry's Server_Location in config/configuration-set.json (Requirement 1.5).
+#
+# THE SINGLE ORCHESTRATED ENTRY POINT
+# -----------------------------------
+# `make orchestrate` is the one invocation that performs the complete
+# cross-language run (Requirement 2.7): it resolves every configured
+# Language_Server's source, builds and launches each as a subprocess on its
+# configured port, runs the single Tests suite over the full pairwise
+# (encrypt, decrypt) matrix of the launched Targets, prints the
+# Resolution_Record, reports one fail-open Result, and always tears the
+# servers down. There is NO separate Makefile-driven cross-language path — the
+# old `test` / `test-live` / `test-cross-language` targets are retired in
+# favor of `make orchestrate`.
 #
 # Usage examples:
 #   make                       # show help (default goal)
 #   make validate              # smithy validate + model smoke checks
 #   make build                 # fast compile/codegen check of all modules
-#   make test                  # in-process round trip (recommended green path)
-#   make run-server PORT=9090  # start the Java server in the foreground
-#   make test-live PORT=9091   # orchestrated over-HTTP round trip
-#   make JAVA_HOME=/path/to/jdk21 test   # force a specific JDK
+#   make orchestrate           # the complete cross-language Commons_Run
+#   make orchestrate-test      # the orchestrator's own property/integration tests
+#   make setup-python          # prepare the Python server env (clone/venv/install)
+#   make JAVA_HOME=/path/to/jdk21 orchestrate   # force a specific JDK
 #
 # NOTE: written to work with the GNU Make 3.81 that ships with macOS, which
 # predates `.ONESHELL`/`.SHELLFLAGS`. Multi-step recipes therefore either live
@@ -36,17 +50,19 @@ MAKEFILE_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 # Module directories.
 MODEL_DIR  := $(MAKEFILE_DIR)/model
 CLIENT_DIR := $(MAKEFILE_DIR)/client-java
-SERVER_DIR := $(MAKEFILE_DIR)/servers/java
 TESTS_DIR  := $(MAKEFILE_DIR)/tests
 ORCH_DIR   := $(MAKEFILE_DIR)/orchestrator
 CDK_DIR    := $(MAKEFILE_DIR)/cdk
 
 # ----------------------------------------------------------------------------
-# KMS_Test_Resources coordinates for the ONLINE, credential-gated KMS Tests
-# (task 15.8). These are read from the environment so a developer can export
-# them once (from the CDK stack's CfnOutputs) and run `make test-kms`. The
-# region defaults to us-west-2. They map 1:1 to the runtime-config keys the
-# Tests read (esdk.testserver.kms.*) via KmsRuntimeConfig.
+# KMS_Test_Resources coordinates for the ONLINE, credential-gated KMS Tests.
+# ----------------------------------------------------------------------------
+# The KMS keyring scenarios are REQUIRED and run INSIDE the orchestrated run
+# (`make orchestrate`); they are not a separate target. The Tests read the key
+# ARNs from KmsRuntimeConfig, which defaults them but honors the
+# ESDK_TESTSERVER_KMS_* environment variables (and matching
+# esdk.testserver.kms.* system properties). To run `make orchestrate` against a
+# non-default key set, export these before invoking it:
 #   ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN -> esdk.testserver.kms.symmetricKeyArn
 #   ESDK_TESTSERVER_KMS_MRK_ARN           -> esdk.testserver.kms.mrkArn
 #   ESDK_TESTSERVER_KMS_RSA_KEY_ARN       -> esdk.testserver.kms.rsaKeyArn
@@ -62,37 +78,30 @@ ESDK_TESTSERVER_KMS_REGION ?= us-west-2
 # into a brand-new account that has no GitHub OIDC provider yet.
 CREATE_OIDC_PROVIDER ?= false
 
-# Makefile-owned scratch directory for temp files (server log for test-live).
-# Kept separate from the per-module Gradle `build/` dirs to avoid confusion,
-# and ignored via the sibling .gitignore.
+# Makefile-owned scratch directory for temp files. Kept separate from the
+# per-module Gradle `build/` dirs to avoid confusion, and ignored via the
+# sibling .gitignore. (The orchestrated run keeps its own scratch under
+# orchestrator/build/; this is only used by `clean`.)
 TMP_DIR    := $(MAKEFILE_DIR)/.make-tmp
-SERVER_LOG := $(TMP_DIR)/roundtrip-server.log
-
-# Port used by run-server / test-live (override on the command line, e.g.
-# `make run-server PORT=9090`). Defaults to 9090.
-PORT ?= 9090
 
 # ----------------------------------------------------------------------------
-# Cross-language (Java + Python) coordinates for `setup-python` / `test-cross-language`.
+# Python Language_Server environment (setup-python / run-python-server).
 # ----------------------------------------------------------------------------
 # The Python Language_Server is hand-implemented and delegates to the real AWS
-# Encryption SDK for Python, installed from a clone of its repository (the repo
-# URL is part of the Configuration — there is no aws-crypto-tools-python repo yet,
-# so its current home is used). Python needs no compile step, so `setup-python`
-# just clones + creates a venv + installs the ESDK editable from the relative path.
+# Encryption SDK for Python, installed from a clone of its repository. Python
+# needs no compile step, so `setup-python` just clones + creates a venv +
+# installs the ESDK editable from the relative path. NOTE: the orchestrated run
+# (`make orchestrate`) sets up its own isolated Python environment via the
+# PythonLaunchPlan, so `setup-python` / `run-python-server` are standalone
+# developer conveniences for exercising the Python server by hand.
 PYTHON3        ?= python3
 PY_SERVER_DIR  := $(MAKEFILE_DIR)/servers/python
 PY_ESDK_REPO   ?= https://github.com/aws/aws-encryption-sdk-python
 PY_ESDK_DIR    := $(PY_SERVER_DIR)/.deps/aws-encryption-sdk-python
 PY_VENV        := $(PY_SERVER_DIR)/.venv
 PY_PYTHON      := $(PY_VENV)/bin/python
-# Language-major-version target ports for the cross-language matrix.
-JAVA_PORT      ?= 8080
+# Port for the standalone `run-python-server` convenience target.
 PYTHON_PORT    ?= 8091
-JAVA_MAJOR     ?= 3
-PYTHON_MAJOR   ?= 4
-JAVA_SERVER_LOG   := $(TMP_DIR)/cross-java-server.log
-PYTHON_SERVER_LOG := $(TMP_DIR)/cross-python-server.log
 
 # ----------------------------------------------------------------------------
 # JDK resolution
@@ -119,9 +128,9 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-java validate smoke build build-client build-server build-tests \
-        test run-server test-live roundtrip orchestrate orchestrate-test \
-        deploy-kms-cdk test-kms setup-python run-python-server test-cross-language clean
+.PHONY: help check-java validate smoke build build-client build-tests \
+        orchestrate orchestrate-test \
+        deploy-kms-cdk setup-python run-python-server clean
 
 # ----------------------------------------------------------------------------
 help: ## Show this help
@@ -132,8 +141,11 @@ help: ## Show this help
 		| sort \
 		| awk 'BEGIN{FS=":.*## "}{printf "  %-20s %s\n", $$1, $$2}'
 	@echo ""
+	@echo "The single orchestrated entry point is 'make orchestrate' (the complete"
+	@echo "cross-language Commons_Run). The KMS scenarios are REQUIRED and run inside"
+	@echo "it, so valid AWS credentials must be present (e.g. run \`creds\`)."
+	@echo ""
 	@echo "Variables:"
-	@echo "  PORT=$(PORT)         port for run-server / test-live"
 	@echo "  JAVA_HOME=$(if $(strip $(JAVA_HOME)),$(JAVA_HOME),<unresolved — set to a JDK 21+>)"
 
 # ----------------------------------------------------------------------------
@@ -147,13 +159,15 @@ check-java: ## Verify a JDK 21+ is resolved (used by Gradle targets)
 	@"$(JAVA_HOME)/bin/java" -version 2>&1 | sed 's/^/    /'
 
 # ----------------------------------------------------------------------------
-validate: ## Validate the Smithy model (smithy validate + model smoke checks)
+validate: ## Validate the Smithy model + structural smoke checks (model + factoring)
 	@echo "==> smithy validate (model/)"
 	@cd "$(MODEL_DIR)" && smithy validate
 	@echo "==> model structural smoke check"
 	@bash "$(MODEL_DIR)/tests/structural_smoke_check.sh"
 	@echo "==> model reject-polymorph check"
 	@bash "$(MODEL_DIR)/tests/reject_polymorph_check.sh"
+	@echo "==> factoring structural smoke check (config/tests/)"
+	@bash "$(MAKEFILE_DIR)/config/tests/structural_smoke_check.sh"
 
 # ----------------------------------------------------------------------------
 smoke: ## Run model smoke checks and the tests round-trip smoke check
@@ -165,130 +179,57 @@ smoke: ## Run model smoke checks and the tests round-trip smoke check
 	@bash "$(TESTS_DIR)/smoke/round_trip_smoke_check.sh"
 
 # ----------------------------------------------------------------------------
-build: build-client build-server build-tests ## Build all modules (skips tests: fast compile/codegen check)
+build: build-client build-tests ## Build all modules (skips tests: fast compile/codegen check)
 	@echo "==> All modules built (tests skipped)."
 
 build-client: check-java ## Build the Java Test_Client (client-java, skips tests)
 	@echo "==> Building client-java"
 	@cd "$(CLIENT_DIR)" && ./gradlew build -x test
 
-build-server: check-java ## Build the Java Language_Server (servers/java, skips tests)
-	@echo "==> Building servers/java"
-	@cd "$(SERVER_DIR)" && ./gradlew build -x test
-
 build-tests: check-java ## Build the Tests suite (tests, skips tests)
 	@echo "==> Building tests"
 	@cd "$(TESTS_DIR)" && ./gradlew build -x test
 
 # ----------------------------------------------------------------------------
-test: check-java ## Run the Tests (boots the server in-process). KMS scenarios are REQUIRED: needs AWS creds
-	@echo "==> Running in-process round trip (tests/)"
-	@echo "    NOTE: the KMS keyring scenarios are required and run against the default"
-	@echo "    KMS_Test_Resources, so valid AWS credentials must be present (e.g. run \`creds\`)."
-	@echo "    Override the default key ARNs with ESDK_TESTSERVER_KMS_* (see test-kms)."
-	@cd "$(TESTS_DIR)" && ./gradlew test
-
-# ----------------------------------------------------------------------------
-run-server: check-java ## Start the Java server in the FOREGROUND on PORT (blocks; Ctrl-C to stop)
-	@echo "==> Starting Java Language_Server on port $(PORT) (foreground; Ctrl-C to stop)"
-	@cd "$(SERVER_DIR)" && ./gradlew runServer --args="$(PORT)"
-
-# ----------------------------------------------------------------------------
-# Orchestrated over-HTTP round trip. Because macOS make (3.81) runs each recipe
-# line in its own shell, the whole orchestration is one script exported via the
-# environment and executed in a single `bash -c` so the PID, cleanup function
-# and trap all share one shell. It starts the server in the BACKGROUND, waits
-# until it accepts connections (with a timeout), runs the Tests against it, and
-# ALWAYS stops the server (even on failure), propagating the Tests' exit code.
-define RUN_LIVE
-set -eo pipefail
-mkdir -p "$(TMP_DIR)"
-echo "==> test-live: PORT=$(PORT)"
-echo "    server log: $(SERVER_LOG)"
-
-# Start the server in the background; capture the launcher PID.
-( cd "$(SERVER_DIR)" && exec ./gradlew --console=plain -q runServer --args="$(PORT)" ) >"$(SERVER_LOG)" 2>&1 &
-SERVER_PID=$$!
-
-# Cleanup runs on ANY exit (success, test failure, timeout, Ctrl-C): kill the
-# launcher subtree AND anything still bound to the port, so we never leave an
-# orphaned server process behind.
-cleanup() {
-	trap - EXIT INT TERM
-	echo "==> Stopping background server (pid $$SERVER_PID) and freeing port $(PORT)"
-	pkill -P "$$SERVER_PID" 2>/dev/null || true
-	kill "$$SERVER_PID" 2>/dev/null || true
-	pids=$$(lsof -ti tcp:$(PORT) 2>/dev/null || true)
-	if [ -n "$$pids" ]; then kill $$pids 2>/dev/null || true; fi
-	sleep 1
-	pids=$$(lsof -ti tcp:$(PORT) 2>/dev/null || true)
-	if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
-}
-trap cleanup EXIT INT TERM
-
-# Wait until the server accepts connections (or the log confirms it), failing
-# fast if the process dies or we exceed the timeout.
-echo "==> Waiting for server to accept connections on 127.0.0.1:$(PORT)"
-attempts=0
-max_attempts=180
-until nc -z 127.0.0.1 "$(PORT)" >/dev/null 2>&1 || grep -q "listening at http://127.0.0.1:$(PORT)" "$(SERVER_LOG)" 2>/dev/null; do
-	if ! kill -0 "$$SERVER_PID" 2>/dev/null && ! lsof -ti tcp:$(PORT) >/dev/null 2>&1; then
-		echo "ERROR: server process exited before becoming ready. Last log lines:" >&2
-		tail -n 40 "$(SERVER_LOG)" >&2 || true
-		exit 1
-	fi
-	attempts=$$((attempts + 1))
-	if [ "$$attempts" -ge "$$max_attempts" ]; then
-		echo "ERROR: timed out after $${max_attempts}s waiting for the server. Last log lines:" >&2
-		tail -n 40 "$(SERVER_LOG)" >&2 || true
-		exit 1
-	fi
-	sleep 1
-done
-echo "==> Server is up. Running Tests against http://127.0.0.1:$(PORT)"
-
-# Run the Tests against the external endpoint; capture the exit code so the EXIT
-# trap can clean up before we propagate it.
-set +e
-( cd "$(TESTS_DIR)" && ./gradlew --console=plain test -Desdk.testserver.endpoints=http://127.0.0.1:$(PORT) )
-rc=$$?
-set -e
-echo "==> Tests exit code: $$rc"
-exit $$rc
-endef
-export RUN_LIVE
-
-test-live roundtrip: check-java ## Start server in background on PORT, run Tests over HTTP, then always stop it
-	@bash -c "$$RUN_LIVE"
-
-# ----------------------------------------------------------------------------
-orchestrate: check-java ## Run the orchestrator end-to-end (launch Java server on its configured port, run Tests, fail-open Result)
-	@echo "==> Running the ESDKTestServer orchestrator (orchestrator/)"
+# The single orchestrated entry point (Requirement 2.7). One invocation runs
+# the complete cross-language Commons_Run: resolve + build + launch every
+# configured Language_Server as a subprocess on its configured port, run the
+# single Tests suite over the full pairwise matrix of the launched Targets,
+# print the Resolution_Record, report one fail-open Result, and always tear the
+# servers down. The KMS scenarios are REQUIRED, so valid AWS credentials must be
+# present (e.g. run `creds`); export ESDK_TESTSERVER_KMS_* to point at a
+# non-default key set.
+orchestrate: check-java ## Run the complete cross-language Commons_Run (all servers, full matrix); needs AWS creds
+	@echo "==> Running the ESDKTestServer orchestrator (orchestrator/) — complete cross-language run"
+	@echo "    Launches every configured Language_Server on its port, runs the Tests over the"
+	@echo "    full pairwise matrix, prints the Resolution_Record, and reports one fail-open Result."
+	@echo "    The KMS keyring scenarios are REQUIRED: valid AWS credentials must be present"
+	@echo "    (e.g. run \`creds\`); export ESDK_TESTSERVER_KMS_* to use a non-default key set."
 	@cd "$(ORCH_DIR)" && ./gradlew --console=plain run
 
-orchestrate-test: check-java ## Run the orchestrator's property + integration tests (Properties 11-14, port binding/conflict, error paths)
+orchestrate-test: check-java ## Run the orchestrator's property + integration tests (pure pipeline logic, no AWS creds)
 	@echo "==> Running orchestrator tests (orchestrator/)"
 	@cd "$(ORCH_DIR)" && ./gradlew --console=plain test
 
 # ----------------------------------------------------------------------------
-# ONLINE AWS KMS keyring coverage (task 15) — REQUIRED.
+# ONLINE AWS KMS keyring coverage — REQUIRED, run inside `make orchestrate`.
 # ----------------------------------------------------------------------------
 # The KMS keyring scenarios (AwsKms / AwsKmsMrk / AwsKmsMultiKeyring / AwsKmsRsa
 # / AwsKmsDiscovery) are ONLINE: they make real AWS KMS calls on encrypt/decrypt.
-# They are REQUIRED and ALWAYS run against the KMS_Test_Resources, whose ARNs
-# default in KmsRuntimeConfig — so `make test` / `make orchestrate` need valid
-# AWS credentials (e.g. run `creds`) and a run does NOT pass unless the KMS
-# scenarios run and pass. `test-kms` below is a convenience for pointing the
-# Tests at a DIFFERENT set of keys by exporting the ESDK_TESTSERVER_KMS_* ARNs;
-# for the default keys, plain `make test` already includes the KMS scenarios.
+# They are REQUIRED and run as part of the orchestrated cross-language run
+# (`make orchestrate`) against the KMS_Test_Resources, whose ARNs default in
+# KmsRuntimeConfig — so `make orchestrate` needs valid AWS credentials (e.g. run
+# `creds`) and a run does NOT pass unless the KMS scenarios run and pass. To run
+# against a DIFFERENT key set, export the ESDK_TESTSERVER_KMS_* variables (see
+# the KMS_Test_Resources block above) before `make orchestrate`.
 #
-# Local flow to run the KMS Tests against a non-default key set:
+# Flow to provision and use a fresh key set:
 #   1. Obtain developer AWS credentials for the CI resources account (Amazon:
 #      run `creds` / `ada credentials update ...` / `aws sso login` — whatever
 #      your environment uses so `aws sts get-caller-identity` succeeds).
 #   2. `make deploy-kms-cdk`  (once) to provision the keys; note the CfnOutputs.
 #   3. export the three key ARNs (and optionally the region) into your env.
-#   4. `make test-kms`        to run the Tests WITH the KMS scenarios included.
+#   4. `make orchestrate`     to run the full matrix WITH the KMS scenarios.
 
 deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via `creds`); prints key/role ARNs
 	@echo "==> Deploying EsdkTestServerKmsStack from cdk/ (region $(ESDK_TESTSERVER_KMS_REGION))"
@@ -296,7 +237,7 @@ deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via 
 	@echo "    Obtain them first (e.g. run \`creds\`) so \`aws sts get-caller-identity\` works."
 	@echo "    createOidcProvider=$(CREATE_OIDC_PROVIDER) (import existing GitHub OIDC provider unless =true)."
 	@echo "    On success, CDK prints the CfnOutputs: symmetricKeyArn, mrkArn, rsaKeyArn, roleArn."
-	@echo "    Export them for \`make test-kms\`:"
+	@echo "    Export them for \`make orchestrate\`:"
 	@echo "      export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<symmetricKeyArn>"
 	@echo "      export ESDK_TESTSERVER_KMS_MRK_ARN=<mrkArn>"
 	@echo "      export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<rsaKeyArn>"
@@ -304,34 +245,11 @@ deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via 
 		AWS_REGION="$(ESDK_TESTSERVER_KMS_REGION)" npx cdk deploy --require-approval never \
 			-c createOidcProvider=$(CREATE_OIDC_PROVIDER)
 
-test-kms: check-java ## Run the Tests INCLUDING online KMS scenarios (needs `creds` + exported KMS ARNs)
-	@if [ -z "$${ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN:-}" ] || \
-		[ -z "$${ESDK_TESTSERVER_KMS_MRK_ARN:-}" ] || \
-		[ -z "$${ESDK_TESTSERVER_KMS_RSA_KEY_ARN:-}" ]; then \
-		echo "ERROR: the KMS_Test_Resources ARNs are not set in the environment." >&2; \
-		echo "       KMS Tests are ONLINE and are skipped without them (and without AWS creds)." >&2; \
-		echo "       First obtain AWS credentials (e.g. run \`creds\`), then export:" >&2; \
-		echo "         export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<arn>" >&2; \
-		echo "         export ESDK_TESTSERVER_KMS_MRK_ARN=<arn>" >&2; \
-		echo "         export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<arn>" >&2; \
-		echo "         export ESDK_TESTSERVER_KMS_REGION=$(ESDK_TESTSERVER_KMS_REGION)  # optional" >&2; \
-		echo "       (Get the ARNs from \`make deploy-kms-cdk\`.) Then re-run \`make test-kms\`." >&2; \
-		exit 1; \
-	fi
-	@echo "==> Running Tests WITH online KMS scenarios (region $${ESDK_TESTSERVER_KMS_REGION:-$(ESDK_TESTSERVER_KMS_REGION)})"
-	@echo "    (real AWS KMS calls happen on encrypt/decrypt; requires valid AWS credentials.)"
-	@cd "$(TESTS_DIR)" && ./gradlew test \
-		-Desdk.testserver.kms.symmetricKeyArn="$$ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN" \
-		-Desdk.testserver.kms.mrkArn="$$ESDK_TESTSERVER_KMS_MRK_ARN" \
-		-Desdk.testserver.kms.rsaKeyArn="$$ESDK_TESTSERVER_KMS_RSA_KEY_ARN" \
-		-Desdk.testserver.kms.region="$${ESDK_TESTSERVER_KMS_REGION:-$(ESDK_TESTSERVER_KMS_REGION)}"
-
 # ----------------------------------------------------------------------------
-# Cross-language (Java + Python) round trip. `setup-python` prepares the Python
-# server's environment (clone the ESDK, create the venv, install); it is Python,
-# so there is no compile step. `test-cross-language` launches BOTH the Java and
-# Python servers and runs the single Tests suite over the pairwise matrix of
-# (java-vN, python-vM) targets via the esdk.testserver.targets runtime property.
+# Python Language_Server standalone conveniences. `setup-python` prepares the
+# Python server's environment (clone the ESDK, create the venv, install); it is
+# Python, so there is no compile step. These are for exercising the Python
+# server by hand — the orchestrated run sets up its own isolated environment.
 # ----------------------------------------------------------------------------
 setup-python: ## Clone the Python ESDK, create the venv, and install the Python server deps
 	@echo "==> Preparing the Python Language_Server environment"
@@ -357,77 +275,10 @@ run-python-server: ## Start the Python server in the FOREGROUND on PYTHON_PORT (
 	@echo "==> Starting Python Language_Server on port $(PYTHON_PORT) (foreground; Ctrl-C to stop)"
 	@cd "$(PY_SERVER_DIR)" && "$(PY_PYTHON)" -m esdk_test_server "$(PYTHON_PORT)"
 
-# Launch the Java server (background) AND the Python server (background), wait for
-# both, run the single Tests over the pairwise (java, python) target matrix, then
-# ALWAYS stop both servers. One `bash -c` so PIDs/trap share a shell (make 3.81).
-define RUN_CROSS
-set -eo pipefail
-mkdir -p "$(TMP_DIR)"
-echo "==> test-cross-language: java:$(JAVA_MAJOR)@$(JAVA_PORT), python:$(PYTHON_MAJOR)@$(PYTHON_PORT)"
-
-if [ ! -x "$(PY_PYTHON)" ]; then
-	echo "ERROR: Python venv not found at $(PY_PYTHON). Run 'make setup-python' first." >&2
-	exit 1
-fi
-
-( cd "$(SERVER_DIR)" && exec ./gradlew --console=plain -q runServer --args="$(JAVA_PORT)" ) >"$(JAVA_SERVER_LOG)" 2>&1 &
-JAVA_PID=$$!
-( cd "$(PY_SERVER_DIR)" && exec "$(PY_PYTHON)" -m esdk_test_server "$(PYTHON_PORT)" ) >"$(PYTHON_SERVER_LOG)" 2>&1 &
-PYTHON_PID=$$!
-
-cleanup() {
-	trap - EXIT INT TERM
-	echo "==> Stopping servers and freeing ports $(JAVA_PORT), $(PYTHON_PORT)"
-	for pid in "$$JAVA_PID" "$$PYTHON_PID"; do pkill -P "$$pid" 2>/dev/null || true; kill "$$pid" 2>/dev/null || true; done
-	for port in $(JAVA_PORT) $(PYTHON_PORT); do
-		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); if [ -n "$$pids" ]; then kill $$pids 2>/dev/null || true; fi
-	done
-	sleep 1
-	for port in $(JAVA_PORT) $(PYTHON_PORT); do
-		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
-	done
-}
-trap cleanup EXIT INT TERM
-
-wait_for() {
-	name="$$1"; port="$$2"; pid="$$3"; log="$$4"
-	echo "==> Waiting for $$name on 127.0.0.1:$$port"
-	attempts=0; max_attempts=180
-	until nc -z 127.0.0.1 "$$port" >/dev/null 2>&1; do
-		if ! kill -0 "$$pid" 2>/dev/null && ! lsof -ti tcp:$$port >/dev/null 2>&1; then
-			echo "ERROR: $$name exited before becoming ready. Last log lines:" >&2; tail -n 40 "$$log" >&2 || true; exit 1
-		fi
-		attempts=$$((attempts + 1))
-		if [ "$$attempts" -ge "$$max_attempts" ]; then
-			echo "ERROR: timed out waiting for $$name. Last log lines:" >&2; tail -n 40 "$$log" >&2 || true; exit 1
-		fi
-		sleep 1
-	done
-	echo "==> $$name is up"
-}
-wait_for "java server" "$(JAVA_PORT)" "$$JAVA_PID" "$(JAVA_SERVER_LOG)"
-wait_for "python server" "$(PYTHON_PORT)" "$$PYTHON_PID" "$(PYTHON_SERVER_LOG)"
-
-TARGETS="java:$(JAVA_MAJOR)=http://127.0.0.1:$(JAVA_PORT),python:$(PYTHON_MAJOR)=http://127.0.0.1:$(PYTHON_PORT)"
-echo "==> Running Tests over the cross-language matrix: $$TARGETS"
-set +e
-( cd "$(TESTS_DIR)" && ./gradlew --console=plain cleanTest test -Desdk.testserver.targets="$$TARGETS" )
-rc=$$?
-set -e
-echo "==> Tests exit code: $$rc"
-exit $$rc
-endef
-export RUN_CROSS
-
-test-cross-language: check-java ## Launch Java + Python servers and run the Tests over the (java, python) matrix
-	@bash -c "$$RUN_CROSS"
-
 # ----------------------------------------------------------------------------
 clean: ## gradle clean in every module + remove Makefile temp files
 	@echo "==> Cleaning client-java"
 	@cd "$(CLIENT_DIR)" && ./gradlew clean || true
-	@echo "==> Cleaning servers/java"
-	@cd "$(SERVER_DIR)" && ./gradlew clean || true
 	@echo "==> Cleaning tests"
 	@cd "$(TESTS_DIR)" && ./gradlew clean || true
 	@echo "==> Cleaning orchestrator"

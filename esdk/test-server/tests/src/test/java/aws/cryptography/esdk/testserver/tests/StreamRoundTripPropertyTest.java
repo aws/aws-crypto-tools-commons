@@ -2,6 +2,7 @@ package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+import java.util.Set;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.ForAll;
@@ -45,9 +46,14 @@ class StreamRoundTripPropertyTest {
     @BeforeContainer
     static void bootEndpoints() {
         // Single-server stream plaintext-breadth property on the primary target's
-        // self-pair (Requirement 4.9); cross-language stream breadth lives in
-        // MaterialsRoundTripTests over Streaming_Capable pairs.
+        // self-pair; cross-language stream breadth lives in
+        // MaterialsRoundTripTests over every pair, gated per combination.
         pair = LanguageServerRegistry.shared().selfPair();
+        // This container is associated with the streaming Feature (Requirements
+        // 9.1, 9.2): gate before any Language_Server operation. A TestAbortedException
+        // thrown here aborts the whole container, surfacing as skipped in the
+        // platform reports (Requirement 9.5).
+        FeatureGate.require(Set.of("streaming"), pair);
     }
 
     // Feature: esdk-test-server, Property 15: Stream round-trip preserves plaintext byte-for-byte
