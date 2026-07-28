@@ -11,8 +11,8 @@ import java.net.URI;
  * {@code java-v3}, decrypt on {@code python-v4}. Same-target pairs (e.g.
  * {@code java-v3 -> java-v3}) are included for completeness.
  *
- * <p>The lifecycle of any managed (in-process) server lives in
- * {@link LanguageServerRegistry}; a pair is a plain value object whose endpoints
+ * <p>Target resolution lives in {@link LanguageServerRegistry} (endpoint-only,
+ * from runtime configuration); a pair is a plain value object whose endpoints
  * are the targets' endpoint URLs.
  */
 public record EndpointPair(LanguageServerTarget encryptTarget, LanguageServerTarget decryptTarget) {
@@ -25,12 +25,6 @@ public record EndpointPair(LanguageServerTarget encryptTarget, LanguageServerTar
     /** @return the base endpoint URL to run {@code CreateClient}/decrypt against. */
     public URI decryptEndpoint() {
         return decryptTarget.endpoint();
-    }
-
-    /** @return {@code true} when BOTH endpoints drive the ESDK streaming API. */
-    public boolean isStreamingCapable() {
-        return LanguageServerRegistry.isStreamingCapable(encryptTarget)
-            && LanguageServerRegistry.isStreamingCapable(decryptTarget);
     }
 
     @Override

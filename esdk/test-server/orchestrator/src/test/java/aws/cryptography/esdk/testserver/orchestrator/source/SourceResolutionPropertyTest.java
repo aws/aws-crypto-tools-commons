@@ -1,117 +1,278 @@
 package aws.cryptography.esdk.testserver.orchestrator.source;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSet;
+import aws.cryptography.esdk.testserver.orchestrator.config.RepositoryCoordinates;
+import aws.cryptography.esdk.testserver.orchestrator.config.ServerLocation;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
-import net.jqwik.api.Combinators;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.GenerationMode;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
+import net.jqwik.api.constraints.IntRange;
 
 /**
- * Property-based test for {@link SourceResolver} using jqwik. Each property runs
- * a minimum of 100 generated iterations against the in-process resolver — a pure
- * function over overrides, so no server is launched and no repository is cloned
- * (design Testing Strategy: P12 is orchestrator resolver logic).
+ * Property-based test for the pure source-resolution planner
+ * ({@link SourceResolver}), implementing the design's Property 3 over
+ * generated Configuration_Sets, Configuration_Overrides, and both run-context
+ * kinds. Example-based coverage of the same rules lives in
+ * {@link SourceResolverTest}.
+ *
+ * <p>Runs against the in-process planner only — no I/O, no git, nothing is
+ * cloned (design "SourceResolver": planning is pure; execution is the
+ * SourceMaterializer's job).
  */
 class SourceResolutionPropertyTest {
 
     private static final List<String> LANG_POOL =
         List.of("java", "python", "javascript", "rust", "go", "dotnet");
 
-    private final SourceResolver resolver = new SourceResolver();
+    private static final List<String> CATALOG = List.of("streaming", "MPL");
 
-    private static ConfigurationSet setOf(List<String> langs) {
-        List<ConfigurationEntry> entries = new ArrayList<>();
-        int port = 1024;
-        for (String lang : langs) {
-            entries.add(new ConfigurationEntry(lang, "main", "repo-" + lang, 3, port++));
-        }
-        return new ConfigurationSet(entries);
+    private static final Path COMMONS_ROOT = Path.of("/work/commons");
+    private static final Path LANGUAGE_REPO_ROOT = Path.of("/work/language-repo");
+
+    /** The three server-host shapes a generated Server_Location can take. */
+    private enum ServerHost { INVOKING_REPOSITORY, OTHER_REPOSITORY_A, OTHER_REPOSITORY_B }
+
+    private static ServerHost hostChoice(int hostSeed, int index) {
+        return ServerHost.values()[Math.floorMod(hostSeed + index, ServerHost.values().length)];
     }
 
-    // Feature: esdk-test-server, Property 12: Source resolution maps each language to its effective source
-    @Property(tries = 200, generation = GenerationMode.RANDOMIZED)
-    void eachLanguageResolvesToItsEffectiveSource(@ForAll("invocation") Invocation inv) {
-        ConfigurationSet set = setOf(inv.languages);
-        SourceResolution resolution = resolver.resolve(set, inv.overrides);
+    /**
+     * A structurally complete entry for {@code language} whose Server_Location
+     * repository is decided by {@code host} relative to the run's invoking
+     * repository, with all coordinates salted so the assertions verify exact
+     * echoing rather than coincidence.
+     */
+    private static ConfigurationEntry entry(
+            String language, int port, ServerHost host, String invokingRepository,
+            int salt, String tag) {
+        String serverRepo = switch (host) {
+            case INVOKING_REPOSITORY -> invokingRepository;
+            case OTHER_REPOSITORY_A -> "other-repo-a-" + language;
+            case OTHER_REPOSITORY_B -> "other-repo-b-" + language;
+        };
+        return new ConfigurationEntry(language, 3, port,
+            new RepositoryCoordinates(
+                tag + "lib-repo-" + language,
+                "git@github.com:aws/" + tag + "lib-" + language + "-" + salt + ".git",
+                tag + "lib-branch-" + language + "-" + salt,
+                tag + "lib-path/" + language),
+            new ServerLocation(
+                serverRepo,
+                "git@github.com:aws/" + tag + "srv-" + language + "-" + salt + ".git",
+                tag + "srv-ref-" + language + "-" + salt,
+                tag + "srv-path/" + language),
+            null, null);
+    }
 
-        assertTrue(resolution.isResolved(),
-            "a conflict-free invocation must resolve, but failed: " + resolution.failure());
-        Map<String, ResolvedSource> sources = resolution.sources();
-        assertEquals(inv.languages.size(), sources.size(),
-            "every configured language must resolve to exactly one source");
+    private static Map<ComponentId, ResolvedComponentPlan> byComponent(
+            List<ResolvedComponentPlan> plans) {
+        Map<ComponentId, ResolvedComponentPlan> map = new LinkedHashMap<>();
+        for (ResolvedComponentPlan plan : plans) {
+            ResolvedComponentPlan previous = map.put(plan.component(), plan);
+            assertTrue(previous == null,
+                "the plan must contain exactly one entry per component, but "
+                + plan.component() + " appeared twice");
+        }
+        return map;
+    }
 
-        // Build the expected override-by-language view.
-        Map<String, Override> expected = new java.util.HashMap<>();
-        for (Override o : inv.overrides) {
-            expected.put(o.language(), o);
+    // Feature: test-server-factoring, Property 3: Source resolution is a pure function of the effective configuration and context
+    //
+    // For any generated Configuration_Set, Configuration_Overrides, and run
+    // context: the resolution plan derives each language's server component
+    // solely from the run-effective Server_Location (the override's when
+    // overridden, the stored entry's otherwise) and each library component
+    // solely from the run-effective library repository coordinates; in a
+    // Commons_Run every component derives from the commons-stored entries; in a
+    // Language_Repository_Run the own language's library and server both
+    // resolve to the working tree (its Server_Location ref is ignored and no
+    // clone is planned) while every Other language derives from the
+    // commons-clone entries except those replaced by an override; a
+    // Server_Location naming a repository other than the invoking one always
+    // yields a clone-plan at exactly (url, ref) with the location's path, and
+    // one naming the invoking repository always yields a working-tree plan with
+    // the location's path.
+    //
+    // Validates: Requirements 1.5, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.6
+    @Property(tries = 300, generation = GenerationMode.RANDOMIZED)
+    void sourceResolutionIsAPureFunctionOfTheEffectiveConfigurationAndContext(
+            @ForAll("languageSubsetsMin2") List<String> langs,
+            @ForAll boolean languageRun,
+            @ForAll @IntRange(min = 0, max = 5) int ownSeed,
+            @ForAll @IntRange(min = 0, max = 5) int storedHostSeed,
+            @ForAll @IntRange(min = 0, max = 5) int overrideHostSeed,
+            @ForAll @IntRange(min = 0, max = 3) int overrideSelectionSeed,
+            @ForAll boolean overridesRequested,
+            @ForAll boolean commonsBranchOverridden,
+            @ForAll @IntRange(min = 0, max = 99) int salt) {
+
+        // --- Arrange: run context ------------------------------------------
+        String ownLanguage = languageRun ? langs.get(Math.floorMod(ownSeed, langs.size())) : null;
+        String invokingRepository = languageRun
+            ? "language-repo-" + ownLanguage
+            : "aws-crypto-tools-commons";
+
+        CommonsOrigin origin = languageRun
+            ? new CommonsOrigin(
+                "git@github.com:aws/aws-crypto-tools-commons-" + salt + ".git",
+                "commons-branch-" + salt,
+                commonsBranchOverridden
+                    ? ResolutionReason.INVOCATION_OVERRIDE
+                    : ResolutionReason.CONFIGURATION_ENTRY)
+            : null;
+        RunContext context = languageRun
+            ? RunContext.languageRun(ownLanguage, LANGUAGE_REPO_ROOT, COMMONS_ROOT,
+                invokingRepository, origin)
+            : RunContext.commonsRun(COMMONS_ROOT, invokingRepository);
+
+        // --- Arrange: commons-stored entries with varied Server_Location
+        // repositories (some naming the invoking repository, some others) ----
+        List<ConfigurationEntry> entries = new ArrayList<>();
+        int port = 1024;
+        for (int i = 0; i < langs.size(); i++) {
+            entries.add(entry(langs.get(i), port++,
+                hostChoice(storedHostSeed, i), invokingRepository, salt, ""));
+        }
+        ConfigurationSet set = new ConfigurationSet("esdk", CATALOG, entries);
+
+        // --- Arrange: full-replacement overrides for a subset of the
+        // non-own languages (overrides only exist in Language_Repository_Runs;
+        // the own language never has one — validation rejects it) ------------
+        Map<String, ConfigurationEntry> overrideByLanguage = new LinkedHashMap<>();
+        if (languageRun && overridesRequested) {
+            int overridePort = 9001;
+            for (int i = 0; i < langs.size(); i++) {
+                String language = langs.get(i);
+                if (language.equals(ownLanguage)
+                        || Math.floorMod(overrideSelectionSeed + i, 2) != 0) {
+                    continue;
+                }
+                overrideByLanguage.put(language, entry(language, overridePort++,
+                    hostChoice(overrideHostSeed, i), invokingRepository, salt, "ovr-"));
+            }
+        }
+        List<ConfigurationEntry> overrides = List.copyOf(overrideByLanguage.values());
+
+        // --- Act ------------------------------------------------------------
+        List<ResolvedComponentPlan> plans =
+            new SourceResolver().resolve(set, context, overrides);
+        Map<ComponentId, ResolvedComponentPlan> plan = byComponent(plans);
+
+        // --- Assert: component population — one (library, server) pair per
+        // language, plus the commons component iff a Language_Repository_Run --
+        assertEquals(2 * langs.size() + (languageRun ? 1 : 0), plans.size(),
+            "the plan must cover every language x {library, server}"
+            + (languageRun ? " plus the commons component" : ""));
+
+        if (languageRun) {
+            ResolvedComponentPlan commons = plan.get(ComponentId.commons());
+            assertNotNull(commons, "a Language_Repository_Run plans the commons clone");
+            SourcePlan.Clone commonsClone =
+                assertInstanceOf(SourcePlan.Clone.class, commons.plan(),
+                    "the commons component of a Language_Repository_Run is a clone plan");
+            assertEquals(origin.url(), commonsClone.url());
+            assertEquals(origin.branch(), commonsClone.ref());
+            assertEquals(origin.reason(), commons.reason(),
+                "the commons component carries the branch-selection reason");
+        } else {
+            assertFalse(plan.containsKey(ComponentId.commons()),
+                "a Commons_Run plans no commons component (the working tree is implicit)");
         }
 
-        for (String lang : inv.languages) {
-            ResolvedSource resolved = sources.get(lang);
-            Override o = expected.get(lang);
-            if (o == null) {
-                // No override -> head of the configured branch/repository (Req 10.1, 10.2).
-                ResolvedSource.Head head = assertInstanceOf(ResolvedSource.Head.class, resolved,
-                    lang + " without an override must resolve to head");
-                assertEquals("main", head.branch());
-                assertEquals("repo-" + lang, head.repository());
-            } else if (o instanceof Override.Live live) {
-                ResolvedSource.Live got = assertInstanceOf(ResolvedSource.Live.class, resolved,
-                    lang + " with a live override must resolve to live");
-                assertEquals(live.path(), got.path());
-            } else if (o instanceof Override.Submodule sub) {
-                ResolvedSource.Submodule got = assertInstanceOf(ResolvedSource.Submodule.class, resolved,
-                    lang + " with a submodule override must resolve to the referenced commit");
-                assertEquals(sub.commit(), got.commit());
-            } else if (o instanceof Override.Artifact art) {
-                ResolvedSource.Artifact got = assertInstanceOf(ResolvedSource.Artifact.class, resolved,
-                    lang + " with an artifact override must resolve to that artifact");
-                assertEquals(art.version(), got.version());
+        // --- Assert: every language's pair matches the design rules exactly --
+        for (String language : langs) {
+            ConfigurationEntry stored = set.forLanguage(language);
+            ConfigurationEntry override = overrideByLanguage.get(language);
+            ConfigurationEntry effective = override != null ? override : stored;
+            boolean own = languageRun && language.equals(ownLanguage);
+
+            ResolvedComponentPlan library = plan.get(ComponentId.library(language));
+            ResolvedComponentPlan server = plan.get(ComponentId.server(language));
+            assertNotNull(library, "missing library plan for " + language);
+            assertNotNull(server, "missing server plan for " + language);
+
+            if (own) {
+                // Own language: library and server both resolve to the working
+                // tree — the Server_Location ref is ignored and no clone is
+                // planned (Req 4.2); reason working-tree.
+                assertEquals(ResolutionReason.WORKING_TREE, library.reason(),
+                    "own-language library reason");
+                assertEquals(ResolutionReason.WORKING_TREE, server.reason(),
+                    "own-language server reason");
+
+                SourcePlan.WorkingTree libTree = assertInstanceOf(
+                    SourcePlan.WorkingTree.class, library.plan(),
+                    "own-language library must be a working-tree plan (no clone)");
+                assertEquals(LANGUAGE_REPO_ROOT, libTree.root());
+                assertEquals(effective.libraryRepository().path(), libTree.path());
+
+                SourcePlan.WorkingTree srvTree = assertInstanceOf(
+                    SourcePlan.WorkingTree.class, server.plan(),
+                    "own-language server must be a working-tree plan (ref ignored, no clone)");
+                assertEquals(LANGUAGE_REPO_ROOT, srvTree.root());
+                assertEquals(effective.serverLocation().path(), srvTree.path());
+                continue;
+            }
+
+            // Other (or Commons_Run) language: the reason states which entry the
+            // component derives from — the override's when overridden (Req 4.6),
+            // the commons-stored / commons-clone entry's otherwise (Req 4.1, 4.3).
+            ResolutionReason expectedReason = override != null
+                ? ResolutionReason.CONFIGURATION_OVERRIDE
+                : ResolutionReason.CONFIGURATION_ENTRY;
+            assertEquals(expectedReason, library.reason(), language + " library reason");
+            assertEquals(expectedReason, server.reason(), language + " server reason");
+
+            // Library: solely the run-effective library repository coordinates.
+            RepositoryCoordinates lib = effective.libraryRepository();
+            SourcePlan.Clone libClone = assertInstanceOf(
+                SourcePlan.Clone.class, library.plan(),
+                language + " library must be a clone of the effective library repository");
+            assertEquals(lib.url(), libClone.url(), language + " library clone url");
+            assertEquals(lib.branch(), libClone.ref(), language + " library clone ref");
+            assertEquals(lib.path(), libClone.path(), language + " library clone path");
+
+            // Server: solely the run-effective Server_Location (Req 1.5, 3.5).
+            ServerLocation location = effective.serverLocation();
+            if (location.repository().equals(invokingRepository)) {
+                // Naming the invoking repository always yields a working-tree
+                // plan with the location's path (Req 3.4).
+                SourcePlan.WorkingTree tree = assertInstanceOf(
+                    SourcePlan.WorkingTree.class, server.plan(),
+                    language + " server naming the invoking repository must be a working-tree plan");
+                assertEquals(context.invokingWorkingTreeRoot(), tree.root(),
+                    language + " server working-tree root");
+                assertEquals(location.path(), tree.path(), language + " server working-tree path");
+            } else {
+                // Naming any other repository always yields a clone plan at
+                // exactly (url, ref) with the location's path (Req 3.3).
+                SourcePlan.Clone clone = assertInstanceOf(
+                    SourcePlan.Clone.class, server.plan(),
+                    language + " server naming another repository must be a clone plan");
+                assertEquals(location.url(), clone.url(), language + " server clone url");
+                assertEquals(location.ref(), clone.ref(), language + " server clone ref");
+                assertEquals(location.path(), clone.path(), language + " server clone path");
             }
         }
     }
 
-    /** A conflict-free invocation: >=1 language, at most one override per language, at most one live. */
-    record Invocation(List<String> languages, List<Override> overrides) {
-    }
-
     @Provide
-    Arbitrary<Invocation> invocation() {
-        Arbitrary<List<String>> langs = Arbitraries.subsetOf(LANG_POOL).ofMinSize(1).map(List::copyOf);
-        return langs.flatMap(languages -> {
-            // Choose the live language index in [-1, size): -1 means no live language.
-            Arbitrary<Integer> liveIndex = Arbitraries.integers().between(-1, languages.size() - 1);
-            // For every language choose a non-live mode: 0=none, 1=submodule, 2=artifact.
-            Arbitrary<List<Integer>> modes =
-                Arbitraries.integers().between(0, 2).list().ofSize(languages.size());
-            return Combinators.combine(liveIndex, modes).as((live, modeList) -> {
-                List<Override> overrides = new ArrayList<>();
-                for (int i = 0; i < languages.size(); i++) {
-                    String lang = languages.get(i);
-                    if (i == live) {
-                        overrides.add(new Override.Live(lang, Path.of("/live/" + lang)));
-                        continue;
-                    }
-                    switch (modeList.get(i)) {
-                        case 1 -> overrides.add(new Override.Submodule(lang, "commit-" + lang));
-                        case 2 -> overrides.add(new Override.Artifact(lang, "1." + i + ".0"));
-                        default -> { /* no override -> head */ }
-                    }
-                }
-                return new Invocation(languages, overrides);
-            });
-        });
+    Arbitrary<List<String>> languageSubsetsMin2() {
+        return Arbitraries.subsetOf(LANG_POOL).ofMinSize(2).map(List::copyOf);
     }
 }

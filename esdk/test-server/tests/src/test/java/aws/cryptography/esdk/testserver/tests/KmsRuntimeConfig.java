@@ -7,7 +7,7 @@ import java.util.Optional;
  * key ARNs and the AWS region — for the online, <strong>required</strong> KMS
  * round-trip scenarios from <em>runtime configuration only</em> (Requirement 14.7),
  * consistent with the runtime-configuration-only principle (Requirement 7.3) and
- * mirroring {@link RuntimeEndpointConfig}. Each value resolves from a system
+ * mirroring {@link LanguageServerRegistry}. Each value resolves from a system
  * property, then an environment variable, and finally falls back to the
  * <em>built-in default</em> for the shared {@code KMS_Test_Resources} deployed by
  * the {@code cdk/} stack ({@code EsdkTestServerKmsStack}) into the CI-resources
@@ -37,8 +37,7 @@ import java.util.Optional;
  * unless they run and pass (Requirements 14.8, 14.9). AWS credentials therefore
  * must be present — developer credentials locally, GitHub OIDC in CI — and
  * {@link #configureAwsRegion()} applies the resolved region to the ambient AWS
- * region provider chain so the in-process Language_Server's {@code KmsClient}
- * targets it.
+ * region provider chain of the Tests JVM.
  */
 public final class KmsRuntimeConfig {
 
@@ -122,9 +121,11 @@ public final class KmsRuntimeConfig {
     /**
      * Apply the resolved region to the ambient AWS region provider chain (the
      * {@code aws.region} system property) unless a region is already configured,
-     * so an in-process Language_Server's {@code KmsClient.create()} — which reads
-     * the ambient region — resolves the region the Tests were given. A no-op when
-     * {@code AWS_REGION} / {@code aws.region} is already set.
+     * so anything in this JVM that reads the ambient region resolves the region
+     * the Tests were given. A no-op when {@code AWS_REGION} / {@code aws.region}
+     * is already set. (Each Language_Server subprocess resolves its own region
+     * from its environment; the orchestrator launches them with credentials and
+     * region in scope.)
      */
     public void configureAwsRegion() {
         boolean alreadyConfigured =

@@ -2,15 +2,15 @@ package aws.cryptography.esdk.testserver.orchestrator;
 
 import aws.cryptography.esdk.testserver.orchestrator.report.TestExecution;
 import aws.cryptography.esdk.testserver.orchestrator.run.MissingRuntimeConfigException;
+import aws.cryptography.esdk.testserver.orchestrator.run.TestRunInput;
 import aws.cryptography.esdk.testserver.orchestrator.run.TestRunner;
-import java.net.URI;
 import java.util.List;
 
 /**
  * A test double {@link TestRunner}. It either returns a preset list of executions
  * or throws {@link MissingRuntimeConfigException} (to model an absent/incomplete
- * runtime config, Requirement 7.4). It records whether it was invoked so tests
- * can assert that an aborted run executes no Tests (records no partial results).
+ * runtime config). It records whether it was invoked so tests can assert that an
+ * aborted run executes no Tests (records no partial results).
  */
 final class StubTestRunner implements TestRunner {
 
@@ -27,7 +27,7 @@ final class StubTestRunner implements TestRunner {
         return new StubTestRunner(executions, false);
     }
 
-    /** A runner that refuses to run because no endpoint is configured (Req 7.4). */
+    /** A runner that refuses to run because no target is configured. */
     static StubTestRunner refusing() {
         return new StubTestRunner(List.of(), true);
     }
@@ -37,11 +37,11 @@ final class StubTestRunner implements TestRunner {
     }
 
     @Override
-    public List<TestExecution> run(List<URI> endpoints) throws MissingRuntimeConfigException {
+    public List<TestExecution> run(TestRunInput input) throws MissingRuntimeConfigException {
         invoked = true;
         if (refuse) {
             throw new MissingRuntimeConfigException(
-                "no target endpoint configured for the Tests; refusing to run (Requirement 7.4)");
+                "no target endpoint configured for the Tests; refusing to run (Requirement 10.2)");
         }
         return executions;
     }

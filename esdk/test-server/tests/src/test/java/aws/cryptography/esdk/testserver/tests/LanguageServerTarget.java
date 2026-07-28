@@ -18,9 +18,9 @@ import java.util.Objects;
  *
  * <p>The endpoint is supplied by runtime configuration (Requirement 7.3): the
  * orchestrator launches each Language_Server on its configured port and hands the
- * Tests the resulting {@code (language, majorVersion, endpoint)} set; for the
- * local Java-only checkpoint the registry boots one Java server in-process and
- * synthesizes its target.
+ * Tests the resulting {@code (language, majorVersion, endpoint)} set via
+ * {@code esdk.testserver.targets}. There is no in-process fallback — the Tests
+ * are endpoint-only (Requirement 10.2).
  */
 public record LanguageServerTarget(String language, int majorVersion, URI endpoint) {
 

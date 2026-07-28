@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,12 +32,16 @@ import org.junit.jupiter.params.provider.MethodSource;
  * the single {@code java-v3 -> java-v3} pair, so this reduces to the prior
  * single-server per-scenario coverage.
  *
- * <p>The blob round-trip runs over every pair. The stream round-trip runs only
- * over pairs whose BOTH endpoints are Streaming_Capable (Requirements 4.9, 4.10):
- * with two Streaming_Capable servers (Java, Python) that is the full matrix; a
- * non-streaming server (a future Rust/Go/.NET) is simply excluded from the stream
- * pairs. Each execution asserts {@code decrypt(encrypt(x)) == x} byte-for-byte
- * over a small fixed representative plaintext set including the empty plaintext.
+ * <p>Both round-trips generate cases over every pair. The stream round-trip is
+ * associated with the {@code streaming} Feature (Requirements 9.1, 9.2): it opens
+ * with {@link FeatureGate#require}, which executes the test when every combination
+ * language declares {@code streaming} supported (Requirement 9.4) and skips it
+ * visibly — before any Language_Server operation — when any language declares it
+ * unsupported (Requirement 9.5). No pair is silently filtered out of the case
+ * list; every skip is recorded in the platform reports. The blob round-trip has no
+ * Feature association and calls no gate (Requirement 9.7). Each execution asserts
+ * {@code decrypt(encrypt(x)) == x} byte-for-byte over a small fixed representative
+ * plaintext set including the empty plaintext.
  *
  * <p>The KMS scenarios among {@link EsdkClientConfigs#scenarios()} are online and
  * required; here they additionally become cross-language KMS round trips (encrypt
@@ -49,12 +54,14 @@ class MaterialsRoundTripTests {
         return casesOver(LanguageServerRegistry.shared().pairs());
     }
 
-    /** Stream round-trip cases: every Streaming_Capable pair × every scenario. */
+    /**
+     * Stream round-trip cases: every pair × every scenario. No pair is filtered
+     * here — Feature gating happens at execution time in {@link #streamRoundTrip}
+     * so a skipped combination is visible in the reports (Requirements 9.5, 9.6),
+     * never silently absent from the case list.
+     */
     static List<Arguments> streamCases() {
-        List<EndpointPair> streamingPairs = LanguageServerRegistry.shared().pairs().stream()
-            .filter(EndpointPair::isStreamingCapable)
-            .toList();
-        return casesOver(streamingPairs);
+        return casesOver(LanguageServerRegistry.shared().pairs());
     }
 
     private static List<Arguments> casesOver(List<EndpointPair> pairs) {
@@ -118,14 +125,19 @@ class MaterialsRoundTripTests {
     }
 
     /**
-     * Stream round-trip, run for every Streaming_Capable {@code (pair × scenario)}.
+     * Stream round-trip, run for every {@code (pair × scenario)}. Associated with
+     * the {@code streaming} Feature (Requirements 9.1, 9.2): the {@link FeatureGate}
+     * call is the FIRST statement in the body, before any Language_Server
+     * operation, so a combination whose language declares {@code streaming}
+     * unsupported is skipped visibly with zero server calls (Requirement 9.5).
      * One named execution per case ({@code stream[<scenario>] <encrypt>-><decrypt>});
      * asserts {@code decryptStream(encryptStream(x)) == x} byte-for-byte over the
-     * representative plaintexts (Requirements 4.5, 4.6, 4.9, 4.10).
+     * representative plaintexts (Requirements 4.5, 4.6, 9.4).
      */
     @ParameterizedTest(name = "stream[{1}] {0}")
     @MethodSource("streamCases")
     void streamRoundTrip(EndpointPair pair, Scenario scenario) {
+        FeatureGate.require(Set.of("streaming"), pair);
         Map<String, String> ec = requiredContext(scenario);
         for (byte[] plaintext : representativePlaintexts()) {
             byte[] recovered = StreamRoundTrip.run(pair, plaintext, scenario, ec);

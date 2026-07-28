@@ -212,8 +212,8 @@ public final class EsdkClientConfigs {
         // run and pass. AWS credentials (developer creds locally, OIDC in CI) must
         // therefore be present; there is no offline skip.
         KmsRuntimeConfig kms = KmsRuntimeConfig.fromRuntime();
-        // Ensure the in-process Language_Server's KmsClient resolves the configured
-        // region (design: KMS runtime configuration).
+        // Ensure this JVM's ambient AWS region matches the configured KMS region
+        // (design: KMS runtime configuration).
         kms.configureAwsRegion();
         scenarios.addAll(kmsScenarios(kms));
         return List.copyOf(scenarios);

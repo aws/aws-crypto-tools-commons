@@ -1,62 +1,104 @@
 package aws.cryptography.esdk.testserver.orchestrator;
 
+import aws.cryptography.esdk.testserver.orchestrator.config.CommonsConfiguration;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
+import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationLoadException;
+import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationLoader;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSet;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSetValidation;
+import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationValidation;
+import aws.cryptography.esdk.testserver.orchestrator.config.FeatureValidation;
+import aws.cryptography.esdk.testserver.orchestrator.launch.CloseResult;
 import aws.cryptography.esdk.testserver.orchestrator.launch.LaunchedServer;
 import aws.cryptography.esdk.testserver.orchestrator.launch.Launcher;
+import aws.cryptography.esdk.testserver.orchestrator.launch.LauncherFactory;
 import aws.cryptography.esdk.testserver.orchestrator.launch.ServerLaunchException;
+import aws.cryptography.esdk.testserver.orchestrator.record.ResolutionRecord;
 import aws.cryptography.esdk.testserver.orchestrator.report.Result;
 import aws.cryptography.esdk.testserver.orchestrator.report.ResultReporter;
 import aws.cryptography.esdk.testserver.orchestrator.report.TestExecution;
 import aws.cryptography.esdk.testserver.orchestrator.run.DuplicateTestsDetector;
 import aws.cryptography.esdk.testserver.orchestrator.run.MissingRuntimeConfigException;
+import aws.cryptography.esdk.testserver.orchestrator.run.TestRunInput;
 import aws.cryptography.esdk.testserver.orchestrator.run.TestRunner;
-import aws.cryptography.esdk.testserver.orchestrator.source.Override;
-import aws.cryptography.esdk.testserver.orchestrator.source.ResolvedSource;
-import aws.cryptography.esdk.testserver.orchestrator.source.SourceResolution;
+import aws.cryptography.esdk.testserver.orchestrator.run.TestTarget;
+import aws.cryptography.esdk.testserver.orchestrator.source.ComponentId;
+import aws.cryptography.esdk.testserver.orchestrator.source.MaterializedSources;
+import aws.cryptography.esdk.testserver.orchestrator.source.Materializer;
+import aws.cryptography.esdk.testserver.orchestrator.source.ResolvedComponentPlan;
+import aws.cryptography.esdk.testserver.orchestrator.source.RunContext;
 import aws.cryptography.esdk.testserver.orchestrator.source.SourceResolver;
-import java.net.URI;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
- * The ESDK TestServer orchestrator — the executable closure over the
- * {@code Configuration_Set}, the source-resolution overrides, and the launched
- * {@code Language_Server}s (design "The Closure / Orchestrator"):
+ * The ESDK TestServer orchestrator core — the fail-closed pipeline over the
+ * {@code Configuration_Set}, the {@link RunContext}, any
+ * Configuration_Overrides, and the launched {@code Language_Server}s (design
+ * "The orchestrated run pipeline").
  *
- * <pre>{@code
- *   ESDKTestServer(Optional<Path> liveSourceCode,
- *                  Optional<Override>... perLanguageOverrides) -> Result<Boolean>
- * }</pre>
- *
- * <p>Here {@code Live} source is expressed as an {@link Override.Live} in the
- * overrides list (carrying the language it belongs to). Invoked with no overrides
- * the run targets the head of every configured branch/repository (Requirement
- * 10.2).
- *
- * <p>Responsibilities, in order (each abort runs no {@code Tests}, records no
- * partial results, and returns a fail-open failure identifying the cause):
+ * <p>The stages, in design order — any stage 1–5 failure runs zero
+ * {@code Tests}, records no partial results, and reports a fail-open failure
+ * identifying the language (where one applies) and the cause:
  * <ol>
- *   <li>Validate the {@code Configuration_Set} (Requirements 9.2, 9.3, 9.5).</li>
- *   <li>Reject duplicate {@code Tests} definitions (Requirement 7.5).</li>
- *   <li>Resolve each language to one effective source; reject conflicting
- *       consumption inputs (Requirements 10-12, 11.5, 12.9).</li>
- *   <li>Build + launch each server on its configured port; reject build failures,
- *       unresolvable references, and port conflicts (Requirements 9.4, 9.6, 11.4,
- *       12.8).</li>
- *   <li>Point the single Java {@code Tests} at the launched endpoints via runtime
- *       configuration only; refuse to run without a configured endpoint
- *       (Requirements 7.2-7.4).</li>
- *   <li>Report a fail-open {@link Result} (Requirements 11.3, 13.1-13.4).</li>
+ *   <li>Load + validate the {@code Configuration_Set} and the on-hand
+ *       Feature_Declarations: structural validation before anything is cloned
+ *       (Requirements 3.2, 3.8, 4.7, 4.11, 7.4, 7.5), the duplicate-Tests
+ *       check (Requirement 10.1), every Feature_Declaration carried inline in
+ *       an effective entry, and — on a Language_Repository_Run — the own
+ *       repository's commons-configuration file (declaration + product match;
+ *       Requirements 8.4–8.11).</li>
+ *   <li>Materialize the planned sources: pure resolution planning, then git
+ *       clones / working-tree checks (Requirements 3.3–3.7, 4).</li>
+ *   <li>Complete Feature validation for declarations obtained by
+ *       materialization — a language whose effective entry carries no inline
+ *       declaration reads it from
+ *       {@code <server root>/esdk/test-server/commons-configuration.json}
+ *       (e.g. Java's in a Commons_Run), including the product match
+ *       (Requirements 8.4, 8.10, 8.11).</li>
+ *   <li>Produce + emit the Resolution_Record — stdout block and
+ *       {@code orchestrator/build/resolution-record.json} — <em>before</em>
+ *       any launch, any Test, and the reported result (Requirement 5.6),
+ *       failures included (Requirement 5.4); gate on completeness
+ *       (Requirement 5.5), then on materialization failures
+ *       (Requirement 3.6). (Emission precedes the stage-3 checks in code so
+ *       the record always accompanies a materialization-failure abort.)</li>
+ *   <li>Build + launch every server on its configured port
+ *       (Requirements 2.1, 2.5), then re-check reachability across all
+ *       launched ports — Tests start only after every server is reachable
+ *       (Requirements 2.3, 2.9).</li>
+ *   <li>Run the Tests with the targets / features / featureCatalog runtime
+ *       properties (Requirements 2.2, 9.3, 10.2).</li>
+ *   <li>Report the fail-open {@link Result} including the KMS coverage floor
+ *       (Requirements 2.8, 2.10, 10.4).</li>
+ *   <li>Teardown in {@code finally}, whatever the outcome (Requirement 2.6);
+ *       {@code STILL_RUNNING} close results feed the report's cleanup
+ *       failures without ever masking the primary result
+ *       (Requirement 2.11).</li>
  * </ol>
  */
 public final class ESDKTestServer {
 
+    /**
+     * Where a Language_Repository carries its commons-configuration file
+     * (Commons_Configuration_Entry + {@code product} + Feature_Declaration),
+     * relative to the repository root (design "Commons-configuration file").
+     */
+    static final String COMMONS_CONFIGURATION_RELATIVE_PATH =
+        "esdk/test-server/commons-configuration.json";
+
     private final ConfigurationSet configurationSet;
+    private final RunContext context;
     private final SourceResolver resolver;
-    private final Launcher launcher;
+    private final Materializer materializer;
+    private final LauncherFactory launcherFactory;
     private final TestRunner testRunner;
     private final DuplicateTestsDetector duplicateDetector;
     private final Path testServerRoot;
@@ -64,79 +106,364 @@ public final class ESDKTestServer {
 
     public ESDKTestServer(
             ConfigurationSet configurationSet,
-            Launcher launcher,
+            RunContext context,
+            Materializer materializer,
+            LauncherFactory launcherFactory,
             TestRunner testRunner,
             DuplicateTestsDetector duplicateDetector,
             Path testServerRoot) {
         this.configurationSet = configurationSet;
+        this.context = context;
         this.resolver = new SourceResolver();
-        this.launcher = launcher;
+        this.materializer = materializer;
+        this.launcherFactory = launcherFactory;
         this.testRunner = testRunner;
         this.duplicateDetector = duplicateDetector;
         this.testServerRoot = testServerRoot;
         this.reporter = new ResultReporter();
     }
 
-    /** Run with no overrides — head of every configured branch/repository (Req 10.2). */
+    /** Run with no Configuration_Overrides. */
     public Result run() {
         return run(List.of());
     }
 
-    /** Run the closure with the given per-language overrides. */
-    public Result run(List<Override> overrides) {
-        // 1. Validate the Configuration_Set; abort without starting any server
-        //    if any entry is malformed or two entries share a port (Req 9.5).
-        ConfigurationSetValidation validation = configurationSet.validate();
-        if (!validation.valid()) {
-            return Result.abort("invalid Configuration_Set: " + validation.message());
+    /**
+     * Run the orchestrated pipeline with the invoking Language_Repository's
+     * Configuration_Overrides (empty for a Commons_Run). Teardown always runs
+     * in a {@code finally} (Requirement 2.6): on the primary path the close
+     * results feed the reporter's cleanup failures; on abort paths the cleanup
+     * information is appended to the abort result without masking it
+     * (Requirement 2.11).
+     */
+    public Result run(List<ConfigurationEntry> overrides) {
+        List<LaunchedServer> launched = new ArrayList<>();
+        List<String> cleanupFailureLanguages = new ArrayList<>();
+        PipelineOutcome outcome;
+        try {
+            outcome = executePipeline(overrides, launched);
+        } finally {
+            // 8. Teardown is total: stop every server launched during the run,
+            // whatever the outcome (Requirement 2.6). A STILL_RUNNING close
+            // result names its language for the cleanup-failure report
+            // (Requirement 2.11).
+            for (LaunchedServer server : launched) {
+                CloseResult close = server.close();
+                if (!close.isStopped()) {
+                    cleanupFailureLanguages.add(close.language());
+                }
+            }
+        }
+        if (outcome.abort() != null) {
+            // Cleanup failures are appended to the abort result — reported,
+            // never masking the primary cause (Requirement 2.11).
+            return outcome.abort().withCleanupFailures(cleanupFailureLanguages);
+        }
+        // 7. Fail-open reporting (Requirements 2.8, 2.10) including the KMS
+        // coverage floor over the launched Target pairs (Requirement 10.4) and
+        // the teardown cleanup failures (Requirement 2.11).
+        return reporter.report(
+            outcome.executions(), outcome.launchedLabels(), cleanupFailureLanguages);
+    }
+
+    // ------------------------------------------------------------------
+    // The fail-closed pipeline (stages 1–6)
+    // ------------------------------------------------------------------
+
+    /** The pipeline's outcome: an abort {@link Result}, or the run's executions. */
+    private record PipelineOutcome(
+            Result abort, List<TestExecution> executions, List<String> launchedLabels) {
+
+        static PipelineOutcome aborted(String cause) {
+            return new PipelineOutcome(Result.abort(cause), null, null);
         }
 
-        // 2. Reject duplicate Tests definitions before running anything (Req 7.5).
+        static PipelineOutcome completed(List<TestExecution> executions, List<String> labels) {
+            return new PipelineOutcome(null, executions, labels);
+        }
+    }
+
+    /** One language's Feature_Declaration, wherever it was carried. */
+    private record Declaration(List<String> supported, List<String> unsupported) {
+    }
+
+    private PipelineOutcome executePipeline(
+            List<ConfigurationEntry> overrides, List<LaunchedServer> launched) {
+        // ---- Stage 1: load + validate the Configuration_Set and the on-hand
+        // Feature_Declarations, all before anything is cloned. ----
+
+        // 1a. Structural validation: the catalog (product + Feature_Catalog),
+        // every entry and override, the override sanity rules, and
+        // effective-set port uniqueness (Requirements 3.2, 3.8, 4.7, 4.11,
+        // 7.4, 7.5).
+        ConfigurationSetValidation validation = ConfigurationValidation.validate(
+            configurationSet, overrides, context.ownLanguage());
+        if (!validation.valid()) {
+            return PipelineOutcome.aborted("invalid Configuration_Set: " + validation.message());
+        }
+
+        // 1b. Reject duplicate Tests definitions before running anything
+        // (Requirement 10.1).
         List<Path> testsDefs = duplicateDetector.findTestsDefinitions(testServerRoot);
         if (testsDefs.size() > 1) {
-            return Result.abort("found " + testsDefs.size()
+            return PipelineOutcome.aborted("found " + testsDefs.size()
                 + " Tests definitions (expected exactly one): " + testsDefs);
         }
 
-        // 3. Resolve each language to its single effective source; abort on
-        //    conflicting consumption inputs (Requirements 11.5, 12.9).
-        SourceResolution resolution = resolver.resolve(configurationSet, overrides);
-        if (!resolution.isResolved()) {
-            return Result.abort(resolution.failure().orElse("source resolution failed"));
-        }
+        // The run-effective entries: each overridden language's entry replaced
+        // by its Configuration_Override (Requirement 4.6).
+        List<ConfigurationEntry> effectiveEntries = effectiveEntries(overrides);
+        List<String> catalog = configurationSet.features();
 
-        // 4. Build + launch each server on its configured port (Req 9.4). Any
-        //    build failure / unresolvable reference / port conflict aborts the run,
-        //    naming the language (Requirements 9.6, 11.4, 12.8).
-        List<LaunchedServer> launched = new ArrayList<>();
-        try {
-            for (ConfigurationEntry entry : configurationSet.entries()) {
-                ResolvedSource source = resolution.sources().get(entry.language());
-                try {
-                    launched.add(launcher.launch(entry, source));
-                } catch (ServerLaunchException e) {
-                    return Result.abort("failed to launch the " + e.language()
-                        + " Language_Server [" + e.category() + "]: " + e.getMessage());
-                }
-            }
-
-            // 5. Point the single Java Tests at the launched endpoints via runtime
-            //    configuration only (Req 7.2, 7.3); refuse if none (Req 7.4).
-            List<URI> endpoints = launched.stream().map(LaunchedServer::endpoint).toList();
-            List<TestExecution> executions;
+        // 1c. On-hand Feature_Declarations (Requirements 8.4–8.11): the own
+        // repository's commons-configuration file on a Language_Repository_Run
+        // (declaration + product match — it is in the working tree, read
+        // now), and every declaration carried inline in an effective entry.
+        // Declarations obtained by materialization complete in stage 3.
+        Map<String, Declaration> declarations = new LinkedHashMap<>();
+        FeatureValidation.Result onHand = FeatureValidation.Result.ok();
+        if (context.kind() == RunContext.Kind.LANGUAGE) {
+            Path expected = context.languageRepoRoot()
+                .resolve(COMMONS_CONFIGURATION_RELATIVE_PATH);
+            CommonsConfiguration own;
             try {
-                executions = testRunner.run(endpoints);
-            } catch (MissingRuntimeConfigException e) {
-                return Result.abort(e.getMessage());
+                own = ConfigurationLoader.loadCommonsConfiguration(expected);
+            } catch (ConfigurationLoadException e) {
+                // Missing/unparseable carrying file: name the language and the
+                // expected Feature_Declaration location (Requirement 8.10).
+                return PipelineOutcome.aborted(FeatureValidation.carryingFileError(
+                    context.ownLanguage(), expected.toString(), e.getMessage()).message());
             }
+            onHand = onHand
+                .and(FeatureValidation.validateDeclaration(catalog, context.ownLanguage(),
+                    own.supportedFeatures(), own.unsupportedFeatures()))
+                .and(FeatureValidation.validateProductMatch(context.invokingRepositoryName(),
+                    own.product(), configurationSet.product()));
+            declarations.put(context.ownLanguage(),
+                new Declaration(own.supportedFeatures(), own.unsupportedFeatures()));
+        }
+        for (ConfigurationEntry entry : effectiveEntries) {
+            if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
+                continue;
+            }
+            onHand = onHand.and(FeatureValidation.validateDeclaration(catalog,
+                entry.language(), entry.supportedFeatures(), entry.unsupportedFeatures()));
+            declarations.put(entry.language(),
+                new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures()));
+        }
+        if (!onHand.valid()) {
+            return PipelineOutcome.aborted(
+                "invalid Feature_Declaration(s): " + onHand.message());
+        }
 
-            // 6. Fail-open reporting (Requirements 11.3, 13.1-13.4).
-            return reporter.report(executions);
-        } finally {
-            // Always stop every server we launched, whatever the outcome.
-            for (LaunchedServer server : launched) {
-                server.close();
+        // ---- Stage 2: materialize the planned sources. Planning is pure
+        // (design resolution-rules table); materialization performs the git
+        // and filesystem I/O, capturing failures as data (Requirement 3.6). ----
+        List<ResolvedComponentPlan> plans = resolver.resolve(configurationSet, context, overrides);
+        MaterializedSources sources = materializer.materialize(plans);
+
+        // ---- Stage 4 (emitted here so the record accompanies every
+        // materialization outcome, failures included — Requirement 5.4):
+        // produce + emit the Resolution_Record before any launch, any Test,
+        // and the reported result (Requirement 5.6). ----
+        ResolutionRecord record;
+        try {
+            record = ResolutionRecord.assemble(context, sources);
+            System.out.println(record.toStdoutBlock());
+            record.writeJson(testServerRoot.resolve(ResolutionRecord.DEFAULT_JSON_OUTPUT));
+        } catch (IOException | RuntimeException e) {
+            // An unproducible record fails the run before any Test, identifying
+            // the production failure (Requirement 5.5).
+            return PipelineOutcome.aborted(
+                "could not produce the Resolution_Record: " + e.getMessage()
+                    + " (Requirement 5.5)");
+        }
+
+        // Gate on record completeness (Requirement 5.5).
+        Set<String> expectedLanguages = new LinkedHashSet<>();
+        for (ConfigurationEntry entry : effectiveEntries) {
+            expectedLanguages.add(entry.language());
+        }
+        if (expectedLanguages.isEmpty()) {
+            return PipelineOutcome.aborted(
+                "the Configuration_Set contains no Configuration_Entries");
+        }
+        ResolutionRecord.Completeness completeness = record.completeness(expectedLanguages);
+        if (!completeness.complete()) {
+            return PipelineOutcome.aborted("the Resolution_Record is incomplete: "
+                + String.join("; ", completeness.problems()) + " (Requirement 5.5)");
+        }
+
+        // Gate on materialization failures: a component that could not be
+        // materialized fails the run before any launch or Test, naming the
+        // attempted coordinates and the cause (Requirement 3.6).
+        if (!sources.allSucceeded()) {
+            StringBuilder message = new StringBuilder("source materialization failed:");
+            for (MaterializedSources.Failure failure : sources.failures()) {
+                message.append(" [").append(failure.component())
+                    .append(" from ").append(failure.attemptedRepository());
+                if (failure.attemptedReference() != null) {
+                    message.append(" at ").append(failure.attemptedReference());
+                }
+                message.append(", path ").append(failure.attemptedPath())
+                    .append(": ").append(failure.cause()).append(']');
+            }
+            return PipelineOutcome.aborted(message.toString());
+        }
+
+        // ---- Stage 3 (completed after materialization, before any launch —
+        // Requirement 8.4): Feature validation for declarations carried in
+        // materialized commons-configuration files. A language whose effective
+        // entry has no inline declaration carries it in its
+        // Language_Repository's commons-configuration file, located under the
+        // materialized Server_Location root (e.g. Java's in a Commons_Run). ----
+        for (ConfigurationEntry entry : effectiveEntries) {
+            if (isOwnLanguage(entry) || entry.hasFeatureDeclaration()) {
+                continue;
+            }
+            String language = entry.language();
+            Optional<MaterializedSources.Success> server =
+                sources.successOf(ComponentId.server(language));
+            if (server.isEmpty()) {
+                // Unreachable post-gate; kept as a defensive fail-closed abort.
+                return PipelineOutcome.aborted("no materialized server component for language '"
+                    + language + "' to locate its Feature_Declaration");
+            }
+            Path expected = server.get().root().resolve(COMMONS_CONFIGURATION_RELATIVE_PATH);
+            CommonsConfiguration carried;
+            try {
+                carried = ConfigurationLoader.loadCommonsConfiguration(expected);
+            } catch (ConfigurationLoadException e) {
+                return PipelineOutcome.aborted(FeatureValidation.carryingFileError(
+                    language, expected.toString(), e.getMessage()).message());
+            }
+            String languageRepository = entry.serverLocation() != null
+                && entry.serverLocation().repository() != null
+                ? entry.serverLocation().repository() : language;
+            FeatureValidation.Result crossRepo = FeatureValidation
+                .validateDeclaration(catalog, language,
+                    carried.supportedFeatures(), carried.unsupportedFeatures())
+                .and(FeatureValidation.validateProductMatch(languageRepository,
+                    carried.product(), configurationSet.product()));
+            if (!crossRepo.valid()) {
+                return PipelineOutcome.aborted(
+                    "invalid Feature_Declaration(s): " + crossRepo.message());
+            }
+            declarations.put(language,
+                new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures()));
+        }
+
+        // ---- Stage 5: build + launch every server as a subprocess on its
+        // configured port (Requirement 2.1), sequentially — each launch()
+        // returns only when its server is reachable. A language with no
+        // launcher wired, and any resolve/build/port/timeout failure, aborts
+        // the run naming the language and the cause (Requirement 2.5). ----
+        for (ConfigurationEntry entry : effectiveEntries) {
+            Optional<Launcher> launcher = launcherFactory.launcherFor(entry.language());
+            if (launcher.isEmpty()) {
+                return PipelineOutcome.aborted(
+                    "no Language_Server launcher is available for language '"
+                        + entry.language() + "'");
+            }
+            try {
+                launched.add(launcher.get().launch(entry, sources));
+            } catch (ServerLaunchException e) {
+                return PipelineOutcome.aborted("failed to launch the " + e.language()
+                    + " Language_Server [" + e.category() + "]: " + e.getMessage());
             }
         }
+
+        // Final reachability re-check across all launched ports: Tests begin
+        // only after every configured Language_Server is reachable
+        // (Requirements 2.3, 2.9) — a server that came up but died while later
+        // servers launched is caught here, not mid-Tests.
+        for (LaunchedServer server : launched) {
+            if (!server.reachable()) {
+                return PipelineOutcome.aborted("the " + server.language()
+                    + " Language_Server is no longer reachable on its configured port "
+                    + server.port() + " (Requirement 2.3)");
+            }
+        }
+
+        // ---- Stage 6: run the Tests, pointed at the launched Targets via
+        // runtime configuration only (Requirements 2.2, 10.2), with every
+        // language's Feature_Declaration — inline, own working tree, and
+        // cross-repo alike — flattened for the FeatureGate (Requirement 9.3). ----
+        TestRunInput input = testRunInput(effectiveEntries, launched, declarations);
+        List<TestExecution> executions;
+        try {
+            executions = testRunner.run(input);
+        } catch (MissingRuntimeConfigException e) {
+            return PipelineOutcome.aborted(e.getMessage());
+        }
+        List<String> launchedLabels = input.targets().stream()
+            .map(t -> t.language() + "-v" + t.majorVersion())
+            .toList();
+        return PipelineOutcome.completed(executions, launchedLabels);
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Assemble the {@link TestRunInput} from the launched servers, the
+     * run-effective entries, and every validated Feature_Declaration: the
+     * launched Targets (Requirement 2.2), each declaration flattened to
+     * booleans, and the Feature_Catalog verbatim (Requirement 9.3).
+     */
+    private TestRunInput testRunInput(
+            List<ConfigurationEntry> effectiveEntries,
+            List<LaunchedServer> launched,
+            Map<String, Declaration> declarations) {
+        Map<String, ConfigurationEntry> entryByLanguage = new LinkedHashMap<>();
+        for (ConfigurationEntry entry : effectiveEntries) {
+            entryByLanguage.put(entry.language(), entry);
+        }
+
+        List<TestTarget> targets = new ArrayList<>();
+        for (LaunchedServer server : launched) {
+            ConfigurationEntry entry = entryByLanguage.get(server.language());
+            int majorVersion = entry != null && entry.majorVersion() != null
+                ? entry.majorVersion() : 0;
+            targets.add(new TestTarget(server.language(), majorVersion, server.endpoint()));
+        }
+
+        List<String> catalog = configurationSet.features() == null
+            ? List.of() : configurationSet.features();
+        Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
+        for (ConfigurationEntry entry : effectiveEntries) {
+            Declaration declaration = declarations.get(entry.language());
+            if (declaration == null) {
+                continue;
+            }
+            Map<String, Boolean> flattened = TestRunInput.flattenDeclaration(
+                catalog, declaration.supported(), declaration.unsupported());
+            if (!flattened.isEmpty()) {
+                features.put(entry.language(), flattened);
+            }
+        }
+        return new TestRunInput(targets, features, catalog);
+    }
+
+    private boolean isOwnLanguage(ConfigurationEntry entry) {
+        return context.kind() == RunContext.Kind.LANGUAGE
+            && entry.language() != null
+            && entry.language().equals(context.ownLanguage());
+    }
+
+    private List<ConfigurationEntry> effectiveEntries(List<ConfigurationEntry> overrides) {
+        Map<String, ConfigurationEntry> overrideByLanguage = new LinkedHashMap<>();
+        for (ConfigurationEntry override : overrides) {
+            overrideByLanguage.put(override.language(), override);
+        }
+        List<ConfigurationEntry> effective = new ArrayList<>();
+        for (ConfigurationEntry stored : configurationSet.entries()) {
+            boolean ownLanguage = stored.language().equals(context.ownLanguage());
+            ConfigurationEntry override =
+                ownLanguage ? null : overrideByLanguage.get(stored.language());
+            effective.add(override != null ? override : stored);
+        }
+        return effective;
     }
 }

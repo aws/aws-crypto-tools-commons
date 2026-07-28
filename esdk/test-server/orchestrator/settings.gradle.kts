@@ -1,12 +1,14 @@
 // The ESDK TestServer orchestrator / runner (the closure over the
 // Configuration_Set, source resolution, launch, and fail-open reporting).
 //
-// The orchestrator launches the Java Language_Server in-process (reusing the
-// same EsdkTestServerHandlers.service() assembly point the checkpoint uses) and
-// points the single Java `Tests` suite at the launched endpoint(s) purely
-// through runtime configuration. To keep the wire contract single-sourced, it
-// consumes the Java Language_Server as a Gradle composite ("included") build
-// rather than duplicating any server code.
+// Every Language_Server is built and launched as a SUBPROCESS from its
+// resolved source directory (JavaLaunchPlan / PythonLaunchPlan on the shared
+// SubprocessLauncher machinery) — the orchestrator has no compile-time
+// coupling to any server implementation (Requirements 1.5, 2.7). The former
+// in-process composite build of the Java server (once includeBuilt from this
+// file) is gone: server sources are resolved at run time from each entry's
+// Server_Location, which is what lets the Java server live in
+// aws-crypto-tools-java (esdk/test-server/server) at all.
 pluginManagement {
     repositories {
         mavenCentral()
@@ -15,13 +17,3 @@ pluginManagement {
 }
 
 rootProject.name = "esdk-test-server-orchestrator"
-
-// The Java Language_Server (smithy-java server codegen + real ESDK delegation).
-// The orchestrator boots this in-process on the port from its Configuration_Entry
-// and drives the single Java `Tests` against it (Requirements 9.4, 7.2, 7.3).
-includeBuild("../servers/java") {
-    dependencySubstitution {
-        substitute(module("aws.cryptography.esdk.testserver:esdk-test-server-java"))
-            .using(project(":"))
-    }
-}

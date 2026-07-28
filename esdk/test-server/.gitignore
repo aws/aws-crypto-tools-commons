@@ -1,4 +1,4 @@
-# Makefile scratch dir (server log / temp files created by `make test-live`)
+# Makefile scratch dir (log / temp files created by make targets)
 /.make-tmp/
 
 # jqwik's local failure-sample database (developer-local, not shared)
