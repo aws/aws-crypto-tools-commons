@@ -385,14 +385,16 @@ jobs:
         # executes against THIS working tree, so the orchestrator writes the
         # Resolution_Record JSON and the per-server launch logs under
         # orchestrator/build/, and the Tests suite's JUnit reports under
-        # tests/build/.
+        # tests/build/. The launch dir is the launch plans' scratch space
+        # (Python venv, build cruft — tens of MB), so only the per-server
+        # *.log files are uploaded, not the directory wholesale.
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: esdk-test-server-reports
           path: |
             esdk/test-server/orchestrator/build/resolution-record.json
-            esdk/test-server/orchestrator/build/launch
+            esdk/test-server/orchestrator/build/launch/*/*.log
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results
           if-no-files-found: ignore
