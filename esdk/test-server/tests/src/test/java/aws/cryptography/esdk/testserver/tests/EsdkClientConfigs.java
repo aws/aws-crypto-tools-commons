@@ -4,6 +4,7 @@ import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsDiscoveryKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkMultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
@@ -305,6 +306,13 @@ public final class EsdkClientConfigs {
                 require(defaultCmm(awsKmsMultiKeyring(
                     kms.symmetricKeyArn(), List.of(kms.mrkArn())))), null, List.of()),
 
+            // AwsKmsMrkMultiKeyring: the first MRK as generator + the SECOND MRK
+            // as a child, so the MRK-aware multi-keyring spans two genuinely
+            // distinct multi-region keys (both KMS_Test_Resources MRKs).
+            new Scenario("awsKmsMrkMultiKeyring",
+                require(defaultCmm(awsKmsMrkMultiKeyring(
+                    kms.mrkArn(), List.of(kms.mrk2Arn())))), null, List.of()),
+
             // AwsKmsRsa: asymmetric RSA KMS key with RSAES-OAEP-SHA-256 padding.
             // The AwsKmsRsaKeyring rejects algorithm suites with asymmetric
             // (ECDSA) signing, so pin a committing, NON-signing suite rather than
@@ -340,6 +348,15 @@ public final class EsdkClientConfigs {
     private static Keyring awsKmsMultiKeyring(String generator, List<String> childKeyIds) {
         return Keyring.builder()
             .awsKmsMultiKeyring(AwsKmsMultiKeyringConfig.builder()
+                .generator(generator)
+                .kmsKeyIds(childKeyIds)
+                .build())
+            .build();
+    }
+
+    private static Keyring awsKmsMrkMultiKeyring(String generator, List<String> childKeyIds) {
+        return Keyring.builder()
+            .awsKmsMrkMultiKeyring(AwsKmsMrkMultiKeyringConfig.builder()
                 .generator(generator)
                 .kmsKeyIds(childKeyIds)
                 .build())

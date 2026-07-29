@@ -18,14 +18,13 @@ function synth(createOidcProvider = true): Template {
 describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
   const template = synth(true);
 
-  test('provisions exactly three KMS keys', () => {
-    template.resourceCountIs('AWS::KMS::Key', 3);
+  test('provisions exactly four KMS keys', () => {
+    // symmetric + two multi-region (MRK + the AwsKmsMrkMultiKeyring child) + RSA.
+    template.resourceCountIs('AWS::KMS::Key', 4);
   });
 
-  test('one key is multi-region (MRK)', () => {
-    template.hasResourceProperties('AWS::KMS::Key', {
-      MultiRegion: true,
-    });
+  test('two keys are multi-region (MRK generator + AwsKmsMrkMultiKeyring child)', () => {
+    template.resourcePropertiesCountIs('AWS::KMS::Key', { MultiRegion: true }, 2);
   });
 
   test('one key is an asymmetric RSA key', () => {
@@ -43,11 +42,12 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
     });
   });
 
-  test('provisions the three stable aliases', () => {
-    template.resourceCountIs('AWS::KMS::Alias', 3);
+  test('provisions the four stable aliases', () => {
+    template.resourceCountIs('AWS::KMS::Alias', 4);
     for (const aliasName of [
       'alias/esdk-test-server/symmetric',
       'alias/esdk-test-server/mrk',
+      'alias/esdk-test-server/mrk2',
       'alias/esdk-test-server/rsa',
     ]) {
       template.hasResourceProperties('AWS::KMS::Alias', { AliasName: aliasName });
@@ -114,7 +114,7 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
 
   test('emits the documented CfnOutputs', () => {
     const outputs = template.findOutputs('*');
-    for (const name of ['symmetricKeyArn', 'mrkArn', 'rsaKeyArn', 'roleArn']) {
+    for (const name of ['symmetricKeyArn', 'mrkArn', 'mrk2Arn', 'rsaKeyArn', 'roleArn']) {
       expect(outputs).toHaveProperty(name);
     }
   });
@@ -128,7 +128,7 @@ describe('EsdkTestServerKmsStack (createOidcProvider=false)', () => {
     template.resourceCountIs('AWS::IAM::Role', 1);
   });
 
-  test('still provisions the three KMS keys', () => {
-    template.resourceCountIs('AWS::KMS::Key', 3);
+  test('still provisions the four KMS keys', () => {
+    template.resourceCountIs('AWS::KMS::Key', 4);
   });
 });

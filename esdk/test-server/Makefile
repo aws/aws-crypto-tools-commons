@@ -65,6 +65,7 @@ CDK_DIR    := $(MAKEFILE_DIR)/cdk
 # non-default key set, export these before invoking it:
 #   ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN -> esdk.testserver.kms.symmetricKeyArn
 #   ESDK_TESTSERVER_KMS_MRK_ARN           -> esdk.testserver.kms.mrkArn
+#   ESDK_TESTSERVER_KMS_MRK2_ARN          -> esdk.testserver.kms.mrk2Arn
 #   ESDK_TESTSERVER_KMS_RSA_KEY_ARN       -> esdk.testserver.kms.rsaKeyArn
 #   ESDK_TESTSERVER_KMS_REGION            -> esdk.testserver.kms.region
 ESDK_TESTSERVER_KMS_REGION ?= us-west-2
@@ -214,8 +215,9 @@ orchestrate-test: check-java ## Run the orchestrator's property + integration te
 # ----------------------------------------------------------------------------
 # ONLINE AWS KMS keyring coverage — REQUIRED, run inside `make orchestrate`.
 # ----------------------------------------------------------------------------
-# The KMS keyring scenarios (AwsKms / AwsKmsMrk / AwsKmsMultiKeyring / AwsKmsRsa
-# / AwsKmsDiscovery) are ONLINE: they make real AWS KMS calls on encrypt/decrypt.
+# The KMS keyring scenarios (AwsKms / AwsKmsMrk / AwsKmsMultiKeyring /
+# AwsKmsMrkMultiKeyring / AwsKmsRsa / AwsKmsDiscovery) are ONLINE: they make
+# real AWS KMS calls on encrypt/decrypt.
 # They are REQUIRED and run as part of the orchestrated cross-language run
 # (`make orchestrate`) against the KMS_Test_Resources, whose ARNs default in
 # KmsRuntimeConfig — so `make orchestrate` needs valid AWS credentials (e.g. run
@@ -236,10 +238,11 @@ deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via 
 	@echo "    Requires developer AWS credentials for the target account."
 	@echo "    Obtain them first (e.g. run \`creds\`) so \`aws sts get-caller-identity\` works."
 	@echo "    createOidcProvider=$(CREATE_OIDC_PROVIDER) (import existing GitHub OIDC provider unless =true)."
-	@echo "    On success, CDK prints the CfnOutputs: symmetricKeyArn, mrkArn, rsaKeyArn, roleArn."
+	@echo "    On success, CDK prints the CfnOutputs: symmetricKeyArn, mrkArn, mrk2Arn, rsaKeyArn, roleArn."
 	@echo "    Export them for \`make orchestrate\`:"
 	@echo "      export ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN=<symmetricKeyArn>"
 	@echo "      export ESDK_TESTSERVER_KMS_MRK_ARN=<mrkArn>"
+	@echo "      export ESDK_TESTSERVER_KMS_MRK2_ARN=<mrk2Arn>"
 	@echo "      export ESDK_TESTSERVER_KMS_RSA_KEY_ARN=<rsaKeyArn>"
 	@cd "$(CDK_DIR)" && npm install && \
 		AWS_REGION="$(ESDK_TESTSERVER_KMS_REGION)" npx cdk deploy --require-approval never \

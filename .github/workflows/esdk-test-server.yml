@@ -98,6 +98,8 @@
 #   * vars.ESDK_TEST_SERVER_KMS_ROLE_ARN           — OIDC IAM role ARN to assume.
 #   * vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN  — symmetric KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_MRK_ARN            — multi-region KMS key ARN.
+#   * vars.ESDK_TEST_SERVER_KMS_MRK2_ARN           — second multi-region KMS key ARN
+#                                                    (AwsKmsMrkMultiKeyring child).
 #   * vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN        — asymmetric RSA KMS key ARN.
 #   * vars.ESDK_TEST_SERVER_KMS_REGION             — AWS region (optional; us-west-2).
 #
@@ -374,6 +376,7 @@ jobs:
         env:
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
+          ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
         run: make orchestrate

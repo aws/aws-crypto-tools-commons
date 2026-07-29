@@ -134,6 +134,16 @@ def _build_keyring(keyring):
                 kms_key_ids=cfg.get("kmsKeyIds"),
             )
         )
+    if name == "AwsKmsMrkMultiKeyring":
+        # MRK-aware multi-keyring: an optional MRK generator + child MRK key ids.
+        # Mirrors AwsKmsMultiKeyring (the MPL builds its own default KMS client
+        # supplier); the MRK-aware form matches multi-region keys on decrypt.
+        return _MATERIAL_PROVIDERS.create_aws_kms_mrk_multi_keyring(
+            input=mpl.CreateAwsKmsMrkMultiKeyringInput(
+                generator=cfg.get("generator"),
+                kms_key_ids=cfg.get("kmsKeyIds"),
+            )
+        )
     if name == "AwsKmsDiscovery":
         return _MATERIAL_PROVIDERS.create_aws_kms_discovery_keyring(
             input=mpl.CreateAwsKmsDiscoveryKeyringInput(

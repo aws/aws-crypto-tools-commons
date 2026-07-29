@@ -25,12 +25,18 @@ export interface EsdkTestServerKmsStackProps extends cdk.StackProps {
  *
  *   - a symmetric KMS key       (SYMMETRIC_DEFAULT, ENCRYPT_DECRYPT) -> AwsKms
  *   - a multi-region KMS key    (MRK)                                -> AwsKmsMrk
+ *   - a SECOND multi-region KMS key (MRK)                            -> AwsKmsMrkMultiKeyring
  *   - an asymmetric RSA KMS key (RSA_4096, ENCRYPT_DECRYPT)          -> AwsKmsRsa
+ *
+ * The two multi-region keys back the AwsKmsMrkMultiKeyring round-trip: the
+ * first MRK is the generator and the second MRK is a child key, so the
+ * MRK-aware multi-keyring is exercised over genuinely distinct MRKs rather
+ * than a single key.
  *
  * plus a GitHub OIDC provider and an IAM role the CI workflows assume via OIDC
  * (Requirement 14.11), whose trust policy is restricted to the two ESDK repos
  * and whose permissions are least-privilege KMS actions scoped to exactly the
- * three keys above (Requirement 14.12).
+ * keys above (Requirement 14.12).
  *
  * The stack is account-agnostic (no hardcoded account) and defaults its region
  * to us-west-2 (set by the app entry point). It is verified by CDK synth /
@@ -100,6 +106,37 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       targetKeyId: mrkCfn.attrKeyId,
     });
 
+    // --- Second multi-region key (backs AwsKmsMrkMultiKeyring as a child key) ---
+    // A distinct MRK so the AwsKmsMrkMultiKeyring round-trip spans two genuinely
+    // different multi-region keys (generator = first MRK, child = this one),
+    // rather than degenerating to a single key. Created with the same L1 CfnKey
+    // pattern and default key policy as the first MRK.
+    const mrk2Cfn = new kms.CfnKey(this, 'MultiRegionKey2', {
+      description: 'ESDK TestServer second multi-region KMS key (AwsKmsMrkMultiKeyring child)',
+      multiRegion: true,
+      keySpec: 'SYMMETRIC_DEFAULT',
+      keyUsage: 'ENCRYPT_DECRYPT',
+      pendingWindowInDays: pendingWindow.toDays(),
+      keyPolicy: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Sid: 'EnableIAMPolicies',
+            Effect: 'Allow',
+            Principal: { AWS: `arn:${this.partition}:iam::${this.account}:root` },
+            Action: 'kms:*',
+            Resource: '*',
+          },
+        ],
+      },
+    });
+    mrk2Cfn.applyRemovalPolicy(removalPolicy);
+    const mrk2 = kms.Key.fromKeyArn(this, 'MultiRegionKey2Ref', mrk2Cfn.attrArn);
+    new kms.CfnAlias(this, 'MultiRegionKey2Alias', {
+      aliasName: 'alias/esdk-test-server/mrk2',
+      targetKeyId: mrk2Cfn.attrKeyId,
+    });
+
     // --- Asymmetric RSA key (backs AwsKmsRsa) ---
     const rsaKey = new kms.Key(this, 'RsaKey', {
       description: 'ESDK TestServer asymmetric RSA KMS key (AwsKmsRsa)',
@@ -144,7 +181,7 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       maxSessionDuration: cdk.Duration.hours(1),
     });
 
-    const allKeyArns = [symmetricKey.keyArn, mrk.keyArn, rsaKey.keyArn];
+    const allKeyArns = [symmetricKey.keyArn, mrk.keyArn, mrk2.keyArn, rsaKey.keyArn];
 
     // Least-privilege KMS actions scoped to exactly the three test key ARNs
     // (not "*") — Requirement 14.12.
@@ -191,6 +228,18 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       value: mrk.keyId,
       description: 'Key id of the multi-region KMS key (AwsKmsMrk).',
       exportName: 'EsdkTestServer-MrkKeyId',
+    });
+    new cdk.CfnOutput(this, 'mrk2Arn', {
+      value: mrk2.keyArn,
+      description:
+        'ARN of the second multi-region KMS key (AwsKmsMrkMultiKeyring child). '
+        + '-> esdk.testserver.kms.mrk2Arn',
+      exportName: 'EsdkTestServer-Mrk2Arn',
+    });
+    new cdk.CfnOutput(this, 'mrk2KeyId', {
+      value: mrk2.keyId,
+      description: 'Key id of the second multi-region KMS key (AwsKmsMrkMultiKeyring child).',
+      exportName: 'EsdkTestServer-Mrk2KeyId',
     });
     new cdk.CfnOutput(this, 'rsaKeyArn', {
       value: rsaKey.keyArn,
