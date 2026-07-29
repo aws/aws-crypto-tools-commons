@@ -24,7 +24,10 @@
     "",
     "Branch pins: while the feature branches are unmerged, refs/branches that",
     "must contain the TestServer pin kessplas/esdk-test-server (Rust:",
-    "kessplas/esdk-rust-test-server); all flip to main after merge."
+    "kessplas/esdk-rust-test-server). Java temporarily pins",
+    "lucasmcdonald3/esdk-test-server-hierarchical (kessplas/esdk-test-server plus the",
+    "hierarchical Feature_Declaration, aws-crypto-tools-java PR#3); flip back to",
+    "kessplas/esdk-test-server once that merges. All flip to main after merge."
   ],
   "product": "esdk",
   "features": ["streaming", "MPL", "hierarchical"],
@@ -36,13 +39,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "branch": "kessplas/esdk-test-server",
+        "branch": "lucasmcdonald3/esdk-test-server-hierarchical",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucasmcdonald3/esdk-test-server-hierarchical",
         "path": "esdk/test-server/server"
       }
     },
