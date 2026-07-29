@@ -9,6 +9,7 @@ import aws.cryptography.esdk.testserver.orchestrator.launch.JavaLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.esdk.testserver.orchestrator.launch.LauncherFactory;
 import aws.cryptography.esdk.testserver.orchestrator.launch.PythonLaunchPlan;
+import aws.cryptography.esdk.testserver.orchestrator.launch.RustLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.report.Result;
 import aws.cryptography.esdk.testserver.orchestrator.run.DuplicateTestsDetector;
 import aws.cryptography.esdk.testserver.orchestrator.run.GradleTestRunner;
@@ -158,7 +159,9 @@ public final class ESDKTestServerMain {
             "java", (Launcher) new JavaLaunchPlan(
                 orchestratorBuildDir.resolve("launch/java"), modelDir),
             "python", new PythonLaunchPlan(
-                orchestratorBuildDir.resolve("launch/python"))));
+                orchestratorBuildDir.resolve("launch/python")),
+            "rust", new RustLaunchPlan(
+                orchestratorBuildDir.resolve("launch/rust"))));
 
         ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(configPath);
         ESDKTestServer orchestrator = new ESDKTestServer(

@@ -197,6 +197,24 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Go (for the Rust server's aws-lc-sys native build)
+        # The orchestrated run's RustLaunchPlan cargo-builds the Rust
+        # Language_Server from the aws-crypto-tools-rust clone; its transitive
+        # aws-lc-sys dependency compiles native code with Go on hosted runners.
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Set up the Rust toolchain (for the Rust Language_Server build)
+        # RustLaunchPlan runs `cargo build --release` in the materialized Rust
+        # server crate. Select a stable toolchain via the runner's preinstalled
+        # rustup (no third-party action, matching the smithy-install rationale).
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+
       - name: Cache Gradle + Maven caches
         # Gradle: the client-java/tests/orchestrator builds under
         # esdk/test-server plus the Java server build the orchestrated run
@@ -265,10 +283,11 @@ jobs:
             -Dversion="$MP_VERSION" \
             -Dpackaging=jar
 
-      - name: Configure git auth for the private aws-crypto-tools-java repo (read-only PAT)
+      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) via the SSH URL in the Java
-        # Configuration_Entry's Server_Location (config/configuration-set.json).
+        # Language_Server + live Java library) and aws-crypto-tools-rust (the
+        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
+        # Configuration_Entries' Server_Locations (config/configuration-set.json).
         # GitHub Actions' default token only reaches THIS repo, so that
         # cross-repo private clone needs its own credential. We supply a
         # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
@@ -286,19 +305,21 @@ jobs:
         #   - This rewrite is CI-ONLY. Local development is unaffected and
         #     keeps using the SSH URL as-is.
         #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java (fine-grained PAT with `Contents:
-        #     Read` on that repo, or a classic PAT with the `repo` scope).
+        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
+        #     with `Contents: Read` on each repo, or a classic PAT with the
+        #     `repo` scope).
         env:
           LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
         run: |
           set -euo pipefail
           if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
             echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java clone the orchestrated run performs (the" >&2
-            echo "Java Configuration_Entry's Server_Location) WILL FAIL without it. Add a" >&2
-            echo "repository/org secret named LANGUAGE_REPO_PAT with read access to the" >&2
-            echo "contents of aws-crypto-tools-java (fine-grained PAT with 'Contents: Read'," >&2
-            echo "or a classic PAT with the 'repo' scope)." >&2
+            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
+            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
+            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
+            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
+            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
+            echo "'repo' scope)." >&2
             exit 1
           fi
           # Rewrite the SSH URL used in config/configuration-set.json to

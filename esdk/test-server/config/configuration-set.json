@@ -3,22 +3,28 @@
     "The ESDK TestServer Configuration_Set (design 'Data Models'): exactly one",
     "product field, exactly one Feature_Catalog (the features list, Requirement",
     "7.1), and one Configuration_Entry per language (Requirements 3.1, 3.2).",
-    "Python has no Language_Repository, so its Feature_Declaration",
-    "(supportedFeatures / unsupportedFeatures) lives in its entry here",
-    "(Requirements 8.3, 8.13); Java's lives in aws-crypto-tools-java's",
-    "commons-configuration.json (Requirement 8.2).",
+    "Python and Rust have no Language_Repository commons-configuration.json, so",
+    "each carries its Feature_Declaration (supportedFeatures / unsupportedFeatures)",
+    "inline in its entry here (Requirements 8.3, 8.13); Java's lives in",
+    "aws-crypto-tools-java's commons-configuration.json (Requirement 8.2).",
     "",
     "Server homes (Requirement 1): the Java Language_Server is hosted in the",
     "aws-crypto-tools-java Language_Repository (its serverLocation below is the",
-    "single authoritative copy — commons holds none); the Python Language_Server",
-    "stays in commons while no aws-crypto-tools-python repository exists.",
+    "single authoritative copy — commons holds none); the Rust Language_Server is",
+    "hosted in aws-crypto-tools-rust; the Python Language_Server stays in commons",
+    "while no aws-crypto-tools-python repository exists.",
+    "",
+    "Feature_Catalog: 'hierarchical' gates the AWS KMS Hierarchical keyring, which",
+    "only the Rust server builds (via the Dafny/legacy MPL key store path); its",
+    "native MPL raw/direct-KMS keyring constructors are unimplemented, so Rust",
+    "declares 'MPL' unsupported and Java/Python declare 'hierarchical' unsupported.",
     "",
     "Branch pins: while the feature branches are unmerged, refs/branches that",
-    "must contain the TestServer pin kessplas/esdk-test-server; both flip to",
-    "main after merge."
+    "must contain the TestServer pin kessplas/esdk-test-server (Rust:",
+    "kessplas/esdk-rust-test-server); all flip to main after merge."
   ],
   "product": "esdk",
-  "features": ["streaming", "MPL"],
+  "features": ["streaming", "MPL", "hierarchical"],
   "entries": [
     {
       "language": "java",
@@ -42,7 +48,7 @@
       "majorVersion": 4,
       "port": 8092,
       "supportedFeatures": ["streaming", "MPL"],
-      "unsupportedFeatures": [],
+      "unsupportedFeatures": ["hierarchical"],
       "libraryRepository": {
         "name": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
@@ -54,6 +60,25 @@
         "url": "git@github.com:aws/aws-crypto-tools-commons.git",
         "ref": "kessplas/esdk-test-server",
         "path": "esdk/test-server/servers/python"
+      }
+    },
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8093,
+      "supportedFeatures": ["hierarchical"],
+      "unsupportedFeatures": ["streaming", "MPL"],
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "kessplas/esdk-rust-test-server",
+        "path": "esdk"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "kessplas/esdk-rust-test-server",
+        "path": "esdk-test-server"
       }
     }
   ]

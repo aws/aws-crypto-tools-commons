@@ -93,11 +93,20 @@ else:
         errors.append('python serverLocation.repository is %r, expected "aws-crypto-tools-commons"'
                       % loc.get("repository"))
 
+rust = entries.get("rust")
+if not isinstance(rust, dict):
+    errors.append("no rust Configuration_Entry")
+else:
+    loc = rust.get("serverLocation") or {}
+    if loc.get("repository") != "aws-crypto-tools-rust":
+        errors.append('rust serverLocation.repository is %r, expected "aws-crypto-tools-rust"'
+                      % loc.get("repository"))
+
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in commons (Req 1.1, 1.3)"
+    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in commons; Rust server in aws-crypto-tools-rust (Req 1.1, 1.3)"
 else
     if [ -n "$location_errors" ]; then
         fail "Server_Location violation: ${location_errors//$'\n'/; } (Req 1.1, 1.3)"
@@ -138,13 +147,13 @@ errors = []
 if cfg.get("product") != "esdk":
     errors.append('product is %r, expected exactly "esdk"' % cfg.get("product"))
 features = cfg.get("features")
-if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL"]):
-    errors.append('Feature_Catalog is %r, expected exactly ["streaming", "MPL"]' % features)
+if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL", "hierarchical"]):
+    errors.append('Feature_Catalog is %r, expected exactly ["streaming", "MPL", "hierarchical"]' % features)
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass 'product is "esdk" and the Feature_Catalog defines exactly streaming and MPL (Req 7.1, 7.3)'
+    pass 'product is "esdk" and the Feature_Catalog defines exactly streaming, MPL, and hierarchical (Req 7.1, 7.3)'
 else
     if [ -n "$catalog_errors" ]; then
         fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; } (Req 7.1, 7.3)"

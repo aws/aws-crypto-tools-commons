@@ -8,6 +8,7 @@ import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
 import aws.cryptography.esdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.esdk.testserver.client.model.DecryptInput;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
+import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.EncryptInput;
@@ -16,6 +17,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -53,7 +55,13 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       on another — so commitment behavior is validated cross-language too.</li>
  * </ul>
  *
- * <p>All executions are fully offline (Raw-AES keyring / Default CMM). A policy
+ * <p>Every case runs against each {@link CommitmentKeyring} and gates on that
+ * keyring's Feature via {@link FeatureGate#require} as the first statement in the
+ * body: the {@code RAW_AES} variant requires {@code MPL} (offline; Java/Python),
+ * the {@code HIERARCHICAL} variant requires {@code hierarchical} (online; the Rust
+ * server). Commitment enforcement is keyring-independent, so the hierarchical
+ * variant is deliberately redundant with Raw-AES — it is the only way to cover
+ * commitment on a server that builds only the hierarchical keyring. A policy
  * violation originates inside the ESDK and surfaces as a modeled
  * {@link ESDKClientError} (Requirements 4.10, 5.6), never a bare HTTP error.
  */
@@ -73,6 +81,45 @@ class KeyCommitmentTests {
         ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+
+    /**
+     * The keyring a commitment case runs against, and the Feature the matrix gates
+     * it on. {@code RAW_AES} is offline (Raw-AES keyring; requires {@code MPL});
+     * {@code HIERARCHICAL} is online (a DynamoDB branch-key store wrapped by a KMS
+     * key; requires {@code hierarchical}). Commitment enforcement is
+     * keyring-independent, so both must reproduce the same behavior.
+     */
+    enum CommitmentKeyring {
+        RAW_AES(Set.of("MPL")),
+        HIERARCHICAL(Set.of("hierarchical"));
+
+        private final Set<String> features;
+
+        CommitmentKeyring(Set<String> features) {
+            this.features = features;
+        }
+
+        /** The Feature(s) a combination's languages must support to run this keyring. */
+        Set<String> features() {
+            return features;
+        }
+
+        /** The client config for this keyring under {@code policy}. */
+        ESDKClientConfig config(ESDKCommitmentPolicy policy) {
+            return switch (this) {
+                case RAW_AES -> EsdkClientConfigs.rawAesWithCommitmentPolicy(policy);
+                case HIERARCHICAL -> EsdkClientConfigs.hierarchicalWithCommitmentPolicy(policy);
+            };
+        }
+
+        @Override
+        public String toString() {
+            return switch (this) {
+                case RAW_AES -> "rawAes";
+                case HIERARCHICAL -> "hierarchical";
+            };
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Commitment model (the expected behavior every server must reproduce).
@@ -123,25 +170,31 @@ class KeyCommitmentTests {
     static List<Arguments> encryptTargetCases() {
         List<Arguments> cases = new ArrayList<>();
         for (LanguageServerTarget target : LanguageServerRegistry.shared().targets()) {
-            for (EncryptCase c : encryptCaseList()) {
-                cases.add(Arguments.of(target, c));
+            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
+                for (EncryptCase c : encryptCaseList()) {
+                    cases.add(Arguments.of(target, keyring, c));
+                }
             }
         }
         return cases;
     }
 
-    @ParameterizedTest(name = "encrypt[{1}] {0}")
+    @ParameterizedTest(name = "encrypt[{1}][{2}] {0}")
     @MethodSource("encryptTargetCases")
-    void encryptHonorsCommitmentPolicy(LanguageServerTarget target, EncryptCase testCase) {
+    void encryptHonorsCommitmentPolicy(
+            LanguageServerTarget target, CommitmentKeyring keyring, EncryptCase testCase) {
+        FeatureGate.require(keyring.features(), new EndpointPair(target, target));
         if (testCase.expectSuccess()) {
-            byte[] ciphertext = encrypt(target.endpoint(), testCase.policy(), testCase.suite(), PLAINTEXT);
+            byte[] ciphertext =
+                encrypt(target.endpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT);
             assertTrue(ciphertext.length > 0,
-                "encrypt with an allowed suite must produce ciphertext (" + target + ", " + testCase + ")");
+                "encrypt with an allowed suite must produce ciphertext ("
+                    + target + ", " + keyring + ", " + testCase + ")");
         } else {
             assertThrows(ESDKClientError.class,
-                () -> encrypt(target.endpoint(), testCase.policy(), testCase.suite(), PLAINTEXT),
+                () -> encrypt(target.endpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT),
                 "encrypt with a suite forbidden by the commitment policy must be rejected "
-                    + "as an ESDKClientError (" + target + ", " + testCase + ")");
+                    + "as an ESDKClientError (" + target + ", " + keyring + ", " + testCase + ")");
         }
     }
 
@@ -153,25 +206,29 @@ class KeyCommitmentTests {
     static List<Arguments> roundTripPairCases() {
         List<Arguments> cases = new ArrayList<>();
         for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
-            for (EncryptCase c : encryptCaseList()) {
-                // Every suite allowed on encrypt under a policy is also allowed on
-                // decrypt under that same policy, so it must round-trip.
-                if (c.expectSuccess()) {
-                    cases.add(Arguments.of(pair, c));
+            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
+                for (EncryptCase c : encryptCaseList()) {
+                    // Every suite allowed on encrypt under a policy is also allowed on
+                    // decrypt under that same policy, so it must round-trip.
+                    if (c.expectSuccess()) {
+                        cases.add(Arguments.of(pair, keyring, c));
+                    }
                 }
             }
         }
         return cases;
     }
 
-    @ParameterizedTest(name = "roundTrip[{1}] {0}")
+    @ParameterizedTest(name = "roundTrip[{1}][{2}] {0}")
     @MethodSource("roundTripPairCases")
-    void roundTripWithinPolicy(EndpointPair pair, EncryptCase testCase) {
-        byte[] ciphertext = encrypt(pair.encryptEndpoint(), testCase.policy(), testCase.suite(), PLAINTEXT);
-        byte[] recovered = decrypt(pair.decryptEndpoint(), testCase.policy(), ciphertext);
+    void roundTripWithinPolicy(EndpointPair pair, CommitmentKeyring keyring, EncryptCase testCase) {
+        FeatureGate.require(keyring.features(), pair);
+        byte[] ciphertext =
+            encrypt(pair.encryptEndpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT);
+        byte[] recovered = decrypt(pair.decryptEndpoint(), keyring, testCase.policy(), ciphertext);
         assertArrayEquals(PLAINTEXT, recovered,
             "decrypt(encrypt(x)) must equal x under a single commitment policy "
-                + "(" + pair + ", " + testCase + ")");
+                + "(" + pair + ", " + keyring + ", " + testCase + ")");
     }
 
     // -----------------------------------------------------------------------
@@ -202,35 +259,38 @@ class KeyCommitmentTests {
     static List<Arguments> decryptPairCases() {
         List<Arguments> cases = new ArrayList<>();
         for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
-            for (DecryptCase c : decryptCaseList()) {
-                cases.add(Arguments.of(pair, c));
+            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
+                for (DecryptCase c : decryptCaseList()) {
+                    cases.add(Arguments.of(pair, keyring, c));
+                }
             }
         }
         return cases;
     }
 
-    @ParameterizedTest(name = "decrypt[{1}] {0}")
+    @ParameterizedTest(name = "decrypt[{1}][{2}] {0}")
     @MethodSource("decryptPairCases")
-    void decryptHonorsCommitmentPolicy(EndpointPair pair, DecryptCase testCase) {
+    void decryptHonorsCommitmentPolicy(EndpointPair pair, CommitmentKeyring keyring, DecryptCase testCase) {
+        FeatureGate.require(keyring.features(), pair);
         // Produce a message of the requested commitment property on the encrypt
         // endpoint with a policy that permits it: committing via
         // REQUIRE_ENCRYPT_ALLOW_DECRYPT, non-committing via FORBID_ENCRYPT_ALLOW_DECRYPT.
         byte[] ciphertext = testCase.messageCommitting()
-            ? encrypt(pair.encryptEndpoint(), ESDKCommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
+            ? encrypt(pair.encryptEndpoint(), keyring, ESDKCommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
                 COMMITTING_SUITE, PLAINTEXT)
-            : encrypt(pair.encryptEndpoint(), ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
+            : encrypt(pair.encryptEndpoint(), keyring, ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
                 NON_COMMITTING_SUITE, PLAINTEXT);
 
         if (testCase.expectSuccess()) {
-            byte[] recovered = decrypt(pair.decryptEndpoint(), testCase.decryptPolicy(), ciphertext);
+            byte[] recovered = decrypt(pair.decryptEndpoint(), keyring, testCase.decryptPolicy(), ciphertext);
             assertArrayEquals(PLAINTEXT, recovered,
                 "decrypt must recover the plaintext when the policy permits the message's "
-                    + "commitment (" + pair + ", " + testCase + ")");
+                    + "commitment (" + pair + ", " + keyring + ", " + testCase + ")");
         } else {
             assertThrows(ESDKClientError.class,
-                () -> decrypt(pair.decryptEndpoint(), testCase.decryptPolicy(), ciphertext),
+                () -> decrypt(pair.decryptEndpoint(), keyring, testCase.decryptPolicy(), ciphertext),
                 "decrypt of a non-committing message under REQUIRE_ENCRYPT_REQUIRE_DECRYPT must "
-                    + "be rejected as an ESDKClientError (" + pair + ", " + testCase + ")");
+                    + "be rejected as an ESDKClientError (" + pair + ", " + keyring + ", " + testCase + ")");
         }
     }
 
@@ -238,11 +298,11 @@ class KeyCommitmentTests {
     // Harness helpers: single-leg encrypt / decrypt over the one Test_Client.
     // -----------------------------------------------------------------------
 
-    /** CreateClient with the policy on {@code endpoint}, then Encrypt with {@code suite}. */
-    private static byte[] encrypt(URI endpoint, ESDKCommitmentPolicy policy,
+    /** CreateClient with the keyring + policy on {@code endpoint}, then Encrypt with {@code suite}. */
+    private static byte[] encrypt(URI endpoint, CommitmentKeyring keyring, ESDKCommitmentPolicy policy,
                                   ESDKAlgorithmSuiteId suite, byte[] plaintext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = createClient(client, policy);
+        String clientId = createClient(client, keyring, policy);
         ByteBuffer ciphertext = client.encrypt(
             EncryptInput.builder()
                 .clientId(clientId)
@@ -253,10 +313,11 @@ class KeyCommitmentTests {
         return toArray(ciphertext);
     }
 
-    /** CreateClient with the policy on {@code endpoint}, then Decrypt {@code ciphertext}. */
-    private static byte[] decrypt(URI endpoint, ESDKCommitmentPolicy policy, byte[] ciphertext) {
+    /** CreateClient with the keyring + policy on {@code endpoint}, then Decrypt {@code ciphertext}. */
+    private static byte[] decrypt(URI endpoint, CommitmentKeyring keyring, ESDKCommitmentPolicy policy,
+                                  byte[] ciphertext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = createClient(client, policy);
+        String clientId = createClient(client, keyring, policy);
         ByteBuffer plaintext = client.decrypt(
             DecryptInput.builder()
                 .clientId(clientId)
@@ -266,10 +327,11 @@ class KeyCommitmentTests {
         return toArray(plaintext);
     }
 
-    private static String createClient(ESDKTestServerClient client, ESDKCommitmentPolicy policy) {
+    private static String createClient(
+            ESDKTestServerClient client, CommitmentKeyring keyring, ESDKCommitmentPolicy policy) {
         return client.createClient(
             CreateClientInput.builder()
-                .config(EsdkClientConfigs.rawAesWithCommitmentPolicy(policy))
+                .config(keyring.config(policy))
                 .build())
             .getClientId();
     }
