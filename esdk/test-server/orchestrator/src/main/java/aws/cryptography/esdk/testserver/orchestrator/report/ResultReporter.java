@@ -49,6 +49,7 @@ public final class ResultReporter {
         "awsKms",
         "awsKmsMrk",
         "awsKmsMultiKeyring",
+        "awsKmsMrkMultiKeyring",
         "awsKmsRsa",
         "awsKmsDiscovery");
 

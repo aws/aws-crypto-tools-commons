@@ -72,7 +72,8 @@ primary (first) configured target.
 ## Online AWS KMS keyring scenarios (credential-gated, Requirement 14)
 
 The KMS keyring variants — `AwsKms` (single symmetric key), `AwsKmsMrk` (multi-region key),
-`AwsKmsMultiKeyring`, `AwsKmsRsa` (asymmetric RSA key), and `AwsKmsDiscovery` — are exercised
+`AwsKmsMultiKeyring`, `AwsKmsMrkMultiKeyring` (two multi-region keys: generator + child),
+`AwsKmsRsa` (asymmetric RSA key), and `AwsKmsDiscovery` — are exercised
 by the **same** `MaterialsRoundTripTests` mechanism as the offline scenarios: each becomes a
 named `blob[awsKms]` / `stream[awsKmsMrk]` / … execution. Unlike the offline Raw-AES/Raw-RSA
 scenarios, these are **online**: they make real AWS KMS calls on encrypt/decrypt, so they
@@ -149,7 +150,8 @@ JAVA_HOME=<jdk21+> ./gradlew test \
 ```
 
 When configured, you will see additional named executions such as `blob[awsKms]`,
-`stream[awsKmsMrk]`, `blob[awsKmsMultiKeyring]`, `blob[awsKmsRsa]`, `stream[awsKmsRsa]`, and
+`stream[awsKmsMrk]`, `blob[awsKmsMultiKeyring]`, `blob[awsKmsMrkMultiKeyring]`,
+`blob[awsKmsRsa]`, `stream[awsKmsRsa]`, and
 `blob[awsKmsDiscovery]` / `stream[awsKmsDiscovery]` alongside the offline scenarios, each
 asserting `decrypt(encrypt(x)) == x` byte-for-byte against real AWS KMS. Without credentials
 or ARNs, none of these appear and only the offline scenarios run.

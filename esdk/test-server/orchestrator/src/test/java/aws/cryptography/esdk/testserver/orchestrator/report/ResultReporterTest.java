@@ -114,7 +114,8 @@ class ResultReporterTest {
         // The documented constant mirrors the Tests module's EsdkClientConfigs
         // KMS scenario labels exactly (Requirement 10.4).
         assertEquals(
-            List.of("awsKms", "awsKmsMrk", "awsKmsMultiKeyring", "awsKmsRsa", "awsKmsDiscovery"),
+            List.of("awsKms", "awsKmsMrk", "awsKmsMultiKeyring", "awsKmsMrkMultiKeyring",
+                "awsKmsRsa", "awsKmsDiscovery"),
             ResultReporter.REQUIRED_KMS_SCENARIOS);
     }
 

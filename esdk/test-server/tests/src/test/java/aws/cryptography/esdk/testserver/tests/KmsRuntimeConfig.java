@@ -24,6 +24,9 @@ import java.util.Optional;
  *       — the symmetric KMS key ({@code AwsKms})</li>
  *   <li>{@code esdk.testserver.kms.mrkArn} / {@code ESDK_TESTSERVER_KMS_MRK_ARN}
  *       — the multi-region KMS key ({@code AwsKmsMrk})</li>
+ *   <li>{@code esdk.testserver.kms.mrk2Arn} / {@code ESDK_TESTSERVER_KMS_MRK2_ARN}
+ *       — the second multi-region KMS key, the child of the
+ *       {@code AwsKmsMrkMultiKeyring} (whose generator is the {@code mrkArn} key)</li>
  *   <li>{@code esdk.testserver.kms.rsaKeyArn} / {@code ESDK_TESTSERVER_KMS_RSA_KEY_ARN}
  *       — the asymmetric RSA KMS key ({@code AwsKmsRsa})</li>
  *   <li>{@code esdk.testserver.kms.region} / {@code ESDK_TESTSERVER_KMS_REGION}
@@ -57,6 +60,8 @@ public final class KmsRuntimeConfig {
         "arn:aws:kms:us-west-2:370957321024:key/d3c7fc4c-5e03-4186-9d8e-ac95a6dc2f34";
     public static final String DEFAULT_MRK_ARN =
         "arn:aws:kms:us-west-2:370957321024:key/mrk-8cc58a2e31cd40d79acb422a2c6faac0";
+    public static final String DEFAULT_MRK2_ARN =
+        "arn:aws:kms:us-west-2:370957321024:key/mrk-68ecfc6885db4dd1a79040f69bdd86fe";
     public static final String DEFAULT_RSA_KEY_ARN =
         "arn:aws:kms:us-west-2:370957321024:key/7dc78563-40d1-46be-b406-865d8893cee9";
 
@@ -64,6 +69,8 @@ public final class KmsRuntimeConfig {
     public static final String SYMMETRIC_KEY_ARN_ENV = "ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN";
     public static final String MRK_ARN_PROPERTY = "esdk.testserver.kms.mrkArn";
     public static final String MRK_ARN_ENV = "ESDK_TESTSERVER_KMS_MRK_ARN";
+    public static final String MRK2_ARN_PROPERTY = "esdk.testserver.kms.mrk2Arn";
+    public static final String MRK2_ARN_ENV = "ESDK_TESTSERVER_KMS_MRK2_ARN";
     public static final String RSA_KEY_ARN_PROPERTY = "esdk.testserver.kms.rsaKeyArn";
     public static final String RSA_KEY_ARN_ENV = "ESDK_TESTSERVER_KMS_RSA_KEY_ARN";
     public static final String REGION_PROPERTY = "esdk.testserver.kms.region";
@@ -71,12 +78,15 @@ public final class KmsRuntimeConfig {
 
     private final String symmetricKeyArn;
     private final String mrkArn;
+    private final String mrk2Arn;
     private final String rsaKeyArn;
     private final String region;
 
-    private KmsRuntimeConfig(String symmetricKeyArn, String mrkArn, String rsaKeyArn, String region) {
+    private KmsRuntimeConfig(
+            String symmetricKeyArn, String mrkArn, String mrk2Arn, String rsaKeyArn, String region) {
         this.symmetricKeyArn = symmetricKeyArn;
         this.mrkArn = mrkArn;
+        this.mrk2Arn = mrk2Arn;
         this.rsaKeyArn = rsaKeyArn;
         this.region = region;
     }
@@ -85,9 +95,10 @@ public final class KmsRuntimeConfig {
     public static KmsRuntimeConfig fromRuntime() {
         String symmetric = resolve(SYMMETRIC_KEY_ARN_PROPERTY, SYMMETRIC_KEY_ARN_ENV).orElse(DEFAULT_SYMMETRIC_KEY_ARN);
         String mrk = resolve(MRK_ARN_PROPERTY, MRK_ARN_ENV).orElse(DEFAULT_MRK_ARN);
+        String mrk2 = resolve(MRK2_ARN_PROPERTY, MRK2_ARN_ENV).orElse(DEFAULT_MRK2_ARN);
         String rsa = resolve(RSA_KEY_ARN_PROPERTY, RSA_KEY_ARN_ENV).orElse(DEFAULT_RSA_KEY_ARN);
         String region = resolve(REGION_PROPERTY, REGION_ENV).orElse(DEFAULT_REGION);
-        return new KmsRuntimeConfig(symmetric, mrk, rsa, region);
+        return new KmsRuntimeConfig(symmetric, mrk, mrk2, rsa, region);
     }
 
     private static Optional<String> resolve(String property, String env) {
@@ -108,6 +119,10 @@ public final class KmsRuntimeConfig {
 
     public String mrkArn() {
         return mrkArn;
+    }
+
+    public String mrk2Arn() {
+        return mrk2Arn;
     }
 
     public String rsaKeyArn() {

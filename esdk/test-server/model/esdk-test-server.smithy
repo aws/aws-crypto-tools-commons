@@ -382,8 +382,11 @@ structure Keyring {
     /// AWS KMS MRK-aware keyring (aws-kms-mrk-keyring.md).
     AwsKmsMrk: AwsKmsMrkKeyringConfig
 
-    /// AWS KMS MRK-aware multi-keyring (aws-kms-mrk-multi-keyrings.md).
+    /// AWS KMS multi-keyring (aws-kms-multi-keyrings.md).
     AwsKmsMultiKeyring: AwsKmsMultiKeyringConfig
+
+    /// AWS KMS MRK-aware multi-keyring (aws-kms-mrk-multi-keyrings.md).
+    AwsKmsMrkMultiKeyring: AwsKmsMrkMultiKeyringConfig
 
     /// AWS KMS discovery keyring (aws-kms-discovery-keyring.md).
     AwsKmsDiscovery: AwsKmsDiscoveryKeyringConfig
@@ -419,17 +422,19 @@ structure AwsKmsMrkKeyringConfig {
     grantTokens: GrantTokenList
 }
 
-/// AWS KMS MRK-aware multi-keyring with an optional generator and child key
-/// identifiers (aws-kms-mrk-multi-keyrings.md).
-structure AwsKmsMrkMultiKeyringConfig {
+/// AWS KMS multi-keyring with an optional generator and child key identifiers
+/// (aws-kms-multi-keyrings.md).
+structure AwsKmsMultiKeyringConfig {
     generator: String
     kmsKeyIds: KmsKeyIdList
     grantTokens: GrantTokenList
 }
 
-/// AWS KMS multi-keyring with an optional generator and child key identifiers
-/// (aws-kms-multi-keyrings.md).
-structure AwsKmsMultiKeyringConfig {
+/// AWS KMS MRK-aware multi-keyring with an optional MRK generator and child MRK
+/// key identifiers (aws-kms-mrk-multi-keyrings.md). Same shape as
+/// AwsKmsMultiKeyringConfig; the MRK-aware form matches multi-region keys across
+/// regions on decrypt.
+structure AwsKmsMrkMultiKeyringConfig {
     generator: String
     kmsKeyIds: KmsKeyIdList
     grantTokens: GrantTokenList
