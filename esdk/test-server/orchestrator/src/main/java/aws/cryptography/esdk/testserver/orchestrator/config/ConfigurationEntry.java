@@ -28,6 +28,11 @@ import java.util.List;
  *                            {@code null} when absent (Requirements 8.1, 8.3)
  * @param unsupportedFeatures the Feature_Declaration's unsupported half, or
  *                            {@code null} when absent (Requirements 8.1, 8.3)
+ * @param commonsConfigurationPath repository-root-relative path to this
+ *                            language's commons-configuration.json (its external
+ *                            Feature_Declaration); {@code null} means the default
+ *                            location applies (a Language_Repository whose layout
+ *                            differs from the default sets this)
  */
 public record ConfigurationEntry(
     String language,
@@ -36,12 +41,26 @@ public record ConfigurationEntry(
     RepositoryCoordinates libraryRepository,
     ServerLocation serverLocation,
     List<String> supportedFeatures,
-    List<String> unsupportedFeatures
+    List<String> unsupportedFeatures,
+    String commonsConfigurationPath
 ) {
     public ConfigurationEntry {
         // Defensive copies; null is preserved to mean "absent from the JSON".
         supportedFeatures = supportedFeatures == null ? null : List.copyOf(supportedFeatures);
         unsupportedFeatures = unsupportedFeatures == null ? null : List.copyOf(unsupportedFeatures);
+    }
+
+    /**
+     * Convenience constructor for an entry with no explicit
+     * {@code commonsConfigurationPath} — the default declaration location
+     * applies. Preserves the pre-generalization {@code (…, unsupportedFeatures)}
+     * shape so existing call sites keep compiling.
+     */
+    public ConfigurationEntry(String language, Integer majorVersion, Integer port,
+            RepositoryCoordinates libraryRepository, ServerLocation serverLocation,
+            List<String> supportedFeatures, List<String> unsupportedFeatures) {
+        this(language, majorVersion, port, libraryRepository, serverLocation,
+            supportedFeatures, unsupportedFeatures, null);
     }
 
     /**

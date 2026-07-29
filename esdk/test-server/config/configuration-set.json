@@ -7,7 +7,9 @@
     "(supportedFeatures / unsupportedFeatures) lives inline in its entry here",
     "(Requirements 8.3, 8.13). Java and Rust each have a Language_Repository, so",
     "their Feature_Declarations live in that repository's commons-configuration.json",
-    "(Requirement 8.2): aws-crypto-tools-java and aws-crypto-tools-rust respectively.",
+    "(Requirement 8.2): aws-crypto-tools-java at the default esdk/test-server/, and",
+    "aws-crypto-tools-rust at esdk-test-server/ (via commonsConfigurationPath, since",
+    "its server sources live there rather than under esdk/test-server/).",
     "",
     "Server homes (Requirement 1): the Java Language_Server is hosted in the",
     "aws-crypto-tools-java Language_Repository and the Rust Language_Server in",
@@ -67,6 +69,7 @@
       "language": "rust",
       "majorVersion": 1,
       "port": 8093,
+      "commonsConfigurationPath": "esdk-test-server/commons-configuration.json",
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",

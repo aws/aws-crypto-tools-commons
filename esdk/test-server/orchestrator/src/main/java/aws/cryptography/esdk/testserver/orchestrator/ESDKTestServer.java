@@ -91,12 +91,27 @@ import java.util.concurrent.Future;
 public final class ESDKTestServer {
 
     /**
-     * Where a Language_Repository carries its commons-configuration file
-     * (Commons_Configuration_Entry + {@code product} + Feature_Declaration),
-     * relative to the repository root (design "Commons-configuration file").
+     * The DEFAULT repository-root-relative location of a Language_Repository's
+     * commons-configuration file (Commons_Configuration_Entry + {@code product}
+     * + Feature_Declaration; design "Commons-configuration file"). A
+     * Configuration_Entry whose Language_Repository places the file elsewhere
+     * overrides this via {@code commonsConfigurationPath}.
      */
     static final String COMMONS_CONFIGURATION_RELATIVE_PATH =
         "esdk/test-server/commons-configuration.json";
+
+    /**
+     * The repository-root-relative path to {@code entry}'s commons-configuration
+     * file: the entry's {@code commonsConfigurationPath} when set, otherwise
+     * {@link #COMMONS_CONFIGURATION_RELATIVE_PATH}. Lets a Language_Repository
+     * whose layout differs from the default (e.g. the Rust server, whose sources
+     * live under {@code esdk-test-server/}) carry its declaration alongside them.
+     */
+    private static String commonsConfigurationRelativePath(ConfigurationEntry entry) {
+        String configured = entry == null ? null : entry.commonsConfigurationPath();
+        return configured == null || configured.isBlank()
+            ? COMMONS_CONFIGURATION_RELATIVE_PATH : configured;
+    }
 
     private final ConfigurationSet configurationSet;
     private final RunContext context;
@@ -228,7 +243,8 @@ public final class ESDKTestServer {
         FeatureValidation.Result onHand = FeatureValidation.Result.ok();
         if (context.kind() == RunContext.Kind.LANGUAGE) {
             Path expected = context.languageRepoRoot()
-                .resolve(COMMONS_CONFIGURATION_RELATIVE_PATH);
+                .resolve(commonsConfigurationRelativePath(
+                    configurationSet.forLanguage(context.ownLanguage())));
             CommonsConfiguration own;
             try {
                 own = ConfigurationLoader.loadCommonsConfiguration(expected);
@@ -333,7 +349,7 @@ public final class ESDKTestServer {
                 return PipelineOutcome.aborted("no materialized server component for language '"
                     + language + "' to locate its Feature_Declaration");
             }
-            Path expected = server.get().root().resolve(COMMONS_CONFIGURATION_RELATIVE_PATH);
+            Path expected = server.get().root().resolve(commonsConfigurationRelativePath(entry));
             CommonsConfiguration carried;
             try {
                 carried = ConfigurationLoader.loadCommonsConfiguration(expected);

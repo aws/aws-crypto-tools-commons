@@ -256,7 +256,7 @@ class ConfigurationLoaderTest {
         ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(shipped);
 
         assertEquals("esdk", set.product());
-        assertEquals(List.of("streaming", "MPL"), set.features());
+        assertEquals(List.of("streaming", "MPL", "hierarchical"), set.features());
 
         ConfigurationEntry java = set.forLanguage("java");
         assertNotNull(java, "the shipped set must carry a java entry");
@@ -271,8 +271,22 @@ class ConfigurationLoaderTest {
         assertEquals(4, python.majorVersion());
         assertEquals(8092, python.port());
         assertEquals(List.of("streaming", "MPL"), python.supportedFeatures());
-        assertEquals(List.of(), python.unsupportedFeatures());
+        assertEquals(List.of("hierarchical"), python.unsupportedFeatures());
         assertEquals("aws-crypto-tools-commons", python.serverLocation().repository());
         assertEquals("esdk/test-server/servers/python", python.serverLocation().path());
+
+        // Rust is a Language_Repository (aws-crypto-tools-rust): its
+        // Feature_Declaration lives in its own repo, not inline here, so the entry
+        // carries no supported/unsupported arrays and points at its declaration
+        // location, alongside its server sources under esdk-test-server/.
+        ConfigurationEntry rust = set.forLanguage("rust");
+        assertNotNull(rust, "the shipped set must carry a rust entry");
+        assertEquals(1, rust.majorVersion());
+        assertEquals(8093, rust.port());
+        assertEquals("aws-crypto-tools-rust", rust.serverLocation().repository());
+        assertEquals("esdk-test-server", rust.serverLocation().path());
+        assertEquals("esdk-test-server/commons-configuration.json", rust.commonsConfigurationPath());
+        assertNull(rust.supportedFeatures());
+        assertNull(rust.unsupportedFeatures());
     }
 }

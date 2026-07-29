@@ -125,7 +125,8 @@ public final class ConfigurationLoader {
             coordinates(n.get("libraryRepository")),
             serverLocation(n.get("serverLocation")),
             stringList(n.get("supportedFeatures")),
-            stringList(n.get("unsupportedFeatures")));
+            stringList(n.get("unsupportedFeatures")),
+            text(n, "commonsConfigurationPath"));
     }
 
     private static RepositoryCoordinates coordinates(JsonNode node) {
