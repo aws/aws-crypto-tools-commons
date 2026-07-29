@@ -40,8 +40,11 @@ public final class RustLaunchPlan implements Launcher {
     /** The cargo executable (resolved from PATH). */
     static final String DEFAULT_CARGO = "cargo";
 
-    /** The release binary cargo produces, relative to the server directory. */
-    static final String SERVER_BINARY = "target/release/esdk-test-server";
+    /** The release binary name cargo produces. */
+    static final String SERVER_BINARY_NAME = "esdk-test-server";
+
+    /** The default cargo target directory (relative to the server crate). */
+    static final String DEFAULT_TARGET_DIR = "target";
 
     private static final String SERVER_LOG_NAME = "rust-server.log";
 
@@ -121,9 +124,25 @@ public final class RustLaunchPlan implements Launcher {
         return List.of(cargo, "build", "--release");
     }
 
-    /** {@code <server>/target/release/esdk-test-server <port>}. */
+    /** {@code <target>/release/esdk-test-server <port>}. */
     static List<String> serverCommand(Path serverDir, int port) {
-        return List.of(serverDir.resolve(SERVER_BINARY).toString(), String.valueOf(port));
+        Path binary = targetDirectory(serverDir).resolve("release").resolve(SERVER_BINARY_NAME);
+        return List.of(binary.toString(), String.valueOf(port));
+    }
+
+    /**
+     * The cargo target directory: {@code CARGO_TARGET_DIR} when set in the
+     * environment (an absolute value is used as-is; a relative one is resolved
+     * against the server crate, as cargo does since the build runs there),
+     * otherwise {@code <server>/target}. Honoring the env var lets CI point the
+     * build at a stable, cached location instead of the ephemeral clone.
+     */
+    static Path targetDirectory(Path serverDir) {
+        String configured = System.getenv("CARGO_TARGET_DIR");
+        if (configured != null && !configured.isBlank()) {
+            return serverDir.resolve(configured);
+        }
+        return serverDir.resolve(DEFAULT_TARGET_DIR);
     }
 
     // ------------------------------------------------------------------

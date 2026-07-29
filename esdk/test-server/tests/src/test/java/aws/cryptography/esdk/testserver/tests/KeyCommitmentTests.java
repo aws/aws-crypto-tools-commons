@@ -17,7 +17,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -69,6 +71,15 @@ class KeyCommitmentTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server key-commitment plaintext".getBytes(StandardCharsets.UTF_8);
+
+    // Ciphertext produced once per (encrypt endpoint, keyring, policy, suite) and
+    // reused across decrypt endpoints; computeIfAbsent runs one encrypt per key
+    // even under parallel execution.
+    private static final Map<String, byte[]> ROUND_TRIP_CIPHERTEXTS = new ConcurrentHashMap<>();
+
+    // Committing / non-committing messages memoized per (encrypt endpoint, keyring,
+    // commitment) and reused across decrypt endpoints and decrypt policies.
+    private static final Map<String, byte[]> DECRYPT_MESSAGES = new ConcurrentHashMap<>();
 
     /** A representative committing, NON-signing suite for the decrypt-side matrix. */
     private static final ESDKAlgorithmSuiteId COMMITTING_SUITE =
@@ -223,8 +234,12 @@ class KeyCommitmentTests {
     @MethodSource("roundTripPairCases")
     void roundTripWithinPolicy(EndpointPair pair, CommitmentKeyring keyring, EncryptCase testCase) {
         FeatureGate.require(keyring.features(), pair);
-        byte[] ciphertext =
-            encrypt(pair.encryptEndpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT);
+        // Encrypt once per (encrypt endpoint, keyring, policy, suite); reuse the
+        // ciphertext across the decrypt endpoints paired with that encrypt endpoint.
+        String key = pair.encryptEndpoint() + "|" + keyring + "|"
+            + testCase.policy() + "|" + testCase.suite();
+        byte[] ciphertext = ROUND_TRIP_CIPHERTEXTS.computeIfAbsent(key,
+            k -> encrypt(pair.encryptEndpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT));
         byte[] recovered = decrypt(pair.decryptEndpoint(), keyring, testCase.policy(), ciphertext);
         assertArrayEquals(PLAINTEXT, recovered,
             "decrypt(encrypt(x)) must equal x under a single commitment policy "
@@ -272,14 +287,16 @@ class KeyCommitmentTests {
     @MethodSource("decryptPairCases")
     void decryptHonorsCommitmentPolicy(EndpointPair pair, CommitmentKeyring keyring, DecryptCase testCase) {
         FeatureGate.require(keyring.features(), pair);
-        // Produce a message of the requested commitment property on the encrypt
-        // endpoint with a policy that permits it: committing via
-        // REQUIRE_ENCRYPT_ALLOW_DECRYPT, non-committing via FORBID_ENCRYPT_ALLOW_DECRYPT.
-        byte[] ciphertext = testCase.messageCommitting()
+        // Produce the committing / non-committing message once per (encrypt endpoint,
+        // keyring, commitment) — permitted via REQUIRE_ENCRYPT_ALLOW_DECRYPT (committing)
+        // or FORBID_ENCRYPT_ALLOW_DECRYPT (non-committing) — and reuse it across decrypt
+        // endpoints and decrypt policies.
+        String key = pair.encryptEndpoint() + "|" + keyring + "|" + testCase.messageCommitting();
+        byte[] ciphertext = DECRYPT_MESSAGES.computeIfAbsent(key, k -> testCase.messageCommitting()
             ? encrypt(pair.encryptEndpoint(), keyring, ESDKCommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
                 COMMITTING_SUITE, PLAINTEXT)
             : encrypt(pair.encryptEndpoint(), keyring, ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
-                NON_COMMITTING_SUITE, PLAINTEXT);
+                NON_COMMITTING_SUITE, PLAINTEXT));
 
         if (testCase.expectSuccess()) {
             byte[] recovered = decrypt(pair.decryptEndpoint(), keyring, testCase.decryptPolicy(), ciphertext);

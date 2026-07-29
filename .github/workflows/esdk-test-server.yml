@@ -158,6 +158,10 @@ jobs:
       # variable ESDK_TEST_SERVER_KMS_ROLE_ARN to target a different
       # account/role. This is an IAM role ARN, not a secret.
       KMS_CI_ROLE_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
+      # Stable target dir for the orchestrated run's Rust cargo build (RustLaunchPlan
+      # honors CARGO_TARGET_DIR). Kept outside the ephemeral materialized clone so it
+      # survives and can be cached across runs (the Rust cache step below saves it).
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.rust-target
 
     steps:
       - name: Checkout (working tree = the Configuration_Set every language resolves from)
@@ -214,6 +218,24 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
           cargo --version
+
+      - name: Cache the Rust build (cargo registry + git + target)
+        # The orchestrated run clones aws-crypto-tools-rust and cargo-builds it —
+        # the slowest setup. Swatinem/rust-cache expects the Cargo project at setup
+        # time, but here it is cloned during `make orchestrate`, so cache the cargo
+        # registry/git plus the stable CARGO_TARGET_DIR directly. The key rotates
+        # per run with a prefix restore-key, so each run warm-starts from the latest
+        # cache and saves an updated one; cargo's own fingerprints decide what to
+        # recompile.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.rust-target
+          key: ${{ runner.os }}-rust-esdk-test-server-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-rust-esdk-test-server-
 
       - name: Cache Gradle + Maven caches
         # Gradle: the client-java/tests/orchestrator builds under
