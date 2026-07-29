@@ -213,6 +213,29 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       }),
     );
 
+    // The AWS KMS Hierarchical keyring reads its branch key from the shared
+    // DynamoDB key store (KeyStoreDdbTable) and unwraps it with the branch key's
+    // KMS key; both the encrypt and decrypt legs need GetItem on the table and
+    // Decrypt on that key. These are the shared branch-key-store fixtures in the
+    // CI-resources account, not resources this stack creates.
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EsdkTestServerHierarchicalKeyStore',
+        effect: iam.Effect.ALLOW,
+        actions: ['dynamodb:GetItem'],
+        resources: ['arn:aws:dynamodb:us-west-2:370957321024:table/KeyStoreDdbTable'],
+      }),
+    );
+
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EsdkTestServerHierarchicalBranchKeyKms',
+        effect: iam.Effect.ALLOW,
+        actions: ['kms:Decrypt'],
+        resources: ['arn:aws:kms:us-west-2:370957321024:key/9d989aa2-2f9c-438c-a745-cc57d3ad0126'],
+      }),
+    );
+
     // --- Outputs (Requirement 14.6): stable, documented names ---
     new cdk.CfnOutput(this, 'symmetricKeyArn', {
       value: symmetricKey.keyArn,
