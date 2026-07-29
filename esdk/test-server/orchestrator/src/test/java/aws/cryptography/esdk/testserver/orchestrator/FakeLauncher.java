@@ -7,6 +7,7 @@ import aws.cryptography.esdk.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.esdk.testserver.orchestrator.launch.ServerLaunchException;
 import aws.cryptography.esdk.testserver.orchestrator.source.MaterializedSources;
 import java.net.URI;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A test double {@link Launcher} that either aborts with a preset
@@ -20,7 +21,7 @@ import java.net.URI;
 final class FakeLauncher implements Launcher {
 
     private final ServerLaunchException toThrow;
-    private int launchCount = 0;
+    private final AtomicInteger launchCount = new AtomicInteger();
 
     private FakeLauncher(ServerLaunchException toThrow) {
         this.toThrow = toThrow;
@@ -37,13 +38,13 @@ final class FakeLauncher implements Launcher {
     }
 
     int launchCount() {
-        return launchCount;
+        return launchCount.get();
     }
 
     @Override
     public LaunchedServer launch(ConfigurationEntry entry, MaterializedSources sources)
             throws ServerLaunchException {
-        launchCount++;
+        launchCount.incrementAndGet();
         if (toThrow != null) {
             throw toThrow;
         }

@@ -26,6 +26,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,7 +62,9 @@ class TeardownTotalityPropertyTest {
             throws IOException {
         List<String> languages = scenario.languages();
         List<String> expectedLaunched = scenario.outcome().kind() == Kind.LAUNCH_FAILURE
-            ? languages.subList(0, scenario.outcome().failAfter())
+            ? languages.stream()
+                .filter(language -> !language.equals(scenario.outcome().failLanguage()))
+                .toList()
             : languages;
         Set<String> expectedStillRunning = new LinkedHashSet<>();
         for (String language : expectedLaunched) {
@@ -73,7 +76,7 @@ class TeardownTotalityPropertyTest {
         ConfigurationSet set = configurationSet(languages);
         RecordingLauncher launcher = new RecordingLauncher(
             scenario.outcome().kind() == Kind.LAUNCH_FAILURE
-                ? scenario.outcome().failAfter() : -1,
+                ? scenario.outcome().failLanguage() : null,
             scenario.stillRunning());
         StubTestRunner runner = runnerFor(scenario.outcome(), languages);
 
@@ -92,8 +95,8 @@ class TeardownTotalityPropertyTest {
 
         // The generated outcome actually happened: the expected prefix launched,
         // and the runner ran only on the non-abort paths.
-        assertEquals(expectedLaunched, launcher.launchedLanguages(),
-            "the generated subset of servers must have launched");
+        assertEquals(Set.copyOf(expectedLaunched), Set.copyOf(launcher.launchedLanguages()),
+            "exactly the servers whose launch did not fail must have launched");
         assertEquals(scenario.outcome().kind() != Kind.LAUNCH_FAILURE, runner.wasInvoked(),
             "the runner runs exactly when every launch succeeded");
         assertEquals(scenario.outcome().kind() == Kind.ALL_PASS, result.succeeded(),
@@ -140,10 +143,10 @@ class TeardownTotalityPropertyTest {
     private enum Kind { ALL_PASS, TEST_FAILS, LAUNCH_FAILURE, RUNNER_EXCEPTION }
 
     /**
-     * A generated run outcome; {@code failAfter} is the number of servers
-     * launched before the failing launch (LAUNCH_FAILURE only, else -1).
+     * A generated run outcome; {@code failLanguage} is the language whose launch
+     * fails (LAUNCH_FAILURE only, else {@code null}).
      */
-    private record RunOutcome(Kind kind, int failAfter) { }
+    private record RunOutcome(Kind kind, String failLanguage) { }
 
     /** A generated multi-language run with a stop-failure subset. */
     private record Scenario(List<String> languages, RunOutcome outcome, Set<String> stillRunning) { }
@@ -155,17 +158,17 @@ class TeardownTotalityPropertyTest {
             .set().ofMinSize(1).ofMaxSize(4)
             .map(s -> List.copyOf(new ArrayList<>(s)));
         return languages.flatMap(langs ->
-            Combinators.combine(outcomes(langs.size()), Arbitraries.subsetOf(langs))
+            Combinators.combine(outcomes(langs), Arbitraries.subsetOf(langs))
                 .as((outcome, still) -> new Scenario(langs, outcome, still)));
     }
 
-    /** All four outcome kinds; a launch failure after any K of the N servers. */
-    private static Arbitrary<RunOutcome> outcomes(int languageCount) {
+    /** All four outcome kinds; a launch failure of any one of the servers. */
+    private static Arbitrary<RunOutcome> outcomes(List<String> languages) {
         return Arbitraries.oneOf(
             Arbitraries.of(Kind.ALL_PASS, Kind.TEST_FAILS, Kind.RUNNER_EXCEPTION)
-                .map(kind -> new RunOutcome(kind, -1)),
-            Arbitraries.integers().between(0, languageCount - 1)
-                .map(k -> new RunOutcome(Kind.LAUNCH_FAILURE, k)));
+                .map(kind -> new RunOutcome(kind, null)),
+            Arbitraries.of(languages.toArray(new String[0]))
+                .map(language -> new RunOutcome(Kind.LAUNCH_FAILURE, language)));
     }
 
     // ------------------------------------------------------------------
@@ -296,12 +299,13 @@ class TeardownTotalityPropertyTest {
      * modeling an abort after K servers launched.
      */
     private static final class RecordingLauncher implements Launcher {
-        private final int failAtIndex; // 0-based launch index that throws; -1 = never
+        private final String failLanguage; // the language whose launch throws; null = none
         private final Set<String> stillRunningLanguages;
-        private final List<InstrumentedServer> launched = new ArrayList<>();
+        private final List<InstrumentedServer> launched =
+            Collections.synchronizedList(new ArrayList<>());
 
-        RecordingLauncher(int failAtIndex, Set<String> stillRunningLanguages) {
-            this.failAtIndex = failAtIndex;
+        RecordingLauncher(String failLanguage, Set<String> stillRunningLanguages) {
+            this.failLanguage = failLanguage;
             this.stillRunningLanguages = stillRunningLanguages;
         }
 
@@ -316,10 +320,10 @@ class TeardownTotalityPropertyTest {
         @Override
         public LaunchedServer launch(ConfigurationEntry entry, MaterializedSources sources)
                 throws ServerLaunchException {
-            if (launched.size() == failAtIndex) {
+            if (entry.language().equals(failLanguage)) {
                 throw new ServerLaunchException(entry.language(),
                     ServerLaunchException.Category.BUILD,
-                    "generated launch failure after " + failAtIndex + " launches");
+                    "generated launch failure for " + failLanguage);
             }
             InstrumentedServer server = new InstrumentedServer(entry.language(),
                 entry.port(), stillRunningLanguages.contains(entry.language()));

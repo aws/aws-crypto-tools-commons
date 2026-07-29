@@ -23,10 +23,12 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import net.jqwik.api.Arbitraries;
@@ -200,8 +202,8 @@ class LaunchOnceAllReachablePropertyTest {
         record Launch(String language, int port) {
         }
 
-        final List<Launch> launches = new ArrayList<>();
-        final Map<String, AtomicBoolean> reachableByLanguage = new LinkedHashMap<>();
+        final List<Launch> launches = Collections.synchronizedList(new ArrayList<>());
+        final Map<String, AtomicBoolean> reachableByLanguage = new ConcurrentHashMap<>();
 
         @Override
         public LaunchedServer launch(ConfigurationEntry entry, MaterializedSources sources) {

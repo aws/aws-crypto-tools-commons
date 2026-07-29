@@ -37,6 +37,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * The ESDK TestServer orchestrator core — the fail-closed pipeline over the
@@ -354,23 +358,60 @@ public final class ESDKTestServer {
         }
 
         // ---- Stage 5: build + launch every server as a subprocess on its
-        // configured port (Requirement 2.1), sequentially — each launch()
-        // returns only when its server is reachable. A language with no
-        // launcher wired, and any resolve/build/port/timeout failure, aborts
-        // the run naming the language and the cause (Requirement 2.5). ----
+        // configured port (Requirement 2.1), concurrently — each launch() runs
+        // on its own thread and returns only when its server is reachable. A
+        // language with no launcher wired aborts before any launch. Every
+        // concurrent launch is awaited, so a server that came up is recorded in
+        // {@code launched} for teardown even when another language's launch
+        // aborts the run; the abort names the failing language and the cause
+        // (Requirements 2.5, 2.6). ----
         for (ConfigurationEntry entry : effectiveEntries) {
-            Optional<Launcher> launcher = launcherFactory.launcherFor(entry.language());
-            if (launcher.isEmpty()) {
+            if (launcherFactory.launcherFor(entry.language()).isEmpty()) {
                 return PipelineOutcome.aborted(
                     "no Language_Server launcher is available for language '"
                         + entry.language() + "'");
             }
-            try {
-                launched.add(launcher.get().launch(entry, sources));
-            } catch (ServerLaunchException e) {
-                return PipelineOutcome.aborted("failed to launch the " + e.language()
-                    + " Language_Server [" + e.category() + "]: " + e.getMessage());
+        }
+        ExecutorService launchPool =
+            Executors.newFixedThreadPool(Math.max(1, effectiveEntries.size()));
+        List<Future<LaunchedServer>> launchFutures = new ArrayList<>();
+        try {
+            for (ConfigurationEntry entry : effectiveEntries) {
+                Launcher launcher = launcherFactory.launcherFor(entry.language()).orElseThrow();
+                launchFutures.add(launchPool.submit(() -> launcher.launch(entry, sources)));
             }
+        } finally {
+            launchPool.shutdown();
+        }
+        ServerLaunchException launchFailure = null;
+        RuntimeException launchError = null;
+        for (Future<LaunchedServer> future : launchFutures) {
+            try {
+                launched.add(future.get());
+            } catch (ExecutionException e) {
+                if (e.getCause() instanceof ServerLaunchException sle) {
+                    if (launchFailure == null) {
+                        launchFailure = sle;
+                    }
+                } else if (launchError == null) {
+                    launchError = new RuntimeException(
+                        "unexpected failure launching a Language_Server", e.getCause());
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                if (launchError == null) {
+                    launchError = new RuntimeException(
+                        "interrupted while launching the Language_Servers", e);
+                }
+            }
+        }
+        if (launchError != null) {
+            throw launchError;
+        }
+        if (launchFailure != null) {
+            return PipelineOutcome.aborted("failed to launch the " + launchFailure.language()
+                + " Language_Server [" + launchFailure.category() + "]: "
+                + launchFailure.getMessage());
         }
 
         // Final reachability re-check across all launched ports: Tests begin
