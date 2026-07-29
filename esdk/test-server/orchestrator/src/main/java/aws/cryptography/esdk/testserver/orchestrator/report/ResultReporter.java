@@ -26,9 +26,12 @@ import java.util.List;
  *   <li><strong>KMS coverage floor</strong>: for every launched
  *       (encrypt, decrypt) Target pair — the full pairwise product of the
  *       launched Target labels, same-Target pairs included — and each required
- *       KMS scenario in {@link #REQUIRED_KMS_SCENARIOS}, at least one passed
- *       execution must match the naming convention; each hole fails the run
- *       naming the scenario and the pair (Requirement 10.4).</li>
+ *       KMS scenario in {@link #REQUIRED_KMS_SCENARIOS}, at least one passed —
+ *       or visibly feature-gated-skipped — execution must match the naming
+ *       convention. A skip records a combination language declaring the
+ *       scenario's Feature unsupported (an explicit exemption, not the silent
+ *       loss this floor guards against); a combination with neither is a hole
+ *       that fails the run naming the scenario and the pair (Requirement 10.4).</li>
  *   <li>Cleanup failures (a {@code Language_Server} still running after
  *       teardown) are appended to the report naming each affected language,
  *       without masking the primary run result (Requirement 2.11).</li>
@@ -170,10 +173,12 @@ public final class ResultReporter {
     /**
      * Compute the KMS coverage floor holes: for every ordered (encrypt, decrypt)
      * pair of launched Target labels (same-Target pairs included) and every
-     * required KMS scenario, at least one {@code PASSED} execution must match the
-     * Tests' {@code …[<scenario>…] <encrypt>-><decrypt>} naming. Only passed
-     * executions satisfy the floor — a failed or unreachable KMS execution is
-     * already a failure of its own and does not provide coverage.
+     * required KMS scenario, at least one {@code PASSED} or visibly-{@code SKIPPED}
+     * execution must match the Tests' {@code …[<scenario>…] <encrypt>-><decrypt>}
+     * naming. A passed execution satisfies the floor as coverage; a feature-gated
+     * skip satisfies it as an explicit exemption (a combination language declared
+     * the scenario's Feature unsupported). A failed or unreachable KMS execution
+     * is already a failure of its own and provides neither.
      *
      * @return one detail line per hole, naming the scenario and the pair.
      */
@@ -184,16 +189,28 @@ public final class ResultReporter {
             .filter(e -> e.outcome() == TestExecution.Outcome.PASSED)
             .map(TestExecution::name)
             .toList();
+        // A visible feature-gated SKIP records that a combination legitimately
+        // does not run a scenario (a combination language declared the scenario's
+        // Feature unsupported, e.g. a server that does not build the KMS keyrings).
+        // That is an explicit exemption, not the silent coverage loss this floor
+        // guards against, so a skip satisfies the floor for its combination just
+        // as a pass does (Requirement 10.4).
+        List<String> skippedNames = executions.stream()
+            .filter(e -> e.outcome() == TestExecution.Outcome.SKIPPED)
+            .map(TestExecution::name)
+            .toList();
         for (String encrypt : launchedTargetLabels) {
             for (String decrypt : launchedTargetLabels) {
                 String pair = encrypt + "->" + decrypt;
                 for (String scenario : REQUIRED_KMS_SCENARIOS) {
                     boolean covered = passedNames.stream().anyMatch(
+                        name -> mentionsScenario(name, scenario) && mentionsPair(name, pair))
+                        || skippedNames.stream().anyMatch(
                         name -> mentionsScenario(name, scenario) && mentionsPair(name, pair));
                     if (!covered) {
                         holes.add("KMS coverage floor hole: scenario " + scenario
-                            + " has no passed execution for combination " + pair
-                            + " (Requirement 10.4)");
+                            + " has no passed or feature-gated-skipped execution for combination "
+                            + pair + " (Requirement 10.4)");
                     }
                 }
             }

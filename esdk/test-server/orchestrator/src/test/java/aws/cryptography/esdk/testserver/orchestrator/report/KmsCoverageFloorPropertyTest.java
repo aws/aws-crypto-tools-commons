@@ -13,6 +13,7 @@ import net.jqwik.api.ForAll;
 import net.jqwik.api.GenerationMode;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
+import org.junit.jupiter.api.Test;
 
 /**
  * Property-based test for the {@link ResultReporter} KMS coverage floor
@@ -85,6 +86,33 @@ class KmsCoverageFloorPropertyTest {
                         + hole.scenario() + ", " + pair + "): " + result.details());
             }
         }
+    }
+
+    // A language that declares the KMS Feature unsupported skips the KMS
+    // scenarios visibly; those recorded skips exempt its combinations from the
+    // floor — an explicit exemption, not silent coverage loss (Requirement 10.4).
+    @Test
+    void featureGatedSkipsExemptCombinationsFromTheFloor() {
+        List<String> targets = List.of("java-v3", "rust-v1");
+        List<TestExecution> executions = new ArrayList<>();
+        for (String encrypt : targets) {
+            for (String decrypt : targets) {
+                for (String scenario : ResultReporter.REQUIRED_KMS_SCENARIOS) {
+                    String name = "Tests#blob[" + scenario + "] " + encrypt + "->" + decrypt;
+                    // A combination involving the KMS-incapable target skips; the
+                    // fully KMS-capable pair passes.
+                    if (encrypt.equals("rust-v1") || decrypt.equals("rust-v1")) {
+                        executions.add(TestExecution.skipped(
+                            name, "feature-gated skip: feature=MPL unsupported by [rust]"));
+                    } else {
+                        executions.add(TestExecution.passed(name));
+                    }
+                }
+            }
+        }
+        Result result = reporter.report(executions, targets, List.of());
+        assertTrue(result.succeeded(),
+            () -> "feature-gated KMS skips must exempt their combinations: " + result);
     }
 
     @Provide
