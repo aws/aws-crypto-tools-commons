@@ -138,6 +138,30 @@ public final class EsdkClientConfigs {
             .build();
     }
 
+    /**
+     * @return a Raw-AES multi-keyring (generator + one child, so two EDKs) Default-CMM config
+     *     under {@code REQUIRE_ENCRYPT_REQUIRE_DECRYPT}, with no encrypted-data-key cap. The
+     *     two raw-AES keyrings both round-trip, and either alone can decrypt.
+     */
+    public static ESDKClientConfig rawAesMulti() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .build();
+    }
+
+    /**
+     * @return the same two-EDK multi-keyring config as {@link #rawAesMulti()} but with the
+     *     encrypted-data-key count capped at {@code maxEncryptedDataKeys}.
+     */
+    public static ESDKClientConfig rawAesMultiWithMaxEdks(long maxEncryptedDataKeys) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .maxEncryptedDataKeys(maxEncryptedDataKeys)
+            .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .build();
+    }
+
     // -----------------------------------------------------------------------
     // Task 14.3: broadened, round-trip-compatible scenarios for Property 1.
     // -----------------------------------------------------------------------
