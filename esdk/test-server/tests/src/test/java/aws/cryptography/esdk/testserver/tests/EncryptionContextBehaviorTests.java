@@ -93,4 +93,21 @@ class EncryptionContextBehaviorTests {
             "decrypt with a reproduced encryption context that changes a value must be rejected "
                 + "as an ESDKClientError (" + pair + ")");
     }
+
+    /**
+     * EC-035: an encryption context with high Unicode code points round-trips (the ESDK sorts the
+     * context by unsigned UTF-8 bytes before binding it into the header AAD). Cross-language matrix.
+     */
+    @ParameterizedTest(name = "highCodepointEcRoundTrips {0}")
+    @MethodSource("pairs")
+    void encryptionContextWithHighCodepointsRoundTrips(EndpointPair pair) {
+        Map<String, String> ec = Map.of(
+            "\u65e5\u672c\u8a9e", "value",          // CJK key
+            "key-\ud83d\udd11", "\ud83d\ude80");    // astral-plane (emoji) key and value
+        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
+        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec);
+        assertArrayEquals(PLAINTEXT, recovered,
+            "an encryption context with high Unicode code points must round-trip (" + pair + ")");
+    }
 }
