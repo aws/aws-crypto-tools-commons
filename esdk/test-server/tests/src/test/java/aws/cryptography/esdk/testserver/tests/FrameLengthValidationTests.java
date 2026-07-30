@@ -53,4 +53,16 @@ class FrameLengthValidationTests {
             "encrypt with a frame length that is not a multiple of the block size must be rejected "
                 + "as an ESDKClientError (" + target + ")");
     }
+
+    /** ENC-003: a frame length above 2^31-1 is rejected (the on-wire frame length is a UInt32,
+     * but implementations cap it at the signed-int maximum). */
+    @ParameterizedTest(name = "oversizedFrameLengthRejected {0}")
+    @MethodSource("targets")
+    void encryptRejectsOversizedFrameLength(LanguageServerTarget target) {
+        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, 1L << 31),
+            "encrypt with a frame length above 2^31-1 must be rejected as an ESDKClientError ("
+                + target + ")");
+    }
 }
