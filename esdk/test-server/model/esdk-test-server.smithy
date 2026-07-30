@@ -180,6 +180,10 @@ structure EncryptStreamRequest {
     algorithmSuiteId: ESDKAlgorithmSuiteId
 
     frameLength: Long
+
+    /// Optional plaintext length bound: encrypt MUST NOT encrypt a plaintext longer
+    /// than this value (spec/client-apis/encrypt.md#plaintext-length-bound).
+    plaintextLengthBound: Long
 }
 
 @output

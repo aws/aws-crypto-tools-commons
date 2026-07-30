@@ -254,8 +254,13 @@ class EsdkClientBundle:
         plaintext, _ = self._client.decrypt(source=ciphertext, **kwargs)
         return plaintext
 
-    def encrypt_stream(self, plaintext, encryption_context, algorithm_suite_id, frame_length):
+    def encrypt_stream(self, plaintext, encryption_context, algorithm_suite_id, frame_length,
+                       plaintext_length_bound=None):
         kwargs = self._common_kwargs(encryption_context, algorithm_suite_id, frame_length)
+        if plaintext_length_bound is not None:
+            # The Python ESDK enforces the plaintext length bound via source_length:
+            # the total plaintext encrypted is not allowed to exceed it.
+            kwargs["source_length"] = plaintext_length_bound
         with self._client.stream(mode="e", source=plaintext, **kwargs) as encryptor:
             return encryptor.read()
 
