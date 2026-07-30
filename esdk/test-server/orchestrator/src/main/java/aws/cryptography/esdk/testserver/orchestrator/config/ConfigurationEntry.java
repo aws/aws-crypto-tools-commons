@@ -4,30 +4,24 @@ import java.util.List;
 
 /**
  * One entry in the {@link ConfigurationSet}, describing a single language: its
- * {@code Library_Repository}, major version, port, and {@code Server_Location}
- * (Requirements 3.1, 3.2, design "Configuration_Entry"); for a language with no
- * Language_Repository (Python), the entry also carries that language's
- * {@code Feature_Declaration} — the {@code supportedFeatures} and
- * {@code unsupportedFeatures} arrays (Requirements 8.1, 8.3).
+ * {@code Library_Repository}, major version, port, and {@code Server_Location};
+ * for a language with no Language_Repository (Python), the entry also carries
+ * that language's {@code Feature_Declaration} (the {@code supportedFeatures} and
+ * {@code unsupportedFeatures} arrays).
  *
- * <p>Fields are deliberately nullable so an under-specified entry parsed from
- * {@code configuration-set.json} (a missing field or object) is representable
- * and can be rejected by validation with an error that identifies the offending
- * entry and each missing element, rather than failing to parse. A {@code null}
- * feature array means the array was absent from the JSON — distinct from an
- * empty array, which is a present, empty declaration half.
+ * <p>Fields are deliberately nullable so an under-specified entry is
+ * representable and can be rejected by validation with an error identifying the
+ * offending entry and each missing element, rather than failing to parse. A
+ * {@code null} feature array means the array was absent from the JSON — distinct
+ * from an empty array, which is a present, empty declaration half.
  *
  * @param language            logical key, e.g. {@code "java"}; unique in the set
- * @param majorVersion        integer &gt;= 1 (Requirement 3.2)
- * @param port                integer in 1..65535, unique across the set (Req 3.2)
- * @param libraryRepository   coordinates of the language's ESDK library source
- *                            (Requirement 3.2)
- * @param serverLocation      coordinates of the language's Language_Server
- *                            implementation (Requirement 3.1)
+ * @param majorVersion        integer &gt;= 1
+ * @param port                integer in 1..65535, unique across the set
  * @param supportedFeatures   the Feature_Declaration's supported half, or
- *                            {@code null} when absent (Requirements 8.1, 8.3)
+ *                            {@code null} when absent
  * @param unsupportedFeatures the Feature_Declaration's unsupported half, or
- *                            {@code null} when absent (Requirements 8.1, 8.3)
+ *                            {@code null} when absent
  */
 public record ConfigurationEntry(
     String language,
@@ -50,7 +44,7 @@ public record ConfigurationEntry(
      * {@code branch}/{@code repository} pair maps onto the
      * {@code libraryRepository} object; no Server_Location or
      * Feature_Declaration is carried. Retained so existing call sites and tests
-     * keep compiling until the validation rework (task 1.2) migrates them.
+     * keep compiling until the validation rework migrates them.
      */
     public ConfigurationEntry(String language, String branch, String repository,
             Integer majorVersion, Integer port) {

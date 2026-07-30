@@ -45,7 +45,7 @@ import net.jqwik.api.Provide;
  * or abort after any subset of servers launched — and any generated subset of
  * servers that fail to stop, stop is invoked on every server that was launched
  * regardless of outcome, and the run report contains a cleanup failure naming
- * exactly the languages whose servers did not stop (Requirements 2.6, 2.11).
+ * exactly the languages whose servers did not stop.
  *
  * <p>The pipeline runs against instrumented fakes: {@link LaunchedServer}s
  * whose terminators count their invocations and return a generated
@@ -100,8 +100,8 @@ class TeardownTotalityPropertyTest {
             () -> "the primary result must reflect the generated outcome "
                 + scenario.outcome().kind() + ": " + result);
 
-        // Teardown is total (Requirement 2.6): stop was invoked on every server
-        // that was launched, whatever the outcome. close() is idempotent and the
+        // Teardown is total: stop was invoked on every server that was
+        // launched, whatever the outcome. close() is idempotent and the
         // orchestrator closes each launched server once, so each instrumented
         // terminator fires exactly once — and in particular at least once.
         for (InstrumentedServer server : launcher.launched()) {
@@ -110,10 +110,10 @@ class TeardownTotalityPropertyTest {
                     + " server regardless of outcome " + scenario.outcome().kind());
         }
 
-        // The report names exactly the still-running languages (Requirement
-        // 2.11): one cleanup-failure detail per generated stop failure among the
-        // launched servers — no more, no fewer — whether the primary result
-        // passed, failed, or aborted.
+        // The report names exactly the still-running languages: one
+        // cleanup-failure detail per generated stop failure among the launched
+        // servers — no more, no fewer — whether the primary result passed,
+        // failed, or aborted.
         List<String> reported = cleanupFailureLanguages(result);
         assertEquals(new LinkedHashSet<>(reported).size(), reported.size(),
             () -> "cleanup failures must not repeat a language: " + reported);

@@ -17,12 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Unit tests for {@link PythonLaunchPlan} (task 6.3, Requirements 1.3, 2.1):
- * the pure command construction reproduces the Makefile's {@code setup-python}
- * + {@code run-python-server} flow against the resolved sources, and a run
- * whose materialized sources lack the Python library or server directory is a
- * {@code RESOLVE} launch failure naming the language — all without running a
- * real venv/pip (the end-to-end launch is checkpoint 10).
+ * Unit tests for {@link PythonLaunchPlan}: the pure command construction
+ * reproduces the Makefile's {@code setup-python} + {@code run-python-server}
+ * flow against the resolved sources, and a run whose materialized sources lack
+ * the Python library or server directory is a {@code RESOLVE} launch failure
+ * naming the language — all without running a real venv/pip.
  */
 class PythonLaunchPlanTest {
 
@@ -82,8 +81,8 @@ class PythonLaunchPlanTest {
     }
 
     // ------------------------------------------------------------------
-    // RESOLVE failure paths (Requirement 2.5): missing materialized sources
-    // abort before any venv/pip step runs.
+    // RESOLVE failure paths: missing materialized sources abort before any
+    // venv/pip step runs.
     // ------------------------------------------------------------------
 
     @Test

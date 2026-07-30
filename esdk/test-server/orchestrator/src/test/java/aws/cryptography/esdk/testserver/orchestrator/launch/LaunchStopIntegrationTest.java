@@ -15,27 +15,22 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Launch/stop integration tests with fake server processes (task 6.5;
- * Requirements 2.5, 2.6, 2.9). These extend — without duplicating — the
- * coverage in {@link SubprocessLauncherTest} (failure categories, including a
- * pre-bound raw socket as a PORT failure) and
- * {@link PortBindingIntegrationTest} (immediate-bind success path and raw
- * pre-bind conflict):
+ * Launch/stop integration tests with fake server processes. These extend —
+ * without duplicating — the coverage in {@link SubprocessLauncherTest} and
+ * {@link PortBindingIntegrationTest}:
  *
  * <ul>
  *   <li><b>Delayed bind.</b> A fake server that binds its port only after a
- *       delay proves the readiness probe genuinely polls: readiness flips from
- *       unreachable to reachable when — and only when — the port binds, and
- *       the launcher succeeds within its window rather than failing on the
- *       first probe (Requirements 2.5, 2.9).</li>
+ *       delay proves the readiness probe genuinely polls rather than deciding
+ *       on the first probe.</li>
  *   <li><b>Process-tree teardown.</b> A fake server whose <em>child</em> binds
  *       the port (parent shell → child listener, the Gradle/venv-children
  *       shape) proves {@code close()} kills descendants, not just the spawned
- *       root, and verifies the port is actually free (Requirement 2.6).</li>
+ *       root, and frees the port.</li>
  *   <li><b>Held port vs freed port.</b> While a launched fake server holds the
  *       port, a second launch on it is a PORT failure; after teardown reports
  *       STOPPED the same port launches again — the strongest evidence the
- *       port was genuinely released (Requirements 2.5, 2.6).</li>
+ *       port was genuinely released.</li>
  * </ul>
  *
  * <p>All fake servers are loopback-only python3/shell one-liners; every wait

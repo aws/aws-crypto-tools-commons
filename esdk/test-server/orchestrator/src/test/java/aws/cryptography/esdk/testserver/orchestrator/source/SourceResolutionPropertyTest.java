@@ -93,22 +93,15 @@ class SourceResolutionPropertyTest {
 
     // Feature: test-server-factoring, Property 3: Source resolution is a pure function of the effective configuration and context
     //
-    // For any generated Configuration_Set, Configuration_Overrides, and run
-    // context: the resolution plan derives each language's server component
-    // solely from the run-effective Server_Location (the override's when
-    // overridden, the stored entry's otherwise) and each library component
-    // solely from the run-effective library repository coordinates; in a
-    // Commons_Run every component derives from the commons-stored entries; in a
-    // Language_Repository_Run the own language's library and server both
-    // resolve to the working tree (its Server_Location ref is ignored and no
-    // clone is planned) while every Other language derives from the
-    // commons-clone entries except those replaced by an override; a
-    // Server_Location naming a repository other than the invoking one always
-    // yields a clone-plan at exactly (url, ref) with the location's path, and
-    // one naming the invoking repository always yields a working-tree plan with
-    // the location's path.
-    //
-    // Validates: Requirements 1.5, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.6
+    // The resolution plan derives each language's server component solely from
+    // the run-effective Server_Location and each library component solely from
+    // the run-effective library coordinates. In a Language_Repository_Run the
+    // own language resolves to the working tree (its ref ignored, no clone),
+    // while other languages derive from the commons-clone entries except those
+    // replaced by an override. A Server_Location naming a repository other than
+    // the invoking one yields a clone plan at exactly (url, ref) with the
+    // location's path; naming the invoking repository yields a working-tree
+    // plan with the location's path.
     @Property(tries = 300, generation = GenerationMode.RANDOMIZED)
     void sourceResolutionIsAPureFunctionOfTheEffectiveConfigurationAndContext(
             @ForAll("languageSubsetsMin2") List<String> langs,
@@ -209,7 +202,7 @@ class SourceResolutionPropertyTest {
             if (own) {
                 // Own language: library and server both resolve to the working
                 // tree — the Server_Location ref is ignored and no clone is
-                // planned (Req 4.2); reason working-tree.
+                // planned; reason working-tree.
                 assertEquals(ResolutionReason.WORKING_TREE, library.reason(),
                     "own-language library reason");
                 assertEquals(ResolutionReason.WORKING_TREE, server.reason(),
@@ -230,8 +223,8 @@ class SourceResolutionPropertyTest {
             }
 
             // Other (or Commons_Run) language: the reason states which entry the
-            // component derives from — the override's when overridden (Req 4.6),
-            // the commons-stored / commons-clone entry's otherwise (Req 4.1, 4.3).
+            // component derives from — the override's when overridden, the
+            // commons-stored / commons-clone entry's otherwise.
             ResolutionReason expectedReason = override != null
                 ? ResolutionReason.CONFIGURATION_OVERRIDE
                 : ResolutionReason.CONFIGURATION_ENTRY;
@@ -247,11 +240,11 @@ class SourceResolutionPropertyTest {
             assertEquals(lib.branch(), libClone.ref(), language + " library clone ref");
             assertEquals(lib.path(), libClone.path(), language + " library clone path");
 
-            // Server: solely the run-effective Server_Location (Req 1.5, 3.5).
+            // Server: solely the run-effective Server_Location.
             ServerLocation location = effective.serverLocation();
             if (location.repository().equals(invokingRepository)) {
                 // Naming the invoking repository always yields a working-tree
-                // plan with the location's path (Req 3.4).
+                // plan with the location's path.
                 SourcePlan.WorkingTree tree = assertInstanceOf(
                     SourcePlan.WorkingTree.class, server.plan(),
                     language + " server naming the invoking repository must be a working-tree plan");
@@ -260,7 +253,7 @@ class SourceResolutionPropertyTest {
                 assertEquals(location.path(), tree.path(), language + " server working-tree path");
             } else {
                 // Naming any other repository always yields a clone plan at
-                // exactly (url, ref) with the location's path (Req 3.3).
+                // exactly (url, ref) with the location's path.
                 SourcePlan.Clone clone = assertInstanceOf(
                     SourcePlan.Clone.class, server.plan(),
                     language + " server naming another repository must be a clone plan");
