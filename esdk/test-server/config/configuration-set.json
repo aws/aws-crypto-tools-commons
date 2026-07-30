@@ -18,7 +18,7 @@
     "main after merge."
   ],
   "product": "esdk",
-  "features": ["streaming", "MPL"],
+  "features": ["streaming", "MPL", "hierarchical"],
   "entries": [
     {
       "language": "java",
@@ -27,13 +27,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "branch": "kessplas/esdk-test-server",
+        "branch": "lucasmcdonald3/esdk-test-server-hierarchical",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucasmcdonald3/esdk-test-server-hierarchical",
         "path": "esdk/test-server/server"
       }
     },
@@ -42,7 +42,7 @@
       "majorVersion": 4,
       "port": 8092,
       "supportedFeatures": ["streaming", "MPL"],
-      "unsupportedFeatures": [],
+      "unsupportedFeatures": ["hierarchical"],
       "libraryRepository": {
         "name": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
