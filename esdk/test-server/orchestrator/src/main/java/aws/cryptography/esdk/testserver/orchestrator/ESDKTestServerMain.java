@@ -5,6 +5,7 @@ import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationLoadException;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationLoader;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSet;
+import aws.cryptography.esdk.testserver.orchestrator.launch.CppShimLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.JavaLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.esdk.testserver.orchestrator.launch.LauncherFactory;
@@ -161,7 +162,9 @@ public final class ESDKTestServerMain {
             "python", new PythonLaunchPlan(
                 orchestratorBuildDir.resolve("launch/python")),
             "rust", new RustLaunchPlan(
-                orchestratorBuildDir.resolve("launch/rust"))));
+                orchestratorBuildDir.resolve("launch/rust")),
+            "rust-cpp", new CppShimLaunchPlan(
+                orchestratorBuildDir.resolve("launch/rust-cpp"))));
 
         ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(configPath);
         ESDKTestServer orchestrator = new ESDKTestServer(

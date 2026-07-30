@@ -86,6 +86,24 @@
         "ref": "kessplas/esdk-rust-test-server",
         "path": "esdk-test-server"
       }
+    },
+    {
+      "language": "rust-cpp",
+      "majorVersion": 1,
+      "port": 8094,
+      "commonsConfigurationPath": "esdk-cpp-test-server/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "aws-crypto-rust/esdk-cpp-test-server",
+        "path": "esdk/shims/aws-esdk-cpp"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "aws-crypto-rust/esdk-cpp-test-server",
+        "path": "esdk-cpp-test-server"
+      }
     }
   ]
 }
