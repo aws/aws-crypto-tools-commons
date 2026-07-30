@@ -112,4 +112,29 @@ class ClientConfigValidationTests {
         assertCreateRejected(target, config(discovery, null),
             "a discovery filter with an empty partition");
     }
+
+    /** KEYRING-037: an MRK-aware KMS keyring with an empty key id is invalid. */
+    @ParameterizedTest(name = "emptyMrkKeyIdRejected {0}")
+    @MethodSource("targets")
+    void createClientRejectsEmptyMrkKeyId(LanguageServerTarget target) {
+        Keyring mrk = Keyring.builder()
+            .awsKmsMrk(aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig.builder()
+                .kmsKeyId("")
+                .build())
+            .build();
+        assertCreateRejected(target, config(mrk, null), "an MRK KMS keyring with an empty key id");
+    }
+
+    /** KEYRING-055: a multi-keyring with no generator and no children is invalid. */
+    @ParameterizedTest(name = "emptyMultiKeyringRejected {0}")
+    @MethodSource("targets")
+    void createClientRejectsEmptyMultiKeyring(LanguageServerTarget target) {
+        Keyring emptyMulti = Keyring.builder()
+            .multi(aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig.builder()
+                .childKeyrings(List.of())
+                .build())
+            .build();
+        assertCreateRejected(target, config(emptyMulti, null),
+            "a multi-keyring with no generator and no child keyrings");
+    }
 }
