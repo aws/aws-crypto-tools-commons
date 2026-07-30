@@ -73,7 +73,7 @@ class HeaderTamperTests {
     private static final Layout V1_SIGNING = new Layout(
         "v1-signing",
         EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT),
-        ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA384_ECDSA_P384,
+        ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
         (byte) 0x01, 2, 4, true);
 
     private static final List<Layout> LAYOUTS = List.of(V2_COMMITTING, V1_SIGNING);
