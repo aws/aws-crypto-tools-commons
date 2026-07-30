@@ -20,7 +20,8 @@
 #     MaterialsRoundTripTests.java in the repository, under
 #     esdk/test-server/tests/.
 #   * Requirements 7.1, 7.3: product is exactly "esdk" and the
-#     Feature_Catalog defines exactly the Features "streaming" and "MPL".
+#     Feature_Catalog defines exactly the Features "streaming", "MPL", and
+#     "hierarchical".
 #   * Requirement 8.13: the Python Configuration_Entry carries the Python
 #     Feature_Declaration — supportedFeatures lists both streaming and MPL,
 #     unsupportedFeatures lists neither.
@@ -138,13 +139,13 @@ errors = []
 if cfg.get("product") != "esdk":
     errors.append('product is %r, expected exactly "esdk"' % cfg.get("product"))
 features = cfg.get("features")
-if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL"]):
-    errors.append('Feature_Catalog is %r, expected exactly ["streaming", "MPL"]' % features)
+if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL", "hierarchical"]):
+    errors.append('Feature_Catalog is %r, expected exactly ["streaming", "MPL", "hierarchical"]' % features)
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass 'product is "esdk" and the Feature_Catalog defines exactly streaming and MPL (Req 7.1, 7.3)'
+    pass 'product is "esdk" and the Feature_Catalog defines exactly streaming, MPL, and hierarchical (Req 7.1, 7.3)'
 else
     if [ -n "$catalog_errors" ]; then
         fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; } (Req 7.1, 7.3)"
