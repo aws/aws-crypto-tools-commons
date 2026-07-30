@@ -13,7 +13,7 @@ Resources:
   HierarchicalConcurrent50MBP50:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalConcurrency50MBP50
+      FilterName: NativeRustHierarchicalConcurrency50MBP50
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -25,7 +25,7 @@ Resources:
   HierarchicalConcurrent50MBP95:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalConcurrency50MBP95
+      FilterName: NativeRustHierarchicalConcurrency50MBP95
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -37,7 +37,7 @@ Resources:
   HierarchicalConcurrent50MBP99:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalConcurrency50MBP99
+      FilterName: NativeRustHierarchicalConcurrency50MBP99
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -49,7 +49,7 @@ Resources:
   HierarchicalThroughput50MBP50:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalThroughput50MBP50
+      FilterName: NativeRustHierarchicalThroughput50MBP50
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -61,7 +61,7 @@ Resources:
   HierarchicalThroughput50MBP95:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalThroughput50MBP95
+      FilterName: NativeRustHierarchicalThroughput50MBP95
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -73,7 +73,7 @@ Resources:
   HierarchicalThroughput50MBP99:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalThroughput50MBP99
+      FilterName: NativeRustHierarchicalThroughput50MBP99
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -85,7 +85,7 @@ Resources:
   HierarchicalMemoryUsage50MB:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalMemoryUsage50MB
+      FilterName: NativeRustHierarchicalMemoryUsage50MB
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
       MetricTransformations:
@@ -97,7 +97,7 @@ Resources:
   HierarchicalMemoryEfficiency50MB:
     Type: AWS::Logs::MetricFilter
     Properties:
-      FilterName: RustHierarchicalMemoryEfficiency50MB
+      FilterName: NativeRustHierarchicalMemoryEfficiency50MB
       LogGroupName: !Ref LogGroupName
       FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
       MetricTransformations:
