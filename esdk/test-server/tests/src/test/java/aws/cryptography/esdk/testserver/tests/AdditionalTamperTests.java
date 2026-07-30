@@ -143,4 +143,17 @@ class AdditionalTamperTests {
         assertRejected(pair, V1_FORBID, tampered,
             "a V1 header (version 1.0) carrying a committing V2 algorithm-suite id");
     }
+
+    /** HDR-017: a framed header whose frame length is 0 (only valid for non-framed) is rejected. */
+    @ParameterizedTest(name = "framedZeroFrameLengthRejected {0}")
+    @MethodSource("pairs")
+    void decryptRejectsFramedHeaderWithZeroFrameLength(EndpointPair pair) {
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(),
+            V2_SUITE, FRAME_LENGTH);
+        EsdkMessage message = EsdkMessage.parse(ciphertext);
+        byte[] tampered = ciphertext.clone();
+        putU32(tampered, message.frameLengthOffset, 0);
+        assertRejected(pair, V2_COMMITTING, tampered,
+            "a framed header whose frame length is 0");
+    }
 }
