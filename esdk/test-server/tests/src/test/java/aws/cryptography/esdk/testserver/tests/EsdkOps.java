@@ -87,6 +87,32 @@ final class EsdkOps {
         return toArray(client.decrypt(input.build()).getPlaintext());
     }
 
+    /** EncryptStream {@code plaintext} on {@code endpoint} under {@code config}; return the ciphertext bytes. */
+    static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        String clientId = client.createClient(
+            CreateClientInput.builder().config(config).build()).getClientId();
+        return toArray(client.encryptStream(
+            aws.cryptography.esdk.testserver.client.model.EncryptStreamInput.builder()
+                .clientId(clientId)
+                .plaintext(ByteBuffer.wrap(plaintext))
+                .build())
+            .getCiphertext());
+    }
+
+    /** DecryptStream {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */
+    static byte[] decryptStream(URI endpoint, ESDKClientConfig config, byte[] ciphertext) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        String clientId = client.createClient(
+            CreateClientInput.builder().config(config).build()).getClientId();
+        return toArray(client.decryptStream(
+            aws.cryptography.esdk.testserver.client.model.DecryptStreamInput.builder()
+                .clientId(clientId)
+                .ciphertext(ByteBuffer.wrap(ciphertext))
+                .build())
+            .getPlaintext());
+    }
+
     static byte[] toArray(ByteBuffer buffer) {
         ByteBuffer duplicate = buffer.duplicate();
         byte[] bytes = new byte[duplicate.remaining()];
