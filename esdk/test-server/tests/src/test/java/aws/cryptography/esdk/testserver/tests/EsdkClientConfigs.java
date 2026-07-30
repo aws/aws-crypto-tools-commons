@@ -221,6 +221,21 @@ public final class EsdkClientConfigs {
             .build();
     }
 
+    /**
+     * @return a Default-CMM config over a multi-keyring with children but NO generator. It can
+     *     decrypt (a child may match) but cannot create a data key on encrypt.
+     */
+    public static ESDKClientConfig rawAesChildrenOnlyMulti() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(Keyring.builder()
+                .multi(MultiKeyringConfig.builder()
+                    .childKeyrings(List.of(rawAesKeyring()))
+                    .build())
+                .build()))
+            .build();
+    }
+
     // -----------------------------------------------------------------------
     // Task 14.3: broadened, round-trip-compatible scenarios for Property 1.
     // -----------------------------------------------------------------------

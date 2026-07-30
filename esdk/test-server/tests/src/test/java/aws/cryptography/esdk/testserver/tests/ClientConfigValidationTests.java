@@ -182,4 +182,36 @@ class ClientConfigValidationTests {
             .build();
         assertCreateRejected(target, config(keyring, null), "a Raw-RSA keyring with an empty key name");
     }
+
+    /** KEYRING-073: a Raw-AES keyring in the reserved "aws-kms" key namespace is rejected. */
+    @ParameterizedTest(name = "reservedNamespaceRejected {0}")
+    @MethodSource("targets")
+    void createClientRejectsReservedNamespace(LanguageServerTarget target) {
+        Keyring keyring = Keyring.builder()
+            .rawAes(RawAesKeyringConfig.builder()
+                .keyNamespace("aws-kms")
+                .keyName("reserved-namespace-key")
+                .wrappingKey(ByteBuffer.wrap(new byte[32]))
+                .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
+                .build())
+            .build();
+        assertCreateRejected(target, config(keyring, null),
+            "a Raw-AES keyring in the reserved 'aws-kms' key namespace");
+    }
+
+    /** KEYRING-074: a Raw-RSA keyring built with a malformed public key is rejected. */
+    @ParameterizedTest(name = "malformedRsaKeyRejected {0}")
+    @MethodSource("targets")
+    void createClientRejectsMalformedRsaKey(LanguageServerTarget target) {
+        Keyring keyring = Keyring.builder()
+            .rawRsa(aws.cryptography.esdk.testserver.client.model.RawRsaKeyringConfig.builder()
+                .keyNamespace("esdk-test-server")
+                .keyName("malformed-rsa")
+                .paddingScheme(aws.cryptography.esdk.testserver.client.model.PaddingScheme.OAEP_SHA256_MGF1)
+                .publicKey(ByteBuffer.wrap("not a valid PEM public key".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .build())
+            .build();
+        assertCreateRejected(target, config(keyring, null),
+            "a Raw-RSA keyring built with a malformed public key");
+    }
 }
