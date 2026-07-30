@@ -53,6 +53,14 @@ final class EsdkHeaderEditor {
         return copy;
     }
 
+    /** Overwrite the first byte of the first encryption-context key with {@code value}. */
+    static byte[] withFirstKeyByte(EsdkMessage message, int value) {
+        byte[] copy = message.bytes.clone();
+        int firstKeyOffset = firstKeyLengthOffset(message) + 2;
+        copy[firstKeyOffset] = (byte) value;
+        return copy;
+    }
+
     /**
      * Overwrite the second pair's key bytes with the first pair's key so the two keys are
      * equal (a duplicate key). Requires the two keys to be the same byte length; callers
