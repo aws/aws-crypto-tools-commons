@@ -404,6 +404,10 @@ structure Keyring {
     /// Raw RSA keyring (raw-rsa-keyring.md).
     RawRsa: RawRsaKeyringConfig
 
+    /// AWS KMS Hierarchical keyring: branch keys in a DynamoDB key store wrapped
+    /// by a KMS key (aws-kms-hierarchical-keyring.md).
+    AwsKmsHierarchical: AwsKmsHierarchicalKeyringConfig
+
     /// Multi-keyring combining other keyrings — a recursive variant
     /// (multi-keyring.md, Requirement 2.5).
     Multi: MultiKeyringConfig
@@ -535,6 +539,32 @@ enum PaddingScheme {
     OAEP_SHA256_MGF1
     OAEP_SHA384_MGF1
     OAEP_SHA512_MGF1
+}
+
+/// AWS KMS Hierarchical keyring configuration. Only serializable configuration
+/// is modeled; the DynamoDB and KMS clients are constructed server-side from the
+/// ambient AWS configuration. The branch key material is persisted in the named
+/// DynamoDB key store and wrapped by the referenced KMS key.
+structure AwsKmsHierarchicalKeyringConfig {
+    /// The branch key id whose material wraps and unwraps data keys.
+    @required
+    branchKeyId: String
+
+    /// The DynamoDB table name backing the branch key store.
+    @required
+    keyStoreTableName: String
+
+    /// The logical key store name bound into the key store's authenticated data.
+    @required
+    logicalKeyStoreName: String
+
+    /// The KMS key ARN protecting the branch keys.
+    @required
+    kmsKeyArn: String
+
+    /// How long, in seconds, branch key material may be cached before re-fetch.
+    @required
+    ttlSeconds: Integer
 }
 
 /// Multi-keyring combining other keyrings. At least one of generator or

@@ -2,6 +2,7 @@ package aws.cryptography.esdk.testserver.tests;
 
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsDiscoveryKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsHierarchicalKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkMultiKeyringConfig;
@@ -26,6 +27,7 @@ import java.security.KeyPairGenerator;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Fully-offline ESDK client configurations for the blob round-trip Tests. Every
@@ -205,6 +207,20 @@ public final class EsdkClientConfigs {
             .build();
     }
 
+    /**
+     * @return a Hierarchical-keyring / Default-CMM config carrying the given commitment
+     *     {@code policy} — the online counterpart to {@link #rawAesWithCommitmentPolicy}.
+     *     Commitment behavior is keyring-independent, so this is deliberately redundant with the
+     *     Raw-AES variant; it exists so a server that builds only the hierarchical keyring still
+     *     gets commitment-policy coverage. Online: reaches KMS + the DynamoDB branch-key store.
+     */
+    public static ESDKClientConfig hierarchicalWithCommitmentPolicy(ESDKCommitmentPolicy policy) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(policy)
+            .cmm(defaultCmm(hierarchicalKeyring(HierarchicalRuntimeConfig.fromRuntime())))
+            .build();
+    }
+
     // -----------------------------------------------------------------------
     // Task 14.3: broadened, round-trip-compatible scenarios for Property 1.
     // -----------------------------------------------------------------------
@@ -235,18 +251,41 @@ public final class EsdkClientConfigs {
         ESDKClientConfig config,
         ESDKAlgorithmSuiteId algorithmSuiteId,
         List<String> requiredEncryptionContextKeys,
-        ESDKClientConfig decryptConfig) {
+        ESDKClientConfig decryptConfig,
+        Set<String> features) {
+
+        /** Defensive copy of the required Features (Feature_Catalog names). */
+        public Scenario {
+            features = Set.copyOf(features);
+        }
 
         /**
          * Convenience constructor for the common case where one config builds both
-         * the encrypt and decrypt client (no distinct decrypt config).
+         * the encrypt and decrypt client (no distinct decrypt config). Requires the
+         * {@code MPL} Feature — a standard MPL keyring (Raw-AES/RSA or a direct KMS
+         * keyring), which the Java and Python servers build.
          */
         public Scenario(
             String label,
             ESDKClientConfig config,
             ESDKAlgorithmSuiteId algorithmSuiteId,
             List<String> requiredEncryptionContextKeys) {
-            this(label, config, algorithmSuiteId, requiredEncryptionContextKeys, null);
+            this(label, config, algorithmSuiteId, requiredEncryptionContextKeys, null,
+                Set.of("MPL"));
+        }
+
+        /**
+         * Convenience constructor for a scenario with a distinct decrypt config
+         * (e.g. {@code AwsKmsDiscovery}); requires the {@code MPL} Feature.
+         */
+        public Scenario(
+            String label,
+            ESDKClientConfig config,
+            ESDKAlgorithmSuiteId algorithmSuiteId,
+            List<String> requiredEncryptionContextKeys,
+            ESDKClientConfig decryptConfig) {
+            this(label, config, algorithmSuiteId, requiredEncryptionContextKeys, decryptConfig,
+                Set.of("MPL"));
         }
 
         /**
@@ -284,6 +323,14 @@ public final class EsdkClientConfigs {
         // (design: KMS runtime configuration).
         kms.configureAwsRegion();
         scenarios.addAll(kmsScenarios(kms));
+        // AWS KMS Hierarchical keyring (online, required): a DynamoDB branch-key
+        // store wrapped by a KMS key, built via the Dafny/legacy MPL key store
+        // path. Tagged with the hierarchical Feature so the matrix runs it only
+        // over pairs whose endpoints declare hierarchical supported (the Rust
+        // server); Java and Python declare it unsupported and skip it.
+        HierarchicalRuntimeConfig hierarchical = HierarchicalRuntimeConfig.fromRuntime();
+        hierarchical.configureAwsRegion();
+        scenarios.add(hierarchicalScenario(hierarchical));
         return List.copyOf(scenarios);
     }
 
@@ -446,6 +493,40 @@ public final class EsdkClientConfigs {
         // resolved from the ambient AWS region the Tests configured.
         return Keyring.builder()
             .awsKmsDiscovery(AwsKmsDiscoveryKeyringConfig.builder().build())
+            .build();
+    }
+
+    // -----------------------------------------------------------------------
+    // Online AWS KMS Hierarchical keyring scenario (hierarchical Feature).
+    // -----------------------------------------------------------------------
+
+    /**
+     * Build the online hierarchical keyring round-trip scenario from a resolved
+     * {@link HierarchicalRuntimeConfig}. The branch key material lives in the named
+     * DynamoDB key store and is wrapped by the configured KMS key; encrypt and
+     * decrypt use the same key store, so the round trip is compatible. Requires the
+     * {@code hierarchical} Feature so the matrix runs it only over pairs whose
+     * endpoints build the hierarchical keyring.
+     */
+    private static Scenario hierarchicalScenario(HierarchicalRuntimeConfig cfg) {
+        return new Scenario(
+            "awsKmsHierarchical",
+            require(defaultCmm(hierarchicalKeyring(cfg))),
+            null,
+            List.of(),
+            null,
+            Set.of("hierarchical"));
+    }
+
+    private static Keyring hierarchicalKeyring(HierarchicalRuntimeConfig cfg) {
+        return Keyring.builder()
+            .awsKmsHierarchical(AwsKmsHierarchicalKeyringConfig.builder()
+                .branchKeyId(cfg.branchKeyId())
+                .keyStoreTableName(cfg.keyStoreTableName())
+                .logicalKeyStoreName(cfg.logicalKeyStoreName())
+                .kmsKeyArn(cfg.kmsKeyArn())
+                .ttlSeconds(cfg.ttlSeconds())
+                .build())
             .build();
     }
 

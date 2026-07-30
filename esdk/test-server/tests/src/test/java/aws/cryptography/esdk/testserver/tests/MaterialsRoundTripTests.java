@@ -6,6 +6,7 @@ import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs.Scenario;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,14 +33,16 @@ import org.junit.jupiter.params.provider.MethodSource;
  * the single {@code java-v3 -> java-v3} pair, so this reduces to the prior
  * single-server per-scenario coverage.
  *
- * <p>Both round-trips generate cases over every pair. The stream round-trip is
- * associated with the {@code streaming} Feature (Requirements 9.1, 9.2): it opens
- * with {@link FeatureGate#require}, which executes the test when every combination
- * language declares {@code streaming} supported (Requirement 9.4) and skips it
- * visibly — before any Language_Server operation — when any language declares it
- * unsupported (Requirement 9.5). No pair is silently filtered out of the case
- * list; every skip is recorded in the platform reports. The blob round-trip has no
- * Feature association and calls no gate (Requirement 9.7). Each execution asserts
+ * <p>Both round-trips generate cases over every pair and gate on the scenario's
+ * required Feature(s) via {@link FeatureGate#require} as the first statement in the
+ * body (Requirements 9.1, 9.2): the blob round-trip requires the scenario's keyring
+ * Feature(s) — {@code MPL} for the raw/KMS scenarios, {@code hierarchical} for the
+ * hierarchical scenario — and the stream round-trip additionally requires the
+ * {@code streaming} Feature. When every combination language declares every
+ * required Feature supported the test runs (Requirement 9.4); a language declaring
+ * any of them unsupported skips it visibly — before any Language_Server operation
+ * (Requirement 9.5). No pair is silently filtered out of the case list; every skip
+ * is recorded in the platform reports (Requirement 9.6). Each execution asserts
  * {@code decrypt(encrypt(x)) == x} byte-for-byte over a small fixed representative
  * plaintext set including the empty plaintext.
  *
@@ -114,6 +117,11 @@ class MaterialsRoundTripTests {
     @ParameterizedTest(name = "blob[{1}] {0}")
     @MethodSource("blobCases")
     void blobRoundTrip(EndpointPair pair, Scenario scenario) {
+        // Gate on the scenario's required Feature(s) — MPL for the raw/KMS keyring
+        // scenarios, hierarchical for the hierarchical scenario. A combination
+        // language declaring any required Feature unsupported skips visibly, before
+        // any Language_Server operation (Requirements 9.1, 9.5).
+        FeatureGate.require(scenario.features(), pair);
         Map<String, String> ec = requiredContext(scenario);
         for (byte[] plaintext : representativePlaintexts()) {
             byte[] recovered = BlobRoundTrip.run(pair, plaintext, scenario, ec);
@@ -137,7 +145,12 @@ class MaterialsRoundTripTests {
     @ParameterizedTest(name = "stream[{1}] {0}")
     @MethodSource("streamCases")
     void streamRoundTrip(EndpointPair pair, Scenario scenario) {
-        FeatureGate.require(Set.of("streaming"), pair);
+        // Requires the streaming Feature in addition to the scenario's keyring
+        // Feature(s); any combination language declaring any of them unsupported
+        // skips visibly, before any Language_Server operation (Requirements 9.1, 9.5).
+        Set<String> required = new LinkedHashSet<>(scenario.features());
+        required.add("streaming");
+        FeatureGate.require(required, pair);
         Map<String, String> ec = requiredContext(scenario);
         for (byte[] plaintext : representativePlaintexts()) {
             byte[] recovered = StreamRoundTrip.run(pair, plaintext, scenario, ec);
