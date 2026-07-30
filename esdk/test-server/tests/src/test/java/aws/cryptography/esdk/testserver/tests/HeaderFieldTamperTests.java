@@ -50,8 +50,11 @@ class HeaderFieldTamperTests {
     private static final ESDKAlgorithmSuiteId V1_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
 
-    /** Small frame length so a modest plaintext yields several frames (for seq/content tampering). */
-    private static final long SMALL_FRAME_LENGTH = 16L;
+    /** A frame length every implementation accepts; small enough that LARGE_PLAINTEXT spans several frames. */
+    private static final long FRAME_LENGTH = 512L;
+
+    /** Long enough that FRAME_LENGTH yields at least two regular frames plus a final frame. */
+    private static final byte[] LARGE_PLAINTEXT = new byte[2 * 512 + 100];
 
     static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
@@ -110,7 +113,8 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "frameContentTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedFrameContent(EndpointPair pair) {
-        byte[] ciphertext = encryptV2(pair, SMALL_FRAME_LENGTH);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
+            Map.of(), V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
         int contentByte = message.frames.get(0).contentOffset();
@@ -122,7 +126,8 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "frameSequenceTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedFrameSequenceNumber(EndpointPair pair) {
-        byte[] ciphertext = encryptV2(pair, SMALL_FRAME_LENGTH);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
+            Map.of(), V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.frames.size() >= 2,
             "baseline: need at least two frames to tamper the second's sequence number");
