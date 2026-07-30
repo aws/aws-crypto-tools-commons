@@ -46,17 +46,15 @@ class RawKeyringBehaviorTests {
     }
 
     /**
-     * KEYRING-009: a public-only RSA keyring wraps on encrypt but cannot unwrap on decrypt (no
-     * private key), so decrypt fails.
+     * KEYRING-053: a multi-keyring with children but no generator cannot create a data key, so
+     * encrypt fails (only a generator can generate material).
      */
-    @ParameterizedTest(name = "rsaPublicOnlyCannotDecrypt {0}")
+    @ParameterizedTest(name = "childrenOnlyMultiCannotEncrypt {0}")
     @MethodSource("pairs")
-    void publicOnlyRsaKeyringCannotDecrypt(EndpointPair pair) {
-        // Encrypt succeeds: the public key can wrap.
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawRsaPublicOnly(), PLAINTEXT);
-        // Decrypt with the same public-only keyring must fail: no private key to unwrap.
+    void childrenOnlyMultiKeyringCannotEncrypt(EndpointPair pair) {
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawRsaPublicOnly(), ciphertext),
-            "a public-only RSA keyring must not be able to decrypt (" + pair + ")");
+            () -> EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesChildrenOnlyMulti(), PLAINTEXT),
+            "a multi-keyring with no generator must fail to encrypt (nothing can create a data key) ("
+                + pair + ")");
     }
 }
