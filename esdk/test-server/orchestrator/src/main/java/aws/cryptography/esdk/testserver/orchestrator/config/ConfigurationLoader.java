@@ -12,39 +12,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Loads the two configuration file kinds of the TestServer (design "Data
- * Models"):
- *
- * <ul>
- *   <li>the {@code Configuration_Set} — commons
- *       {@code esdk/test-server/config/configuration-set.json}: {@code product},
- *       the Feature_Catalog ({@code features}), and the Configuration_Entries
- *       (Requirements 3.1, 3.2, 7.1);</li>
- *   <li>a Language_Repository's commons-configuration file (e.g.
- *       {@code aws-crypto-tools-java/esdk/test-server/commons-configuration.json}):
- *       the Commons_Configuration_Entry, {@code product}, the language's
- *       Feature_Declaration, and optional Configuration_Overrides
- *       (Requirements 4.4, 8.2).</li>
- * </ul>
+ * Loads the two configuration file kinds of the TestServer: the commons
+ * {@code Configuration_Set} ({@code configuration-set.json}) and a
+ * Language_Repository's commons-configuration file.
  *
  * <p><b>Strict duplicate detection.</b> The shared mapper enables Jackson's
  * {@code STRICT_DUPLICATE_DETECTION}, so a duplicate JSON key anywhere in either
- * file kind is an unparseable-file error (which the duplicate-declaration rules
- * of Requirement 8 depend on), never a silent last-value-wins.
+ * file kind is an unparseable-file error, never a silent last-value-wins.
  *
  * <p><b>Lenient fields, strict structure.</b> A missing field parses as
- * {@code null} (or an absent object as a {@code null} object) so that
- * validation — not the parser — is the single place that rejects an
- * under-specified entry and names the language and each missing element.
- * Structural problems (a missing file, malformed JSON, a duplicate key, or a
- * non-object top level) raise a {@link ConfigurationLoadException} whose
- * message names the expected location (Requirements 4.9, 7.4, 8.10).
+ * {@code null} (an absent object as a {@code null} object) so that validation —
+ * not the parser — is the single place that rejects an under-specified entry and
+ * names the language and each missing element. Structural problems (missing
+ * file, malformed JSON, duplicate key, non-object top level) raise a
+ * {@link ConfigurationLoadException} whose message names the expected location.
  */
 public final class ConfigurationLoader {
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
-        // Duplicate JSON keys are validation errors, everywhere (design "Data
-        // Models"); Requirement 8.10's unparseable-file handling depends on it.
+        // Duplicate JSON keys are validation errors everywhere; unparseable-file
+        // handling depends on it.
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .build();
 
@@ -198,9 +185,9 @@ public final class ConfigurationLoader {
     }
 
     /**
-     * Parse a JSON array of strings, preserving duplicates (the duplicate-name
-     * checks of Requirements 7.5 and 8.9 need to see them). Absent or non-array
-     * values parse as {@code null} ("no such array"), for validation to reject.
+     * Parse a JSON array of strings, preserving duplicates so the duplicate-name
+     * checks can see them. Absent or non-array values parse as {@code null} ("no
+     * such array"), for validation to reject.
      */
     private static List<String> stringList(JsonNode node) {
         if (node == null || !node.isArray()) {

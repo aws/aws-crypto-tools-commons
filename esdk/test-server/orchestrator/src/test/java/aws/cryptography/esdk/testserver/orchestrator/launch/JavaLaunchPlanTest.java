@@ -18,13 +18,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Unit tests for {@link JavaLaunchPlan} (task 6.2, Requirements 1.7, 2.1):
- * the pure command construction reproduces the aws-crypto-tools-java
- * Makefile's {@code build-live-esdk} stamp-and-install flow and the server's
- * {@code runServer} launch against the resolved sources, and a run whose
- * materialized sources lack the Java library or server directory is a
- * {@code RESOLVE} launch failure naming the language — all without running a
- * real Maven or Gradle build (the end-to-end launch is checkpoint 10).
+ * Unit tests for {@link JavaLaunchPlan}: the pure command construction
+ * reproduces the aws-crypto-tools-java Makefile's {@code build-live-esdk}
+ * stamp-and-install flow and the server's {@code runServer} launch against the
+ * resolved sources, and a run whose materialized sources lack the Java library
+ * or server directory is a {@code RESOLVE} launch failure naming the language —
+ * all without running a real Maven or Gradle build.
  */
 class JavaLaunchPlanTest {
 
@@ -86,8 +85,8 @@ class JavaLaunchPlanTest {
     }
 
     // ------------------------------------------------------------------
-    // RESOLVE failure paths (Requirement 2.5): missing materialized sources
-    // abort before any Maven/Gradle step runs.
+    // RESOLVE failure paths: missing materialized sources abort before any
+    // Maven/Gradle step runs.
     // ------------------------------------------------------------------
 
     @Test

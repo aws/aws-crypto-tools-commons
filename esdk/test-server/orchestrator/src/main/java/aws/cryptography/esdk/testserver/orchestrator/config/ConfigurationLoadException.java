@@ -6,8 +6,7 @@ import java.nio.file.Path;
  * A configuration file could not be loaded: it is missing from its expected
  * location or is unparseable (malformed JSON, a duplicate key rejected by
  * strict duplicate detection, or a non-object top level). The message always
- * names the expected location when one is known, so failures satisfy
- * Requirements 4.9, 7.4, and 8.10's "name the expected location" clauses.
+ * names the expected location when one is known.
  */
 public final class ConfigurationLoadException extends RuntimeException {
 

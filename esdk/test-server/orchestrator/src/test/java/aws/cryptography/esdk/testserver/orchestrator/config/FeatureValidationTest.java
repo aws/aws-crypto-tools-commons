@@ -10,11 +10,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link FeatureValidation}: the Feature_Declaration rules
- * (Requirements 8.5–8.9), the commons-configuration {@code product}
- * exact-match check (Requirement 8.11), and the missing/unparseable
- * carrying-file error (Requirement 8.10). The jqwik property test (Property 2)
- * is a separate task.
+ * Unit tests for {@link FeatureValidation}: the Feature_Declaration rules, the
+ * commons-configuration {@code product} exact-match check, and the
+ * missing/unparseable carrying-file error. The jqwik coverage (Property 2)
+ * lives separately.
  */
 class FeatureValidationTest {
 

@@ -43,12 +43,11 @@ import net.jqwik.api.Provide;
  * {@code Configuration_Set}, the orchestrated pipeline
  * <ul>
  *   <li>invokes the launcher exactly once per {@code Configuration_Entry},
- *       with that entry's configured port (Requirement 2.1);</li>
+ *       with that entry's configured port;</li>
  *   <li>invokes the test runner only after every launched server has
- *       reported reachable (Requirements 2.2, 2.3);</li>
+ *       reported reachable;</li>
  *   <li>hands the runner exactly the launched
- *       {@code (language, majorVersion, endpoint)} set as its Targets
- *       (Requirement 2.2).</li>
+ *       {@code (language, majorVersion, endpoint)} set as its Targets.</li>
  * </ul>
  *
  * <p>The pipeline is driven hermetically: {@link FakeMaterializer} stands in
@@ -59,8 +58,6 @@ import net.jqwik.api.Provide;
  * carries an inline Feature_Declaration partitioning the whole catalog, so
  * stage-1 validation covers all declarations and no cross-repository
  * declaration loading is triggered.
- *
- * <p><b>Validates: Requirements 2.1, 2.2, 2.3</b>
  */
 class LaunchOnceAllReachablePropertyTest {
 
@@ -84,7 +81,7 @@ class LaunchOnceAllReachablePropertyTest {
             List<ConfigurationEntry> entries = set.entries();
 
             // Exactly one launch per Configuration_Entry, at that entry's
-            // configured port (Requirement 2.1).
+            // configured port.
             assertEquals(entries.size(), launcher.launches.size(),
                 "expected exactly one launch per Configuration_Entry");
             for (ConfigurationEntry entry : entries) {
@@ -99,8 +96,7 @@ class LaunchOnceAllReachablePropertyTest {
             }
 
             // The runner was invoked exactly once, and only after every
-            // configured server had launched and reported reachable
-            // (Requirements 2.2, 2.3).
+            // configured server had launched and reported reachable.
             assertEquals(1, runner.invocationCount, "the Tests must run exactly once");
             assertEquals(entries.size(), runner.launchedCountAtInvocation,
                 "every server must have launched before the Tests start");
@@ -111,7 +107,7 @@ class LaunchOnceAllReachablePropertyTest {
             }
 
             // The Targets handed to the runner are exactly the launched
-            // (language, majorVersion, endpoint) set (Requirement 2.2).
+            // (language, majorVersion, endpoint) set.
             List<TestTarget> expectedTargets = new ArrayList<>();
             for (ConfigurationEntry entry : entries) {
                 expectedTargets.add(new TestTarget(entry.language(), entry.majorVersion(),

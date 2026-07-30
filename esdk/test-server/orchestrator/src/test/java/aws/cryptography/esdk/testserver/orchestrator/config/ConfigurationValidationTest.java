@@ -8,11 +8,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link ConfigurationValidation} — the structural checks added
- * by the factoring (Requirements 3.2, 3.8, 4.7, 4.11, 7.4, 7.5). All pure: no
- * I/O, nothing cloned. The jqwik coverage lives in
- * {@link ConfigurationSetValidationPropertyTest} (migrated legacy checks) and
- * the task-1.3 Property 1 test.
+ * Unit tests for {@link ConfigurationValidation}'s structural checks. All pure:
+ * no I/O, nothing cloned. The exhaustive jqwik coverage lives in
+ * {@link ConfigurationSetValidationPropertyTest} and the Property 1 test.
  */
 class ConfigurationValidationTest {
 

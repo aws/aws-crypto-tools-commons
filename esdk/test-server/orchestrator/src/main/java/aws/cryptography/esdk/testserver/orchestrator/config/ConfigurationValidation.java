@@ -9,39 +9,34 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Pure structural validation of the run's configuration (design
- * "ConfigurationValidation"): the {@link ConfigurationSet} (its {@code product},
- * Feature_Catalog, and Configuration_Entries) together with any
- * Configuration_Overrides supplied by the invoking Language_Repository.
+ * Pure structural validation of the run's configuration: the
+ * {@link ConfigurationSet} together with any Configuration_Overrides supplied by
+ * the invoking Language_Repository.
  *
  * <p>Everything here is a pure function over the already-parsed models — no
  * I/O, no git — so the pipeline can (and must) run it <em>before anything is
- * cloned</em> (Requirements 3.8, 4.7, 4.11, 7.4, 7.5). The checks:
+ * cloned</em>. The checks:
  *
  * <ul>
- *   <li><b>Catalog level</b> (Requirements 7.4, 7.5): a non-empty
- *       {@code product}, a present Feature_Catalog ({@code features}), and no
- *       Feature name duplicated within the catalog under exact string
- *       comparison — each duplicated name is named.</li>
- *   <li><b>Per entry</b> (Requirements 3.2, 3.8): a non-empty language, a
- *       {@code majorVersion >= 1}, a port in
- *       {@value ConfigurationSet#MIN_PORT}..{@value ConfigurationSet#MAX_PORT},
- *       a complete {@code libraryRepository} (name, url, branch), and a
- *       complete {@code serverLocation} (repository, ref, path) — every error
- *       names the language and each missing element.</li>
- *   <li><b>Overrides</b> (Requirements 4.6, 4.7, 4.11): each
- *       Configuration_Override is validated structurally exactly like a
- *       commons-stored entry; an override naming the run's own language is
- *       rejected (the own language resolves to its working tree), as is an
- *       override naming a language with no commons-stored entry.</li>
- *   <li><b>Effective set</b> (Requirement 3.2): port uniqueness is checked
- *       across the <em>effective</em> set — the commons-stored entries with
- *       each overridden language's entry replaced by its override.</li>
+ *   <li><b>Catalog level</b>: a non-empty {@code product}, a present
+ *       Feature_Catalog ({@code features}), and no Feature name duplicated
+ *       within the catalog under exact string comparison.</li>
+ *   <li><b>Per entry</b>: a non-empty language, a {@code majorVersion >= 1}, a
+ *       port in {@value ConfigurationSet#MIN_PORT}..{@value ConfigurationSet#MAX_PORT},
+ *       a complete {@code libraryRepository} (name, url, branch), and a complete
+ *       {@code serverLocation} (repository, ref, path) — every error names the
+ *       language and each missing element.</li>
+ *   <li><b>Overrides</b>: each Configuration_Override is validated structurally
+ *       exactly like a commons-stored entry; an override naming the run's own
+ *       language is rejected (the own language resolves to its working tree), as
+ *       is an override naming a language with no commons-stored entry.</li>
+ *   <li><b>Effective set</b>: port uniqueness is checked across the
+ *       <em>effective</em> set — the commons-stored entries with each overridden
+ *       language's entry replaced by its override.</li>
  * </ul>
  *
- * <p>Feature_Declaration content validation (catalog coverage, both-array
- * conflicts, unknown Features, in-array duplicates, product match) is
- * {@code FeatureValidation}'s job, not this class's.
+ * <p>Feature_Declaration content validation is {@code FeatureValidation}'s job,
+ * not this class's.
  */
 public final class ConfigurationValidation {
 
@@ -63,7 +58,7 @@ public final class ConfigurationValidation {
      * @param overrides   the invoking Language_Repository's
      *                    Configuration_Overrides (empty for a Commons_Run)
      * @param ownLanguage the run's own language for a Language_Repository_Run,
-     *                    or {@code null} for a Commons_Run (Requirement 4.7)
+     *                    or {@code null} for a Commons_Run
      * @return the validation outcome; {@code valid()} is {@code false} with one
      *     message per problem, each naming the offending language and element
      */
@@ -84,8 +79,8 @@ public final class ConfigurationValidation {
             }
         }
 
-        // Overrides are validated structurally exactly like commons entries
-        // (Requirement 4.6), then checked against the override sanity rules.
+        // Overrides are validated structurally exactly like commons entries,
+        // then checked against the override sanity rules.
         Map<String, ConfigurationEntry> applicableOverrides = new LinkedHashMap<>();
         for (ConfigurationEntry override : overrides) {
             validateEntry("override", override, errors);
@@ -94,14 +89,13 @@ public final class ConfigurationValidation {
                 continue; // already reported as missing language above
             }
             if (language.equals(ownLanguage)) {
-                // Requirement 4.7: the own language resolves to its working tree.
+                // The own language resolves to its working tree.
                 errors.add("override " + language + ": a Configuration_Override must not name"
                     + " the run's own language '" + language
                     + "' — the own language resolves to its working tree");
                 continue;
             }
             if (!commonsLanguages.contains(language)) {
-                // Requirement 4.11.
                 errors.add("override " + language + ": no commons-stored Configuration_Entry"
                     + " exists for language '" + language + "'");
                 continue;
@@ -115,7 +109,7 @@ public final class ConfigurationValidation {
     }
 
     // ------------------------------------------------------------------
-    // Catalog level (Requirements 7.4, 7.5)
+    // Catalog level
     // ------------------------------------------------------------------
 
     private static void validateCatalog(ConfigurationSet set, List<String> errors) {
@@ -128,7 +122,7 @@ public final class ConfigurationValidation {
             return;
         }
         // Duplicate Feature names under exact string comparison, naming each
-        // duplicated name once (Requirement 7.5).
+        // duplicated name once.
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (String name : features) {
             counts.merge(name, 1, Integer::sum);
@@ -142,7 +136,7 @@ public final class ConfigurationValidation {
     }
 
     // ------------------------------------------------------------------
-    // Per-entry structure (Requirements 3.2, 3.8)
+    // Per-entry structure
     // ------------------------------------------------------------------
 
     private static void validateEntry(String kind, ConfigurationEntry e, List<String> errors) {
@@ -195,13 +189,12 @@ public final class ConfigurationValidation {
     }
 
     // ------------------------------------------------------------------
-    // Effective set and port uniqueness (Requirement 3.2)
+    // Effective set and port uniqueness
     // ------------------------------------------------------------------
 
     /**
      * The run-effective entries: the commons-stored entries with each
-     * overridden language's entry replaced by its Configuration_Override
-     * (Requirement 4.6).
+     * overridden language's entry replaced by its Configuration_Override.
      */
     private static List<ConfigurationEntry> effectiveEntries(
             ConfigurationSet set, Map<String, ConfigurationEntry> applicableOverrides) {
