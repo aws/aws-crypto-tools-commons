@@ -100,4 +100,14 @@ class SyntheticHeaderTests {
         assertRejected(pair, EsdkHeaderEditor.withDuplicateFirstKey(message),
             "a header whose encryption context contains a duplicate key");
     }
+
+    /** HDR-023: a header whose encryption-context key is not valid UTF-8 is rejected. */
+    @ParameterizedTest(name = "nonUtf8EcKeyRejected {0}")
+    @MethodSource("pairs")
+    void decryptRejectsNonUtf8EncryptionContextKey(EndpointPair pair) {
+        EsdkMessage message = encryptAndParse(pair, twoPairContext());
+        // 0xFF is never a valid UTF-8 byte, so the first key is no longer valid UTF-8.
+        assertRejected(pair, EsdkHeaderEditor.withFirstKeyByte(message, 0xFF),
+            "a header whose encryption-context key is not valid UTF-8");
+    }
 }
