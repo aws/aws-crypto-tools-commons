@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  CloudWatch metric filters for the ESDK Rust hierarchical-keyring performance
+  benchmarks published to CloudWatch Logs by aws-crypto-tools-rust.
+
+Parameters:
+  LogGroupName:
+    Type: String
+    Default: aws-esdk-performance-benchmarks
+    Description: Log group the benchmark workflow publishes to.
+
+Resources:
+  HierarchicalConcurrent50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalConcurrency50MBP50
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalConcurrentP50Latency
+          MetricValue: $.result.p50_latency
+          Unit: Milliseconds
+
+  HierarchicalConcurrent50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalConcurrency50MBP95
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalConcurrentP95Latency
+          MetricValue: $.result.p95_latency
+          Unit: Milliseconds
+
+  HierarchicalConcurrent50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalConcurrency50MBP99
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalConcurrentP99Latency
+          MetricValue: $.result.p99_latency
+          Unit: Milliseconds
+
+  HierarchicalThroughput50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalThroughput50MBP50
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalThroughputP50Latency
+          MetricValue: $.result.p50_latency
+          Unit: Milliseconds
+
+  HierarchicalThroughput50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalThroughput50MBP95
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalThroughputP95Latency
+          MetricValue: $.result.p95_latency
+          Unit: Milliseconds
+
+  HierarchicalThroughput50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalThroughput50MBP99
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalThroughputP99Latency
+          MetricValue: $.result.p99_latency
+          Unit: Milliseconds
+
+  HierarchicalMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalMemoryUsage50MB
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalPeakMemoryUsage
+          MetricValue: $.result.peak_memory_mb
+          Unit: Megabytes
+
+  HierarchicalMemoryEfficiency50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustHierarchicalMemoryEfficiency50MB
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical" && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      MetricTransformations:
+        - MetricNamespace: RustPerformanceBenchmarks
+          MetricName: HierarchicalMemoryEfficiencyRatio
+          MetricValue: $.result.memory_efficiency_ratio
+          # Payload bytes per byte of peak memory delta.
+          Unit: None
