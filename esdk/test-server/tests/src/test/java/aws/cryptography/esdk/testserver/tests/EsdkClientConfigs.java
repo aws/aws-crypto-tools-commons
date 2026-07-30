@@ -162,6 +162,49 @@ public final class EsdkClientConfigs {
             .build();
     }
 
+    /**
+     * @return a Raw-AES config whose CMM is a Required-Encryption-Context CMM over a Default CMM,
+     *     requiring {@code requiredKeys} (dropped from the header on encrypt, demanded again on
+     *     decrypt). Fully offline.
+     */
+    public static ESDKClientConfig rawAesRequiredEc(List<String> requiredKeys) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(requiredEcCmm(defaultCmm(rawAesKeyring()), requiredKeys))
+            .build();
+    }
+
+    /**
+     * @return a Default-CMM config over ONLY the second Raw-AES keyring (key "b"). Used to prove a
+     *     decrypt keyring holding just one of several EDKs' wrapping keys can still decrypt.
+     */
+    public static ESDKClientConfig rawAesBOnly() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(rawAesKeyringB()))
+            .build();
+    }
+
+    /**
+     * @return a Default-CMM config over a Raw-RSA keyring built with the PUBLIC key only (no private
+     *     key), so it can wrap on encrypt but cannot unwrap on decrypt. Non-committing so a
+     *     public-only asymmetric keyring is valid.
+     */
+    public static ESDKClientConfig rawRsaPublicOnly() {
+        Keyring publicOnly = Keyring.builder()
+            .rawRsa(RawRsaKeyringConfig.builder()
+                .keyNamespace(KEY_NAMESPACE)
+                .keyName(RSA_KEY_NAME)
+                .paddingScheme(PaddingScheme.OAEP_SHA256_MGF1)
+                .publicKey(ByteBuffer.wrap(RSA_KEY_PAIR.publicPem()))
+                .build())
+            .build();
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT)
+            .cmm(defaultCmm(publicOnly))
+            .build();
+    }
+
     // -----------------------------------------------------------------------
     // Task 14.3: broadened, round-trip-compatible scenarios for Property 1.
     // -----------------------------------------------------------------------
