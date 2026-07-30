@@ -47,7 +47,7 @@ class MessageFormatTests {
         EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
-    private static final long FRAME_LENGTH = 16L;
+    private static final long FRAME_LENGTH = 512L;
 
     static List<LanguageServerTarget> targets() {
         return LanguageServerRegistry.shared().targets();
