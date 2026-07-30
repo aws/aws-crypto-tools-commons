@@ -89,15 +89,25 @@ final class EsdkOps {
 
     /** EncryptStream {@code plaintext} on {@code endpoint} under {@code config}; return the ciphertext bytes. */
     static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext) {
+        return encryptStream(endpoint, config, plaintext, null);
+    }
+
+    /**
+     * EncryptStream {@code plaintext} on {@code endpoint} under {@code config}, applying the
+     * optional plaintext-length bound when supplied; return the ciphertext bytes.
+     */
+    static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext,
+                                Long plaintextLengthBound) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
         String clientId = client.createClient(
             CreateClientInput.builder().config(config).build()).getClientId();
-        return toArray(client.encryptStream(
-            aws.cryptography.esdk.testserver.client.model.EncryptStreamInput.builder()
-                .clientId(clientId)
-                .plaintext(ByteBuffer.wrap(plaintext))
-                .build())
-            .getCiphertext());
+        var input = aws.cryptography.esdk.testserver.client.model.EncryptStreamInput.builder()
+            .clientId(clientId)
+            .plaintext(ByteBuffer.wrap(plaintext));
+        if (plaintextLengthBound != null) {
+            input.plaintextLengthBound(plaintextLengthBound);
+        }
+        return toArray(client.encryptStream(input.build()).getCiphertext());
     }
 
     /** DecryptStream {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */

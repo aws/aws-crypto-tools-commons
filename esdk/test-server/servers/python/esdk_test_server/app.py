@@ -104,6 +104,7 @@ def _encrypt_stream(registry, request):
             request.get("encryptionContext"),
             request.get("algorithmSuiteId"),
             request.get("frameLength"),
+            request.get("plaintextLengthBound"),
         )
     except Exception as exc:  # noqa: BLE001
         raise ClientError(str(exc)) from exc
