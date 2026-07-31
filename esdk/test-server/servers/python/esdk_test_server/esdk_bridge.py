@@ -51,6 +51,22 @@ def _kms_client():
     return boto3.client("kms", region_name=_region())
 
 
+def _kms_client_for_key(kms_key_id):
+    """A KMS client in the key's own region.
+
+    KMS rejects an ARN whose region differs from the client's region ("Invalid
+    arn <region>"), so a us-east-1 key needs a us-east-1 client even when the
+    default region is us-west-2. Falls back to the default region for a bare key
+    id or alias that carries no region.
+    """
+    region = _region()
+    if isinstance(kms_key_id, str) and kms_key_id.startswith("arn:"):
+        parts = kms_key_id.split(":")
+        if len(parts) > 3 and parts[3]:
+            region = parts[3]
+    return boto3.client("kms", region_name=region)
+
+
 def to_algorithm(model_suite_id):
     """Map a modeled ``ESDKAlgorithmSuiteId`` to a Python ``Algorithm`` member.
 
@@ -143,7 +159,7 @@ def _build_keyring(keyring):
         return _MATERIAL_PROVIDERS.create_aws_kms_keyring(
             input=mpl.CreateAwsKmsKeyringInput(
                 kms_key_id=cfg["kmsKeyId"],
-                kms_client=_kms_client(),
+                kms_client=_kms_client_for_key(cfg["kmsKeyId"]),
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
@@ -151,7 +167,7 @@ def _build_keyring(keyring):
         return _MATERIAL_PROVIDERS.create_aws_kms_mrk_keyring(
             input=mpl.CreateAwsKmsMrkKeyringInput(
                 kms_key_id=cfg["kmsKeyId"],
-                kms_client=_kms_client(),
+                kms_client=_kms_client_for_key(cfg["kmsKeyId"]),
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
@@ -181,7 +197,7 @@ def _build_keyring(keyring):
             )
         )
     if name == "AwsKmsRsa":
-        kms_client = _kms_client()
+        kms_client = _kms_client_for_key(cfg["kmsKeyId"])
         public_key = cfg.get("publicKey")
         if public_key is None:
             # Fetch the RSA public key from KMS (as the Java server does) so the

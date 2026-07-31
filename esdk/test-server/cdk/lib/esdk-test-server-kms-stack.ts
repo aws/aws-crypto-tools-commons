@@ -213,6 +213,38 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       }),
     );
 
+    // The cross-language interop test vectors (TestVectorManifestTests) replay
+    // the AWS Crypto Tools test-vector-framework keys, which are external,
+    // publicly accessible fixtures in the shared vectors accounts (not the keys
+    // this stack creates). Cross-account KMS still requires the caller's own
+    // identity policy to allow the action, so the CI role needs the same KMS
+    // actions on those key ARNs. They span us-west-2 and us-east-1 (the same
+    // MRK replicated) so MRK cross-region vectors resolve.
+    const testVectorKeyArns = [
+      'arn:aws:kms:us-west-2:658956600833:key/b3537ef1-d8dc-4780-9f5a-55776cbb2f7f',
+      'arn:aws:kms:us-west-2:658956600833:key/590fd781-ddde-4036-abec-3e1ab5a5d2ad',
+      'arn:aws:kms:us-west-2:658956600833:key/mrk-80bd8ecdcd4342aebd84b7dc9da498a7',
+      'arn:aws:kms:us-east-1:658956600833:key/mrk-80bd8ecdcd4342aebd84b7dc9da498a7',
+      'arn:aws:kms:us-west-2:370957321024:key/mrk-63d386cb70614ea59b32ad65c9315297',
+    ];
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EsdkTestServerVectorKeys',
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'kms:Encrypt',
+          'kms:Decrypt',
+          'kms:GenerateDataKey',
+          'kms:GenerateDataKeyWithoutPlaintext',
+          'kms:GenerateDataKeyPair',
+          'kms:GenerateDataKeyPairWithoutPlaintext',
+          'kms:GetPublicKey',
+          'kms:DescribeKey',
+        ],
+        resources: testVectorKeyArns,
+      }),
+    );
+
     // The AWS KMS Hierarchical keyring reads its branch key from the shared
     // DynamoDB key store (KeyStoreDdbTable) and unwraps it with the branch key's
     // KMS key; both the encrypt and decrypt legs need GetItem on the table and
