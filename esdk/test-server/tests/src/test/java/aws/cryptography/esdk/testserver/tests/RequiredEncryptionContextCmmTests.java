@@ -8,6 +8,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -45,6 +46,7 @@ class RequiredEncryptionContextCmmTests {
 
     /** Encrypt with the required-EC CMM and the full context (required keys dropped from the header). */
     private static byte[] encrypt(EndpointPair pair) {
+        FeatureGate.require(Set.of("required-encryption-context", "raw-aes"), pair);
         return EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT, FULL_CONTEXT, null, null);
     }
 

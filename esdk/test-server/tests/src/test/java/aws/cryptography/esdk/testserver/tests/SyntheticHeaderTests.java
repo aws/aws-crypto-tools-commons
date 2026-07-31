@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -53,6 +54,7 @@ class SyntheticHeaderTests {
     }
 
     private static EsdkMessage encryptAndParse(EndpointPair pair, Map<String, String> ec) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, ec, SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.aadLength > 0, "baseline: the message must carry a non-empty encryption context (" + pair + ")");
