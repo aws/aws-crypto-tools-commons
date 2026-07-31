@@ -159,6 +159,15 @@ structure DecryptRequest {
 structure DecryptResponse {
     @required
     plaintext: Blob
+
+    /// The encryption context the decryptor authenticated from the message
+    /// (spec/client-apis/decrypt.md). Optional: a Language_Server that does not
+    /// expose its decrypt result omits it.
+    encryptionContext: EncryptionContext
+
+    /// The algorithm suite the decryptor determined from the message header.
+    /// Optional for the same reason.
+    algorithmSuiteId: ESDKAlgorithmSuiteId
 }
 
 @input
@@ -217,6 +226,15 @@ structure DecryptStreamResponse {
     /// carried as a plain Blob on the wire (Requirements 4.1, 4.6).
     @required
     plaintext: Blob
+
+    /// The encryption context the decryptor authenticated from the message
+    /// (spec/client-apis/decrypt.md). Optional: a Language_Server that does not
+    /// expose its decrypt result omits it.
+    encryptionContext: EncryptionContext
+
+    /// The algorithm suite the decryptor determined from the message header.
+    /// Optional for the same reason.
+    algorithmSuiteId: ESDKAlgorithmSuiteId
 }
 
 // ===========================================================================

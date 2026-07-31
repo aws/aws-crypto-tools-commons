@@ -87,6 +87,26 @@ final class EsdkOps {
         return toArray(client.decrypt(input.build()).getPlaintext());
     }
 
+    /**
+     * Decrypt {@code ciphertext} on {@code endpoint} under {@code config}, returning the full
+     * response so callers can inspect the encryption context and algorithm suite the decryptor
+     * exposed (both optional — a Language_Server that does not surface them leaves them null).
+     */
+    static aws.cryptography.esdk.testserver.client.model.DecryptOutput decryptResponse(
+            URI endpoint, ESDKClientConfig config, byte[] ciphertext,
+            Map<String, String> encryptionContext) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        String clientId = client.createClient(
+            CreateClientInput.builder().config(config).build()).getClientId();
+        DecryptInput.Builder input = DecryptInput.builder()
+            .clientId(clientId)
+            .ciphertext(ByteBuffer.wrap(ciphertext));
+        if (encryptionContext != null && !encryptionContext.isEmpty()) {
+            input.encryptionContext(encryptionContext);
+        }
+        return client.decrypt(input.build());
+    }
+
     /** EncryptStream {@code plaintext} on {@code endpoint} under {@code config}; return the ciphertext bytes. */
     static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext) {
         return encryptStream(endpoint, config, plaintext, null);
