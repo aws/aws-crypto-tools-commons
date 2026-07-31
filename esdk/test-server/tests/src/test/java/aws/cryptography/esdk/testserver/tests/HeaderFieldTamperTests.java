@@ -10,6 +10,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -76,6 +77,7 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "contentTypeRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsInvalidContentType(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = encryptV2(pair, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
@@ -87,6 +89,7 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "edkCountZeroRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsZeroEdkCount(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = encryptV2(pair, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.edkCount >= 1, "baseline: message must carry at least one EDK");
@@ -100,6 +103,7 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "v1ReservedNonZeroRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsNonZeroV1Reserved(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_SIGNING, PLAINTEXT, Map.of(),
             V1_SUITE, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -113,6 +117,7 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "frameContentTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedFrameContent(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
             Map.of(), V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -126,6 +131,7 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "frameSequenceTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedFrameSequenceNumber(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
             Map.of(), V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

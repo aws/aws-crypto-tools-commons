@@ -31,8 +31,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -109,9 +111,17 @@ class TestVectorManifestTests {
                 cmmFor(scenario.get("decryptKeyDescription"), keys), committing);
             Map<String, String> reproducedEc =
                 toStringMap(scenario.get("reproduced-encryption-context"));
+            // The Feature(s) this vector's keyrings require (encrypt and decrypt
+            // legs). A combination whose encrypt or decrypt language declares any
+            // of them unsupported is skipped visibly, rather than driven into a
+            // Language_Server that does not wire the keyring (Requirements 9.1, 9.5).
+            Set<String> vectorFeatures = new LinkedHashSet<>();
+            vectorFeatures.addAll(featuresFor(scenario.get("encryptKeyDescription")));
+            vectorFeatures.addAll(featuresFor(scenario.get("decryptKeyDescription")));
 
             for (EndpointPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
+                    FeatureGate.require(vectorFeatures, pair);
                     byte[] ciphertext = EsdkOps.encrypt(
                         pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
                     byte[] recovered =
@@ -157,6 +167,61 @@ class TestVectorManifestTests {
         }
         String algorithm = text(desc, "encryption-algorithm");
         return algorithm == null ? text(desc, "type") : text(desc, "type") + "/" + algorithm;
+    }
+
+    /**
+     * The Feature_Catalog Feature(s) a key/CMM description depends on, so the test
+     * can gate on them ({@link FeatureGate#require}) and skip on a language that
+     * declares any unsupported. Recurses into multi-keyring children and the
+     * Required-Encryption-Context CMM's underlying keyring so a combination must
+     * support every keyring the vector actually uses. Only maps the descriptions
+     * {@link #keyringFor} builds; unmapped types never reach here (they are dropped
+     * by {@link #skipReason} first).
+     */
+    private static Set<String> featuresFor(JsonNode desc) {
+        Set<String> features = new LinkedHashSet<>();
+        collectFeatures(desc, features);
+        return features;
+    }
+
+    private static void collectFeatures(JsonNode desc, Set<String> into) {
+        if (desc == null) {
+            return;
+        }
+        String type = text(desc, "type");
+        if (type == null) {
+            return;
+        }
+        switch (type) {
+            case "raw" -> {
+                String algorithm = text(desc, "encryption-algorithm");
+                if ("aes".equals(algorithm)) {
+                    into.add("raw-aes");
+                } else if ("rsa".equals(algorithm)) {
+                    into.add("raw-rsa");
+                }
+            }
+            case "aws-kms" -> into.add("aws-kms");
+            case "aws-kms-mrk-aware" -> into.add("aws-kms-mrk");
+            case "aws-kms-mrk-aware-discovery" -> into.add("aws-kms-mrk-discovery");
+            case "aws-kms-rsa" -> into.add("aws-kms-rsa");
+            case "aws-kms-hierarchy" -> into.add("hierarchical");
+            case "multi-keyring" -> {
+                into.add("multi");
+                collectFeatures(desc.get("generator"), into);
+                JsonNode children = desc.get("childKeyrings");
+                if (children != null) {
+                    children.forEach(child -> collectFeatures(child, into));
+                }
+            }
+            case "required-encryption-context-cmm" -> {
+                into.add("required-encryption-context");
+                collectFeatures(desc.get("underlying"), into);
+            }
+            default -> {
+                // Unmapped types are dropped by skipReason before the gate runs.
+            }
+        }
     }
 
     /** Build a keyring from a framework key description, or {@code null} if unsupported here. */

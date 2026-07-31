@@ -9,6 +9,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -54,6 +55,7 @@ class MessageFormatTests {
     }
 
     private static byte[] encrypt(LanguageServerTarget target, byte[] plaintext, Long frameLength) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         return EsdkOps.encrypt(target.endpoint(), CONFIG, plaintext, Map.of(), SUITE, frameLength);
     }
 

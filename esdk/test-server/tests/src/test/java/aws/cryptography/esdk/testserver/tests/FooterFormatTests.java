@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -97,6 +98,7 @@ class FooterFormatTests {
     @ParameterizedTest(name = "footerPresentForSigning[{1}] {0}")
     @MethodSource("cases")
     void signingSuiteProducesFooterAndPublicKey(LanguageServerTarget target, Layout layout) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         if (!layout.signing()) {
             return;
         }
@@ -118,6 +120,7 @@ class FooterFormatTests {
     @ParameterizedTest(name = "noFooterForNonSigning[{1}] {0}")
     @MethodSource("cases")
     void nonSigningSuiteHasNoFooterOrPublicKey(LanguageServerTarget target, Layout layout) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         if (layout.signing()) {
             return;
         }

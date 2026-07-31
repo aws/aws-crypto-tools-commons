@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -36,6 +37,7 @@ class RawKeyringBehaviorTests {
     @ParameterizedTest(name = "subsetKeyringDecrypts {0}")
     @MethodSource("pairs")
     void decryptSucceedsWithASubsetKeyring(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes", "multi"), pair);
         // Encrypt to a multi-keyring (generator "a" + child "b") => two EDKs.
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesMulti(), PLAINTEXT);
         // Decrypt with a keyring holding only key "b" — it matches the second EDK.
@@ -52,6 +54,7 @@ class RawKeyringBehaviorTests {
     @ParameterizedTest(name = "childrenOnlyMultiCannotEncrypt {0}")
     @MethodSource("pairs")
     void childrenOnlyMultiKeyringCannotEncrypt(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes", "multi"), pair);
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesChildrenOnlyMulti(), PLAINTEXT),
             "a multi-keyring with no generator must fail to encrypt (nothing can create a data key) ("
