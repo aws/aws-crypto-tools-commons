@@ -4,12 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.Keyring;
+import aws.cryptography.esdk.testserver.client.model.KmsRsaEncryptionAlgorithm;
+import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.RawRsaKeyringConfig;
@@ -149,9 +154,33 @@ class TestVectorManifestTests {
 
     /** Build a keyring from a framework key description, or {@code null} if unsupported here. */
     private static Keyring keyringFor(JsonNode desc, JsonNode keys) {
-        if (desc == null || !"raw".equals(text(desc, "type"))) {
+        if (desc == null) {
             return null;
         }
+        String type = text(desc, "type");
+        if ("raw".equals(type)) {
+            return rawKeyringFor(desc, keys);
+        }
+        if ("aws-kms".equals(type)) {
+            String arn = kmsArn(desc, keys);
+            return arn == null ? null
+                : Keyring.builder().awsKms(AwsKmsKeyringConfig.builder().kmsKeyId(arn).build()).build();
+        }
+        if ("aws-kms-mrk-aware".equals(type)) {
+            String arn = kmsArn(desc, keys);
+            return arn == null ? null
+                : Keyring.builder().awsKmsMrk(AwsKmsMrkKeyringConfig.builder().kmsKeyId(arn).build()).build();
+        }
+        if ("aws-kms-rsa".equals(type)) {
+            return kmsRsaKeyringFor(desc, keys);
+        }
+        if ("multi-keyring".equals(type)) {
+            return multiKeyringFor(desc, keys);
+        }
+        return null;
+    }
+
+    private static Keyring rawKeyringFor(JsonNode desc, JsonNode keys) {
         JsonNode key = keys.get(text(desc, "key"));
         if (key == null) {
             return null;
@@ -197,6 +226,61 @@ class TestVectorManifestTests {
             return Keyring.builder().rawRsa(rsa.build()).build();
         }
         return null;
+    }
+
+    /** The KMS ARN a KMS key description names, resolved through keys.json, or {@code null}. */
+    private static String kmsArn(JsonNode desc, JsonNode keys) {
+        JsonNode key = keys.get(text(desc, "key"));
+        return key == null ? null : text(key, "key-id");
+    }
+
+    private static Keyring kmsRsaKeyringFor(JsonNode desc, JsonNode keys) {
+        JsonNode key = keys.get(text(desc, "key"));
+        if (key == null) {
+            return null;
+        }
+        var rsa = AwsKmsRsaKeyringConfig.builder().kmsKeyId(text(key, "key-id"));
+        String encryptionAlgorithm = text(desc, "encryption-algorithm");
+        if (encryptionAlgorithm != null) {
+            KmsRsaEncryptionAlgorithm algorithm = switch (encryptionAlgorithm) {
+                case "RSAES_OAEP_SHA_1" -> KmsRsaEncryptionAlgorithm.RSAES_OAEP_SHA_1;
+                case "RSAES_OAEP_SHA_256" -> KmsRsaEncryptionAlgorithm.RSAES_OAEP_SHA_256;
+                default -> null;
+            };
+            if (algorithm == null) {
+                return null;
+            }
+            rsa.encryptionAlgorithm(algorithm);
+        }
+        String material = text(key, "material");
+        if (material != null) {
+            rsa.publicKey(ByteBuffer.wrap(material.getBytes(StandardCharsets.UTF_8)));
+        }
+        return Keyring.builder().awsKmsRsa(rsa.build()).build();
+    }
+
+    private static Keyring multiKeyringFor(JsonNode desc, JsonNode keys) {
+        var multi = MultiKeyringConfig.builder();
+        JsonNode generator = desc.get("generator");
+        if (generator != null && !generator.isNull()) {
+            Keyring built = keyringFor(generator, keys);
+            if (built == null) {
+                return null;
+            }
+            multi.generator(built);
+        }
+        List<Keyring> children = new ArrayList<>();
+        JsonNode childKeyrings = desc.get("childKeyrings");
+        if (childKeyrings != null) {
+            for (JsonNode child : childKeyrings) {
+                Keyring built = keyringFor(child, keys);
+                if (built == null) {
+                    return null;
+                }
+                children.add(built);
+            }
+        }
+        return Keyring.builder().multi(multi.childKeyrings(children).build()).build();
     }
 
     private static PaddingScheme paddingFor(String algorithm, String hash) {
