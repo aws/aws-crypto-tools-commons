@@ -7,6 +7,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -41,6 +42,7 @@ class FrameLengthValidationTests {
     @ParameterizedTest(name = "nonPositiveFrameLengthRejected {0}")
     @MethodSource("targets")
     void encryptRejectsNonPositiveFrameLength(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, -16L),

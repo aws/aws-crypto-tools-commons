@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -34,6 +35,7 @@ class HeaderTruncationTests {
     @ParameterizedTest(name = "zeroByteRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsZeroByteMessage(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, new byte[0]),
             "decrypt of a zero-byte message must be rejected (" + pair + ")");
@@ -43,6 +45,7 @@ class HeaderTruncationTests {
     @ParameterizedTest(name = "versionOnlyByteRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsVersionOnlyByte(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT);
         byte[] versionOnly = Arrays.copyOf(ciphertext, 1);
         assertThrows(ESDKClientError.class,
@@ -54,6 +57,7 @@ class HeaderTruncationTests {
     @ParameterizedTest(name = "truncatedHeaderRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTruncatedHeader(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), null, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         // Truncate one byte before the body begins — the header is incomplete.

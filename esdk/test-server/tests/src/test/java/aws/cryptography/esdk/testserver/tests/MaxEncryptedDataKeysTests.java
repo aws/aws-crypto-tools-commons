@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -43,6 +44,7 @@ class MaxEncryptedDataKeysTests {
     @ParameterizedTest(name = "encryptEnforcesMaxEdks {0}")
     @MethodSource("targets")
     void encryptEnforcesMaxEncryptedDataKeys(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes", "multi"), new EndpointPair(target, target));
         // Cap of 2 permits the two EDKs.
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(),
             EsdkClientConfigs.rawAesMultiWithMaxEdks(2), PLAINTEXT);
@@ -62,6 +64,7 @@ class MaxEncryptedDataKeysTests {
     @ParameterizedTest(name = "decryptEnforcesMaxEdks {0}")
     @MethodSource("pairs")
     void decryptEnforcesMaxEncryptedDataKeys(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes", "multi"), pair);
         // Encrypt a two-EDK message with no cap.
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesMulti(), PLAINTEXT);
 

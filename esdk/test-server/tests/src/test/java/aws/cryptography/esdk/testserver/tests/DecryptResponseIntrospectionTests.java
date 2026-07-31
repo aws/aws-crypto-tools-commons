@@ -9,6 +9,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -36,6 +37,7 @@ class DecryptResponseIntrospectionTests {
     @ParameterizedTest(name = "decryptResponseExposesSuiteAndContext {0}")
     @MethodSource("pairs")
     void decryptResponseExposesSuiteAndContext(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         Map<String, String> ec = Map.of("purpose", "introspection");
         ESDKAlgorithmSuiteId suite = ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
@@ -59,6 +61,7 @@ class DecryptResponseIntrospectionTests {
     @ParameterizedTest(name = "decryptResponseExposesSignaturePublicKey {0}")
     @MethodSource("pairs")
     void decryptResponseExposesSignaturePublicKey(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         Map<String, String> ec = Map.of("purpose", "signing");
         ESDKAlgorithmSuiteId suite =
             ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384;

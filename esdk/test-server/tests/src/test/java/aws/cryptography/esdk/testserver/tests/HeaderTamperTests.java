@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -90,6 +91,7 @@ class HeaderTamperTests {
 
     /** Encrypt one message for {@code layout} on the pair's encrypt endpoint. */
     private static byte[] encrypt(EndpointPair pair, Layout layout) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), layout.config(), PLAINTEXT,
             Map.of(), layout.suite(), null);
         // Sanity: the layout's expected version byte is what the server produced.

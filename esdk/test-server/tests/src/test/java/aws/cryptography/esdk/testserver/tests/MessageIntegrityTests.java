@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -64,6 +65,7 @@ class MessageIntegrityTests {
     @ParameterizedTest(name = "truncateByOneRejected[{1}] {0}")
     @MethodSource("cases")
     void decryptRejectsTruncatedMessage(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         ESDKClientConfig config = config();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);
@@ -83,6 +85,7 @@ class MessageIntegrityTests {
     @ParameterizedTest(name = "trailingBytesRejected[{1}] {0}")
     @MethodSource("cases")
     void decryptRejectsTrailingBytes(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         ESDKClientConfig config = config();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);
