@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsHierarchicalKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkDiscoveryKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
+import aws.cryptography.esdk.testserver.client.model.DiscoveryFilter;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
@@ -176,6 +178,18 @@ class TestVectorManifestTests {
             return arn == null ? null
                 : Keyring.builder().awsKmsMrk(AwsKmsMrkKeyringConfig.builder().kmsKeyId(arn).build()).build();
         }
+        if ("aws-kms-mrk-aware-discovery".equals(type)) {
+            String region = text(desc, "default-mrk-region");
+            if (region == null) {
+                return null;
+            }
+            var builder = AwsKmsMrkDiscoveryKeyringConfig.builder().region(region);
+            DiscoveryFilter filter = discoveryFilterFor(desc.get("aws-kms-discovery-filter"));
+            if (filter != null) {
+                builder.discoveryFilter(filter);
+            }
+            return Keyring.builder().awsKmsMrkDiscovery(builder.build()).build();
+        }
         if ("aws-kms-rsa".equals(type)) {
             return kmsRsaKeyringFor(desc, keys);
         }
@@ -252,6 +266,24 @@ class TestVectorManifestTests {
     private static String kmsArn(JsonNode desc, JsonNode keys) {
         JsonNode key = keys.get(text(desc, "key"));
         return key == null ? null : text(key, "key-id");
+    }
+
+    /** Map a manifest {@code aws-kms-discovery-filter} to a modeled DiscoveryFilter, or null. */
+    private static DiscoveryFilter discoveryFilterFor(JsonNode filterNode) {
+        if (filterNode == null) {
+            return null;
+        }
+        List<String> accountIds = new ArrayList<>();
+        JsonNode ids = filterNode.get("account-ids");
+        if (ids != null) {
+            for (JsonNode id : ids) {
+                accountIds.add(id.asText());
+            }
+        }
+        return DiscoveryFilter.builder()
+            .partition(text(filterNode, "partition"))
+            .accountIds(accountIds)
+            .build();
     }
 
     private static Keyring kmsRsaKeyringFor(JsonNode desc, JsonNode keys) {
