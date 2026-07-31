@@ -65,6 +65,31 @@ def to_algorithm(model_suite_id):
         raise ServerError(f"unknown algorithm suite id: {model_suite_id}") from exc
 
 
+# Modeled ESDKAlgorithmSuiteId names, used to invert to_algorithm() so decrypt can
+# report the suite it determined from the message header.
+_MODEL_SUITE_IDS = (
+    "ALG_AES_128_GCM_IV12_TAG16_NO_KDF",
+    "ALG_AES_192_GCM_IV12_TAG16_NO_KDF",
+    "ALG_AES_256_GCM_IV12_TAG16_NO_KDF",
+    "ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256",
+    "ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA256",
+    "ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256",
+    "ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256",
+    "ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384",
+    "ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384",
+    "ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY",
+    "ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384",
+)
+
+
+def from_algorithm(algorithm):
+    """Inverse of to_algorithm: a Python ``Algorithm`` -> modeled ESDKAlgorithmSuiteId name."""
+    for model_suite_id in _MODEL_SUITE_IDS:
+        if to_algorithm(model_suite_id) == algorithm:
+            return model_suite_id
+    return None
+
+
 def _commitment_policy(value):
     try:
         return getattr(CommitmentPolicy, value)
@@ -251,8 +276,8 @@ class EsdkClientBundle:
         kwargs = {"materials_manager": self._cmm}
         if encryption_context:
             kwargs["encryption_context"] = encryption_context
-        plaintext, _ = self._client.decrypt(source=ciphertext, **kwargs)
-        return plaintext
+        plaintext, header = self._client.decrypt(source=ciphertext, **kwargs)
+        return plaintext, dict(header.encryption_context or {}), from_algorithm(header.algorithm)
 
     def encrypt_stream(self, plaintext, encryption_context, algorithm_suite_id, frame_length,
                        plaintext_length_bound=None):
@@ -269,7 +294,9 @@ class EsdkClientBundle:
         if encryption_context:
             kwargs["encryption_context"] = encryption_context
         with self._client.stream(mode="d", source=ciphertext, **kwargs) as decryptor:
-            return decryptor.read()
+            plaintext = decryptor.read()
+            header = decryptor.header
+        return plaintext, dict(header.encryption_context or {}), from_algorithm(header.algorithm)
 
 
 def build_client(config):
