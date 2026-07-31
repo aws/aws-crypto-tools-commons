@@ -19,6 +19,7 @@ import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.RawRsaKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.RequiredEncryptionContextCmmConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
@@ -101,15 +102,18 @@ class TestVectorManifestTests {
             byte[] plaintext = deterministicPlaintext(
                 plaintexts.getOrDefault(text(scenario, "plaintext"), 32));
             ESDKClientConfig encConfig = configFor(
-                keyringFor(scenario.get("encryptKeyDescription"), keys), committing);
+                cmmFor(scenario.get("encryptKeyDescription"), keys), committing);
             ESDKClientConfig decConfig = configFor(
-                keyringFor(scenario.get("decryptKeyDescription"), keys), committing);
+                cmmFor(scenario.get("decryptKeyDescription"), keys), committing);
+            Map<String, String> reproducedEc =
+                toStringMap(scenario.get("reproduced-encryption-context"));
 
             for (EndpointPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
                     byte[] ciphertext = EsdkOps.encrypt(
                         pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
-                    byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), decConfig, ciphertext);
+                    byte[] recovered =
+                        EsdkOps.decrypt(pair.decryptEndpoint(), decConfig, ciphertext, reproducedEc);
                     assertArrayEquals(plaintext, recovered,
                         "manifest vector " + label + " must round-trip (" + pair + ")");
                 }));
@@ -136,10 +140,10 @@ class TestVectorManifestTests {
         if (scenario.path("frame-size").asLong() <= 0) {
             return "non-framed message";
         }
-        if (keyringFor(scenario.get("encryptKeyDescription"), keys) == null) {
+        if (cmmFor(scenario.get("encryptKeyDescription"), keys) == null) {
             return "unsupported encrypt keyring: " + descLabel(scenario.get("encryptKeyDescription"));
         }
-        if (keyringFor(scenario.get("decryptKeyDescription"), keys) == null) {
+        if (cmmFor(scenario.get("decryptKeyDescription"), keys) == null) {
             return "unsupported decrypt keyring: " + descLabel(scenario.get("decryptKeyDescription"));
         }
         return null;
@@ -315,10 +319,45 @@ class TestVectorManifestTests {
         return null;
     }
 
-    private static ESDKClientConfig configFor(Keyring keyring, boolean committing) {
-        CryptographicMaterialsManager cmm = CryptographicMaterialsManager.builder()
+    /**
+     * The materials manager for a key/CMM description, or {@code null} if unsupported here. Most
+     * descriptions are a keyring wrapped in a Default CMM; a {@code required-encryption-context-cmm}
+     * description wraps its underlying keyring in a Required-Encryption-Context CMM.
+     */
+    private static CryptographicMaterialsManager cmmFor(JsonNode desc, JsonNode keys) {
+        if (desc == null) {
+            return null;
+        }
+        if ("required-encryption-context-cmm".equals(text(desc, "type"))) {
+            Keyring underlying = keyringFor(desc.get("underlying"), keys);
+            if (underlying == null) {
+                return null;
+            }
+            List<String> requiredKeys = new ArrayList<>();
+            JsonNode requiredKeysNode = desc.get("requiredEncryptionContextKeys");
+            if (requiredKeysNode != null) {
+                for (JsonNode key : requiredKeysNode) {
+                    requiredKeys.add(key.asText());
+                }
+            }
+            return CryptographicMaterialsManager.builder()
+                .requiredEncryptionContext(RequiredEncryptionContextCmmConfig.builder()
+                    .underlyingCMM(defaultCmm(underlying))
+                    .requiredEncryptionContextKeys(requiredKeys)
+                    .build())
+                .build();
+        }
+        Keyring keyring = keyringFor(desc, keys);
+        return keyring == null ? null : defaultCmm(keyring);
+    }
+
+    private static CryptographicMaterialsManager defaultCmm(Keyring keyring) {
+        return CryptographicMaterialsManager.builder()
             .defaultMember(DefaultCmmConfig.builder().keyring(keyring).build())
             .build();
+    }
+
+    private static ESDKClientConfig configFor(CryptographicMaterialsManager cmm, boolean committing) {
         return ESDKClientConfig.builder()
             .commitmentPolicy(committing
                 ? ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT
