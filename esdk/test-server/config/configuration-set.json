@@ -41,8 +41,8 @@
       "language": "python",
       "majorVersion": 4,
       "port": 8092,
-      "supportedFeatures": ["streaming", "MPL"],
-      "unsupportedFeatures": ["hierarchical"],
+      "supportedFeatures": ["streaming", "MPL", "hierarchical"],
+      "unsupportedFeatures": [],
       "libraryRepository": {
         "name": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
