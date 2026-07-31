@@ -21,6 +21,9 @@ from aws_encryption_sdk.identifiers import Algorithm
 from aws_cryptographic_material_providers.mpl import AwsCryptographicMaterialProviders
 from aws_cryptographic_material_providers.mpl.config import MaterialProvidersConfig
 from aws_cryptographic_material_providers.mpl import models as mpl
+from aws_cryptographic_material_providers.keystore import KeyStore
+from aws_cryptographic_material_providers.keystore.config import KeyStoreConfig
+from aws_cryptographic_material_providers.keystore.models import KMSConfigurationKmsKeyArn
 
 
 class ClientError(Exception):
@@ -48,6 +51,22 @@ def _kms_client():
     return boto3.client("kms", region_name=_region())
 
 
+def _kms_client_for_key(kms_key_id):
+    """A KMS client in the key's own region.
+
+    KMS rejects an ARN whose region differs from the client's region ("Invalid
+    arn <region>"), so a us-east-1 key needs a us-east-1 client even when the
+    default region is us-west-2. Falls back to the default region for a bare key
+    id or alias that carries no region.
+    """
+    region = _region()
+    if isinstance(kms_key_id, str) and kms_key_id.startswith("arn:"):
+        parts = kms_key_id.split(":")
+        if len(parts) > 3 and parts[3]:
+            region = parts[3]
+    return boto3.client("kms", region_name=region)
+
+
 def to_algorithm(model_suite_id):
     """Map a modeled ``ESDKAlgorithmSuiteId`` to a Python ``Algorithm`` member.
 
@@ -63,6 +82,31 @@ def to_algorithm(model_suite_id):
         return getattr(Algorithm, name)
     except AttributeError as exc:
         raise ServerError(f"unknown algorithm suite id: {model_suite_id}") from exc
+
+
+# Modeled ESDKAlgorithmSuiteId names, used to invert to_algorithm() so decrypt can
+# report the suite it determined from the message header.
+_MODEL_SUITE_IDS = (
+    "ALG_AES_128_GCM_IV12_TAG16_NO_KDF",
+    "ALG_AES_192_GCM_IV12_TAG16_NO_KDF",
+    "ALG_AES_256_GCM_IV12_TAG16_NO_KDF",
+    "ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256",
+    "ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA256",
+    "ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256",
+    "ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256",
+    "ALG_AES_192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384",
+    "ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384",
+    "ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY",
+    "ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384",
+)
+
+
+def from_algorithm(algorithm):
+    """Inverse of to_algorithm: a Python ``Algorithm`` -> modeled ESDKAlgorithmSuiteId name."""
+    for model_suite_id in _MODEL_SUITE_IDS:
+        if to_algorithm(model_suite_id) == algorithm:
+            return model_suite_id
+    return None
 
 
 def _commitment_policy(value):
@@ -115,7 +159,7 @@ def _build_keyring(keyring):
         return _MATERIAL_PROVIDERS.create_aws_kms_keyring(
             input=mpl.CreateAwsKmsKeyringInput(
                 kms_key_id=cfg["kmsKeyId"],
-                kms_client=_kms_client(),
+                kms_client=_kms_client_for_key(cfg["kmsKeyId"]),
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
@@ -123,7 +167,7 @@ def _build_keyring(keyring):
         return _MATERIAL_PROVIDERS.create_aws_kms_mrk_keyring(
             input=mpl.CreateAwsKmsMrkKeyringInput(
                 kms_key_id=cfg["kmsKeyId"],
-                kms_client=_kms_client(),
+                kms_client=_kms_client_for_key(cfg["kmsKeyId"]),
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
@@ -152,8 +196,17 @@ def _build_keyring(keyring):
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
+    if name == "AwsKmsMrkDiscovery":
+        return _MATERIAL_PROVIDERS.create_aws_kms_mrk_discovery_keyring(
+            input=mpl.CreateAwsKmsMrkDiscoveryKeyringInput(
+                kms_client=boto3.client("kms", region_name=cfg["region"]),
+                region=cfg["region"],
+                discovery_filter=_discovery_filter(cfg.get("discoveryFilter")),
+                grant_tokens=cfg.get("grantTokens"),
+            )
+        )
     if name == "AwsKmsRsa":
-        kms_client = _kms_client()
+        kms_client = _kms_client_for_key(cfg["kmsKeyId"])
         public_key = cfg.get("publicKey")
         if public_key is None:
             # Fetch the RSA public key from KMS (as the Java server does) so the
@@ -175,6 +228,24 @@ def _build_keyring(keyring):
         generator = _build_keyring(cfg["generator"]) if cfg.get("generator") else None
         return _MATERIAL_PROVIDERS.create_multi_keyring(
             input=mpl.CreateMultiKeyringInput(child_keyrings=children, generator=generator)
+        )
+    if name == "AwsKmsHierarchical":
+        key_store = KeyStore(
+            config=KeyStoreConfig(
+                ddb_client=boto3.client("dynamodb", region_name=_region()),
+                ddb_table_name=cfg["keyStoreTableName"],
+                logical_key_store_name=cfg["logicalKeyStoreName"],
+                kms_client=_kms_client(),
+                kms_configuration=KMSConfigurationKmsKeyArn(value=cfg["kmsKeyArn"]),
+            )
+        )
+        return _MATERIAL_PROVIDERS.create_aws_kms_hierarchical_keyring(
+            input=mpl.CreateAwsKmsHierarchicalKeyringInput(
+                key_store=key_store,
+                branch_key_id=cfg["branchKeyId"],
+                ttl_seconds=cfg["ttlSeconds"],
+                cache=mpl.CacheTypeDefault(value=mpl.DefaultCache(entry_capacity=100)),
+            )
         )
     raise ClientError(f"unsupported keyring variant: {name}")
 
@@ -251,11 +322,16 @@ class EsdkClientBundle:
         kwargs = {"materials_manager": self._cmm}
         if encryption_context:
             kwargs["encryption_context"] = encryption_context
-        plaintext, _ = self._client.decrypt(source=ciphertext, **kwargs)
-        return plaintext
+        plaintext, header = self._client.decrypt(source=ciphertext, **kwargs)
+        return plaintext, dict(header.encryption_context or {}), from_algorithm(header.algorithm)
 
-    def encrypt_stream(self, plaintext, encryption_context, algorithm_suite_id, frame_length):
+    def encrypt_stream(self, plaintext, encryption_context, algorithm_suite_id, frame_length,
+                       plaintext_length_bound=None):
         kwargs = self._common_kwargs(encryption_context, algorithm_suite_id, frame_length)
+        if plaintext_length_bound is not None:
+            # The Python ESDK enforces the plaintext length bound via source_length:
+            # the total plaintext encrypted is not allowed to exceed it.
+            kwargs["source_length"] = plaintext_length_bound
         with self._client.stream(mode="e", source=plaintext, **kwargs) as encryptor:
             return encryptor.read()
 
@@ -264,7 +340,9 @@ class EsdkClientBundle:
         if encryption_context:
             kwargs["encryption_context"] = encryption_context
         with self._client.stream(mode="d", source=ciphertext, **kwargs) as decryptor:
-            return decryptor.read()
+            plaintext = decryptor.read()
+            header = decryptor.header
+        return plaintext, dict(header.encryption_context or {}), from_algorithm(header.algorithm)
 
 
 def build_client(config):

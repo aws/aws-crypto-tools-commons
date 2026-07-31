@@ -141,19 +141,98 @@ public final class EsdkClientConfigs {
     }
 
     /**
-     * @return a Hierarchical-keyring / Default-CMM config carrying the given
-     *     commitment {@code policy} — the online counterpart to
-     *     {@link #rawAesWithCommitmentPolicy}. Commitment behavior is
-     *     keyring-independent, so this is deliberately redundant with the Raw-AES
-     *     variant; it exists so a server that builds only the hierarchical keyring
-     *     (the Rust server, which does not build Raw-AES) still gets
-     *     commitment-policy coverage. Online: reaches KMS + the DynamoDB branch-key
-     *     store on encrypt/decrypt.
+     * @return a Raw-AES multi-keyring (generator + one child, so two EDKs) Default-CMM config
+     *     under {@code REQUIRE_ENCRYPT_REQUIRE_DECRYPT}, with no encrypted-data-key cap. The
+     *     two raw-AES keyrings both round-trip, and either alone can decrypt.
+     */
+    public static ESDKClientConfig rawAesMulti() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .build();
+    }
+
+    /**
+     * @return the same two-EDK multi-keyring config as {@link #rawAesMulti()} but with the
+     *     encrypted-data-key count capped at {@code maxEncryptedDataKeys}.
+     */
+    public static ESDKClientConfig rawAesMultiWithMaxEdks(long maxEncryptedDataKeys) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .maxEncryptedDataKeys(maxEncryptedDataKeys)
+            .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .build();
+    }
+
+    /**
+     * @return a Raw-AES config whose CMM is a Required-Encryption-Context CMM over a Default CMM,
+     *     requiring {@code requiredKeys} (dropped from the header on encrypt, demanded again on
+     *     decrypt). Fully offline.
+     */
+    public static ESDKClientConfig rawAesRequiredEc(List<String> requiredKeys) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(requiredEcCmm(defaultCmm(rawAesKeyring()), requiredKeys))
+            .build();
+    }
+
+    /**
+     * @return a Default-CMM config over ONLY the second Raw-AES keyring (key "b"). Used to prove a
+     *     decrypt keyring holding just one of several EDKs' wrapping keys can still decrypt.
+     */
+    public static ESDKClientConfig rawAesBOnly() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(rawAesKeyringB()))
+            .build();
+    }
+
+    /**
+     * @return a Default-CMM config over a Raw-RSA keyring built with the PUBLIC key only (no private
+     *     key), so it can wrap on encrypt but cannot unwrap on decrypt. Non-committing so a
+     *     public-only asymmetric keyring is valid.
+     */
+    public static ESDKClientConfig rawRsaPublicOnly() {
+        Keyring publicOnly = Keyring.builder()
+            .rawRsa(RawRsaKeyringConfig.builder()
+                .keyNamespace(KEY_NAMESPACE)
+                .keyName(RSA_KEY_NAME)
+                .paddingScheme(PaddingScheme.OAEP_SHA256_MGF1)
+                .publicKey(ByteBuffer.wrap(RSA_KEY_PAIR.publicPem()))
+                .build())
+            .build();
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT)
+            .cmm(defaultCmm(publicOnly))
+            .build();
+    }
+
+    /**
+     * @return a Hierarchical-keyring / Default-CMM config carrying the given commitment
+     *     {@code policy} — the online counterpart to {@link #rawAesWithCommitmentPolicy}.
+     *     Commitment behavior is keyring-independent, so this is deliberately redundant with the
+     *     Raw-AES variant; it exists so a server that builds only the hierarchical keyring still
+     *     gets commitment-policy coverage. Online: reaches KMS + the DynamoDB branch-key store.
      */
     public static ESDKClientConfig hierarchicalWithCommitmentPolicy(ESDKCommitmentPolicy policy) {
         return ESDKClientConfig.builder()
             .commitmentPolicy(policy)
             .cmm(defaultCmm(hierarchicalKeyring(HierarchicalRuntimeConfig.fromRuntime())))
+            .build();
+    }
+
+    /**
+     * @return a Default-CMM config over a multi-keyring with children but NO generator. It can
+     *     decrypt (a child may match) but cannot create a data key on encrypt.
+     */
+    public static ESDKClientConfig rawAesChildrenOnlyMulti() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(Keyring.builder()
+                .multi(MultiKeyringConfig.builder()
+                    .childKeyrings(List.of(rawAesKeyring()))
+                    .build())
+                .build()))
             .build();
     }
 

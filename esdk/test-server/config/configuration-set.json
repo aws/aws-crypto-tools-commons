@@ -32,7 +32,12 @@
   ],
   "product": "esdk",
   "features": [
-    "streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "raw-ecdh", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "aws-kms-ecdh", "required-encryption-context", "caching"
+    "streaming", "MPL", "hierarchical",
+    "raw-aes", "raw-rsa", "raw-ecdh", "multi",
+    "aws-kms", "aws-kms-multi", "aws-kms-discovery",
+    "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery",
+    "aws-kms-rsa", "aws-kms-ecdh",
+    "required-encryption-context", "caching"
   ],
   "entries": [
     {
@@ -56,8 +61,10 @@
       "language": "python",
       "majorVersion": 4,
       "port": 8092,
-      "supportedFeatures": ["streaming", "MPL", "raw-aes", "raw-rsa", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-rsa", "required-encryption-context"],
-      "unsupportedFeatures": ["hierarchical", "aws-kms-mrk-discovery", "raw-ecdh", "aws-kms-ecdh", "caching"],
+      "supportedFeatures": [
+        "streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "required-encryption-context"
+      ],
+      "unsupportedFeatures": ["raw-ecdh", "aws-kms-ecdh", "caching"],
       "libraryRepository": {
         "name": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
