@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsHierarchicalKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
@@ -176,6 +177,21 @@ class TestVectorManifestTests {
         }
         if ("multi-keyring".equals(type)) {
             return multiKeyringFor(desc, keys);
+        }
+        if ("aws-kms-hierarchy".equals(type)) {
+            // The manifest names a branch key from the vector authors' key store; for a round
+            // trip we encrypt and decrypt against our own runtime key store instead, so the suite
+            // and encryption context are exercised without needing that specific branch key.
+            HierarchicalRuntimeConfig runtime = HierarchicalRuntimeConfig.fromRuntime();
+            return Keyring.builder()
+                .awsKmsHierarchical(AwsKmsHierarchicalKeyringConfig.builder()
+                    .branchKeyId(runtime.branchKeyId())
+                    .keyStoreTableName(runtime.keyStoreTableName())
+                    .logicalKeyStoreName(runtime.logicalKeyStoreName())
+                    .kmsKeyArn(runtime.kmsKeyArn())
+                    .ttlSeconds(runtime.ttlSeconds())
+                    .build())
+                .build();
         }
         return null;
     }
