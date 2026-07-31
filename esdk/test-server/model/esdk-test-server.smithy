@@ -418,6 +418,13 @@ structure Keyring {
     /// (aws-kms-mrk-discovery-keyring.md).
     AwsKmsMrkDiscovery: AwsKmsMrkDiscoveryKeyringConfig
 
+    /// Raw ECDH keyring: derives a wrapping key from ECC key agreement
+    /// (raw-ecdh-keyring.md).
+    RawEcdh: RawEcdhKeyringConfig
+
+    /// AWS KMS ECDH keyring (aws-kms-ecdh-keyring.md).
+    AwsKmsEcdh: AwsKmsEcdhKeyringConfig
+
     /// AWS KMS RSA keyring (aws-kms-rsa-keyring.md).
     AwsKmsRsa: AwsKmsRsaKeyringConfig
 
@@ -487,6 +494,91 @@ structure AwsKmsMrkDiscoveryKeyringConfig {
     discoveryFilter: DiscoveryFilter
 
     grantTokens: GrantTokenList
+}
+
+/// The ECC curve an ECDH keyring agrees over.
+enum EcdhCurveSpec {
+    ECC_NIST_P256
+    ECC_NIST_P384
+    ECC_NIST_P521
+}
+
+/// Raw ECDH keyring (raw-ecdh-keyring.md): derives a wrapping key from ECDH key
+/// agreement between locally-supplied ECC keys.
+structure RawEcdhKeyringConfig {
+    @required
+    curveSpec: EcdhCurveSpec
+
+    @required
+    keyAgreementScheme: RawEcdhStaticConfigurations
+}
+
+/// The key-agreement configuration of a Raw ECDH keyring — exactly one variant
+/// member is set (tagged union via optional members, Requirements 2.3, 2.4).
+structure RawEcdhStaticConfigurations {
+    /// This keyring's static private key + the recipient's static public key.
+    RawPrivateKeyToStaticPublicKey: RawPrivateKeyToStaticPublicKeyInput
+
+    /// A fresh ephemeral sender key + the recipient's static public key (encrypt).
+    EphemeralPrivateKeyToStaticPublicKey: EphemeralPrivateKeyToStaticPublicKeyInput
+
+    /// Decrypt-only: this keyring's static private key, discovering the sender.
+    PublicKeyDiscovery: PublicKeyDiscoveryInput
+}
+
+structure RawPrivateKeyToStaticPublicKeyInput {
+    @required
+    senderStaticPrivateKey: Blob
+
+    @required
+    recipientPublicKey: Blob
+}
+
+structure EphemeralPrivateKeyToStaticPublicKeyInput {
+    @required
+    recipientPublicKey: Blob
+}
+
+structure PublicKeyDiscoveryInput {
+    @required
+    recipientStaticPrivateKey: Blob
+}
+
+/// AWS KMS ECDH keyring (aws-kms-ecdh-keyring.md): the sender private key is an
+/// asymmetric KMS key agreement key; the KMS client is built server-side.
+structure AwsKmsEcdhKeyringConfig {
+    @required
+    curveSpec: EcdhCurveSpec
+
+    @required
+    keyAgreementScheme: KmsEcdhStaticConfigurations
+
+    grantTokens: GrantTokenList
+}
+
+/// The key-agreement configuration of a KMS ECDH keyring — exactly one variant
+/// member is set (tagged union via optional members, Requirements 2.3, 2.4).
+structure KmsEcdhStaticConfigurations {
+    /// Sender KMS key agreement key + the recipient's static public key.
+    KmsPrivateKeyToStaticPublicKey: KmsPrivateKeyToStaticPublicKeyInput
+
+    /// Decrypt-only: a KMS key agreement key discovering the sender.
+    KmsPublicKeyDiscovery: KmsPublicKeyDiscoveryInput
+}
+
+structure KmsPrivateKeyToStaticPublicKeyInput {
+    @required
+    senderKmsIdentifier: String
+
+    senderPublicKey: Blob
+
+    @required
+    recipientPublicKey: Blob
+}
+
+structure KmsPublicKeyDiscoveryInput {
+    @required
+    recipientKmsIdentifier: String
 }
 
 /// AWS KMS RSA keyring (aws-kms-rsa-keyring.md).
