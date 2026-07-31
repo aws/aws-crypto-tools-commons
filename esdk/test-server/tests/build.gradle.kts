@@ -45,6 +45,9 @@ dependencies {
     // blob round-trip Test (Task 14.3): one named execution per keyring/CMM/
     // algorithm-suite scenario.
     testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
+    // Parses the AWS Crypto Tools test-vector-framework manifest + keys.json
+    // that TestVectorManifestTests drives through the Test_Client.
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
 }
 

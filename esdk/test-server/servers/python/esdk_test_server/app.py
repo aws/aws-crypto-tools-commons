@@ -60,6 +60,19 @@ def _require_client(registry, request):
 # Operation handlers. Each returns the response member map or raises
 # ClientError (-> ESDKClientError) / ServerError (-> GenericServerError).
 # ---------------------------------------------------------------------------
+def _describe_exception(exc):
+    """Flatten an exception to a message, appending any nested ``list`` of
+    encountered exceptions (the MPL ``CollectionOfErrors`` raised when e.g. no
+    configured key could decrypt) so the underlying causes are visible rather
+    than only the top-level "the list ... is available via `list`"."""
+    message = str(exc)
+    nested = getattr(exc, "list", None)
+    if isinstance(nested, (list, tuple)) and nested:
+        causes = "; ".join(_describe_exception(cause) for cause in nested)
+        message = f"{message} [encountered: {causes}]"
+    return message
+
+
 def _create_client(registry, request):
     config = request.get("config")
     if config is None:
@@ -69,7 +82,7 @@ def _create_client(registry, request):
     except (ClientError, ServerError):
         raise
     except Exception as exc:  # noqa: BLE001 - construction failure -> GenericServerError (Req 3.6)
-        raise ServerError(f"CreateClient failed to construct the ESDK client: {exc}") from exc
+        raise ServerError(f"CreateClient failed to construct the ESDK client: {_describe_exception(exc)}") from exc
     return {"clientId": registry.register(bundle)}
 
 
@@ -83,17 +96,23 @@ def _encrypt(registry, request):
             request.get("frameLength"),
         )
     except Exception as exc:  # noqa: BLE001 - ESDK-thrown -> ESDKClientError (Req 4.10, 5.6)
-        raise ClientError(str(exc)) from exc
+        raise ClientError(_describe_exception(exc)) from exc
     return {"ciphertext": ciphertext}
 
 
 def _decrypt(registry, request):
     bundle = _require_client(registry, request)
     try:
-        plaintext = bundle.decrypt(request["ciphertext"], request.get("encryptionContext"))
+        plaintext, encryption_context, algorithm_suite_id = bundle.decrypt(
+            request["ciphertext"], request.get("encryptionContext"))
     except Exception as exc:  # noqa: BLE001
-        raise ClientError(str(exc)) from exc
-    return {"plaintext": plaintext}
+        raise ClientError(_describe_exception(exc)) from exc
+    response = {"plaintext": plaintext}
+    if encryption_context:
+        response["encryptionContext"] = encryption_context
+    if algorithm_suite_id:
+        response["algorithmSuiteId"] = algorithm_suite_id
+    return response
 
 
 def _encrypt_stream(registry, request):
@@ -104,19 +123,26 @@ def _encrypt_stream(registry, request):
             request.get("encryptionContext"),
             request.get("algorithmSuiteId"),
             request.get("frameLength"),
+            request.get("plaintextLengthBound"),
         )
     except Exception as exc:  # noqa: BLE001
-        raise ClientError(str(exc)) from exc
+        raise ClientError(_describe_exception(exc)) from exc
     return {"ciphertext": ciphertext}
 
 
 def _decrypt_stream(registry, request):
     bundle = _require_client(registry, request)
     try:
-        plaintext = bundle.decrypt_stream(request["ciphertext"], request.get("encryptionContext"))
+        plaintext, encryption_context, algorithm_suite_id = bundle.decrypt_stream(
+            request["ciphertext"], request.get("encryptionContext"))
     except Exception as exc:  # noqa: BLE001
-        raise ClientError(str(exc)) from exc
-    return {"plaintext": plaintext}
+        raise ClientError(_describe_exception(exc)) from exc
+    response = {"plaintext": plaintext}
+    if encryption_context:
+        response["encryptionContext"] = encryption_context
+    if algorithm_suite_id:
+        response["algorithmSuiteId"] = algorithm_suite_id
+    return response
 
 
 _OPERATIONS = {

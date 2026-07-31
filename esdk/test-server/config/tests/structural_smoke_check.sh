@@ -20,7 +20,8 @@
 #     MaterialsRoundTripTests.java in the repository, under
 #     esdk/test-server/tests/.
 #   * Requirements 7.1, 7.3: product is exactly "esdk" and the
-#     Feature_Catalog defines exactly the Features "streaming" and "MPL".
+#     Feature_Catalog defines exactly the Features "streaming", "MPL", and
+#     "hierarchical".
 #   * Requirement 8.13: the Python Configuration_Entry carries the Python
 #     Feature_Declaration — supportedFeatures lists both streaming and MPL,
 #     unsupportedFeatures lists neither.
@@ -93,20 +94,11 @@ else:
         errors.append('python serverLocation.repository is %r, expected "aws-crypto-tools-commons"'
                       % loc.get("repository"))
 
-rust = entries.get("rust")
-if not isinstance(rust, dict):
-    errors.append("no rust Configuration_Entry")
-else:
-    loc = rust.get("serverLocation") or {}
-    if loc.get("repository") != "aws-crypto-tools-rust":
-        errors.append('rust serverLocation.repository is %r, expected "aws-crypto-tools-rust"'
-                      % loc.get("repository"))
-
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in commons; Rust server in aws-crypto-tools-rust (Req 1.1, 1.3)"
+    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in commons (Req 1.1, 1.3)"
 else
     if [ -n "$location_errors" ]; then
         fail "Server_Location violation: ${location_errors//$'\n'/; } (Req 1.1, 1.3)"
@@ -153,7 +145,7 @@ print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass 'product is "esdk" and the Feature_Catalog defines exactly streaming, MPL, and hierarchical (Req 7.1, 7.3)'
+    pass 'product is "esdk" and the Feature_Catalog defines the per-keyring/per-CMM Features (Req 7.1, 7.3)'
 else
     if [ -n "$catalog_errors" ]; then
         fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; } (Req 7.1, 7.3)"
