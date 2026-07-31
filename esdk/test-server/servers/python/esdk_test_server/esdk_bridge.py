@@ -21,6 +21,9 @@ from aws_encryption_sdk.identifiers import Algorithm
 from aws_cryptographic_material_providers.mpl import AwsCryptographicMaterialProviders
 from aws_cryptographic_material_providers.mpl.config import MaterialProvidersConfig
 from aws_cryptographic_material_providers.mpl import models as mpl
+from aws_cryptographic_material_providers.keystore import KeyStore
+from aws_cryptographic_material_providers.keystore.config import KeyStoreConfig
+from aws_cryptographic_material_providers.keystore.models import KMSConfigurationKmsKeyArn
 
 
 class ClientError(Exception):
@@ -200,6 +203,24 @@ def _build_keyring(keyring):
         generator = _build_keyring(cfg["generator"]) if cfg.get("generator") else None
         return _MATERIAL_PROVIDERS.create_multi_keyring(
             input=mpl.CreateMultiKeyringInput(child_keyrings=children, generator=generator)
+        )
+    if name == "AwsKmsHierarchical":
+        key_store = KeyStore(
+            config=KeyStoreConfig(
+                ddb_client=boto3.client("dynamodb", region_name=_region()),
+                ddb_table_name=cfg["keyStoreTableName"],
+                logical_key_store_name=cfg["logicalKeyStoreName"],
+                kms_client=_kms_client(),
+                kms_configuration=KMSConfigurationKmsKeyArn(value=cfg["kmsKeyArn"]),
+            )
+        )
+        return _MATERIAL_PROVIDERS.create_aws_kms_hierarchical_keyring(
+            input=mpl.CreateAwsKmsHierarchicalKeyringInput(
+                key_store=key_store,
+                branch_key_id=cfg["branchKeyId"],
+                ttl_seconds=cfg["ttlSeconds"],
+                cache=mpl.CacheTypeDefault(value=mpl.DefaultCache(entry_capacity=100)),
+            )
         )
     raise ClientError(f"unsupported keyring variant: {name}")
 
