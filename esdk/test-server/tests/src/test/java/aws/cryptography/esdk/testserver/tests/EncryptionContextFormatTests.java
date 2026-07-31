@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -55,6 +56,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "emptyEcZeroLength {0}")
     @MethodSource("targets")
     void emptyEncryptionContextSerializesToZeroLength(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertEquals(0, message.aadLength,
@@ -68,6 +70,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "ecKeysCanonicallyOrdered {0}")
     @MethodSource("targets")
     void encryptionContextKeysAreCanonicallyOrdered(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         // Insert keys out of order; the wire form must sort them.
         Map<String, String> ec = new java.util.LinkedHashMap<>();
         ec.put("zebra", "1");
