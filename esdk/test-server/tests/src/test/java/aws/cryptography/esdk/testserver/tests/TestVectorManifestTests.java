@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
@@ -71,32 +72,32 @@ class TestVectorManifestTests {
             .forEachRemaining(e -> plaintexts.put(e.getKey(), e.getValue().asInt()));
 
         List<DynamicTest> tests = new ArrayList<>();
-        int skipped = 0;
         for (Iterator<Map.Entry<String, JsonNode>> it = manifest.get("tests").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> entry = it.next();
             JsonNode scenario = entry.getValue().get("encryption-scenario");
-            if (scenario == null || !"positive-esdk".equals(text(scenario, "type"))) {
-                skipped++;
+            String label = entry.getKey()
+                + (scenario == null ? "" : " (" + text(scenario, "description") + ")");
+
+            String skip = skipReason(scenario, keys);
+            if (skip != null) {
+                // Surface every unmapped vector as an explicit skipped test (never silently
+                // dropped), so the report shows exactly which vectors are not yet covered
+                // and why.
+                tests.add(dynamicTest("skipped: " + label, () -> Assumptions.abort(skip)));
                 continue;
             }
+
             ESDKAlgorithmSuiteId suite = HEX_TO_SUITE.get(text(scenario, "algorithmSuiteId"));
-            long frame = scenario.path("frame-size").asLong(-1);
-            Keyring encKeyring = keyringFor(scenario.get("encryptKeyDescription"), keys);
-            Keyring decKeyring = keyringFor(scenario.get("decryptKeyDescription"), keys);
-            // Non-framed (frame 0) is not yet expressible; unmapped keyring types and unknown
-            // suites are the bulk of the skips (ECDH, KMS, hierarchical, multi, required-EC CMM).
-            if (suite == null || frame <= 0 || encKeyring == null || decKeyring == null) {
-                skipped++;
-                continue;
-            }
             boolean committing = "0478".equals(text(scenario, "algorithmSuiteId"))
                 || "0578".equals(text(scenario, "algorithmSuiteId"));
+            long frame = scenario.path("frame-size").asLong();
             Map<String, String> ec = toStringMap(scenario.get("encryption-context"));
             byte[] plaintext = deterministicPlaintext(
                 plaintexts.getOrDefault(text(scenario, "plaintext"), 32));
-            ESDKClientConfig encConfig = configFor(encKeyring, committing);
-            ESDKClientConfig decConfig = configFor(decKeyring, committing);
-            String label = entry.getKey() + " (" + text(scenario, "description") + ")";
+            ESDKClientConfig encConfig = configFor(
+                keyringFor(scenario.get("encryptKeyDescription"), keys), committing);
+            ESDKClientConfig decConfig = configFor(
+                keyringFor(scenario.get("decryptKeyDescription"), keys), committing);
 
             for (EndpointPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
@@ -108,9 +109,42 @@ class TestVectorManifestTests {
                 }));
             }
         }
-        System.out.println("TestVectorManifestTests: emitted " + tests.size()
-            + " round-trip tests; skipped " + skipped + " unmapped vectors");
         return tests;
+    }
+
+    /**
+     * @return {@code null} if the vector can be replayed as a round trip, otherwise a
+     *     human-readable reason it is skipped (surfaced via {@link Assumptions#abort} so the
+     *     test report shows it as a skipped test).
+     */
+    private static String skipReason(JsonNode scenario, JsonNode keys) {
+        if (scenario == null) {
+            return "no encryption-scenario";
+        }
+        if (!"positive-esdk".equals(text(scenario, "type"))) {
+            return "non-positive scenario: " + text(scenario, "type");
+        }
+        if (!HEX_TO_SUITE.containsKey(text(scenario, "algorithmSuiteId"))) {
+            return "unsupported algorithm suite: " + text(scenario, "algorithmSuiteId");
+        }
+        if (scenario.path("frame-size").asLong() <= 0) {
+            return "non-framed message";
+        }
+        if (keyringFor(scenario.get("encryptKeyDescription"), keys) == null) {
+            return "unsupported encrypt keyring: " + descLabel(scenario.get("encryptKeyDescription"));
+        }
+        if (keyringFor(scenario.get("decryptKeyDescription"), keys) == null) {
+            return "unsupported decrypt keyring: " + descLabel(scenario.get("decryptKeyDescription"));
+        }
+        return null;
+    }
+
+    private static String descLabel(JsonNode desc) {
+        if (desc == null) {
+            return "none";
+        }
+        String algorithm = text(desc, "encryption-algorithm");
+        return algorithm == null ? text(desc, "type") : text(desc, "type") + "/" + algorithm;
     }
 
     /** Build a keyring from a framework key description, or {@code null} if unsupported here. */
