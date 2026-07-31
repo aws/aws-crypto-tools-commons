@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -52,6 +53,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reservedEcKeyRejected {0}")
     @MethodSource("targets")
     void encryptRejectsReservedEncryptionContextKey(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put(RESERVED_KEY, "any-value");
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
@@ -68,6 +70,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reproducedEcMatchDecrypts {0}")
     @MethodSource("pairs")
     void decryptSucceedsWithMatchingReproducedContext(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
@@ -84,6 +87,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reproducedEcMismatchRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsMismatchedReproducedContext(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         Map<String, String> ec = Map.of("purpose", "test");
         Map<String, String> wrong = Map.of("purpose", "tampered");
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
@@ -101,6 +105,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "highCodepointEcRoundTrips {0}")
     @MethodSource("pairs")
     void encryptionContextWithHighCodepointsRoundTrips(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         Map<String, String> ec = Map.of(
             "\u65e5\u672c\u8a9e", "value",          // CJK key
             "key-\ud83d\udd11", "\ud83d\ude80");    // astral-plane (emoji) key and value
