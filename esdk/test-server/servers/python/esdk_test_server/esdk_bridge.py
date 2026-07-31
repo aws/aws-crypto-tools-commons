@@ -196,6 +196,15 @@ def _build_keyring(keyring):
                 grant_tokens=cfg.get("grantTokens"),
             )
         )
+    if name == "AwsKmsMrkDiscovery":
+        return _MATERIAL_PROVIDERS.create_aws_kms_mrk_discovery_keyring(
+            input=mpl.CreateAwsKmsMrkDiscoveryKeyringInput(
+                kms_client=boto3.client("kms", region_name=cfg["region"]),
+                region=cfg["region"],
+                discovery_filter=_discovery_filter(cfg.get("discoveryFilter")),
+                grant_tokens=cfg.get("grantTokens"),
+            )
+        )
     if name == "AwsKmsRsa":
         kms_client = _kms_client_for_key(cfg["kmsKeyId"])
         public_key = cfg.get("publicKey")
