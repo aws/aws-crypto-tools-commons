@@ -90,10 +90,16 @@ def _encrypt(registry, request):
 def _decrypt(registry, request):
     bundle = _require_client(registry, request)
     try:
-        plaintext = bundle.decrypt(request["ciphertext"], request.get("encryptionContext"))
+        plaintext, encryption_context, algorithm_suite_id = bundle.decrypt(
+            request["ciphertext"], request.get("encryptionContext"))
     except Exception as exc:  # noqa: BLE001
         raise ClientError(str(exc)) from exc
-    return {"plaintext": plaintext}
+    response = {"plaintext": plaintext}
+    if encryption_context:
+        response["encryptionContext"] = encryption_context
+    if algorithm_suite_id:
+        response["algorithmSuiteId"] = algorithm_suite_id
+    return response
 
 
 def _encrypt_stream(registry, request):
@@ -114,10 +120,16 @@ def _encrypt_stream(registry, request):
 def _decrypt_stream(registry, request):
     bundle = _require_client(registry, request)
     try:
-        plaintext = bundle.decrypt_stream(request["ciphertext"], request.get("encryptionContext"))
+        plaintext, encryption_context, algorithm_suite_id = bundle.decrypt_stream(
+            request["ciphertext"], request.get("encryptionContext"))
     except Exception as exc:  # noqa: BLE001
         raise ClientError(str(exc)) from exc
-    return {"plaintext": plaintext}
+    response = {"plaintext": plaintext}
+    if encryption_context:
+        response["encryptionContext"] = encryption_context
+    if algorithm_suite_id:
+        response["algorithmSuiteId"] = algorithm_suite_id
+    return response
 
 
 _OPERATIONS = {
