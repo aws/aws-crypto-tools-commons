@@ -391,6 +391,11 @@ structure Keyring {
     /// AWS KMS discovery keyring (aws-kms-discovery-keyring.md).
     AwsKmsDiscovery: AwsKmsDiscoveryKeyringConfig
 
+    /// AWS KMS MRK-aware discovery keyring: decrypt-only discovery normalized to
+    /// a region so it can decrypt multi-region keys written in another region
+    /// (aws-kms-mrk-discovery-keyring.md).
+    AwsKmsMrkDiscovery: AwsKmsMrkDiscoveryKeyringConfig
+
     /// AWS KMS RSA keyring (aws-kms-rsa-keyring.md).
     AwsKmsRsa: AwsKmsRsaKeyringConfig
 
@@ -447,6 +452,18 @@ structure AwsKmsMrkMultiKeyringConfig {
 /// AWS KMS discovery keyring (aws-kms-discovery-keyring.md).
 structure AwsKmsDiscoveryKeyringConfig {
     discoveryFilter: DiscoveryFilter
+    grantTokens: GrantTokenList
+}
+
+/// AWS KMS MRK-aware discovery keyring (aws-kms-mrk-discovery-keyring.md). A
+/// decrypt-only discovery keyring normalized to a single region, so it can
+/// decrypt a multi-region key written in another region.
+structure AwsKmsMrkDiscoveryKeyringConfig {
+    @required
+    region: String
+
+    discoveryFilter: DiscoveryFilter
+
     grantTokens: GrantTokenList
 }
 
