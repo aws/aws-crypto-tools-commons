@@ -247,45 +247,6 @@ def _build_keyring(keyring):
                 cache=mpl.CacheTypeDefault(value=mpl.DefaultCache(entry_capacity=100)),
             )
         )
-    if name == "RawEcdh":
-        scheme_name, scheme = _one_variant(cfg["keyAgreementScheme"], "raw ECDH key agreement")
-        if scheme_name == "RawPrivateKeyToStaticPublicKey":
-            agreement = mpl.RawEcdhStaticConfigurationsRawPrivateKeyToStaticPublicKey(
-                value=mpl.RawPrivateKeyToStaticPublicKeyInput(
-                    sender_static_private_key=scheme["senderStaticPrivateKey"],
-                    recipient_public_key=scheme["recipientPublicKey"]))
-        elif scheme_name == "EphemeralPrivateKeyToStaticPublicKey":
-            agreement = mpl.RawEcdhStaticConfigurationsEphemeralPrivateKeyToStaticPublicKey(
-                value=mpl.EphemeralPrivateKeyToStaticPublicKeyInput(
-                    recipient_public_key=scheme["recipientPublicKey"]))
-        else:  # PublicKeyDiscovery
-            agreement = mpl.RawEcdhStaticConfigurationsPublicKeyDiscovery(
-                value=mpl.PublicKeyDiscoveryInput(
-                    recipient_static_private_key=scheme["recipientStaticPrivateKey"]))
-        return _MATERIAL_PROVIDERS.create_raw_ecdh_keyring(
-            input=mpl.CreateRawEcdhKeyringInput(
-                curve_spec=cfg["curveSpec"],
-                key_agreement_scheme=agreement))
-    if name == "AwsKmsEcdh":
-        scheme_name, scheme = _one_variant(cfg["keyAgreementScheme"], "KMS ECDH key agreement")
-        if scheme_name == "KmsPrivateKeyToStaticPublicKey":
-            agreement = mpl.KmsEcdhStaticConfigurationsKmsPrivateKeyToStaticPublicKey(
-                value=mpl.KmsPrivateKeyToStaticPublicKeyInput(
-                    sender_kms_identifier=scheme["senderKmsIdentifier"],
-                    sender_public_key=scheme.get("senderPublicKey"),
-                    recipient_public_key=scheme["recipientPublicKey"]))
-            kms_id = scheme["senderKmsIdentifier"]
-        else:  # KmsPublicKeyDiscovery
-            agreement = mpl.KmsEcdhStaticConfigurationsKmsPublicKeyDiscovery(
-                value=mpl.KmsPublicKeyDiscoveryInput(
-                    recipient_kms_identifier=scheme["recipientKmsIdentifier"]))
-            kms_id = scheme["recipientKmsIdentifier"]
-        return _MATERIAL_PROVIDERS.create_aws_kms_ecdh_keyring(
-            input=mpl.CreateAwsKmsEcdhKeyringInput(
-                curve_spec=cfg["curveSpec"],
-                key_agreement_scheme=agreement,
-                kms_client=_kms_client_for_key(kms_id),
-                grant_tokens=cfg.get("grantTokens")))
     raise ClientError(f"unsupported keyring variant: {name}")
 
 
