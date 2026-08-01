@@ -97,4 +97,35 @@ class SubprocessLauncherTest {
         assertTrue(ex.getMessage().contains(String.valueOf(port)),
             "the abort must identify the unready port");
     }
+
+    @Test
+    @DisplayName("the default readiness window is 180s unless the env var is set")
+    void defaultReadinessTimeoutWithoutEnvOverride() {
+        assertEquals(SubprocessLauncher.DEFAULT_READINESS_TIMEOUT,
+            SubprocessLauncher.defaultReadinessTimeout(null));
+        assertEquals(SubprocessLauncher.DEFAULT_READINESS_TIMEOUT,
+            SubprocessLauncher.defaultReadinessTimeout("  "));
+    }
+
+    @Test
+    @DisplayName(SubprocessLauncher.READY_TIMEOUT_ENV_VAR + " overrides the default readiness window")
+    void envVarOverridesDefaultReadinessTimeout() {
+        assertEquals(Duration.ofSeconds(900),
+            SubprocessLauncher.defaultReadinessTimeout("900"));
+        assertEquals(Duration.ofSeconds(1),
+            SubprocessLauncher.defaultReadinessTimeout(" 1 "));
+    }
+
+    @Test
+    @DisplayName("a non-numeric or non-positive env override is a configuration error naming the variable")
+    void malformedEnvOverrideIsConfigurationError() {
+        for (String bad : new String[] {"abc", "0", "-5", "1.5"}) {
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> SubprocessLauncher.defaultReadinessTimeout(bad));
+            assertTrue(ex.getMessage().contains(SubprocessLauncher.READY_TIMEOUT_ENV_VAR),
+                "the error must name the environment variable");
+            assertTrue(ex.getMessage().contains(bad),
+                "the error must carry the rejected value");
+        }
+    }
 }

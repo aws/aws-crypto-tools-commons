@@ -22,7 +22,9 @@ import java.time.Instant;
  *   <li><b>Readiness.</b> Reachability is determined only by the server
  *       accepting a TCP connection on its configured port (Requirement 2.9),
  *       polled up to the readiness timeout — 180 seconds by default
- *       (Requirement 2.5), injectable for tests.</li>
+ *       (Requirement 2.5), overridable via the
+ *       {@value #READY_TIMEOUT_ENV_VAR} environment variable and injectable
+ *       for tests.</li>
  *   <li><b>Timeout.</b> On readiness timeout the spawned process tree is
  *       killed, then the launch aborts with category {@code TIMEOUT}.</li>
  * </ol>
@@ -36,12 +38,45 @@ public final class SubprocessLauncher {
     /** Readiness window: reachable within 180 seconds of launch (Requirement 2.5). */
     public static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofSeconds(180);
 
+    /**
+     * Environment variable overriding the default readiness window, in whole
+     * seconds. Launch plans that build inside the readiness window (the Java
+     * plan's {@code gradlew runServer}) need a larger window when many servers
+     * build concurrently on a small host, e.g. an orchestrated CI run.
+     */
+    public static final String READY_TIMEOUT_ENV_VAR =
+        "ESDK_TESTSERVER_READY_TIMEOUT_SECONDS";
+
     private static final Duration READINESS_POLL_INTERVAL = Duration.ofMillis(250);
 
     private final Duration readinessTimeout;
 
     public SubprocessLauncher() {
-        this(DEFAULT_READINESS_TIMEOUT);
+        this(defaultReadinessTimeout(System.getenv(READY_TIMEOUT_ENV_VAR)));
+    }
+
+    /**
+     * The readiness window default construction uses: {@code envValue} seconds
+     * when set ({@link #READY_TIMEOUT_ENV_VAR}), else
+     * {@link #DEFAULT_READINESS_TIMEOUT}. A set but non-numeric or
+     * non-positive value is a configuration error naming the variable.
+     */
+    static Duration defaultReadinessTimeout(String envValue) {
+        if (envValue == null || envValue.isBlank()) {
+            return DEFAULT_READINESS_TIMEOUT;
+        }
+        long seconds;
+        try {
+            seconds = Long.parseLong(envValue.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(READY_TIMEOUT_ENV_VAR
+                + " must be a positive whole number of seconds (was '" + envValue + "')", e);
+        }
+        if (seconds <= 0) {
+            throw new IllegalArgumentException(READY_TIMEOUT_ENV_VAR
+                + " must be a positive whole number of seconds (was '" + envValue + "')");
+        }
+        return Duration.ofSeconds(seconds);
     }
 
     /** @param readinessTimeout the readiness window (injectable for tests). */

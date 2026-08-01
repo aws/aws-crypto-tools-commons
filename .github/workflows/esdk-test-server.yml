@@ -493,6 +493,11 @@ jobs:
         # run in a nested JVM that inherits the parent ENVIRONMENT only.
         working-directory: esdk/test-server
         env:
+          # Readiness window for each Language_Server launch (SubprocessLauncher).
+          # The Java plan builds inside this window (gradlew runServer), and with
+          # nine servers building concurrently on a 2-core hosted runner the
+          # default 180s starves it out — 900s absorbs the contention.
+          ESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
           ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
