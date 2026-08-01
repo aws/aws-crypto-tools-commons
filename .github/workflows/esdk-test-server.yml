@@ -326,11 +326,13 @@ jobs:
         # Gradle: the client-java/tests/orchestrator builds under
         # esdk/test-server plus the Java server build the orchestrated run
         # executes inside its clone. Maven: the live ESDK `mvn install`
-        # JavaLaunchPlan runs during the orchestrated run. Key on every
-        # gradle build script + wrapper descriptor beneath the test-server
-        # tree so the cache invalidates when any module's build config
-        # changes. Saved by the end-of-job save step (`if: always()` — see
-        # the cargo restore note).
+        # JavaLaunchPlan runs during the orchestrated run. Key on the three
+        # gradle modules' build scripts + wrapper descriptors, path-depth
+        # pinned (single `*` does not cross `/`) so gradle files inside the
+        # materialized clones under orchestrator/build/sources/ never enter
+        # the hash — the save-time key must equal the restore-time key.
+        # Saved by the end-of-job save step (`if: always()` — see the cargo
+        # restore note).
         id: gradle-cache
         uses: actions/cache/restore@v4
         with:
@@ -340,8 +342,10 @@ jobs:
             ~/.m2/repository
           key: >-
             ${{ runner.os }}-gradle-${{ hashFiles(
-              'esdk/test-server/**/*.gradle*',
-              'esdk/test-server/**/gradle-wrapper.properties'
+              'esdk/test-server/*/build.gradle.kts',
+              'esdk/test-server/*/settings.gradle.kts',
+              'esdk/test-server/*/gradle.properties',
+              'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -672,8 +676,10 @@ jobs:
             ~/.m2/repository
           key: >-
             ${{ runner.os }}-gradle-${{ hashFiles(
-              'esdk/test-server/**/*.gradle*',
-              'esdk/test-server/**/gradle-wrapper.properties'
+              'esdk/test-server/*/build.gradle.kts',
+              'esdk/test-server/*/settings.gradle.kts',
+              'esdk/test-server/*/gradle.properties',
+              'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
 
       - name: Save the materialized aws-encryption-sdk clone
