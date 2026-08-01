@@ -119,6 +119,36 @@ class DotnetLaunchPlanTest {
     }
 
     // ------------------------------------------------------------------
+    // Build stamp guard: pure over a constructed server directory.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("the build is up to date only when the stamp holds the exact commit and the assembly exists")
+    void buildUpToDate(@TempDir Path serverDir) throws Exception {
+        String commit = "0123456789abcdef0123456789abcdef01234567";
+
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit),
+            "no stamp, no assembly: build required");
+
+        Path dll = serverDir.resolve(DotnetLaunchPlan.SERVER_DLL_RELATIVE_PATH);
+        Files.createDirectories(dll.getParent());
+        Files.writeString(dll, "assembly");
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit),
+            "assembly without a stamp: build required");
+
+        Files.writeString(serverDir.resolve(DotnetLaunchPlan.BUILD_STAMP_NAME), commit + "\n");
+        assertTrue(DotnetLaunchPlan.buildUpToDate(serverDir, commit),
+            "matching stamp + assembly: build skipped");
+
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, "f".repeat(40)),
+            "a different commit never reuses the stamped build");
+
+        Files.delete(dll);
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit),
+            "matching stamp without the assembly: build required");
+    }
+
+    // ------------------------------------------------------------------
     // Fixtures.
     // ------------------------------------------------------------------
 

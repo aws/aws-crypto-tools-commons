@@ -35,7 +35,10 @@ import java.util.List;
  *       smithy-dafny makefile), then {@code make setup_net} and {@code make
  *       transpile_net CORES=4} in {@code AwsEncryptionSDK/} — the same steps
  *       the repository's own net workflow runs. A non-zero step is a
- *       {@code BUILD} launch failure carrying the tool output.</li>
+ *       {@code BUILD} launch failure carrying the tool output. A stamp file
+ *       written after a successful build skips the transpile and build steps
+ *       (Dafny gate included) when a reused clone already holds a build of
+ *       the same commit.</li>
  *   <li><b>Build the server.</b> The server Makefile's {@code build-server}
  *       recipe: {@code dotnet build EsdkTestServer.csproj -c Release} in the
  *       server directory.</li>
@@ -64,6 +67,14 @@ public final class DotnetLaunchPlan implements Launcher {
 
     /** The built server assembly, relative to the server directory. */
     static final String SERVER_DLL_RELATIVE_PATH = "bin/Release/net8.0/EsdkTestServer.dll";
+
+    /**
+     * Build stamp in the server directory: holds the clone commit the last
+     * successful build ran at. When it matches the resolved commit and the
+     * built assembly exists (a reused clone), the transpile and build are
+     * skipped.
+     */
+    static final String BUILD_STAMP_NAME = ".esdk-build-stamp";
 
     private static final String SERVER_LOG_NAME = "net-server.log";
 
@@ -123,16 +134,6 @@ public final class DotnetLaunchPlan implements Launcher {
         Path repoRoot = server.root();
         Path dafnyProjectDir = repoRoot.resolve(DAFNY_PROJECT_RELATIVE_PATH);
 
-        // The transpile cannot succeed without Dafny; fail eagerly with the
-        // requirement rather than deep inside make output.
-        if (!commandOnPath("dafny", System.getenv("PATH"))) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                "the " + language + " Language_Server build requires Dafny "
-                    + REQUIRED_DAFNY_VERSION + " on PATH ('dafny' was not found): the .NET"
-                    + " library carries no committed generated code and transpiles from Dafny"
-                    + " before building");
-        }
-
         try {
             Files.createDirectories(workDirectory);
         } catch (IOException e) {
@@ -141,18 +142,31 @@ public final class DotnetLaunchPlan implements Launcher {
                     + workDirectory + ": " + e.getMessage(), e);
         }
 
-        // 2. Transpile the library: submodules, then the repository's own
-        //    setup_net + transpile_net in AwsEncryptionSDK/.
-        runBuildStep(language, "git submodule update --init libraries",
-            submoduleLibrariesCommand(), repoRoot);
-        runBuildStep(language, "git submodule update --init --recursive mpl",
-            submoduleMplCommand(), repoRoot);
-        runBuildStep(language, "make setup_net", setupCommand(make), dafnyProjectDir);
-        runBuildStep(language, "make transpile_net", transpileCommand(make), dafnyProjectDir);
-
-        // 3. Build the server: the server Makefile's build-server recipe.
-        runBuildStep(language, "dotnet build EsdkTestServer.csproj -c Release",
-            buildCommand(dotnet), serverDir);
+        // 2–3. Transpile the library and build the server: submodules, then the
+        //    repository's own setup_net + transpile_net in AwsEncryptionSDK/,
+        //    then the server Makefile's build-server recipe. Skipped — Dafny
+        //    gate included — when the stamp shows a successful build of this
+        //    exact commit already sits in the (reused) clone.
+        if (!buildUpToDate(serverDir, server.commit())) {
+            // The transpile cannot succeed without Dafny; fail eagerly with the
+            // requirement rather than deep inside make output.
+            if (!commandOnPath("dafny", System.getenv("PATH"))) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    "the " + language + " Language_Server build requires Dafny "
+                        + REQUIRED_DAFNY_VERSION + " on PATH ('dafny' was not found): the .NET"
+                        + " library carries no committed generated code and transpiles from Dafny"
+                        + " before building");
+            }
+            runBuildStep(language, "git submodule update --init libraries",
+                submoduleLibrariesCommand(), repoRoot);
+            runBuildStep(language, "git submodule update --init --recursive mpl",
+                submoduleMplCommand(), repoRoot);
+            runBuildStep(language, "make setup_net", setupCommand(make), dafnyProjectDir);
+            runBuildStep(language, "make transpile_net", transpileCommand(make), dafnyProjectDir);
+            runBuildStep(language, "dotnet build EsdkTestServer.csproj -c Release",
+                buildCommand(dotnet), serverDir);
+            writeBuildStamp(language, serverDir, server.commit());
+        }
 
         // 4. Launch: dotnet <server>/bin/Release/net8.0/EsdkTestServer.dll
         //    <port> via the shared probe/spawn/readiness/teardown.
@@ -196,6 +210,40 @@ public final class DotnetLaunchPlan implements Launcher {
     static List<String> serverCommand(String dotnet, Path serverDir, int port) {
         return List.of(dotnet, serverDir.resolve(SERVER_DLL_RELATIVE_PATH).toString(),
             String.valueOf(port));
+    }
+
+    // ------------------------------------------------------------------
+    // Build stamp (skip the build on a reused clone of the same commit).
+    // ------------------------------------------------------------------
+
+    /**
+     * Whether {@code serverDir} already holds a successful build of
+     * {@code commit}: the stamp records exactly that commit and the built
+     * assembly exists.
+     */
+    static boolean buildUpToDate(Path serverDir, String commit) {
+        Path stamp = serverDir.resolve(BUILD_STAMP_NAME);
+        if (!Files.isRegularFile(stamp)
+                || !Files.isRegularFile(serverDir.resolve(SERVER_DLL_RELATIVE_PATH))) {
+            return false;
+        }
+        try {
+            return Files.readString(stamp, StandardCharsets.UTF_8).trim().equals(commit);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static void writeBuildStamp(String language, Path serverDir, String commit)
+            throws ServerLaunchException {
+        try {
+            Files.writeString(serverDir.resolve(BUILD_STAMP_NAME), commit,
+                StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                "failed to write the " + language + " build stamp in " + serverDir
+                    + ": " + e.getMessage(), e);
+        }
     }
 
     /**

@@ -1,11 +1,13 @@
 package aws.cryptography.esdk.testserver.orchestrator.launch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.esdk.testserver.orchestrator.source.MaterializedSources;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -78,6 +80,35 @@ class NodeLaunchPlanTest {
         assertEquals("javascript", ex.language(), "the abort must name the language");
         assertTrue(ex.getMessage().contains("server:javascript"),
             "the abort must identify the missing component");
+    }
+
+    // ------------------------------------------------------------------
+    // Build stamp guard: pure over a constructed server directory.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("the build is up to date only when the stamp holds the exact commit and the entry point exists")
+    void buildUpToDate(@TempDir Path serverDir) throws Exception {
+        String commit = "0123456789abcdef0123456789abcdef01234567";
+
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit),
+            "no stamp, no entry point: build required");
+
+        Files.createDirectories(serverDir.resolve("build/src"));
+        Files.writeString(serverDir.resolve(NodeLaunchPlan.SERVER_ENTRY), "// entry");
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit),
+            "entry point without a stamp: build required");
+
+        Files.writeString(serverDir.resolve(NodeLaunchPlan.BUILD_STAMP_NAME), commit + "\n");
+        assertTrue(NodeLaunchPlan.buildUpToDate(serverDir, commit),
+            "matching stamp + entry point: build skipped");
+
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, "f".repeat(40)),
+            "a different commit never reuses the stamped build");
+
+        Files.delete(serverDir.resolve(NodeLaunchPlan.SERVER_ENTRY));
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit),
+            "matching stamp without the entry point: build required");
     }
 
     // ------------------------------------------------------------------

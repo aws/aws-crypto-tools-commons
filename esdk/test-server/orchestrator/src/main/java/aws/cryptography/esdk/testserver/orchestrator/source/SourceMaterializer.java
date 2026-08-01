@@ -20,7 +20,9 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@link SourcePlan.Clone}: {@code git clone --depth 1 --single-branch
  *       --branch <ref> <url>} into a scratch directory, one clone per distinct
  *       {@code (url, ref)} pair — components sharing coordinates share the
- *       clone (Requirement 3.3).</li>
+ *       clone (Requirement 3.3). A pre-existing scratch directory whose
+ *       {@code HEAD} equals the live remote tip of the ref is reused in place;
+ *       otherwise it is wiped and cloned fresh.</li>
  *   <li>{@link SourcePlan.WorkingTree}: the already-present tree is used in
  *       place — nothing is cloned (Requirements 3.4, 4.2).</li>
  *   <li>Every component: the plan's path must exist under the clone or
@@ -160,6 +162,10 @@ public final class SourceMaterializer implements Materializer {
 
     private CloneResult cloneOnce(CloneKey key) {
         Path target = scratchDirectory.resolve(cloneDirectoryName(key));
+        CloneResult reused = reuseExistingClone(key, target);
+        if (reused != null) {
+            return reused;
+        }
         try {
             if (Files.exists(target)) {
                 deleteRecursively(target); // stale clone from an earlier run
@@ -184,6 +190,37 @@ public final class SourceMaterializer implements Materializer {
                 + key.url() + " at branch " + key.ref() + ": " + head.describeFailure());
         }
         return CloneResult.success(target, head.output().trim());
+    }
+
+    /**
+     * Reuse {@code target} as the clone of {@code key} when it is already a
+     * git repository whose {@code HEAD} equals the live remote tip of
+     * {@code refs/heads/<ref>} (e.g. a CI-cache-restored directory from an
+     * earlier run of the same commit). Returns {@code null} — caller wipes and
+     * clones fresh — when the directory is absent, not a repository, the tip
+     * cannot be verified, or the commits differ.
+     */
+    private CloneResult reuseExistingClone(CloneKey key, Path target) {
+        if (!Files.isDirectory(target.resolve(".git"))) {
+            return null;
+        }
+        GitResult head = git(target, "rev-parse", "HEAD");
+        if (head.failed()) {
+            return null;
+        }
+        GitResult remote = git(target, "ls-remote", key.url(), "refs/heads/" + key.ref());
+        if (remote.failed()) {
+            return null;
+        }
+        String tip = remote.output().strip();
+        int end = tip.indexOf('\t');
+        if (end > 0) {
+            tip = tip.substring(0, end);
+        }
+        if (tip.isEmpty() || !tip.equals(head.output().trim())) {
+            return null;
+        }
+        return CloneResult.success(target, tip);
     }
 
     private MaterializedSources.Outcome cloneOutcome(

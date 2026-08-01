@@ -167,6 +167,10 @@ jobs:
       # rustc invocations hit the cache.
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      # Keep the sccache server alive for the whole job so the end-of-job
+      # stats step reports the orchestrated run's real hit/miss counts (the
+      # default 600s idle timeout kills the server long before that step).
+      SCCACHE_IDLE_TIMEOUT: "0"
 
     steps:
       - name: Checkout (working tree = the Configuration_Set every language resolves from)
@@ -253,7 +257,7 @@ jobs:
           sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
           sccache --version
 
-      - name: Cache the Rust cargo downloads + sccache compiler cache
+      - name: Restore the Rust cargo downloads + sccache compiler cache
         # Cache the cargo registry/git downloads AND the sccache compiler cache —
         # NOT the compiled target dir. The orchestrated run clones aws-crypto-tools-rust
         # mid-run, giving the sources fresh mtimes, so a restored target/ yields an
@@ -262,13 +266,18 @@ jobs:
         # sccache is content-hashed, so both reuse safely across runs while only the
         # final link step runs fresh. A distinct key prefix (cargo- not rust-) avoids
         # restoring the earlier target-containing caches.
-        uses: actions/cache@v4
+        #
+        # Explicit restore/save split: the orchestrate step exits non-zero on any
+        # failed Test (fail-open Result), and actions/cache's implicit post step
+        # only saves on job SUCCESS — so the combined action never saved anything
+        # here. The matching save step at the end of the job runs `if: always()`.
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}
+          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             ${{ runner.os }}-cargo-esdk-test-server-
 
@@ -313,15 +322,17 @@ jobs:
           cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
           echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
 
-      - name: Cache Gradle + Maven caches
+      - name: Restore Gradle + Maven caches
         # Gradle: the client-java/tests/orchestrator builds under
         # esdk/test-server plus the Java server build the orchestrated run
         # executes inside its clone. Maven: the live ESDK `mvn install`
         # JavaLaunchPlan runs during the orchestrated run. Key on every
         # gradle build script + wrapper descriptor beneath the test-server
         # tree so the cache invalidates when any module's build config
-        # changes.
-        uses: actions/cache@v4
+        # changes. Saved by the end-of-job save step (`if: always()` — see
+        # the cargo restore note).
+        id: gradle-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.gradle/caches
@@ -334,6 +345,107 @@ jobs:
             ) }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+
+      - name: Resolve language-repo commit pins (cache keys)
+        # The materialized-sources caches below are keyed on the resolved tip
+        # commit of each language branch the Configuration_Set pins, so a push
+        # to one language repo invalidates only that repo's cache. Coordinates
+        # come from the Configuration_Set itself (jq), tips from git ls-remote.
+        # An unresolvable tip degrades to a per-run unique pin: that cache
+        # simply misses and the run builds cold, exactly as before caching.
+        id: pins
+        run: |
+          set -euo pipefail
+          config=esdk/test-server/config/configuration-set.json
+          pin() {
+            local name="$1" language="$2" url ref tip
+            url=$(jq -r --arg l "$language" \
+              '.entries[] | select(.language==$l) | .serverLocation.url' "$config")
+            ref=$(jq -r --arg l "$language" \
+              '.entries[] | select(.language==$l) | .serverLocation.ref' "$config")
+            tip=$(git ls-remote "$url" "refs/heads/$ref" | cut -f1)
+            if [ -z "$tip" ]; then
+              echo "::warning::could not resolve $url @ $ref — the $name sources cache misses this run"
+              tip="unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            fi
+            echo "$name=$tip" >> "$GITHUB_OUTPUT"
+            echo "$name: $url @ $ref -> $tip"
+          }
+          pin esdk net
+          pin javascript javascript
+          pin c c
+
+      - name: Restore the materialized aws-encryption-sdk clone (net transpile + go)
+        # The orchestrator reuses a materialized clone whose HEAD equals the
+        # live branch tip (SourceMaterializer), and DotnetLaunchPlan's stamp
+        # skips the submodule init + Dafny transpile + dotnet build when the
+        # stamped commit matches — the single longest build in the run. The
+        # rust-dafny cargo target dir is excluded: sccache covers those
+        # compiles and target dirs are multi-GB. No restore-keys: a clone at
+        # any other commit is wiped by the materializer, so a stale restore
+        # is pure download cost.
+        id: sources-esdk
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*
+            !esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
+          key: ${{ runner.os }}-sources-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
+
+      - name: Restore the materialized aws-encryption-sdk-javascript clone
+        # NodeLaunchPlan's stamp skips the root npm ci + lerna build-node +
+        # server tsc on a reused clone of the same commit; node_modules and
+        # the built workspace packages ride in the clone. Keyed on the branch
+        # tip + the Node major this workflow provisions.
+        id: sources-javascript
+        uses: actions/cache/restore@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-javascript@*
+          key: ${{ runner.os }}-sources-javascript-${{ steps.pins.outputs.javascript }}-node22
+
+      - name: Restore the materialized aws-encryption-sdk-c clone
+        # The clone carries the cmake build tree (test-server/.build); on a
+        # reused clone the cmake re-run finds everything up to date (tar
+        # preserves the source-older-than-objects mtime order).
+        id: sources-c
+        uses: actions/cache/restore@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-c@*
+          key: ${{ runner.os }}-sources-c-${{ steps.pins.outputs.c }}
+
+      - name: Restore the NuGet package cache
+        # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
+        # pays off when the esdk pin moves and the transpile runs cold.
+        id: nuget-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-esdk-test-server-
+
+      - name: Restore the Go module + build caches
+        # GoLaunchPlan's go build (modules + compiled packages) and the
+        # aws-lc-sys native builds' Go tooling.
+        id: go-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
+          restore-keys: |
+            ${{ runner.os }}-go-esdk-test-server-
+
+      - name: Restore the npm download cache
+        # Pays off when the javascript pin moves and npm ci runs cold.
+        id: npm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
+          restore-keys: |
+            ${{ runner.os }}-npm-esdk-test-server-
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -532,3 +644,80 @@ jobs:
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results
           if-no-files-found: ignore
+
+      # ------------------------------------------------------------------
+      # Cache saves. Every save runs `if: always()` because the orchestrate
+      # step exits non-zero on any failed Test (the fail-open Result), and a
+      # cache that only saves on job success would never save here. Saves
+      # whose exact key was already restored are skipped.
+      # ------------------------------------------------------------------
+
+      - name: Save the Rust cargo downloads + sccache compiler cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save Gradle + Maven caches
+        if: always() && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.m2/repository
+          key: >-
+            ${{ runner.os }}-gradle-${{ hashFiles(
+              'esdk/test-server/**/*.gradle*',
+              'esdk/test-server/**/gradle-wrapper.properties'
+            ) }}
+
+      - name: Save the materialized aws-encryption-sdk clone
+        if: always() && steps.sources-esdk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*
+            !esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
+          key: ${{ runner.os }}-sources-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
+
+      - name: Save the materialized aws-encryption-sdk-javascript clone
+        if: always() && steps.sources-javascript.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-javascript@*
+          key: ${{ runner.os }}-sources-javascript-${{ steps.pins.outputs.javascript }}-node22
+
+      - name: Save the materialized aws-encryption-sdk-c clone
+        if: always() && steps.sources-c.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-c@*
+          key: ${{ runner.os }}-sources-c-${{ steps.pins.outputs.c }}
+
+      - name: Save the NuGet package cache
+        if: always() && steps.nuget-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
+
+      - name: Save the Go module + build caches
+        if: always() && steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
+
+      - name: Save the npm download cache
+        if: always() && steps.npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}

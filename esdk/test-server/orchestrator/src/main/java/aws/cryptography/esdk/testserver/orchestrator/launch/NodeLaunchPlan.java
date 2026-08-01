@@ -28,7 +28,9 @@ import java.util.List;
  *       tsconfig.json} in the server directory. A non-zero step is a
  *       {@code BUILD} launch failure carrying the tool output. (The root
  *       {@code npm ci} runs the repository's lerna postinstall, which needs
- *       {@code structuredClone} — Node.js 17+.)</li>
+ *       {@code structuredClone} — Node.js 17+.) A stamp file written after
+ *       a successful build skips these steps when a reused clone already
+ *       holds a build of the same commit.</li>
  *   <li><b>Launch.</b> {@code node <server>/build/src/main.js <port>} via the
  *       shared {@link SubprocessLauncher} (port probe, TCP readiness,
  *       process-tree teardown).</li>
@@ -48,6 +50,13 @@ public final class NodeLaunchPlan implements Launcher {
 
     /** The compiled server entry point, relative to the server directory. */
     static final String SERVER_ENTRY = "build/src/main.js";
+
+    /**
+     * Build stamp in the server directory: holds the clone commit the last
+     * successful build ran at. When it matches the resolved commit and the
+     * compiled entry point exists (a reused clone), the build is skipped.
+     */
+    static final String BUILD_STAMP_NAME = ".esdk-build-stamp";
 
     private static final String SERVER_LOG_NAME = "node-server.log";
 
@@ -117,9 +126,14 @@ public final class NodeLaunchPlan implements Launcher {
 
         // 2. Build: the server Makefile's build-server recipe against a fresh
         //    clone — root npm ci + npm run build-node, then tsc in the server.
-        runBuildStep(language, "npm ci --unsafe-perm", installCommand(npm), repoRoot);
-        runBuildStep(language, "npm run build-node", buildModulesCommand(npm), repoRoot);
-        runBuildStep(language, "npx tsc -p tsconfig.json", buildServerCommand(), serverDir);
+        //    Skipped when the stamp shows a successful build of this exact
+        //    commit already sits in the (reused) clone.
+        if (!buildUpToDate(serverDir, server.commit())) {
+            runBuildStep(language, "npm ci --unsafe-perm", installCommand(npm), repoRoot);
+            runBuildStep(language, "npm run build-node", buildModulesCommand(npm), repoRoot);
+            runBuildStep(language, "npx tsc -p tsconfig.json", buildServerCommand(), serverDir);
+            writeBuildStamp(language, serverDir, server.commit());
+        }
 
         // 3. Launch: node <server>/build/src/main.js <port> via the shared
         //    probe/spawn/readiness/teardown.
@@ -152,6 +166,40 @@ public final class NodeLaunchPlan implements Launcher {
     /** {@code node <server>/build/src/main.js <port>}. */
     static List<String> serverCommand(String node, Path serverDir, int port) {
         return List.of(node, serverDir.resolve(SERVER_ENTRY).toString(), String.valueOf(port));
+    }
+
+    // ------------------------------------------------------------------
+    // Build stamp (skip the build on a reused clone of the same commit).
+    // ------------------------------------------------------------------
+
+    /**
+     * Whether {@code serverDir} already holds a successful build of
+     * {@code commit}: the stamp records exactly that commit and the compiled
+     * entry point exists.
+     */
+    static boolean buildUpToDate(Path serverDir, String commit) {
+        Path stamp = serverDir.resolve(BUILD_STAMP_NAME);
+        if (!Files.isRegularFile(stamp)
+                || !Files.isRegularFile(serverDir.resolve(SERVER_ENTRY))) {
+            return false;
+        }
+        try {
+            return Files.readString(stamp, StandardCharsets.UTF_8).trim().equals(commit);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static void writeBuildStamp(String language, Path serverDir, String commit)
+            throws ServerLaunchException {
+        try {
+            Files.writeString(serverDir.resolve(BUILD_STAMP_NAME), commit,
+                StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                "failed to write the " + language + " build stamp in " + serverDir
+                    + ": " + e.getMessage(), e);
+        }
     }
 
     // ------------------------------------------------------------------

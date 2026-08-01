@@ -281,6 +281,96 @@ class SourceMaterializerGitIntegrationTest {
     }
 
     // ------------------------------------------------------------------
+    // (f) A pre-existing clone at the remote tip is reused; a stale or
+    //     non-repository directory is wiped and cloned fresh
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a pre-existing clone whose HEAD equals the remote tip is reused in place")
+    void existingCloneAtRemoteTipIsReused() throws Exception {
+        Path repo = initRepo(fixtures.resolve("upstream"));
+        commitFile(repo, "esdk/test-server/server/marker.txt", "content", "initial commit");
+        String tip = gitOutput(repo, "rev-parse", "HEAD");
+
+        var plan = new ResolvedComponentPlan(
+            ComponentId.server("java"),
+            new SourcePlan.Clone(fileUrl(repo), "main", "esdk/test-server/server"),
+            ResolutionReason.CONFIGURATION_ENTRY);
+
+        var materializer = new SourceMaterializer(scratch);
+        var first = assertInstanceOf(MaterializedSources.Success.class,
+            materializer.materialize(List.of(plan)).outcomes().get(0));
+        // A build output in the materialized clone: survives only without a wipe.
+        Path buildOutput = first.directory().resolve("build-output.txt");
+        Files.writeString(buildOutput, "built at " + tip);
+
+        var second = assertInstanceOf(MaterializedSources.Success.class,
+            materializer.materialize(List.of(plan)).outcomes().get(0));
+
+        assertEquals(tip, second.commit());
+        assertEquals(first.directory(), second.directory());
+        assertTrue(Files.isRegularFile(buildOutput),
+            "the reused clone keeps its contents — no wipe happened");
+    }
+
+    @Test
+    @DisplayName("a pre-existing clone behind the remote tip is wiped and cloned fresh")
+    void existingCloneBehindRemoteTipIsRecloned() throws Exception {
+        Path repo = initRepo(fixtures.resolve("upstream"));
+        commitFile(repo, "esdk/test-server/server/marker.txt", "old", "initial commit");
+
+        var plan = new ResolvedComponentPlan(
+            ComponentId.server("java"),
+            new SourcePlan.Clone(fileUrl(repo), "main", "esdk/test-server/server"),
+            ResolutionReason.CONFIGURATION_ENTRY);
+
+        var materializer = new SourceMaterializer(scratch);
+        var first = assertInstanceOf(MaterializedSources.Success.class,
+            materializer.materialize(List.of(plan)).outcomes().get(0));
+        Path buildOutput = first.directory().resolve("build-output.txt");
+        Files.writeString(buildOutput, "stale build output");
+
+        // The upstream branch advances: the existing clone is now stale.
+        commitFile(repo, "esdk/test-server/server/marker.txt", "new", "advance");
+        String newTip = gitOutput(repo, "rev-parse", "HEAD");
+
+        var second = assertInstanceOf(MaterializedSources.Success.class,
+            materializer.materialize(List.of(plan)).outcomes().get(0));
+
+        assertEquals(newTip, second.commit(), "the fresh clone stands at the new tip");
+        assertEquals("new",
+            Files.readString(second.directory().resolve("marker.txt")).trim());
+        assertFalse(Files.exists(buildOutput),
+            "the stale clone was wiped — nothing carried over");
+    }
+
+    @Test
+    @DisplayName("a non-repository directory at the clone target is wiped and cloned fresh")
+    void nonRepositoryTargetIsRecloned() throws Exception {
+        Path repo = initRepo(fixtures.resolve("upstream"));
+        commitFile(repo, "esdk/test-server/server/marker.txt", "content", "initial commit");
+        String tip = gitOutput(repo, "rev-parse", "HEAD");
+
+        var plan = new ResolvedComponentPlan(
+            ComponentId.server("java"),
+            new SourcePlan.Clone(fileUrl(repo), "main", "esdk/test-server/server"),
+            ResolutionReason.CONFIGURATION_ENTRY);
+
+        // Occupy the target with a plain directory (no .git).
+        Path target = scratch.resolve(SourceMaterializer.cloneDirectoryName(
+            new SourceMaterializer.CloneKey(fileUrl(repo), "main")));
+        Files.createDirectories(target);
+        Files.writeString(target.resolve("junk.txt"), "not a clone");
+
+        var success = assertInstanceOf(MaterializedSources.Success.class,
+            new SourceMaterializer(scratch).materialize(List.of(plan)).outcomes().get(0));
+
+        assertEquals(tip, success.commit());
+        assertFalse(Files.exists(target.resolve("junk.txt")),
+            "the non-repository occupant was wiped before the clone");
+    }
+
+    // ------------------------------------------------------------------
     // Fixture-repo plumbing (real git via ProcessBuilder, all under @TempDir)
     // ------------------------------------------------------------------
 
