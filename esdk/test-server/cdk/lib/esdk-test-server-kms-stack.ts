@@ -178,7 +178,9 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       description:
         'Role assumed via GitHub OIDC by the ESDK TestServer CI workflows; least-privilege KMS on the test keys.',
       assumedBy: principal,
-      maxSessionDuration: cdk.Duration.hours(1),
+      // 2h so a full nine-language orchestrated run (~70min cold) never
+      // outlives its OIDC session mid-suite.
+      maxSessionDuration: cdk.Duration.hours(2),
     });
 
     const allKeyArns = [symmetricKey.keyArn, mrk.keyArn, mrk2.keyArn, rsaKey.keyArn];

@@ -85,6 +85,13 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
     });
   });
 
+  test('the CI role allows 2h sessions (a full orchestrated run)', () => {
+    template.hasResourceProperties('AWS::IAM::Role', {
+      RoleName: 'esdk-test-server-ci-kms-role',
+      MaxSessionDuration: 7200,
+    });
+  });
+
   test('role policy grants least-privilege KMS actions scoped to key ARNs, not "*"', () => {
     // Core KMS actions on the three keys.
     template.hasResourceProperties('AWS::IAM::Policy', {
