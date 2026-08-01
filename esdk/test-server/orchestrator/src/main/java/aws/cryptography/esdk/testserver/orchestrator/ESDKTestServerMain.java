@@ -5,10 +5,14 @@ import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationLoadException;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationLoader;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSet;
+import aws.cryptography.esdk.testserver.orchestrator.launch.CLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.CppShimLaunchPlan;
+import aws.cryptography.esdk.testserver.orchestrator.launch.DotnetLaunchPlan;
+import aws.cryptography.esdk.testserver.orchestrator.launch.GoLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.JavaLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.esdk.testserver.orchestrator.launch.LauncherFactory;
+import aws.cryptography.esdk.testserver.orchestrator.launch.NodeLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.PythonLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.launch.RustLaunchPlan;
 import aws.cryptography.esdk.testserver.orchestrator.report.Result;
@@ -120,7 +124,12 @@ public final class ESDKTestServerMain {
         Path modelDir = testServerRoot.resolve("model");
 
         // Build the execution context from the CLI, and (for a language run)
-        // load the invoking repository's Configuration_Overrides.
+        // load the invoking repository's Configuration_Overrides. The
+        // Configuration_Set is loaded first: the overrides live in the own
+        // language's commons-configuration file, whose repository-root-relative
+        // location the own Configuration_Entry may override via
+        // commonsConfigurationPath.
+        ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(configPath);
         RunContext context;
         List<ConfigurationEntry> overrides;
         try {
@@ -141,7 +150,7 @@ public final class ESDKTestServerMain {
                     "invokingRepositoryName", "aws-crypto-tools-" + ownLanguage);
                 context = RunContext.languageRun(
                     ownLanguage, languageRepoRoot, commonsRoot, invoking, origin);
-                overrides = loadOverrides(languageRepoRoot);
+                overrides = loadOverrides(languageRepoRoot, set.forLanguage(ownLanguage));
             } else {
                 throw new IllegalArgumentException(
                     "unknown context '" + contextArg
@@ -156,6 +165,8 @@ public final class ESDKTestServerMain {
 
         // Per-language subprocess launch plans (Requirements 1.5, 2.7): a
         // language absent from this map aborts the run naming the language.
+        // rust-dafny reuses RustLaunchPlan: its server is the same cargo
+        // build/launch shape, delegating to the Dafny-generated aws-esdk crate.
         LauncherFactory launchers = LauncherFactory.fromMap(Map.of(
             "java", (Launcher) new JavaLaunchPlan(
                 orchestratorBuildDir.resolve("launch/java"), modelDir),
@@ -164,9 +175,18 @@ public final class ESDKTestServerMain {
             "rust", new RustLaunchPlan(
                 orchestratorBuildDir.resolve("launch/rust")),
             "rust-cpp", new CppShimLaunchPlan(
-                orchestratorBuildDir.resolve("launch/rust-cpp"))));
+                orchestratorBuildDir.resolve("launch/rust-cpp")),
+            "javascript", new NodeLaunchPlan(
+                orchestratorBuildDir.resolve("launch/javascript")),
+            "c", new CLaunchPlan(
+                orchestratorBuildDir.resolve("launch/c")),
+            "net", new DotnetLaunchPlan(
+                orchestratorBuildDir.resolve("launch/net")),
+            "rust-dafny", new RustLaunchPlan(
+                orchestratorBuildDir.resolve("launch/rust-dafny")),
+            "go", new GoLaunchPlan(
+                orchestratorBuildDir.resolve("launch/go"))));
 
-        ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(configPath);
         ESDKTestServer orchestrator = new ESDKTestServer(
             set,
             context,
@@ -254,13 +274,16 @@ public final class ESDKTestServerMain {
 
     /**
      * Load the invoking Language_Repository's Configuration_Overrides from its
-     * commons-configuration file (Requirement 4.6). A missing/unparseable file
-     * halts the invocation before any run — the same failure the bootstrap
-     * reports (Requirement 4.9) — surfaced here as a usage error.
+     * commons-configuration file (Requirement 4.6), at the location the own
+     * language's Configuration_Entry declares ({@code commonsConfigurationPath},
+     * defaulting to the standard location). A missing/unparseable file halts the
+     * invocation before any run — the same failure the bootstrap reports
+     * (Requirement 4.9) — surfaced here as a usage error.
      */
-    private static List<ConfigurationEntry> loadOverrides(Path languageRepoRoot) {
+    private static List<ConfigurationEntry> loadOverrides(
+            Path languageRepoRoot, ConfigurationEntry ownEntry) {
         Path expected = languageRepoRoot.resolve(
-            ESDKTestServer.COMMONS_CONFIGURATION_RELATIVE_PATH);
+            ESDKTestServer.commonsConfigurationRelativePath(ownEntry));
         try {
             CommonsConfiguration own = ConfigurationLoader.loadCommonsConfiguration(expected);
             return own.configurationOverrides();

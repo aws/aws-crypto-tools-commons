@@ -107,7 +107,7 @@ public final class ESDKTestServer {
      * whose layout differs from the default (e.g. the Rust server, whose sources
      * live under {@code esdk-test-server/}) carry its declaration alongside them.
      */
-    private static String commonsConfigurationRelativePath(ConfigurationEntry entry) {
+    static String commonsConfigurationRelativePath(ConfigurationEntry entry) {
         String configured = entry == null ? null : entry.commonsConfigurationPath();
         return configured == null || configured.isBlank()
             ? COMMONS_CONFIGURATION_RELATIVE_PATH : configured;

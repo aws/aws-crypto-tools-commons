@@ -23,12 +23,32 @@
     "constructors are unimplemented, so Rust declares 'MPL' unsupported; Python",
     "declares 'hierarchical' unsupported.",
     "",
+    "The javascript, c, net, rust-dafny, and go entries follow the same",
+    "Language_Repository pattern: each repository ships its Feature_Declaration",
+    "in a commons-configuration.json next to its server sources, pointed at via",
+    "commonsConfigurationPath. javascript (aws-encryption-sdk-javascript) and c",
+    "(aws-encryption-sdk-c) host their servers at test-server/. net, rust-dafny,",
+    "and go share the aws-encryption-sdk repository: servers under",
+    "esdk-test-servers/<lang>, libraries at AwsEncryptionSDK/runtimes/net (needs",
+    "a Dafny transpile, performed by its launch plan) and the committed",
+    "releases/rust/esdk and releases/go/encryption-sdk trees. The Go module",
+    "releases at v0.x; majorVersion is floored at 1 (the schema minimum).",
+    "",
+    "C caveats: the C server declares every aws-kms* Feature unsupported until",
+    "its aws-sdk-cpp (aws-encryption-sdk-cpp component) wiring lands, and the C",
+    "library's raw-rsa supports only PKCS1/OAEP-SHA1/OAEP-SHA256 padding —",
+    "raw-rsa scenarios using OAEP-SHA384/512 fail (not skip) against C, since",
+    "padding is not a gateable Feature.",
+    "",
     "Branch pins: while the feature branches are unmerged, refs/branches that",
     "must contain the TestServer pin kessplas/esdk-test-server (Rust:",
     "kessplas/esdk-rust-test-server). Java temporarily pins",
     "lucasmcdonald3/esdk-test-server-hierarchical (kessplas/esdk-test-server plus",
     "hierarchical keyring support, aws-crypto-tools-java PR#3); flip back to",
-    "kessplas/esdk-test-server once that merges. All flip to main after merge."
+    "kessplas/esdk-test-server once that merges. javascript and c pin",
+    "lucmcdon/esdk-test-server of their repositories; net, rust-dafny, and go pin",
+    "lucmcdon/esdk-test-servers of aws-encryption-sdk. All flip to their default",
+    "branches after merge."
   ],
   "product": "esdk",
   "features": [
@@ -112,6 +132,96 @@
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
         "ref": "aws-crypto-rust/esdk-cpp-test-server",
         "path": "esdk-cpp-test-server"
+      }
+    },
+    {
+      "language": "javascript",
+      "majorVersion": 5,
+      "port": 8095,
+      "commonsConfigurationPath": "test-server/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk-javascript",
+        "url": "https://github.com/aws/aws-encryption-sdk-javascript",
+        "branch": "lucmcdon/esdk-test-server",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk-javascript",
+        "url": "https://github.com/aws/aws-encryption-sdk-javascript",
+        "ref": "lucmcdon/esdk-test-server",
+        "path": "test-server"
+      }
+    },
+    {
+      "language": "c",
+      "majorVersion": 2,
+      "port": 8096,
+      "commonsConfigurationPath": "test-server/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk-c",
+        "url": "https://github.com/aws/aws-encryption-sdk-c",
+        "branch": "lucmcdon/esdk-test-server",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk-c",
+        "url": "https://github.com/aws/aws-encryption-sdk-c",
+        "ref": "lucmcdon/esdk-test-server",
+        "path": "test-server"
+      }
+    },
+    {
+      "language": "net",
+      "majorVersion": 5,
+      "port": 8097,
+      "commonsConfigurationPath": "esdk-test-servers/net/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "branch": "lucmcdon/esdk-test-servers",
+        "path": "AwsEncryptionSDK/runtimes/net"
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "ref": "lucmcdon/esdk-test-servers",
+        "path": "esdk-test-servers/net"
+      }
+    },
+    {
+      "language": "rust-dafny",
+      "majorVersion": 1,
+      "port": 8098,
+      "commonsConfigurationPath": "esdk-test-servers/rust/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "branch": "lucmcdon/esdk-test-servers",
+        "path": "releases/rust/esdk"
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "ref": "lucmcdon/esdk-test-servers",
+        "path": "esdk-test-servers/rust"
+      }
+    },
+    {
+      "language": "go",
+      "majorVersion": 1,
+      "port": 8099,
+      "commonsConfigurationPath": "esdk-test-servers/go/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "branch": "lucmcdon/esdk-test-servers",
+        "path": "releases/go/encryption-sdk"
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "ref": "lucmcdon/esdk-test-servers",
+        "path": "esdk-test-servers/go"
       }
     }
   ]

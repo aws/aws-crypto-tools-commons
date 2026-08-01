@@ -206,10 +206,21 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set up Go (for the Rust server's aws-lc-sys native build)
-        # The orchestrated run's RustLaunchPlan cargo-builds the Rust
-        # Language_Server from the aws-crypto-tools-rust clone; its transitive
-        # aws-lc-sys dependency compiles native code with Go on hosted runners.
+      - name: Set up Node.js 22 (for the JavaScript Language_Server build)
+        # The orchestrated run's NodeLaunchPlan runs the repository-root
+        # `npm ci` + `npm run build-node` in the aws-encryption-sdk-javascript
+        # clone; the root install runs its lerna postinstall, which needs
+        # structuredClone (Node.js 17+). 22 mirrors that repo's own
+        # test-server workflow.
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Go (for the Go Language_Server and the Rust servers' aws-lc-sys native builds)
+        # The orchestrated run's GoLaunchPlan builds the Go Language_Server
+        # from the aws-encryption-sdk clone, and the Rust launch plans'
+        # cargo builds compile aws-lc-sys native code with Go on hosted
+        # runners.
         uses: actions/setup-go@v5
         with:
           go-version: "stable"
@@ -260,6 +271,47 @@ jobs:
           key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-cargo-esdk-test-server-
+
+      - name: Set up .NET (for the .NET Language_Server build)
+        # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
+        # library and server inside the aws-encryption-sdk clone. 6.0 + 8.0
+        # mirror that repo's own test-server workflow (the library's TFMs; the
+        # server targets net8.0).
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - name: Install Dafny 4.9.0 (for the .NET library transpile)
+        # The .NET library carries no committed generated code, so
+        # DotnetLaunchPlan runs `make setup_net && make transpile_net` in the
+        # clone, which needs dafny on PATH. Installed as a global dotnet tool
+        # pinned to the version the aws-encryption-sdk repo's
+        # project.properties declares (a deterministic download, no
+        # third-party action, matching the smithy-install rationale).
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dafny --version 4.9.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          export PATH="$HOME/.dotnet/tools:$PATH"
+          dafny --version
+
+      - name: Build aws-c-common (for the C Language_Server build)
+        # The orchestrated run's CLaunchPlan cmake-configures the
+        # aws-encryption-sdk-c clone, whose CMake requires an aws-c-common
+        # install; ubuntu runners ship none. Build it from source into the
+        # workspace and export CMAKE_PREFIX_PATH, which CLaunchPlan passes
+        # through to the configure — the same approach as that repo's own
+        # test-server workflow.
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/awslabs/aws-c-common "$RUNNER_TEMP/aws-c-common"
+          cmake -S "$RUNNER_TEMP/aws-c-common" -B "$RUNNER_TEMP/aws-c-common-build" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/.aws-c-common-install" \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
+          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
 
       - name: Cache Gradle + Maven caches
         # Gradle: the client-java/tests/orchestrator builds under

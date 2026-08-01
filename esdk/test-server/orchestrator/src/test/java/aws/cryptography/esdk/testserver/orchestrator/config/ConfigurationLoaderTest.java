@@ -256,7 +256,13 @@ class ConfigurationLoaderTest {
         ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(shipped);
 
         assertEquals("esdk", set.product());
-        assertEquals(List.of("streaming", "MPL", "hierarchical"), set.features());
+        assertEquals(List.of(
+            "streaming", "MPL", "hierarchical",
+            "raw-aes", "raw-rsa", "raw-ecdh", "multi",
+            "aws-kms", "aws-kms-multi", "aws-kms-discovery",
+            "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery",
+            "aws-kms-rsa", "aws-kms-ecdh",
+            "required-encryption-context", "caching"), set.features());
 
         ConfigurationEntry java = set.forLanguage("java");
         assertNotNull(java, "the shipped set must carry a java entry");
@@ -270,8 +276,13 @@ class ConfigurationLoaderTest {
         assertNotNull(python, "the shipped set must carry a python entry");
         assertEquals(4, python.majorVersion());
         assertEquals(8092, python.port());
-        assertEquals(List.of("streaming", "MPL"), python.supportedFeatures());
-        assertEquals(List.of("hierarchical"), python.unsupportedFeatures());
+        assertEquals(List.of(
+            "streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "multi",
+            "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk",
+            "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa",
+            "required-encryption-context"), python.supportedFeatures());
+        assertEquals(List.of("raw-ecdh", "aws-kms-ecdh", "caching"),
+            python.unsupportedFeatures());
         assertEquals("aws-crypto-tools-commons", python.serverLocation().repository());
         assertEquals("esdk/test-server/servers/python", python.serverLocation().path());
 
@@ -288,5 +299,48 @@ class ConfigurationLoaderTest {
         assertEquals("esdk-test-server/commons-configuration.json", rust.commonsConfigurationPath());
         assertNull(rust.supportedFeatures());
         assertNull(rust.unsupportedFeatures());
+
+        // The remaining entries follow the same Language_Repository pattern:
+        // no inline arrays, a commonsConfigurationPath next to the server.
+        assertLanguageRepositoryEntry(set, "rust-cpp", 1, 8094,
+            "aws-crypto-tools-rust", "esdk-cpp-test-server",
+            "esdk-cpp-test-server/commons-configuration.json");
+        assertLanguageRepositoryEntry(set, "javascript", 5, 8095,
+            "aws-encryption-sdk-javascript", "test-server",
+            "test-server/commons-configuration.json");
+        assertLanguageRepositoryEntry(set, "c", 2, 8096,
+            "aws-encryption-sdk-c", "test-server",
+            "test-server/commons-configuration.json");
+        assertLanguageRepositoryEntry(set, "net", 5, 8097,
+            "aws-encryption-sdk", "esdk-test-servers/net",
+            "esdk-test-servers/net/commons-configuration.json");
+        assertLanguageRepositoryEntry(set, "rust-dafny", 1, 8098,
+            "aws-encryption-sdk", "esdk-test-servers/rust",
+            "esdk-test-servers/rust/commons-configuration.json");
+        assertLanguageRepositoryEntry(set, "go", 1, 8099,
+            "aws-encryption-sdk", "esdk-test-servers/go",
+            "esdk-test-servers/go/commons-configuration.json");
+    }
+
+    /**
+     * Assert one shipped Language_Repository-pattern entry: its coordinates,
+     * its external declaration location, and that no inline Feature_Declaration
+     * is carried.
+     */
+    private static void assertLanguageRepositoryEntry(ConfigurationSet set, String language,
+            int majorVersion, int port, String serverRepository, String serverPath,
+            String commonsConfigurationPath) {
+        ConfigurationEntry entry = set.forLanguage(language);
+        assertNotNull(entry, "the shipped set must carry a " + language + " entry");
+        assertEquals(majorVersion, entry.majorVersion(), language + " majorVersion");
+        assertEquals(port, entry.port(), language + " port");
+        assertEquals(serverRepository, entry.serverLocation().repository(),
+            language + " serverLocation.repository");
+        assertEquals(serverPath, entry.serverLocation().path(),
+            language + " serverLocation.path");
+        assertEquals(commonsConfigurationPath, entry.commonsConfigurationPath(),
+            language + " commonsConfigurationPath");
+        assertNull(entry.supportedFeatures(), language + " carries no inline supportedFeatures");
+        assertNull(entry.unsupportedFeatures(), language + " carries no inline unsupportedFeatures");
     }
 }
