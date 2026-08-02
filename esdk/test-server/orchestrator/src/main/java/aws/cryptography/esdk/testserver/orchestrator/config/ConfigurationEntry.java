@@ -28,6 +28,10 @@ import java.util.List;
  *                            {@code null} when absent (Requirements 8.1, 8.3)
  * @param unsupportedFeatures the Feature_Declaration's unsupported half, or
  *                            {@code null} when absent (Requirements 8.1, 8.3)
+ * @param rawRsaPaddingSchemes the raw-RSA padding schemes the language's library
+ *                            supports, or {@code null} when absent — absent means
+ *                            every scheme the Smithy model defines (see
+ *                            {@link FeatureValidation#validateRawRsaPaddingSchemes})
  * @param commonsConfigurationPath repository-root-relative path to this
  *                            language's commons-configuration.json (its external
  *                            Feature_Declaration); {@code null} means the default
@@ -42,12 +46,29 @@ public record ConfigurationEntry(
     ServerLocation serverLocation,
     List<String> supportedFeatures,
     List<String> unsupportedFeatures,
+    List<String> rawRsaPaddingSchemes,
     String commonsConfigurationPath
 ) {
     public ConfigurationEntry {
         // Defensive copies; null is preserved to mean "absent from the JSON".
         supportedFeatures = supportedFeatures == null ? null : List.copyOf(supportedFeatures);
         unsupportedFeatures = unsupportedFeatures == null ? null : List.copyOf(unsupportedFeatures);
+        rawRsaPaddingSchemes =
+            rawRsaPaddingSchemes == null ? null : List.copyOf(rawRsaPaddingSchemes);
+    }
+
+    /**
+     * Convenience constructor for an entry with no {@code rawRsaPaddingSchemes}
+     * capability — every scheme is supported. Preserves the pre-capability
+     * {@code (…, commonsConfigurationPath)} shape so existing call sites keep
+     * compiling.
+     */
+    public ConfigurationEntry(String language, Integer majorVersion, Integer port,
+            RepositoryCoordinates libraryRepository, ServerLocation serverLocation,
+            List<String> supportedFeatures, List<String> unsupportedFeatures,
+            String commonsConfigurationPath) {
+        this(language, majorVersion, port, libraryRepository, serverLocation,
+            supportedFeatures, unsupportedFeatures, null, commonsConfigurationPath);
     }
 
     /**

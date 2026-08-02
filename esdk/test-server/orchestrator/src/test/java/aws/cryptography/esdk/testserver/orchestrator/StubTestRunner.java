@@ -17,6 +17,7 @@ final class StubTestRunner implements TestRunner {
     private final List<TestExecution> executions;
     private final boolean refuse;
     private boolean invoked = false;
+    private TestRunInput lastInput;
 
     private StubTestRunner(List<TestExecution> executions, boolean refuse) {
         this.executions = executions;
@@ -36,9 +37,15 @@ final class StubTestRunner implements TestRunner {
         return invoked;
     }
 
+    /** The input of the most recent {@link #run}, for handoff assertions. */
+    TestRunInput lastInput() {
+        return lastInput;
+    }
+
     @Override
     public List<TestExecution> run(TestRunInput input) throws MissingRuntimeConfigException {
         invoked = true;
+        lastInput = input;
         if (refuse) {
             throw new MissingRuntimeConfigException(
                 "no target endpoint configured for the Tests; refusing to run (Requirement 10.2)");

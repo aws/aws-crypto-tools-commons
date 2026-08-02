@@ -114,6 +114,7 @@ class ConfigurationLoaderTest {
         assertNull(entry.libraryRepository());
         assertNull(entry.serverLocation());
         assertNull(entry.supportedFeatures());
+        assertNull(entry.rawRsaPaddingSchemes());
     }
 
     // ------------------------------------------------------------------
@@ -159,6 +160,7 @@ class ConfigurationLoaderTest {
         assertEquals("esdk", config.product());
         assertEquals(List.of("streaming", "MPL"), config.supportedFeatures());
         assertEquals(List.of(), config.unsupportedFeatures());
+        assertNull(config.rawRsaPaddingSchemes());
         assertEquals(1, config.configurationOverrides().size());
         ConfigurationEntry override = config.configurationOverrides().get(0);
         assertEquals("python", override.language());
@@ -178,6 +180,27 @@ class ConfigurationLoaderTest {
     // ------------------------------------------------------------------
     // Strict duplicate detection (both file kinds)
     // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("rawRsaPaddingSchemes parses in both Feature_Declaration carriers")
+    void parsesRawRsaPaddingSchemes() {
+        CommonsConfiguration carried = ConfigurationLoader.parseCommonsConfiguration("""
+            {
+              "product": "esdk",
+              "supportedFeatures": ["raw-rsa"],
+              "unsupportedFeatures": [],
+              "rawRsaPaddingSchemes": ["PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"]
+            }
+            """);
+        assertEquals(List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"),
+            carried.rawRsaPaddingSchemes());
+
+        ConfigurationSet set = ConfigurationLoader.parseConfigurationSet("""
+            { "entries": [ { "language": "python",
+                             "rawRsaPaddingSchemes": ["PKCS1"] } ] }
+            """);
+        assertEquals(List.of("PKCS1"), set.entries().get(0).rawRsaPaddingSchemes());
+    }
 
     @Test
     @DisplayName("a duplicate JSON key in the Configuration_Set is an unparseable-file error")

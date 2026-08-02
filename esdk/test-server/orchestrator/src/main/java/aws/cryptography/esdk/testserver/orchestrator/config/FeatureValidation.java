@@ -53,6 +53,19 @@ import java.util.Set;
 public final class FeatureValidation {
 
     /**
+     * The raw-RSA padding schemes the Smithy model defines (the
+     * {@code PaddingScheme} enum in {@code model/esdk-test-server.smithy});
+     * {@code PaddingSchemeCatalogTest} pins this list against the model. A
+     * declaration's {@code rawRsaPaddingSchemes} names must come from here.
+     */
+    public static final List<String> RAW_RSA_PADDING_SCHEMES = List.of(
+        "PKCS1",
+        "OAEP_SHA1_MGF1",
+        "OAEP_SHA256_MGF1",
+        "OAEP_SHA384_MGF1",
+        "OAEP_SHA512_MGF1");
+
+    /**
      * The outcome of a Feature validation check. When {@link #valid()} is
      * {@code false}, {@link #errors()} lists one message per problem, each
      * naming the language (or Language_Repository) and each affected Feature
@@ -126,8 +139,8 @@ public final class FeatureValidation {
 
         // In-array duplicates, exact string comparison (Requirement 8.9):
         // each duplicated name is named once per array it is duplicated in.
-        addDuplicateErrors(errors, language, "supportedFeatures", supported);
-        addDuplicateErrors(errors, language, "unsupportedFeatures", unsupported);
+        addDuplicateErrors(errors, language, "Feature", "supportedFeatures", supported);
+        addDuplicateErrors(errors, language, "Feature", "unsupportedFeatures", unsupported);
 
         // Unknown Features in either array (Requirement 8.8): each unknown
         // name is named once per array it appears in.
@@ -156,6 +169,68 @@ public final class FeatureValidation {
                     + " is undeclared: it appears in neither supportedFeatures"
                     + " nor unsupportedFeatures");
             }
+        }
+
+        return Result.of(errors);
+    }
+
+    /**
+     * Validate one language's optional {@code rawRsaPaddingSchemes} capability —
+     * the raw-RSA padding schemes its library supports, carried next to the
+     * Feature_Declaration in either carrier. An <b>absent</b> field ({@code null})
+     * is valid and means every scheme in {@link #RAW_RSA_PADDING_SCHEMES}; a
+     * present field means exactly that subset. Rules for a present field:
+     *
+     * <ul>
+     *   <li>every name must be a scheme the Smithy model defines
+     *       ({@link #RAW_RSA_PADDING_SCHEMES}) — an unknown name is an error,</li>
+     *   <li>an empty list is an error: a language with no usable raw-RSA padding
+     *       declares the {@code raw-rsa} Feature unsupported instead,</li>
+     *   <li>a name repeated within the list, under exact string comparison, is
+     *       an error,</li>
+     *   <li>the field is only meaningful for a language that declares the
+     *       {@code raw-rsa} Feature supported — present with {@code raw-rsa}
+     *       absent from {@code supportedFeatures} is an error.</li>
+     * </ul>
+     *
+     * @param language          the language whose capability this is; named in
+     *                          every error
+     * @param paddingSchemes    the declared schemes, or {@code null} when the
+     *                          field was absent from the JSON
+     * @param supportedFeatures the same declaration's supported half, or
+     *                          {@code null} when absent
+     * @return a {@link Result} with one error per violated (rule, name) pair
+     */
+    public static Result validateRawRsaPaddingSchemes(
+            String language,
+            List<String> paddingSchemes,
+            List<String> supportedFeatures) {
+        if (paddingSchemes == null) {
+            return Result.ok();
+        }
+        List<String> errors = new ArrayList<>();
+
+        if (paddingSchemes.isEmpty()) {
+            errors.add("language " + language + ": rawRsaPaddingSchemes is empty:"
+                + " a language with no usable raw-RSA padding declares the"
+                + " raw-rsa Feature unsupported instead");
+        }
+
+        addDuplicateErrors(errors, language, "raw-RSA padding scheme",
+            "rawRsaPaddingSchemes", paddingSchemes);
+
+        for (String name : new LinkedHashSet<>(paddingSchemes)) {
+            if (!RAW_RSA_PADDING_SCHEMES.contains(name)) {
+                errors.add("language " + language + ": unknown raw-RSA padding scheme "
+                    + quote(name) + " in rawRsaPaddingSchemes: the model defines "
+                    + RAW_RSA_PADDING_SCHEMES);
+            }
+        }
+
+        List<String> supported = supportedFeatures == null ? List.of() : supportedFeatures;
+        if (!supported.contains("raw-rsa")) {
+            errors.add("language " + language + ": rawRsaPaddingSchemes is declared"
+                + " but Feature \"raw-rsa\" is not in supportedFeatures");
         }
 
         return Result.of(errors);
@@ -221,16 +296,17 @@ public final class FeatureValidation {
     // Rule helpers (pure)
     // ------------------------------------------------------------------
 
-    /** Requirement 8.9: name each Feature repeated within {@code array}. */
+    /** Requirement 8.9: name each value repeated within {@code array}. */
     private static void addDuplicateErrors(
-            List<String> errors, String language, String arrayName, List<String> array) {
+            List<String> errors, String language, String noun,
+            String arrayName, List<String> array) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (String name : array) {
             counts.merge(name, 1, Integer::sum);
         }
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
             if (e.getValue() > 1) {
-                errors.add("language " + language + ": Feature " + quote(e.getKey())
+                errors.add("language " + language + ": " + noun + " " + quote(e.getKey())
                     + " appears " + e.getValue() + " times in " + arrayName);
             }
         }

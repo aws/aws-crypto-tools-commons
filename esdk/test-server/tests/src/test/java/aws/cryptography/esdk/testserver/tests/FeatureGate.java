@@ -1,6 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -103,6 +105,63 @@ public final class FeatureGate {
         //    operation (Requirements 9.5, 9.6).
         if (!unsupportedByFeature.isEmpty()) {
             throw new TestAbortedException(skipMessage(unsupportedByFeature));
+        }
+    }
+
+    /**
+     * Gate the calling Test execution on both combination languages supporting
+     * every raw-RSA padding scheme in {@code paddingSchemes}; call after
+     * {@link #require} (which gates the {@code raw-rsa} Feature itself), before
+     * any Language_Server operation. A language whose Feature_Declaration
+     * carries no {@code rawRsaPaddingSchemes} supports every scheme, so an
+     * empty registry never skips. Type safety of {@link PaddingScheme} plays
+     * the Feature_Catalog's role: there is no unknown-scheme case.
+     *
+     * @throws TestAbortedException if any combination language declares any
+     *     required scheme outside its supported subset, with the message
+     *     {@code padding-gated skip: rawRsaPadding=<scheme> unsupported by
+     *     [<languages>]}, one clause per gating scheme
+     */
+    public static void requireRawRsaPaddings(
+            Set<PaddingScheme> paddingSchemes, EndpointPair combination) {
+        requireRawRsaPaddings(paddingSchemes, combination, FeatureDeclarations.shared());
+    }
+
+    /** Padding gate against an explicit registry; package-private for unit tests. */
+    static void requireRawRsaPaddings(
+            Set<PaddingScheme> paddingSchemes, EndpointPair combination,
+            FeatureDeclarations declarations) {
+        List<PaddingScheme> required = paddingSchemes.stream()
+            .sorted(Comparator.comparing(PaddingScheme::getValue))
+            .toList();
+
+        List<String> languages = combinationLanguages(combination);
+        Map<String, List<String>> unsupportedByScheme = new LinkedHashMap<>();
+        for (PaddingScheme scheme : required) {
+            List<String> unsupporting = new ArrayList<>();
+            for (String language : languages) {
+                if (!declarations.supportsRawRsaPadding(language, scheme)) {
+                    unsupporting.add(language);
+                }
+            }
+            if (!unsupporting.isEmpty()) {
+                unsupportedByScheme.put(scheme.getValue(), unsupporting);
+            }
+        }
+
+        if (!unsupportedByScheme.isEmpty()) {
+            StringBuilder message = new StringBuilder("padding-gated skip: ");
+            boolean first = true;
+            for (Map.Entry<String, List<String>> gating : unsupportedByScheme.entrySet()) {
+                if (!first) {
+                    message.append("; ");
+                }
+                first = false;
+                message.append("rawRsaPadding=").append(gating.getKey())
+                    .append(" unsupported by [")
+                    .append(String.join(", ", gating.getValue())).append(']');
+            }
+            throw new TestAbortedException(message.toString());
         }
     }
 

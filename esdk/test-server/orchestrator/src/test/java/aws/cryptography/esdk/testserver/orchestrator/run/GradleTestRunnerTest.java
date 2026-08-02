@@ -33,7 +33,8 @@ class GradleTestRunnerTest {
             List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")),
                 new TestTarget("python", 4, URI.create("http://127.0.0.1:8092"))),
             features(),
-            List.of("streaming", "MPL"));
+            List.of("streaming", "MPL"),
+            Map.of("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")));
 
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 
@@ -45,6 +46,9 @@ class GradleTestRunnerTest {
             "must pass the flattened features property: " + command);
         assertTrue(command.contains("-Desdk.testserver.featureCatalog=streaming,MPL"),
             "must pass the catalog verbatim: " + command);
+        assertTrue(command.contains(
+                "-Desdk.testserver.rawRsaPaddingSchemes=c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1"),
+            "must pass the declared padding capabilities: " + command);
         assertTrue(command.stream().noneMatch(a -> a.startsWith("-Desdk.testserver.endpoints")),
             "the legacy endpoints property is replaced: " + command);
     }
@@ -55,13 +59,17 @@ class GradleTestRunnerTest {
         TestRunInput input = new TestRunInput(
             List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
             Map.of(),
-            List.of());
+            List.of(),
+            Map.of());
 
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 
         assertTrue(command.stream().anyMatch(a -> a.startsWith("-Desdk.testserver.targets=")));
         assertTrue(command.stream().noneMatch(a -> a.startsWith("-Desdk.testserver.features")),
             "no features property when none are on hand: " + command);
+        assertTrue(command.stream()
+                .noneMatch(a -> a.startsWith("-Desdk.testserver.rawRsaPaddingSchemes")),
+            "no padding property when no language declares one: " + command);
     }
 
     // ---- JUnit XML parsing ----------------------------------------------

@@ -1,5 +1,6 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,6 +30,19 @@ import java.util.Set;
  *       (e.g. {@code streaming,MPL}).</li>
  * </ol>
  *
+ * <p>A third, <em>optional</em> property carries the per-language raw-RSA
+ * padding capability: <b>{@code esdk.testserver.rawRsaPaddingSchemes} /
+ * {@code ESDK_TESTSERVER_RAW_RSA_PADDING_SCHEMES}</b> — a comma-separated list
+ * of {@code <language>:<SCHEME>[;<SCHEME>…]} entries (e.g.
+ * {@code c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1}), one per language whose
+ * Feature_Declaration carries {@code rawRsaPaddingSchemes}. Unlike Feature
+ * support, absence here is itself a declaration: a language absent from the
+ * property (or the property absent entirely) declared no restriction, so it
+ * supports every {@link PaddingScheme} — that is the capability's
+ * absent-means-all semantic transmitted from the configuration, not an
+ * assumption. Scheme names must be values of the modeled {@link PaddingScheme};
+ * anything else is a parse error.
+ *
  * <p>Support is determined <em>solely</em> from the declarations: an absent
  * property, an absent language, or an absent {@code (language, Feature)} pair is
  * a <b>configuration error</b> surfaced when queried ({@link IllegalStateException}
@@ -46,6 +60,12 @@ public final class FeatureDeclarations {
     public static final String CATALOG_PROPERTY = "esdk.testserver.featureCatalog";
     public static final String CATALOG_ENV = "ESDK_TESTSERVER_FEATURE_CATALOG";
 
+    /** Runtime-config key: comma-separated {@code lang:SCHEME[;SCHEME…]} entries. */
+    public static final String RAW_RSA_PADDING_SCHEMES_PROPERTY =
+        "esdk.testserver.rawRsaPaddingSchemes";
+    public static final String RAW_RSA_PADDING_SCHEMES_ENV =
+        "ESDK_TESTSERVER_RAW_RSA_PADDING_SCHEMES";
+
     private static volatile FeatureDeclarations instance;
 
     /** Catalog names in configuration order; {@code null} when unconfigured. */
@@ -54,9 +74,18 @@ public final class FeatureDeclarations {
     /** language -> (feature -> supported); {@code null} when unconfigured. */
     private final Map<String, Map<String, Boolean>> declarations;
 
-    private FeatureDeclarations(List<String> catalog, Map<String, Map<String, Boolean>> declarations) {
+    /**
+     * language -> declared raw-RSA padding schemes, only for languages that
+     * declared the capability; never {@code null} (absence means "no language
+     * declared a restriction", not "unconfigured").
+     */
+    private final Map<String, Set<String>> rawRsaPaddingSchemes;
+
+    private FeatureDeclarations(List<String> catalog, Map<String, Map<String, Boolean>> declarations,
+            Map<String, Set<String>> rawRsaPaddingSchemes) {
         this.catalog = catalog;
         this.declarations = declarations;
+        this.rawRsaPaddingSchemes = rawRsaPaddingSchemes;
     }
 
     /**
@@ -73,7 +102,9 @@ public final class FeatureDeclarations {
                 if (local == null) {
                     local = parse(
                         configuredValue(FEATURES_PROPERTY, FEATURES_ENV),
-                        configuredValue(CATALOG_PROPERTY, CATALOG_ENV));
+                        configuredValue(CATALOG_PROPERTY, CATALOG_ENV),
+                        configuredValue(
+                            RAW_RSA_PADDING_SCHEMES_PROPERTY, RAW_RSA_PADDING_SCHEMES_ENV));
                     instance = local;
                 }
             }
@@ -87,11 +118,18 @@ public final class FeatureDeclarations {
      * Package-private so unit tests can exercise parsing without touching the
      * JVM-wide singleton or system properties.
      */
+    /** {@link #parse(String, String, String)} with no padding property configured. */
     static FeatureDeclarations parse(String featuresRaw, String catalogRaw) {
+        return parse(featuresRaw, catalogRaw, null);
+    }
+
+    static FeatureDeclarations parse(String featuresRaw, String catalogRaw, String paddingsRaw) {
         List<String> catalog = isBlank(catalogRaw) ? null : parseCatalog(catalogRaw);
         Map<String, Map<String, Boolean>> declarations =
             isBlank(featuresRaw) ? null : parseDeclarations(featuresRaw);
-        return new FeatureDeclarations(catalog, declarations);
+        Map<String, Set<String>> rawRsaPaddingSchemes =
+            isBlank(paddingsRaw) ? Map.of() : parseRawRsaPaddingSchemes(paddingsRaw);
+        return new FeatureDeclarations(catalog, declarations, rawRsaPaddingSchemes);
     }
 
     /**
@@ -118,6 +156,19 @@ public final class FeatureDeclarations {
                     + "); Feature support is never assumed");
         }
         return supported;
+    }
+
+    /**
+     * @return whether {@code language} supports the raw-RSA padding
+     *     {@code scheme}. A language absent from the
+     *     {@value #RAW_RSA_PADDING_SCHEMES_PROPERTY} property (or the property
+     *     absent entirely) declared no restriction — its Feature_Declaration
+     *     carries no {@code rawRsaPaddingSchemes} — so every scheme is
+     *     supported; a present language supports exactly its declared subset.
+     */
+    public boolean supportsRawRsaPadding(String language, PaddingScheme scheme) {
+        Set<String> declared = rawRsaPaddingSchemes.get(language);
+        return declared == null || declared.contains(scheme.getValue());
     }
 
     /**
@@ -249,5 +300,64 @@ public final class FeatureDeclarations {
                 "language '" + language + "' declares no features in " + FEATURES_PROPERTY);
         }
         return byFeature;
+    }
+
+    /**
+     * Parse {@code lang:SCHEME[;SCHEME…]} CSV entries, rejecting duplicate
+     * languages, duplicate schemes, empty scheme lists, and any name that is
+     * not a modeled {@link PaddingScheme} value.
+     */
+    private static Map<String, Set<String>> parseRawRsaPaddingSchemes(String raw) {
+        Map<String, Set<String>> byLanguage = new LinkedHashMap<>();
+        for (String entry : raw.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            int colon = trimmed.indexOf(':');
+            if (colon < 0) {
+                throw new IllegalArgumentException(
+                    "malformed padding entry (expected language:SCHEME[;SCHEME...]): " + trimmed);
+            }
+            String language = trimmed.substring(0, colon).trim();
+            if (language.isEmpty()) {
+                throw new IllegalArgumentException("blank language in padding entry: " + trimmed);
+            }
+            if (byLanguage.containsKey(language)) {
+                throw new IllegalArgumentException(
+                    "duplicate language in " + RAW_RSA_PADDING_SCHEMES_PROPERTY + ": " + language);
+            }
+            Set<String> schemes = new LinkedHashSet<>();
+            for (String scheme : trimmed.substring(colon + 1).split(";")) {
+                String name = scheme.trim();
+                if (name.isEmpty()) {
+                    continue;
+                }
+                try {
+                    PaddingScheme.from(name);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                        "unknown raw-RSA padding scheme '" + name + "' for language '"
+                            + language + "' in " + RAW_RSA_PADDING_SCHEMES_PROPERTY);
+                }
+                if (!schemes.add(name)) {
+                    throw new IllegalArgumentException(
+                        "duplicate raw-RSA padding scheme '" + name + "' declared for language '"
+                            + language + "'");
+                }
+            }
+            if (schemes.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "language '" + language + "' declares no padding schemes in "
+                        + RAW_RSA_PADDING_SCHEMES_PROPERTY);
+            }
+            byLanguage.put(language, schemes);
+        }
+        if (byLanguage.isEmpty()) {
+            throw new IllegalArgumentException(
+                "no padding declarations parsed from " + RAW_RSA_PADDING_SCHEMES_PROPERTY
+                    + ": " + raw);
+        }
+        return byLanguage;
     }
 }

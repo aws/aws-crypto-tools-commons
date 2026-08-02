@@ -18,10 +18,14 @@ import java.util.stream.Collectors;
  *       {@code supportedFeatures} becomes {@code true}, one in
  *       {@code unsupportedFeatures} becomes {@code false}),</li>
  *   <li>the Configuration_Set's Feature_Catalog verbatim →
- *       {@code esdk.testserver.featureCatalog}.</li>
+ *       {@code esdk.testserver.featureCatalog},</li>
+ *   <li>each language's declared raw-RSA padding capability →
+ *       {@code esdk.testserver.rawRsaPaddingSchemes} (only languages whose
+ *       declaration carries {@code rawRsaPaddingSchemes}; an absent language
+ *       supports every scheme).</li>
  * </ul>
  *
- * <p>All three values derive from the validated merged configuration artifacts;
+ * <p>All values derive from the validated merged configuration artifacts;
  * the formatting helpers are static so the orchestrated pipeline (task 9.1) can
  * reuse them. Insertion order is preserved throughout so the properties are
  * deterministic for a given configuration.
@@ -29,11 +33,14 @@ import java.util.stream.Collectors;
  * @param targets        the launched Targets, in launch order
  * @param features       language → (Feature → supported) flattened declarations
  * @param featureCatalog the Feature_Catalog names, in catalog order
+ * @param rawRsaPaddingSchemes language → declared raw-RSA padding schemes, only
+ *                       for languages whose declaration carries the capability
  */
 public record TestRunInput(
     List<TestTarget> targets,
     Map<String, Map<String, Boolean>> features,
-    List<String> featureCatalog
+    List<String> featureCatalog,
+    Map<String, List<String>> rawRsaPaddingSchemes
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -43,6 +50,10 @@ public record TestRunInput(
             copied.put(language, Collections.unmodifiableMap(new LinkedHashMap<>(declaration))));
         features = Collections.unmodifiableMap(copied);
         featureCatalog = List.copyOf(featureCatalog);
+        Map<String, List<String>> copiedSchemes = new LinkedHashMap<>();
+        rawRsaPaddingSchemes.forEach((language, schemes) ->
+            copiedSchemes.put(language, List.copyOf(schemes)));
+        rawRsaPaddingSchemes = Collections.unmodifiableMap(copiedSchemes);
     }
 
     /**
@@ -76,6 +87,19 @@ public record TestRunInput(
      */
     public static String formatFeatureCatalog(List<String> featureCatalog) {
         return String.join(",", featureCatalog);
+    }
+
+    /**
+     * Format the declared raw-RSA padding capabilities as the
+     * {@code esdk.testserver.rawRsaPaddingSchemes} value:
+     * {@code lang:SCHEME[;SCHEME…]} CSV, e.g.
+     * {@code c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1}. Only languages whose
+     * declaration carries the capability appear.
+     */
+    public static String formatRawRsaPaddingSchemes(Map<String, List<String>> schemes) {
+        return schemes.entrySet().stream()
+            .map(language -> language.getKey() + ":" + String.join(";", language.getValue()))
+            .collect(Collectors.joining(","));
     }
 
     /**

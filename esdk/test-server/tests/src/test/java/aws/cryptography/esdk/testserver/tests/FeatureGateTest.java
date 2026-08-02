@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import java.net.URI;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -149,5 +150,45 @@ class FeatureGateTest {
 
         assertThrows(IllegalStateException.class, () ->
             FeatureGate.require(Set.of("streaming"), pair("java", "python"), declarations));
+    }
+
+    // ------------------------------------------------------ padding-gated skip
+
+    @Test
+    @DisplayName("skips with the exact padding-gated message when either combination language excludes a scheme")
+    void skipsWhenEitherLanguageExcludesTheScheme() {
+        FeatureDeclarations declarations = FeatureDeclarations.parse(
+            "java:streaming=true;MPL=true,c:streaming=true;MPL=true",
+            CATALOG, "c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1");
+
+        TestAbortedException encryptSide = assertThrows(TestAbortedException.class, () ->
+            FeatureGate.requireRawRsaPaddings(
+                Set.of(PaddingScheme.OAEP_SHA384_MGF1), pair("c", "java"), declarations));
+        assertEquals("padding-gated skip: rawRsaPadding=OAEP_SHA384_MGF1 unsupported by [c]",
+            encryptSide.getMessage());
+
+        TestAbortedException decryptSide = assertThrows(TestAbortedException.class, () ->
+            FeatureGate.requireRawRsaPaddings(
+                Set.of(PaddingScheme.OAEP_SHA512_MGF1), pair("java", "c"), declarations));
+        assertEquals("padding-gated skip: rawRsaPadding=OAEP_SHA512_MGF1 unsupported by [c]",
+            decryptSide.getMessage());
+    }
+
+    @Test
+    @DisplayName("permits execution when both combination languages support every required scheme")
+    void permitsWhenBothLanguagesSupportTheSchemes() {
+        FeatureDeclarations declarations = FeatureDeclarations.parse(
+            "java:streaming=true;MPL=true,c:streaming=true;MPL=true",
+            CATALOG, "c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1");
+
+        assertDoesNotThrow(() -> FeatureGate.requireRawRsaPaddings(
+            Set.of(PaddingScheme.PKCS1, PaddingScheme.OAEP_SHA256_MGF1),
+            pair("java", "c"), declarations));
+        // Languages that declared no restriction support every scheme.
+        assertDoesNotThrow(() -> FeatureGate.requireRawRsaPaddings(
+            Set.of(PaddingScheme.OAEP_SHA512_MGF1), pair("java", "java"), declarations));
+        // No required schemes (a non-raw-RSA vector): never gates.
+        assertDoesNotThrow(() -> FeatureGate.requireRawRsaPaddings(
+            Set.of(), pair("c", "c"), declarations));
     }
 }

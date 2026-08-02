@@ -202,8 +202,12 @@ public final class ESDKTestServer {
         }
     }
 
-    /** One language's Feature_Declaration, wherever it was carried. */
-    private record Declaration(List<String> supported, List<String> unsupported) {
+    /**
+     * One language's Feature_Declaration, wherever it was carried, with its
+     * optional raw-RSA padding capability ({@code null} = every scheme).
+     */
+    private record Declaration(
+            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes) {
     }
 
     private PipelineOutcome executePipeline(
@@ -257,19 +261,26 @@ public final class ESDKTestServer {
             onHand = onHand
                 .and(FeatureValidation.validateDeclaration(catalog, context.ownLanguage(),
                     own.supportedFeatures(), own.unsupportedFeatures()))
+                .and(FeatureValidation.validateRawRsaPaddingSchemes(context.ownLanguage(),
+                    own.rawRsaPaddingSchemes(), own.supportedFeatures()))
                 .and(FeatureValidation.validateProductMatch(context.invokingRepositoryName(),
                     own.product(), configurationSet.product()));
             declarations.put(context.ownLanguage(),
-                new Declaration(own.supportedFeatures(), own.unsupportedFeatures()));
+                new Declaration(own.supportedFeatures(), own.unsupportedFeatures(),
+                    own.rawRsaPaddingSchemes()));
         }
         for (ConfigurationEntry entry : effectiveEntries) {
             if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
                 continue;
             }
-            onHand = onHand.and(FeatureValidation.validateDeclaration(catalog,
-                entry.language(), entry.supportedFeatures(), entry.unsupportedFeatures()));
+            onHand = onHand
+                .and(FeatureValidation.validateDeclaration(catalog,
+                    entry.language(), entry.supportedFeatures(), entry.unsupportedFeatures()))
+                .and(FeatureValidation.validateRawRsaPaddingSchemes(entry.language(),
+                    entry.rawRsaPaddingSchemes(), entry.supportedFeatures()));
             declarations.put(entry.language(),
-                new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures()));
+                new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures(),
+                    entry.rawRsaPaddingSchemes()));
         }
         if (!onHand.valid()) {
             return PipelineOutcome.aborted(
@@ -363,6 +374,8 @@ public final class ESDKTestServer {
             FeatureValidation.Result crossRepo = FeatureValidation
                 .validateDeclaration(catalog, language,
                     carried.supportedFeatures(), carried.unsupportedFeatures())
+                .and(FeatureValidation.validateRawRsaPaddingSchemes(language,
+                    carried.rawRsaPaddingSchemes(), carried.supportedFeatures()))
                 .and(FeatureValidation.validateProductMatch(languageRepository,
                     carried.product(), configurationSet.product()));
             if (!crossRepo.valid()) {
@@ -370,7 +383,8 @@ public final class ESDKTestServer {
                     "invalid Feature_Declaration(s): " + crossRepo.message());
             }
             declarations.put(language,
-                new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures()));
+                new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures(),
+                    carried.rawRsaPaddingSchemes()));
         }
 
         // ---- Stage 5: build + launch every server as a subprocess on its
@@ -489,6 +503,7 @@ public final class ESDKTestServer {
         List<String> catalog = configurationSet.features() == null
             ? List.of() : configurationSet.features();
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
+        Map<String, List<String>> rawRsaPaddingSchemes = new LinkedHashMap<>();
         for (ConfigurationEntry entry : effectiveEntries) {
             Declaration declaration = declarations.get(entry.language());
             if (declaration == null) {
@@ -499,8 +514,11 @@ public final class ESDKTestServer {
             if (!flattened.isEmpty()) {
                 features.put(entry.language(), flattened);
             }
+            if (declaration.rawRsaPaddingSchemes() != null) {
+                rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
+            }
         }
-        return new TestRunInput(targets, features, catalog);
+        return new TestRunInput(targets, features, catalog, rawRsaPaddingSchemes);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

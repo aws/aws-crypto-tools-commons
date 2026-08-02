@@ -84,6 +84,18 @@ class TestRunInputTest {
     }
 
     @Test
+    @DisplayName("formats declared raw-RSA padding capabilities as lang:SCHEME[;SCHEME…] CSV")
+    void formatsRawRsaPaddingSchemes() {
+        Map<String, List<String>> schemes = new LinkedHashMap<>();
+        schemes.put("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"));
+        schemes.put("python", List.of("OAEP_SHA512_MGF1"));
+
+        assertEquals("c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1,python:OAEP_SHA512_MGF1",
+            TestRunInput.formatRawRsaPaddingSchemes(schemes));
+        assertEquals("", TestRunInput.formatRawRsaPaddingSchemes(Map.of()));
+    }
+
+    @Test
     @DisplayName("the record preserves target, language, and Feature ordering")
     void preservesOrdering() {
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
@@ -94,7 +106,8 @@ class TestRunInputTest {
             List.of(new TestTarget("python", 4, URI.create("http://127.0.0.1:8092")),
                 new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
             features,
-            List.of("streaming", "MPL"));
+            List.of("streaming", "MPL"),
+            Map.of());
 
         assertEquals("python:4=http://127.0.0.1:8092,java:3=http://127.0.0.1:8091",
             TestRunInput.formatTargets(input.targets()));

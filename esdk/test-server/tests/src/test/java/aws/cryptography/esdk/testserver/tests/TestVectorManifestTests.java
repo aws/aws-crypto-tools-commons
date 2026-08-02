@@ -118,10 +118,18 @@ class TestVectorManifestTests {
             Set<String> vectorFeatures = new LinkedHashSet<>();
             vectorFeatures.addAll(featuresFor(scenario.get("encryptKeyDescription")));
             vectorFeatures.addAll(featuresFor(scenario.get("decryptKeyDescription")));
+            // The raw-RSA padding scheme(s) the vector's keyrings use. A
+            // combination whose encrypt or decrypt language declares a
+            // rawRsaPaddingSchemes capability excluding any of them is skipped
+            // visibly, mirroring the Feature gate.
+            Set<PaddingScheme> vectorPaddings = new LinkedHashSet<>();
+            vectorPaddings.addAll(paddingsFor(scenario.get("encryptKeyDescription")));
+            vectorPaddings.addAll(paddingsFor(scenario.get("decryptKeyDescription")));
 
             for (EndpointPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
                     FeatureGate.require(vectorFeatures, pair);
+                    FeatureGate.requireRawRsaPaddings(vectorPaddings, pair);
                     byte[] ciphertext = EsdkOps.encrypt(
                         pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
                     byte[] recovered =
@@ -220,6 +228,53 @@ class TestVectorManifestTests {
             }
             default -> {
                 // Unmapped types are dropped by skipReason before the gate runs.
+            }
+        }
+    }
+
+    /**
+     * The raw-RSA {@link PaddingScheme}(s) a key/CMM description uses, so the
+     * test can gate on them ({@link FeatureGate#requireRawRsaPaddings}) and skip
+     * on a language whose declared padding capability excludes any. Recurses
+     * exactly like {@link #featuresFor}; descriptions with no raw-RSA keyring
+     * yield an empty set. Only maps descriptions {@link #keyringFor} builds;
+     * unmapped paddings never reach here (they are dropped by
+     * {@link #skipReason} first).
+     */
+    private static Set<PaddingScheme> paddingsFor(JsonNode desc) {
+        Set<PaddingScheme> paddings = new LinkedHashSet<>();
+        collectPaddings(desc, paddings);
+        return paddings;
+    }
+
+    private static void collectPaddings(JsonNode desc, Set<PaddingScheme> into) {
+        if (desc == null) {
+            return;
+        }
+        String type = text(desc, "type");
+        if (type == null) {
+            return;
+        }
+        switch (type) {
+            case "raw" -> {
+                if ("rsa".equals(text(desc, "encryption-algorithm"))) {
+                    PaddingScheme padding =
+                        paddingFor(text(desc, "padding-algorithm"), text(desc, "padding-hash"));
+                    if (padding != null) {
+                        into.add(padding);
+                    }
+                }
+            }
+            case "multi-keyring" -> {
+                collectPaddings(desc.get("generator"), into);
+                JsonNode children = desc.get("childKeyrings");
+                if (children != null) {
+                    children.forEach(child -> collectPaddings(child, into));
+                }
+            }
+            case "required-encryption-context-cmm" -> collectPaddings(desc.get("underlying"), into);
+            default -> {
+                // No other description type carries a raw-RSA padding.
             }
         }
     }

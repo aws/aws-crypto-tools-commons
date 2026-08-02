@@ -11,7 +11,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 
 /**
@@ -38,10 +40,23 @@ final class FakeMaterializer implements Materializer {
     private final String product;
     private final List<String> catalog;
 
+    /** language -> rawRsaPaddingSchemes to write into that server's declaration. */
+    private final Map<String, List<String>> rawRsaPaddingSchemes = new LinkedHashMap<>();
+
     private FakeMaterializer(Path root, String product, List<String> catalog) {
         this.root = root;
         this.product = product;
         this.catalog = catalog;
+    }
+
+    /**
+     * Also write a {@code rawRsaPaddingSchemes} capability into
+     * {@code language}'s materialized commons-configuration file, so pipeline
+     * tests can exercise the stage-3 carried-capability path.
+     */
+    FakeMaterializer withRawRsaPaddingSchemes(String language, List<String> schemes) {
+        rawRsaPaddingSchemes.put(language, List.copyOf(schemes));
+        return this;
     }
 
     /**
@@ -71,7 +86,8 @@ final class FakeMaterializer implements Materializer {
                 // Write at the location the pipeline's stage-3 read computes —
                 // Success.root() (the plan's working-tree root, or the clone
                 // root), not the raw component directory.
-                writeCommonsConfiguration(success.root());
+                writeCommonsConfiguration(success.root(),
+                    rawRsaPaddingSchemes.get(plan.component().language()));
             }
             outcomes.add(success);
         }
@@ -84,18 +100,18 @@ final class FakeMaterializer implements Materializer {
      * {@code esdk/test-server/commons-configuration.json} relative path) so the
      * orchestrator's stage-3 cross-repository Feature validation read succeeds.
      */
-    private void writeCommonsConfiguration(Path serverRoot) {
+    private void writeCommonsConfiguration(Path serverRoot, List<String> paddingSchemes) {
         Path file = serverRoot.resolve(ESDKTestServer.COMMONS_CONFIGURATION_RELATIVE_PATH);
         try {
             Files.createDirectories(file.getParent());
-            Files.writeString(file, commonsConfigurationJson());
+            Files.writeString(file, commonsConfigurationJson(paddingSchemes));
         } catch (IOException e) {
             throw new UncheckedIOException(
                 "fake materializer could not write " + file, e);
         }
     }
 
-    private String commonsConfigurationJson() {
+    private String commonsConfigurationJson(List<String> paddingSchemes) {
         StringJoiner supported = new StringJoiner(", ", "[", "]");
         for (String feature : catalog) {
             supported.add('"' + feature + '"');
@@ -108,7 +124,17 @@ final class FakeMaterializer implements Materializer {
             + "  },\n"
             + "  \"product\": \"" + product + "\",\n"
             + "  \"supportedFeatures\": " + supported + ",\n"
-            + "  \"unsupportedFeatures\": []\n"
-            + "}\n";
+            + "  \"unsupportedFeatures\": []"
+            + (paddingSchemes == null ? "" : ",\n  \"rawRsaPaddingSchemes\": "
+                + jsonArray(paddingSchemes))
+            + "\n}\n";
+    }
+
+    private static String jsonArray(List<String> values) {
+        StringJoiner joined = new StringJoiner(", ", "[", "]");
+        for (String value : values) {
+            joined.add('"' + value + '"');
+        }
+        return joined.toString();
     }
 }

@@ -21,6 +21,70 @@ class FeatureValidationTest {
     private static final List<String> CATALOG = List.of("streaming", "MPL");
 
     @Nested
+    @DisplayName("rawRsaPaddingSchemes capability")
+    class RawRsaPaddingSchemes {
+
+        @Test
+        @DisplayName("an absent field (null) is valid: every scheme is supported")
+        void absentFieldIsValid() {
+            FeatureValidation.Result r = FeatureValidation.validateRawRsaPaddingSchemes(
+                "java", null, List.of());
+            assertTrue(r.valid());
+        }
+
+        @Test
+        @DisplayName("a subset of model schemes with raw-rsa supported is valid")
+        void modelSubsetIsValid() {
+            FeatureValidation.Result r = FeatureValidation.validateRawRsaPaddingSchemes(
+                "c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"),
+                List.of("raw-aes", "raw-rsa"));
+            assertTrue(r.valid());
+        }
+
+        @Test
+        @DisplayName("an unknown scheme name is an error naming language and name")
+        void unknownSchemeIsError() {
+            FeatureValidation.Result r = FeatureValidation.validateRawRsaPaddingSchemes(
+                "c", List.of("PKCS1", "OAEP_SHA3_MGF1"), List.of("raw-rsa"));
+            assertFalse(r.valid());
+            assertEquals(1, r.errors().size());
+            assertTrue(r.errors().get(0).contains("c"));
+            assertTrue(r.errors().get(0).contains("\"OAEP_SHA3_MGF1\""));
+        }
+
+        @Test
+        @DisplayName("an empty list is an error: declare raw-rsa unsupported instead")
+        void emptyListIsError() {
+            FeatureValidation.Result r = FeatureValidation.validateRawRsaPaddingSchemes(
+                "c", List.of(), List.of("raw-rsa"));
+            assertFalse(r.valid());
+            assertEquals(1, r.errors().size());
+            assertTrue(r.errors().get(0).contains("raw-rsa Feature unsupported instead"));
+        }
+
+        @Test
+        @DisplayName("a duplicated scheme name is an error naming each duplicate")
+        void duplicateSchemeIsError() {
+            FeatureValidation.Result r = FeatureValidation.validateRawRsaPaddingSchemes(
+                "c", List.of("PKCS1", "PKCS1"), List.of("raw-rsa"));
+            assertFalse(r.valid());
+            assertEquals(1, r.errors().size());
+            assertTrue(r.errors().get(0).contains("\"PKCS1\""));
+            assertTrue(r.errors().get(0).contains("2 times"));
+        }
+
+        @Test
+        @DisplayName("the field present without raw-rsa in supportedFeatures is an error")
+        void withoutRawRsaSupportedIsError() {
+            FeatureValidation.Result r = FeatureValidation.validateRawRsaPaddingSchemes(
+                "c", List.of("PKCS1"), List.of("raw-aes"));
+            assertFalse(r.valid());
+            assertEquals(1, r.errors().size());
+            assertTrue(r.errors().get(0).contains("\"raw-rsa\""));
+        }
+    }
+
+    @Nested
     @DisplayName("catalog coverage (Requirements 8.5, 8.6)")
     class CatalogCoverage {
 

@@ -109,6 +109,7 @@ public final class ConfigurationLoader {
             text(root, "product"),
             stringList(root.get("supportedFeatures")),
             stringList(root.get("unsupportedFeatures")),
+            stringList(root.get("rawRsaPaddingSchemes")),
             overrides);
     }
 
@@ -126,6 +127,7 @@ public final class ConfigurationLoader {
             serverLocation(n.get("serverLocation")),
             stringList(n.get("supportedFeatures")),
             stringList(n.get("unsupportedFeatures")),
+            stringList(n.get("rawRsaPaddingSchemes")),
             text(n, "commonsConfigurationPath"));
     }
 

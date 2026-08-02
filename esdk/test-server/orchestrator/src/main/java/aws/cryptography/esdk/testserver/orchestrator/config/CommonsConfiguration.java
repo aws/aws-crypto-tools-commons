@@ -15,7 +15,9 @@ import java.util.List;
  *       Configuration_Set's {@code product} (Requirement 8.11),</li>
  *   <li>the repository language's {@code Feature_Declaration} — the
  *       {@code supportedFeatures} / {@code unsupportedFeatures} arrays
- *       (Requirements 8.1, 8.2),</li>
+ *       (Requirements 8.1, 8.2) and the optional {@code rawRsaPaddingSchemes}
+ *       capability (the raw-RSA padding schemes the library supports; absent
+ *       means all),</li>
  *   <li>optional {@code configurationOverrides}: each a <em>complete</em>
  *       {@link ConfigurationEntry} replacing the commons-stored entry for that
  *       language (Requirement 4.6).</li>
@@ -34,6 +36,10 @@ import java.util.List;
  *                            {@code null} when absent
  * @param unsupportedFeatures the Feature_Declaration's unsupported half, or
  *                            {@code null} when absent
+ * @param rawRsaPaddingSchemes the raw-RSA padding schemes the language's library
+ *                            supports, or {@code null} when absent — absent means
+ *                            every scheme the Smithy model defines (see
+ *                            {@link FeatureValidation#validateRawRsaPaddingSchemes})
  * @param configurationOverrides complete replacement Configuration_Entries for
  *                            Other languages (Requirement 4.6); never null
  */
@@ -42,11 +48,14 @@ public record CommonsConfiguration(
     String product,
     List<String> supportedFeatures,
     List<String> unsupportedFeatures,
+    List<String> rawRsaPaddingSchemes,
     List<ConfigurationEntry> configurationOverrides
 ) {
     public CommonsConfiguration {
         supportedFeatures = supportedFeatures == null ? null : List.copyOf(supportedFeatures);
         unsupportedFeatures = unsupportedFeatures == null ? null : List.copyOf(unsupportedFeatures);
+        rawRsaPaddingSchemes =
+            rawRsaPaddingSchemes == null ? null : List.copyOf(rawRsaPaddingSchemes);
         configurationOverrides =
             configurationOverrides == null ? List.of() : List.copyOf(configurationOverrides);
     }

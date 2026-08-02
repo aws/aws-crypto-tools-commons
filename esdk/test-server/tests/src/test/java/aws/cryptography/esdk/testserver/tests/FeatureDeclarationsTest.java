@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -130,5 +131,50 @@ class FeatureDeclarationsTest {
     void rejectsDuplicateCatalogName() {
         assertThrows(IllegalArgumentException.class,
             () -> FeatureDeclarations.parse(FEATURES, "streaming,streaming"));
+    }
+
+    // ------------------------------------------- raw-RSA padding capability
+
+    @Test
+    @DisplayName("a declared padding subset is supported exactly; other languages support every scheme")
+    void paddingSubsetIsExact() {
+        FeatureDeclarations declarations = FeatureDeclarations.parse(
+            FEATURES, CATALOG, "c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1");
+
+        assertTrue(declarations.supportsRawRsaPadding("c", PaddingScheme.PKCS1));
+        assertTrue(declarations.supportsRawRsaPadding("c", PaddingScheme.OAEP_SHA256_MGF1));
+        assertFalse(declarations.supportsRawRsaPadding("c", PaddingScheme.OAEP_SHA384_MGF1));
+        assertFalse(declarations.supportsRawRsaPadding("c", PaddingScheme.OAEP_SHA512_MGF1));
+        // java declared no restriction: every scheme is supported.
+        assertTrue(declarations.supportsRawRsaPadding("java", PaddingScheme.OAEP_SHA512_MGF1));
+    }
+
+    @Test
+    @DisplayName("an absent padding property means every language supports every scheme")
+    void absentPaddingPropertyMeansAllSupported() {
+        FeatureDeclarations declarations = FeatureDeclarations.parse(FEATURES, CATALOG, null);
+
+        assertTrue(declarations.supportsRawRsaPadding("java", PaddingScheme.OAEP_SHA384_MGF1));
+        assertTrue(declarations.supportsRawRsaPadding("python", PaddingScheme.PKCS1));
+    }
+
+    @Test
+    @DisplayName("rejects malformed padding entries: unknown scheme, duplicates, empty lists")
+    void rejectsMalformedPaddingEntries() {
+        // A name that is not a modeled PaddingScheme value.
+        assertThrows(IllegalArgumentException.class,
+            () -> FeatureDeclarations.parse(FEATURES, CATALOG, "c:OAEP_SHA3_MGF1"));
+        // Duplicate scheme within a language.
+        assertThrows(IllegalArgumentException.class,
+            () -> FeatureDeclarations.parse(FEATURES, CATALOG, "c:PKCS1;PKCS1"));
+        // Duplicate language.
+        assertThrows(IllegalArgumentException.class,
+            () -> FeatureDeclarations.parse(FEATURES, CATALOG, "c:PKCS1,c:PKCS1"));
+        // A language with zero schemes.
+        assertThrows(IllegalArgumentException.class,
+            () -> FeatureDeclarations.parse(FEATURES, CATALOG, "c:"));
+        // Missing ':' separating language from schemes.
+        assertThrows(IllegalArgumentException.class,
+            () -> FeatureDeclarations.parse(FEATURES, CATALOG, "PKCS1"));
     }
 }

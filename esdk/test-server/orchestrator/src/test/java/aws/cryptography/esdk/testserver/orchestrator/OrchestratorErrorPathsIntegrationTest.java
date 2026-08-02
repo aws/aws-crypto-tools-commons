@@ -1,5 +1,6 @@
 package aws.cryptography.esdk.testserver.orchestrator;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,11 +39,16 @@ class OrchestratorErrorPathsIntegrationTest {
 
     /** A structurally complete entry (task 1.2 validation requires it). */
     private static ConfigurationEntry completeJavaEntry(int port) {
-        return new ConfigurationEntry("java", 3, port,
-            new RepositoryCoordinates("aws-crypto-tools-java",
-                "git@github.com:aws/aws-crypto-tools-java.git", "main", "esdk"),
-            new ServerLocation("aws-crypto-tools-java",
-                "git@github.com:aws/aws-crypto-tools-java.git", "main",
+        return completeEntry("java", port);
+    }
+
+    /** A structurally complete entry for {@code language}, no inline declaration. */
+    private static ConfigurationEntry completeEntry(String language, int port) {
+        return new ConfigurationEntry(language, 3, port,
+            new RepositoryCoordinates("aws-crypto-tools-" + language,
+                "git@github.com:aws/aws-crypto-tools-" + language + ".git", "main", "esdk"),
+            new ServerLocation("aws-crypto-tools-" + language,
+                "git@github.com:aws/aws-crypto-tools-" + language + ".git", "main",
                 "esdk/test-server/server"),
             null, null);
     }
@@ -161,7 +167,7 @@ class OrchestratorErrorPathsIntegrationTest {
     void gradleRunnerRefusesWithoutEndpoint(@TempDir Path root) {
         GradleTestRunner runner = new GradleTestRunner(root.resolve("tests"));
         Assertions.assertThrows(MissingRuntimeConfigException.class,
-            () -> runner.run(new TestRunInput(List.of(), Map.of(), List.of())),
+            () -> runner.run(new TestRunInput(List.of(), Map.of(), List.of(), Map.of())),
             "the runner must refuse to run when no target is configured");
     }
 
@@ -178,6 +184,69 @@ class OrchestratorErrorPathsIntegrationTest {
         assertFalse(result.succeeded());
         assertTrue(result.details().toString().contains("RoundTrip#b"),
             "failure must identify the failed Test");
+    }
+
+    /** A structurally complete entry with an inline Feature_Declaration. */
+    private static ConfigurationEntry inlineDeclarationEntry(String language, int port,
+            List<String> supported, List<String> paddingSchemes) {
+        return new ConfigurationEntry(language, 1, port,
+            new RepositoryCoordinates("aws-crypto-tools-" + language,
+                "git@github.com:aws/aws-crypto-tools-" + language + ".git", "main", "esdk"),
+            new ServerLocation("aws-crypto-tools-" + language,
+                "git@github.com:aws/aws-crypto-tools-" + language + ".git", "main",
+                "esdk/test-server/server"),
+            supported, List.of(), paddingSchemes, null);
+    }
+
+    @Test
+    @DisplayName("declared rawRsaPaddingSchemes reach the Tests run from both carriers;"
+        + " a language without the capability is absent")
+    void rawRsaPaddingSchemesReachTheTestsRun(@TempDir Path root) {
+        // python: inline carrier with the capability; c: cross-repo carrier (the
+        // FakeMaterializer writes its declaration); java: cross-repo, no capability.
+        ConfigurationSet set = new ConfigurationSet("esdk", List.of("raw-rsa"), List.of(
+            inlineDeclarationEntry("python", 8092, List.of("raw-rsa"), List.of("PKCS1")),
+            completeEntry("c", 8096),
+            completeEntry("java", 8091)));
+        FakeLauncher launcher = FakeLauncher.succeeding();
+        StubTestRunner runner = StubTestRunner.returning(List.of(
+            TestExecution.passed("RoundTrip#a")));
+        FakeMaterializer materializer = FakeMaterializer.succeedingUnder(root, set)
+            .withRawRsaPaddingSchemes("c",
+                List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"));
+        RunContext context = RunContext.commonsRun(root, "aws-crypto-tools-commons");
+        ESDKTestServer orchestrator = new ESDKTestServer(set, context, materializer,
+            LauncherFactory.uniform(launcher), runner, new DuplicateTestsDetector(), root);
+
+        Result result = orchestrator.run();
+
+        // The fail-open Result reports KMS coverage-floor holes for this stub
+        // run; the handoff is what this test pins: the Tests ran with both
+        // carriers' capabilities.
+        assertTrue(runner.wasInvoked(), () -> "the Tests must run: " + result.summary());
+        assertEquals(
+            Map.of("python", List.of("PKCS1"),
+                "c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
+            runner.lastInput().rawRsaPaddingSchemes(),
+            "both carriers' capabilities must reach the Tests run; java must be absent");
+    }
+
+    @Test
+    @DisplayName("an invalid rawRsaPaddingSchemes capability aborts before any launch")
+    void invalidRawRsaPaddingSchemesAborts(@TempDir Path root) {
+        ConfigurationSet set = new ConfigurationSet("esdk", List.of("raw-rsa"), List.of(
+            inlineDeclarationEntry("python", 8092, List.of("raw-rsa"),
+                List.of("OAEP_SHA3_MGF1"))));
+        FakeLauncher launcher = FakeLauncher.succeeding();
+        StubTestRunner runner = StubTestRunner.returning(List.of());
+
+        Result result = orchestrator(set, launcher, runner, root).run();
+
+        assertFalse(result.succeeded());
+        assertTrue(result.summary().contains("OAEP_SHA3_MGF1"),
+            "the abort must name the unknown scheme: " + result.summary());
+        assertEquals(0, launcher.launchCount(), "no server may launch on an invalid capability");
+        assertFalse(runner.wasInvoked(), "no Tests may run on an invalid capability");
     }
 
     private static void writeTestsMarker(Path dir) throws IOException {
