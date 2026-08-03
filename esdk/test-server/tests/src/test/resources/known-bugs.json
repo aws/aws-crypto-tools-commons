@@ -23,5 +23,10 @@
     "id": "decrypt-accepts-trailing-bytes-commit-key-ecdsa",
     "description": "decrypt accepts trailing bytes appended after a valid ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384 message",
     "languages": ["python"]
+  },
+  {
+    "id": "encrypt-rejects-empty-encryption-context-value",
+    "description": "encrypt rejects an encryption context entry whose value is the empty string (\"All keys and values in encryption context must be non-empty\"), though the message format permits a zero-length value",
+    "languages": ["java"]
   }
 ]
