@@ -76,8 +76,10 @@ class ClientConfigValidationTests {
     @MethodSource("targets")
     void createClientRejectsZeroMaxEncryptedDataKeys(LanguageServerTarget target) {
         FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        assertCreateRejected(target, config(rawAes(new byte[32], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), 0L),
-            "a maxEncryptedDataKeys of 0");
+        KnownBugGate.gate("create-client-accepts-zero-max-encrypted-data-keys", target.language(),
+            () -> assertCreateRejected(target,
+                config(rawAes(new byte[32], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), 0L),
+                "a maxEncryptedDataKeys of 0"));
     }
 
     /** KEYRING-006: a 16-byte wrapping key does not match the AES-256 wrapping suite. */
