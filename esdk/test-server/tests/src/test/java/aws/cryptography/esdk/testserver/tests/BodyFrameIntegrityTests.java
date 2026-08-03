@@ -35,11 +35,13 @@ import org.junit.jupiter.params.provider.MethodSource;
  * attack surface; the existing tamper tests corrupt bytes within a frame, none manipulate
  * frames as units. Added by gap analysis; not a catalog behavior.
  *
- * <p>Uses a committing, non-signing suite (0x0478) so a rejection is attributable to the
- * body frames alone: there is no footer, and the header commitment is left intact. The
- * plaintext spans three whole regular frames plus a short final frame, giving adjacent
- * equal-length regular frames to manipulate. Fully offline (Raw-AES). ESDK-originated
- * failures surface as {@link ESDKClientError}.
+ * <p>A decrypt-side property (the assertion reads only the decryptor), so it runs one row
+ * per target against the reference implementation as producer. Uses a committing,
+ * non-signing suite (0x0478) so a rejection is attributable to the body frames alone:
+ * there is no footer, and the header commitment is left intact. The plaintext spans three
+ * whole regular frames plus a short final frame, giving adjacent equal-length regular
+ * frames to manipulate. Fully offline (Raw-AES). ESDK-originated failures surface as
+ * {@link ESDKClientError}.
  */
 class BodyFrameIntegrityTests {
 
@@ -49,6 +51,7 @@ class BodyFrameIntegrityTests {
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
     private static final long FRAME_LENGTH = 512L;
     private static final byte[] PLAINTEXT = deterministicPlaintext(3 * (int) FRAME_LENGTH + 100);
+    private static final Set<String> FEATURES = Set.of("raw-aes");
 
     private static byte[] deterministicPlaintext(int length) {
         byte[] plaintext = new byte[length];
@@ -58,11 +61,11 @@ class BodyFrameIntegrityTests {
         return plaintext;
     }
 
-    static List<EndpointPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
     }
 
-    private static byte[] encrypt(EndpointPair pair) {
+    private static byte[] encrypt(ReferencePair pair) {
         return EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE, FRAME_LENGTH);
     }
 
@@ -70,7 +73,7 @@ class BodyFrameIntegrityTests {
      * Parse a freshly produced message, confirm it round-trips (so a later rejection is the
      * surgery's doing), and return its regular (non-final) frames.
      */
-    private static List<EsdkMessage.Frame> regularFrames(byte[] ciphertext, EndpointPair pair) {
+    private static List<EsdkMessage.Frame> regularFrames(byte[] ciphertext, ReferencePair pair) {
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, ciphertext),
             "baseline: the untampered multi-frame message must decrypt (" + pair + ")");
@@ -80,7 +83,7 @@ class BodyFrameIntegrityTests {
         return regular;
     }
 
-    private static void assertRejected(EndpointPair pair, byte[] tampered, String what) {
+    private static void assertRejected(ReferencePair pair, byte[] tampered, String what) {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, tampered),
             "decrypt must reject " + what + " (" + pair + ")");
@@ -92,9 +95,9 @@ class BodyFrameIntegrityTests {
 
     /** Two adjacent regular frames swapped: each sits at a sequence/IV it was not sealed for. */
     @ParameterizedTest(name = "swappedFramesRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsSwappedFrames(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsSwappedFrames(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = encrypt(pair);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair);
         EsdkMessage.Frame first = regular.get(0);
@@ -111,9 +114,9 @@ class BodyFrameIntegrityTests {
 
     /** A middle regular frame deleted: the following frame moves onto the wrong sequence number. */
     @ParameterizedTest(name = "deletedFrameRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsDeletedFrame(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsDeletedFrame(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = encrypt(pair);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair);
         EsdkMessage.Frame victim = regular.get(1);
@@ -127,9 +130,9 @@ class BodyFrameIntegrityTests {
 
     /** A regular frame duplicated: the replayed copy lands on the next frame's sequence number. */
     @ParameterizedTest(name = "duplicatedFrameRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsDuplicatedFrame(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsDuplicatedFrame(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = encrypt(pair);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair);
         EsdkMessage.Frame frame = regular.get(0);
@@ -144,9 +147,9 @@ class BodyFrameIntegrityTests {
 
     /** A body cut at a regular-frame boundary never reaches a final frame. */
     @ParameterizedTest(name = "missingFinalFrameRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsBodyTruncatedBeforeFinalFrame(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsBodyTruncatedBeforeFinalFrame(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = encrypt(pair);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair);
         EsdkMessage.Frame lastRegular = regular.get(regular.size() - 1);
@@ -156,9 +159,9 @@ class BodyFrameIntegrityTests {
 
     /** A frame transplanted from another message hits a different message id and derived key. */
     @ParameterizedTest(name = "crossMessageSplicedFrameRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsFrameSplicedFromAnotherMessage(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsFrameSplicedFromAnotherMessage(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] messageA = encrypt(pair);
         byte[] messageB = encrypt(pair);
         List<EsdkMessage.Frame> regularA = regularFrames(messageA, pair);
