@@ -136,4 +136,40 @@ class NonFramedVectorTests {
             target + " " + vector + ": decrypt of the vector with its final auth-tag byte flipped "
                 + "must be rejected");
     }
+
+    /**
+     * A non-framed body whose 8-byte encrypted content length is inflated past the 2^36 - 32
+     * bound is rejected ({@code spec/data-format/message-body.md#encrypted-content-length}):
+     * the bound caps what one AES-GCM invocation may authenticate, and honoring a huge declared
+     * length instead drives allocation and decrypt work for a body that is not there. Tampering
+     * only the length field leaves every authenticated byte untouched, so acceptance could only
+     * come from a reader that trusts the declared length.
+     */
+    @ParameterizedTest(name = "nonFramedContentLengthBoundRejected[{1}] {0}")
+    @MethodSource("cases")
+    void nonFramedContentLengthOverBoundRejected(LanguageServerTarget target, Vector vector) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        byte[] ciphertext = resource(vector.ciphertextResource());
+        int contentLength = resource(vector.plaintextResource()).length;
+        // Non-framed body (non-signing suite): ... IV(12) ‖ contentLength(8 BE) ‖ content ‖ tag(16).
+        int contentLengthOffset = ciphertext.length - 16 - contentLength - 8;
+        long declaredBaseline = 0;
+        for (int i = 0; i < 8; i++) {
+            declaredBaseline = (declaredBaseline << 8) | (ciphertext[contentLengthOffset + i] & 0xFFL);
+        }
+        assertEquals(contentLength, declaredBaseline,
+            vector + ": baseline — the computed offset must hold the vector's content length");
+
+        long bound = (1L << 36) - 32;
+        for (long declared : new long[] {bound + 1, -1L /* 0xFFFFFFFFFFFFFFFF */}) {
+            byte[] tampered = ciphertext.clone();
+            for (int i = 0; i < 8; i++) {
+                tampered[contentLengthOffset + i] = (byte) (declared >>> (8 * (7 - i)));
+            }
+            assertThrows(ESDKClientError.class,
+                () -> EsdkOps.decrypt(target.endpoint(), config(vector.decryptPolicy()), tampered),
+                target + " " + vector + ": a non-framed content length of " + Long.toUnsignedString(declared)
+                    + " exceeds 2^36 - 32 and must be rejected");
+        }
+    }
 }

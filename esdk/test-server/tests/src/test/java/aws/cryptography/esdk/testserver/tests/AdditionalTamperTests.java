@@ -27,6 +27,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *   <li><b>FOOT-004</b> — a signed message whose footer is truncated (signature bytes
  *       dropped) is rejected
  *       ({@code spec/client-apis/decrypt.md#verify-the-signature}).</li>
+ *   <li>a footer signature field enlarged with trailing garbage is rejected
+ *       ({@code spec/client-apis/decrypt.md#verify-the-signature}; regression class from the
+ *       2024 signature-verification advisories).</li>
  *   <li><b>HDR-012</b> — a V1 header with an invalid type byte is rejected
  *       ({@code spec/data-format/message-header.md#supported-types}).</li>
  *   <li><b>HDR-016</b> — a V1 header whose IV length does not match the suite is rejected
@@ -112,6 +115,36 @@ class AdditionalTamperTests {
         // Keep the 2-byte signature-length field, drop the signature bytes.
         byte[] tampered = Arrays.copyOf(ciphertext, message.footerOffset + 2);
         assertRejected(pair, V1_FORBID, tampered, "a signed message whose footer signature is truncated");
+    }
+
+    /**
+     * A footer signature field containing the valid signature plus appended garbage (with the
+     * 2-byte signature length inflated to match) is rejected: the enlarged field is not a valid
+     * encoding of a signature over the message, so verification must fail
+     * ({@code spec/client-apis/decrypt.md#verify-the-signature}). Regression class from
+     * GHSA-55xh-53m6-936r / GHSA-x5h4-9gqw-942j / GHSA-h45p-w933-jxh3 / GHSA-r8cc-xhh9-rg65
+     * ("certain invalid ECDSA signatures incorrectly passed validation"): lenient DER parsing
+     * that ignored trailing bytes accepted exactly this shape.
+     */
+    @ParameterizedTest(name = "signatureTrailingGarbageRejected {0}")
+    @MethodSource("pairs")
+    void decryptRejectsSignatureWithTrailingGarbage(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
+            V1_SIGNING, FRAME_LENGTH);
+        EsdkMessage message = EsdkMessage.parse(ciphertext);
+        assertTrue(message.footerOffset >= 0 && message.signatureLength > 0,
+            "baseline: signing suite must produce a footer with a signature (" + pair + ")");
+
+        int garbage = 8;
+        byte[] tampered = Arrays.copyOf(ciphertext, ciphertext.length + garbage);
+        Arrays.fill(tampered, ciphertext.length, tampered.length, (byte) 0xA5);
+        int inflatedLength = message.signatureLength + garbage;
+        tampered[message.footerOffset] = (byte) (inflatedLength >>> 8);
+        tampered[message.footerOffset + 1] = (byte) inflatedLength;
+
+        assertRejected(pair, V1_FORBID, tampered,
+            "a footer whose signature field is the valid signature plus trailing garbage");
     }
 
     /** HDR-012: an unsupported V1 type byte is rejected. */
