@@ -1,6 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
@@ -150,5 +151,53 @@ class MessageFormatTests {
         byte[] dflt = encrypt(target, "default frame length".getBytes(StandardCharsets.UTF_8), null);
         assertEquals(4096L, EsdkMessage.parse(dflt).frameLength,
             target + ": with no input frame length the header must record the 4096 default");
+    }
+
+    /**
+     * Exact-multiple framing ({@code spec/data-format/message-body.md#final-frame}): when the
+     * plaintext length is an exact multiple of the frame length, the final frame's content length
+     * SHOULD equal the frame length but MAY be 0 — writer freedom, so this asserts the emitted
+     * shape is one of the two legal forms and the invariants hold: exactly one final frame, and
+     * per-frame contents summing to the plaintext length. Added by gap analysis; every other
+     * framing test here deliberately avoids the exact-multiple boundary.
+     */
+    @ParameterizedTest(name = "exactMultipleFraming {0}")
+    @MethodSource("targets")
+    void exactMultiplePlaintextFramesLegally(LanguageServerTarget target) {
+        int plaintextLength = (int) (FRAME_LENGTH * 2);  // exactly two frame lengths
+        byte[] ciphertext = encrypt(target, new byte[plaintextLength], FRAME_LENGTH);
+        EsdkMessage message = EsdkMessage.parse(ciphertext);
+
+        long finalFrames = message.frames.stream().filter(EsdkMessage.Frame::isFinal).count();
+        assertEquals(1, finalFrames, target + ": exactly one final frame");
+        EsdkMessage.Frame finalFrame = message.frames.get(message.frames.size() - 1);
+        assertTrue(finalFrame.isFinal(), target + ": the final frame must be last");
+        assertTrue(finalFrame.contentLength() == FRAME_LENGTH || finalFrame.contentLength() == 0,
+            target + ": on an exact multiple the final frame content must be the frame length or 0, "
+                + "got " + finalFrame.contentLength());
+        int totalContent = message.frames.stream().mapToInt(EsdkMessage.Frame::contentLength).sum();
+        assertEquals(plaintextLength, totalContent,
+            target + ": per-frame content lengths must sum to the plaintext length");
+    }
+
+    /**
+     * Message-ID freshness ({@code spec/data-format/message-header.md#message-id}: uniquely
+     * identifies the message; "implementations MUST use a good source of randomness"): two encrypts
+     * of the same input must produce distinct message IDs. A constant or reused message ID — which
+     * weakens the derived-key domain separation — passes every other test in this suite. Added by
+     * gap analysis.
+     */
+    @ParameterizedTest(name = "messageIdFresh {0}")
+    @MethodSource("targets")
+    void repeatedEncryptsProduceDistinctMessageIds(LanguageServerTarget target) {
+        byte[] plaintext = "message-id freshness".getBytes(StandardCharsets.UTF_8);
+        EsdkMessage first = EsdkMessage.parse(encrypt(target, plaintext, FRAME_LENGTH));
+        EsdkMessage second = EsdkMessage.parse(encrypt(target, plaintext, FRAME_LENGTH));
+        byte[] firstId = java.util.Arrays.copyOfRange(first.bytes, first.messageIdOffset,
+            first.messageIdOffset + first.messageIdLength);
+        byte[] secondId = java.util.Arrays.copyOfRange(second.bytes, second.messageIdOffset,
+            second.messageIdOffset + second.messageIdLength);
+        assertFalse(java.util.Arrays.equals(firstId, secondId),
+            target + ": two encrypts of the same plaintext must carry distinct message IDs");
     }
 }
