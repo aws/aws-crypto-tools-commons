@@ -118,6 +118,16 @@ final class EsdkOps {
      */
     static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext,
                                 Long plaintextLengthBound) {
+        return encryptStream(endpoint, config, plaintext, plaintextLengthBound, null);
+    }
+
+    /**
+     * EncryptStream {@code plaintext} on {@code endpoint} under {@code config}, applying the
+     * optional plaintext-length bound and framing length when supplied; return the ciphertext
+     * bytes.
+     */
+    static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext,
+                                Long plaintextLengthBound, Long frameLength) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
         String clientId = client.createClient(
             CreateClientInput.builder().config(config).build()).getClientId();
@@ -126,6 +136,9 @@ final class EsdkOps {
             .plaintext(ByteBuffer.wrap(plaintext));
         if (plaintextLengthBound != null) {
             input.plaintextLengthBound(plaintextLengthBound);
+        }
+        if (frameLength != null) {
+            input.frameLength(frameLength);
         }
         return toArray(client.encryptStream(input.build()).getCiphertext());
     }
