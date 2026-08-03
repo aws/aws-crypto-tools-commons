@@ -97,6 +97,13 @@ public final class EsdkClientConfigs {
      */
     private static final PemKeyPair RSA_KEY_PAIR = generateRsaPemKeyPair();
 
+    /**
+     * A second, independent RSA key pair published under the SAME namespace/name as
+     * {@link #RSA_KEY_PAIR}: a decryptor holding it matches the EDK's provider fields but
+     * fails the actual unwrap.
+     */
+    private static final PemKeyPair RSA_KEY_PAIR_MISMATCHED = generateRsaPemKeyPair();
+
     private EsdkClientConfigs() {
     }
 
@@ -161,6 +168,59 @@ public final class EsdkClientConfigs {
             .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
             .maxEncryptedDataKeys(maxEncryptedDataKeys)
             .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .build();
+    }
+
+    /**
+     * @return a Default-CMM config over a multi-keyring of Raw-RSA generator + Raw-AES child,
+     *     so an encrypted message carries an RSA EDK first and an AES EDK second.
+     */
+    public static ESDKClientConfig rawRsaPlusAesMulti() {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(multiKeyring(rawRsaKeyring(), List.of(rawAesKeyring()))))
+            .build();
+    }
+
+    /**
+     * @return the decrypt-side counterpart to {@link #rawRsaPlusAesMulti()} whose Raw-RSA
+     *     keyring carries a DIFFERENT private key under the same namespace/name: the RSA EDK's
+     *     provider fields match, so the unwrap is attempted and fails hard, and decrypt must
+     *     continue to the Raw-AES child (multi-keyring.md#ondecrypt).
+     */
+    public static ESDKClientConfig rawRsaMismatchedKeyPlusAesMulti() {
+        Keyring mismatchedRsa = Keyring.builder()
+            .rawRsa(RawRsaKeyringConfig.builder()
+                .keyNamespace(KEY_NAMESPACE)
+                .keyName(RSA_KEY_NAME)
+                .paddingScheme(PaddingScheme.OAEP_SHA256_MGF1)
+                .publicKey(ByteBuffer.wrap(RSA_KEY_PAIR_MISMATCHED.publicPem()))
+                .privateKey(ByteBuffer.wrap(RSA_KEY_PAIR_MISMATCHED.privatePem()))
+                .build())
+            .build();
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(multiKeyring(mismatchedRsa, List.of(rawAesKeyring()))))
+            .build();
+    }
+
+    /**
+     * @return a Raw-AES / Default-CMM config whose keyring uses the given key namespace and
+     *     key name (sharing the standard wrapping key), for wire assertions over the EDK
+     *     provider fields.
+     */
+    public static ESDKClientConfig rawAesNamed(String keyNamespace, String keyName) {
+        Keyring keyring = Keyring.builder()
+            .rawAes(RawAesKeyringConfig.builder()
+                .keyNamespace(keyNamespace)
+                .keyName(keyName)
+                .wrappingKey(ByteBuffer.wrap(WRAPPING_KEY_32.clone()))
+                .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
+                .build())
+            .build();
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(keyring))
             .build();
     }
 
