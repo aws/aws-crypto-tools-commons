@@ -11,6 +11,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -57,6 +58,7 @@ class KeyCommitmentTamperTests {
     @ParameterizedTest(name = "commitmentValueTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedCommitmentValue(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE,
             null);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, ciphertext),
