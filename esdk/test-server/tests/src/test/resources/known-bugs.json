@@ -38,5 +38,10 @@
     "id": "encrypt-rejects-empty-encryption-context-value",
     "description": "encrypt rejects an encryption context entry whose value is the empty string (\"All keys and values in encryption context must be non-empty\"), though the message format permits a zero-length value",
     "languages": ["java"]
+  },
+  {
+    "id": "encrypt-accepts-reserved-prefix-encryption-context-key",
+    "description": "encrypt accepts an encryption-context key beginning with the reserved aws-crypto- prefix (other than aws-crypto-public-key); encrypt.md requires the operation to fail for any key beginning with aws-crypto-",
+    "languages": ["java", "python"]
   }
 ]

@@ -124,11 +124,12 @@ class EncryptionContextBehaviorTests {
 
     /**
      * The whole {@code aws-crypto-} prefix is reserved, not only the exact
-     * {@code aws-crypto-public-key} key that EC-010 covers: encrypt must reject any caller
-     * encryption-context key beginning with {@code aws-crypto-}
-     * ({@code spec/client-apis/encrypt.md#encryption-context}). Per-server property. Not gated —
-     * a server that special-cases only the public-key would accept this and surface as a
-     * divergence to ledger. Added by gap analysis.
+     * {@code aws-crypto-public-key} key that EC-010 covers: {@code encrypt.md} requires the
+     * encryption operation to fail for any caller encryption-context key beginning with
+     * {@code aws-crypto-} ({@code spec/client-apis/encrypt.md#encryption-context}). Per-server
+     * property. Added by gap analysis; ledgered because current servers special-case only the
+     * public-key rather than the whole prefix, so the gate re-activates the assertion if a server
+     * starts enforcing it.
      */
     @ParameterizedTest(name = "reservedPrefixEcKeyRejected {0}")
     @MethodSource("targets")
@@ -137,10 +138,11 @@ class EncryptionContextBehaviorTests {
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
-        assertThrows(ESDKClientError.class,
-            () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
-            "encrypt with an 'aws-crypto-' prefixed encryption-context key must be rejected as an "
-                + "ESDKClientError (" + target + ")");
+        KnownBugGate.gate("encrypt-accepts-reserved-prefix-encryption-context-key", target.language(),
+            () -> assertThrows(ESDKClientError.class,
+                () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
+                "encrypt with an 'aws-crypto-' prefixed encryption-context key must be rejected as an "
+                    + "ESDKClientError (" + target + ")"));
     }
 
     /**
