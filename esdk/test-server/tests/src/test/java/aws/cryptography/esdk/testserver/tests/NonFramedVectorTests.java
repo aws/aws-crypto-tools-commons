@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -112,6 +113,7 @@ class NonFramedVectorTests {
     @ParameterizedTest(name = "nonFramedVectorDecrypts[{1}] {0}")
     @MethodSource("cases")
     void nonFramedVectorDecryptsToKnownPlaintext(LanguageServerTarget target, Vector vector) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         byte[] ciphertext = resource(vector.ciphertextResource());
         byte[] expected = resource(vector.plaintextResource());
         assertEquals(vector.versionByte(), ciphertext[0] & 0xFF,
@@ -126,6 +128,7 @@ class NonFramedVectorTests {
     @ParameterizedTest(name = "nonFramedTamperRejected[{1}] {0}")
     @MethodSource("cases")
     void nonFramedVectorTamperRejected(LanguageServerTarget target, Vector vector) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         byte[] tampered = resource(vector.ciphertextResource());
         tampered[tampered.length - 1] ^= (byte) 0xFF;
         assertThrows(ESDKClientError.class,

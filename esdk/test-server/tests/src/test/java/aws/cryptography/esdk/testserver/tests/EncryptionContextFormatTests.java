@@ -111,6 +111,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "ecKeysSortedByUtf8Bytes {0}")
     @MethodSource("targets")
     void encryptionContextKeysSortByUtf8BytesNotUtf16(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         String bmpKey = "\uff61";                 // U+FF61,  UTF-8 EF BD A1
         String astralKey = "\ud800\udc00";        // U+10000, UTF-8 F0 90 80 80
         Map<String, String> ec = new java.util.LinkedHashMap<>();
@@ -133,6 +134,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "emptyEcValueRoundTrips {0}")
     @MethodSource("targets")
     void emptyEncryptionContextValueSerializesAndRoundTrips(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         Map<String, String> ec = Map.of("empty-value-key", "");
         KnownBugGate.gate("encrypt-rejects-empty-encryption-context-value", target.language(), () -> {
             byte[] ciphertext = assertDoesNotThrow(
