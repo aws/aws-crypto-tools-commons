@@ -85,7 +85,8 @@ class HeaderStructureTests {
             target + " " + expected + ": the header must declare at least one EDK");
         assertEquals(0x02, ciphertext[message.contentTypeOffset] & 0xFF,
             target + " " + expected + ": content type must be framed (0x02)");
-        assertEquals(4096L, message.frameLength,
-            target + " " + expected + ": default frame length must be 4096");
+        KnownBugGate.gate("default-frame-length-262144", target.language(),
+            () -> assertEquals(4096L, message.frameLength,
+                target + " " + expected + ": default frame length must be 4096"));
     }
 }

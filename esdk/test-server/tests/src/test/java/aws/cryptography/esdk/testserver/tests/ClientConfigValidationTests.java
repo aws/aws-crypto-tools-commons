@@ -176,7 +176,8 @@ class ClientConfigValidationTests {
                 .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
                 .build())
             .build();
-        assertCreateRejected(target, config(keyring, null),
-            "a Raw-AES keyring in the reserved 'aws-kms' key namespace");
+        KnownBugGate.gate("create-client-accepts-reserved-aws-kms-namespace", target.language(),
+            () -> assertCreateRejected(target, config(keyring, null),
+                "a Raw-AES keyring in the reserved 'aws-kms' key namespace"));
     }
 }

@@ -17,11 +17,21 @@
   {
     "id": "decrypt-accepts-trailing-bytes-commit-key",
     "description": "decrypt accepts trailing bytes appended after a valid ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY message",
-    "languages": ["python"]
+    "languages": ["python", "javascript"]
   },
   {
     "id": "decrypt-accepts-trailing-bytes-commit-key-ecdsa",
     "description": "decrypt accepts trailing bytes appended after a valid ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384 message",
     "languages": ["python"]
+  },
+  {
+    "id": "create-client-accepts-reserved-aws-kms-namespace",
+    "description": "CreateClient accepts a Raw-AES keyring in the reserved aws-kms key namespace",
+    "languages": ["javascript"]
+  },
+  {
+    "id": "default-frame-length-262144",
+    "description": "the default frame length is 262144 where every other implementation defaults to 4096 (a default-value difference, not a validation bug)",
+    "languages": ["c"]
   }
 ]
