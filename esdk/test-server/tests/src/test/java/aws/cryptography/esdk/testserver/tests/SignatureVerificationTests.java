@@ -126,9 +126,9 @@ class SignatureVerificationTests {
         return verifier.verify(signature);
     }
 
-    static List<Arguments> pairCases() {
+    static List<Arguments> decryptSideCases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (ReferencePair pair : ReferenceImplementation.decryptSide(Set.of("raw-aes"))) {
             cases.add(Arguments.of(pair, P384));
             cases.add(Arguments.of(pair, P256));
         }
@@ -145,10 +145,10 @@ class SignatureVerificationTests {
      * failures propagated and {@code Success(false)} was discarded.
      */
     @ParameterizedTest(name = "wrongKeySignatureRejected[{1}] {0}")
-    @MethodSource("pairCases")
-    void decryptRejectsWellFormedSignatureByWrongKey(EndpointPair pair, SigningLayout layout)
+    @MethodSource("decryptSideCases")
+    void decryptRejectsWellFormedSignatureByWrongKey(ReferencePair pair, SigningLayout layout)
         throws Exception {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+        FeatureGate.require(Set.of("raw-aes"), pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), layout.config(), PLAINTEXT,
             Map.of(), layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

@@ -127,9 +127,9 @@ class AdditionalTamperTests {
      * that ignored trailing bytes accepted exactly this shape.
      */
     @ParameterizedTest(name = "signatureTrailingGarbageRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsSignatureWithTrailingGarbage(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsSignatureWithTrailingGarbage(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
             V1_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
