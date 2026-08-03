@@ -115,4 +115,42 @@ class EncryptionContextBehaviorTests {
         assertArrayEquals(PLAINTEXT, recovered,
             "an encryption context with high Unicode code points must round-trip (" + pair + ")");
     }
+
+    /**
+     * The whole {@code aws-crypto-} prefix is reserved, not only the exact
+     * {@code aws-crypto-public-key} key that EC-010 covers: encrypt must reject any caller
+     * encryption-context key beginning with {@code aws-crypto-}
+     * ({@code spec/client-apis/encrypt.md#encryption-context}). Per-server property. Not gated —
+     * a server that special-cases only the public-key would accept this and surface as a
+     * divergence to ledger. Added by gap analysis.
+     */
+    @ParameterizedTest(name = "reservedPrefixEcKeyRejected {0}")
+    @MethodSource("targets")
+    void encryptRejectsReservedPrefixEncryptionContextKey(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        Map<String, String> reserved = new LinkedHashMap<>();
+        reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
+        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
+            "encrypt with an 'aws-crypto-' prefixed encryption-context key must be rejected as an "
+                + "ESDKClientError (" + target + ")");
+    }
+
+    /**
+     * The reservation is exactly the {@code aws-crypto-} prefix: {@code aws-crypto} with no
+     * trailing hyphen does not begin with it, so it is an ordinary caller key that must be accepted
+     * and round-trip ({@code spec/client-apis/encrypt.md#encryption-context}). Guards against a
+     * server over-blocking on a substring. Added by gap analysis.
+     */
+    @ParameterizedTest(name = "nonReservedPrefixBoundaryAccepted {0}")
+    @MethodSource("targets")
+    void encryptAcceptsKeyThatDoesNotBeginWithReservedPrefix(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        Map<String, String> ec = Map.of("aws-crypto", "no-trailing-hyphen-is-not-reserved");
+        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, null, null);
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), config, ciphertext),
+            target + ": a key that does not begin with 'aws-crypto-' must be accepted and round-trip");
+    }
 }
