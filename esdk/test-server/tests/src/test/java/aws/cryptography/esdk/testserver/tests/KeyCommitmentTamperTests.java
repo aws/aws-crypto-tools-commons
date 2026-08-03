@@ -39,8 +39,10 @@ class KeyCommitmentTamperTests {
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
 
-    static List<EndpointPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    private static final Set<String> FEATURES = Set.of("raw-aes");
+
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
     }
 
     /**
@@ -56,9 +58,9 @@ class KeyCommitmentTamperTests {
 
     /** Flipping a byte of the stored 32-byte commitment value makes decrypt fail. */
     @ParameterizedTest(name = "commitmentValueTamperRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsTamperedCommitmentValue(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsTamperedCommitmentValue(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE,
             null);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, ciphertext),

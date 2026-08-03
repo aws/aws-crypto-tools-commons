@@ -125,8 +125,8 @@ class SyntheticHeaderTests {
      * zero-count case); not a catalog behavior.
      */
     @ParameterizedTest(name = "inflatedEdkCountRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsInflatedEdkCount(EndpointPair pair) {
+    @MethodSource("decryptSide")
+    void decryptRejectsInflatedEdkCount(ReferencePair pair) {
         EsdkMessage message = encryptAndParse(pair, twoPairContext());
         byte[] tampered = message.bytes.clone();
         tampered[message.edkCountOffset] = (byte) 0xFF;
