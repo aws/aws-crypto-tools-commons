@@ -12,6 +12,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -78,6 +79,7 @@ class VerificationKeyContextTests {
     @ParameterizedTest(name = "signedMissingVerificationKeyRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsSignedSuiteMissingVerificationKey(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), SIGNING_CONFIG, PLAINTEXT, Map.of(),
             SIGNING_SUITE, null);
         assertArrayEquals(PLAINTEXT,
@@ -99,6 +101,7 @@ class VerificationKeyContextTests {
     @ParameterizedTest(name = "unsignedStrayVerificationKeyRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsUnsignedSuiteWithStrayVerificationKey(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         assertEquals(PUBLIC_KEY.length, STRAY_PLACEHOLDER_KEY.length(),
             "the placeholder EC key must match aws-crypto-public-key's byte length for an in-place rename");
         Map<String, String> ec = Map.of(STRAY_PLACEHOLDER_KEY, "v");
