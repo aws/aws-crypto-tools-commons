@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -86,6 +87,7 @@ class SignatureVerificationTests {
     @MethodSource("cases")
     void footerSignatureIndependentlyVerifies(LanguageServerTarget target, SigningLayout layout)
         throws Exception {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT, Map.of(),
             layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

@@ -8,6 +8,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -71,6 +72,7 @@ class MessageRegionOrderingTests {
     @ParameterizedTest(name = "regionOrdering[{1}] {0}")
     @MethodSource("cases")
     void headerPrecedesBodyAtExactBoundary(LanguageServerTarget target, Layout layout) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT, Map.of(),
             layout.suite(), FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
