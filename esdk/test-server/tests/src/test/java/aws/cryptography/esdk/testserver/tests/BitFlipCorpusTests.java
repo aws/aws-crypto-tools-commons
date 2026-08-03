@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -56,6 +57,7 @@ class BitFlipCorpusTests {
     @ParameterizedTest(name = "singleBitFlipRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsAnySingleBitFlip(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE,
             FRAME_LENGTH);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, ciphertext),

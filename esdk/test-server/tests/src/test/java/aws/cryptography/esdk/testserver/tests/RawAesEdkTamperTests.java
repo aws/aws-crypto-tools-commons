@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -79,6 +80,7 @@ class RawAesEdkTamperTests {
     @ParameterizedTest(name = "garbledEdkCiphertextRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsGarbledEdkCiphertext(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = encrypt(pair);
         assertArrayEquals(PLAINTEXT,
             EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(), ciphertext),
@@ -102,6 +104,7 @@ class RawAesEdkTamperTests {
     @ParameterizedTest(name = "malformedEdkIvLengthRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsMalformedEdkIvLength(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = encrypt(pair);
         FirstEdk edk = firstEdk(EsdkMessage.parse(ciphertext));
         // Key provider info = keyName || tagLength(4) || ivLength(4) || IV(ivLength); the 4-byte
