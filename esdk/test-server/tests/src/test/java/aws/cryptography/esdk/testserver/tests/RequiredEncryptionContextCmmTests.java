@@ -26,6 +26,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *   <li><b>CMM-008</b> — decrypt fails when the required keys are not correctly reproduced: none
  *       supplied, the required key missing, or a required key given a wrong value
  *       ({@code spec/framework/required-encryption-context-cmm.md#decrypt-materials}).</li>
+ *   <li><b>EC-011</b> — a Required-EC CMM configured with the reserved {@code aws-crypto-public-key}
+ *       as a required key is rejected on encrypt (a per-server property)
+ *       ({@code spec/framework/required-encryption-context-cmm.md#get-encryption-materials}).</li>
  * </ul>
  *
  * <p>Fully offline (Raw-AES). The required keys never appear on the wire, so decrypt must obtain
@@ -99,5 +102,27 @@ class RequiredEncryptionContextCmmTests {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, wrong),
             "decrypt reproducing a required key with a wrong value must fail (" + pair + ")");
+    }
+
+    static List<LanguageServerTarget> targets() {
+        return LanguageServerRegistry.shared().targets();
+    }
+
+    /**
+     * EC-011: a Required-EC CMM that lists the reserved {@code aws-crypto-public-key} as a required
+     * key must fail on encrypt. The reserved key is only supplied as a <em>required</em> key (never
+     * in the caller's encryption context, which would instead trip the reserved-key-in-context rule),
+     * so the rejection is attributable to the reserved-as-required configuration. Per-server property.
+     */
+    @ParameterizedTest(name = "reservedKeyAsRequiredRejected {0}")
+    @MethodSource("targets")
+    void encryptRejectsReservedKeyAsRequiredEcKey(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("required-encryption-context", "raw-aes"),
+            new EndpointPair(target, target));
+        ESDKClientConfig config = EsdkClientConfigs.rawAesRequiredEc(List.of("aws-crypto-public-key"));
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, null),
+            "encrypt with the reserved aws-crypto-public-key as a required encryption-context key "
+                + "must be rejected (" + target + ")");
     }
 }

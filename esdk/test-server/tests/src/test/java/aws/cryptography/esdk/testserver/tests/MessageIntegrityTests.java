@@ -100,9 +100,14 @@ class MessageIntegrityTests {
         withTrailer[ciphertext.length + 1] = (byte) 0xAD;
         withTrailer[ciphertext.length + 2] = (byte) 0xBE;
         withTrailer[ciphertext.length + 3] = (byte) 0xEF;
-        assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, withTrailer),
-            "decrypt of a valid message with 4 trailing bytes appended must be rejected as an "
-                + "ESDKClientError (" + pair + ", " + suite.getValue() + ")");
+        // The trailing-bytes bug is suite-variant-specific, so the ledger holds one entry per suite.
+        String bugId = ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY.equals(suite)
+            ? "decrypt-accepts-trailing-bytes-commit-key"
+            : "decrypt-accepts-trailing-bytes-commit-key-ecdsa";
+        KnownBugGate.gate(bugId, pair.decryptTarget().language(),
+            () -> assertThrows(ESDKClientError.class,
+                () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, withTrailer),
+                "decrypt of a valid message with 4 trailing bytes appended must be rejected as an "
+                    + "ESDKClientError (" + pair + ", " + suite.getValue() + ")"));
     }
 }

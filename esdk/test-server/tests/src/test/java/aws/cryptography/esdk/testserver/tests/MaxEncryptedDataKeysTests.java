@@ -22,6 +22,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  *   <li><b>DEC-002</b> — decrypt rejects a header carrying more EDKs than the configured
  *       maximum before unwrapping ({@code spec/client-apis/decrypt.md#v2-header-deserialization}).
  *       Cross-language matrix.</li>
+ *   <li><b>HDR-019</b> — header parse enforces the maxEncryptedDataKeys bound: EDK counts at or
+ *       below the max are accepted, counts above are rejected
+ *       ({@code spec/data-format/message-header.md#encrypted-data-key-count}). Proven by the same
+ *       two-EDK message that the DEC-002 case decrypts under a cap of 2 and rejects under a cap of
+ *       1.</li>
  * </ul>
  *
  * <p>Fully offline (Raw-AES multi-keyring / Default CMM). Rejections surface as a modeled
@@ -60,9 +65,10 @@ class MaxEncryptedDataKeysTests {
     }
 
     /**
-     * DEC-002: a two-EDK message decrypts under a cap of 2 but is rejected under a cap of 1
-     * (before any unwrap). Decrypt-side: the reference produces the two-EDK message and
-     * every configured target decrypts it.
+     * DEC-002 / HDR-019: a two-EDK message decrypts under a cap of 2 (count at/below the max
+     * accepted) but is rejected under a cap of 1 (count above the max rejected, before any unwrap).
+     * Decrypt-side: the reference produces the two-EDK message and every configured target
+     * decrypts it.
      */
     @ParameterizedTest(name = "decryptEnforcesMaxEdks {0}")
     @MethodSource("decryptSide")
