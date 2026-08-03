@@ -117,4 +117,21 @@ class SyntheticHeaderTests {
         assertRejected(pair, EsdkHeaderEditor.withFirstKeyByte(message, 0xFF),
             "a header whose encryption-context key is not valid UTF-8");
     }
+
+    /**
+     * An encrypted-data-key count inflated far beyond the EDKs present (0xFFFF) makes the header
+     * parser walk the following bytes as garbage EDK structures and must be rejected — the EDK-count
+     * sibling of the inflated EC pair count above. Added by gap analysis (HDR-020 covers only the
+     * zero-count case); not a catalog behavior.
+     */
+    @ParameterizedTest(name = "inflatedEdkCountRejected {0}")
+    @MethodSource("pairs")
+    void decryptRejectsInflatedEdkCount(EndpointPair pair) {
+        EsdkMessage message = encryptAndParse(pair, twoPairContext());
+        byte[] tampered = message.bytes.clone();
+        tampered[message.edkCountOffset] = (byte) 0xFF;
+        tampered[message.edkCountOffset + 1] = (byte) 0xFF;
+        assertRejected(pair, tampered,
+            "a header whose encrypted-data-key count (0xFFFF) exceeds the EDKs present");
+    }
 }

@@ -33,5 +33,10 @@
     "id": "default-frame-length-262144",
     "description": "the default frame length is 262144 where every other implementation defaults to 4096 (a default-value difference, not a validation bug)",
     "languages": ["c"]
+  },
+  {
+    "id": "encrypt-rejects-empty-encryption-context-value",
+    "description": "encrypt rejects an encryption context entry whose value is the empty string (\"All keys and values in encryption context must be non-empty\"), though the message format permits a zero-length value",
+    "languages": ["java"]
   }
 ]
