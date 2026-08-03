@@ -117,6 +117,33 @@ class EncryptionContextBehaviorTests {
     }
 
     /**
+     * Encryption-context keys that collide with reserved member names of a language's map/object
+     * type round-trip: the message format allows any UTF-8 key
+     * ({@code spec/framework/structures.md#encryption-context}), so a decryptor whose context
+     * container treats {@code __proto__}, {@code constructor}, or {@code hasOwnProperty} as
+     * special rejects or corrupts valid foreign messages. That shipped in the JavaScript ESDK,
+     * where a header key matching an inherited {@code Object.prototype} property tripped the
+     * duplicate-key check and valid messages failed to decrypt.
+     */
+    @ParameterizedTest(name = "reservedIdentifierEcKeysRoundTrip {0}")
+    @MethodSource("pairs")
+    void encryptionContextKeysCollidingWithReservedIdentifiersRoundTrip(EndpointPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
+        Map<String, String> ec = Map.of(
+            "__proto__", "a",
+            "constructor", "b",
+            "hasOwnProperty", "c",
+            "toString", "d",
+            "__init__", "e");
+        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
+        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec);
+        assertArrayEquals(PLAINTEXT, recovered,
+            "encryption-context keys colliding with reserved identifiers must round-trip ("
+                + pair + ")");
+    }
+
+    /**
      * The whole {@code aws-crypto-} prefix is reserved, not only the exact
      * {@code aws-crypto-public-key} key that EC-010 covers: {@code encrypt.md} requires the
      * encryption operation to fail for any caller encryption-context key beginning with
