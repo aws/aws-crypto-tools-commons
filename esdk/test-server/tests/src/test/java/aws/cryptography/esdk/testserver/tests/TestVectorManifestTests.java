@@ -49,8 +49,10 @@ import org.junit.jupiter.api.TestFactory;
  * <p>This is the in-test-server port of the ESDK Dafny interop test-vector workflows: the
  * server's own {@code Encrypt}/{@code Decrypt} operations do the work, so no per-language
  * vector runner is needed. Only vectors whose encrypt AND decrypt key descriptions map to a
- * currently-supported keyring (Raw-AES, Raw-RSA) are emitted; the rest are skipped and
- * counted (see {@link #manifestRoundTrips()}).
+ * modeled keyring or CMM (Raw-AES, Raw-RSA, AWS-KMS, KMS-MRK, KMS-MRK-discovery, KMS-RSA,
+ * hierarchical, multi-keyring, and the Required-Encryption-Context CMM) are emitted; the
+ * rest (the ECDH families) are skipped and surfaced as skipped tests (see
+ * {@link #manifestRoundTrips()}).
  */
 class TestVectorManifestTests {
 
