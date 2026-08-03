@@ -33,5 +33,10 @@
     "id": "encrypt-accepts-reserved-prefix-encryption-context-key",
     "description": "encrypt accepts an encryption-context key beginning with the reserved aws-crypto- prefix (other than aws-crypto-public-key); encrypt.md requires the operation to fail for any key beginning with aws-crypto-",
     "languages": ["java", "python"]
+  },
+  {
+    "id": "encryption-context-value-length-capped-at-32767",
+    "description": "encrypt and decrypt reject an encryption-context value of 32767 bytes or longer (\"All keys and values in encryption context must be shorter than 32767\"), though the message format permits value lengths up to 65535",
+    "languages": ["java"]
   }
 ]

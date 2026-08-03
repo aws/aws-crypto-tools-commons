@@ -1,6 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -47,6 +48,9 @@ class EncryptionContextSizeBoundaryTests {
     private static final int SINGLE_ENTRY_OVERHEAD = 7;
     private static final int MAX_AAD = 65535;
 
+    private static final String VALUE_LENGTH_CAP_BUG =
+        "encryption-context-value-length-capped-at-32767";
+
     private static String asciiValue(int length) {
         return "a".repeat(length);
     }
@@ -62,7 +66,9 @@ class EncryptionContextSizeBoundaryTests {
     /**
      * An encryption context serializing to exactly the UInt16 AAD maximum (65535 bytes) is
      * representable: encrypt succeeds, the wire AAD length is exactly 65535, and the message
-     * round-trips cross-language.
+     * round-trips cross-language. Gated per side on the ledgered java value-length cap
+     * (a signed-16-bit bound over an unsigned wire field), which breaks encrypt and decrypt
+     * independently.
      */
     @ParameterizedTest(name = "maxSizeEncryptionContextRoundTrips {0}")
     @MethodSource("pairs")
@@ -71,15 +77,22 @@ class EncryptionContextSizeBoundaryTests {
         Map<String, String> ec = Map.of("k", asciiValue(MAX_AAD - SINGLE_ENTRY_OVERHEAD));
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
 
-        byte[] ciphertext = EsdkOps.encrypt(
-            pair.encryptEndpoint(), config, PLAINTEXT, ec, NON_SIGNING_SUITE, null);
-        EsdkMessage message = EsdkMessage.parse(ciphertext);
-        assertEquals(MAX_AAD, message.aadLength,
-            pair + ": a context serializing to the UInt16 maximum must carry AAD length 65535");
+        KnownBugGate.gate(VALUE_LENGTH_CAP_BUG, pair.encryptTarget().language(), () -> {
+            byte[] ciphertext = assertDoesNotThrow(
+                () -> EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, NON_SIGNING_SUITE, null),
+                pair + ": encrypt with a maximum-size encryption context must be accepted");
+            EsdkMessage message = EsdkMessage.parse(ciphertext);
+            assertEquals(MAX_AAD, message.aadLength,
+                pair + ": a context serializing to the UInt16 maximum must carry AAD length 65535");
 
-        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext);
-        assertArrayEquals(PLAINTEXT, recovered,
-            pair + ": a maximum-size encryption context must round-trip");
+            KnownBugGate.gate(VALUE_LENGTH_CAP_BUG, pair.decryptTarget().language(), () -> {
+                byte[] recovered = assertDoesNotThrow(
+                    () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
+                    pair + ": decrypt of a maximum-size encryption context must be accepted");
+                assertArrayEquals(PLAINTEXT, recovered,
+                    pair + ": a maximum-size encryption context must round-trip");
+            });
+        });
     }
 
     /**
