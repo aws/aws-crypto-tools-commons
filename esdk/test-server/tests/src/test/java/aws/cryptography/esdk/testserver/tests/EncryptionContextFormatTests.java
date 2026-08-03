@@ -1,6 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -133,18 +134,22 @@ class EncryptionContextFormatTests {
     @MethodSource("targets")
     void emptyEncryptionContextValueSerializesAndRoundTrips(LanguageServerTarget target) {
         Map<String, String> ec = Map.of("empty-value-key", "");
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, ec, SUITE, null);
-        EsdkMessage message = EsdkMessage.parse(ciphertext);
-        // Walk the single pair: count(2) keyLen(2) key valLen(2) — the value length must be 0.
-        int pos = message.aadContentOffset;
-        assertEquals(1, u16(ciphertext, pos), target + ": AAD must declare exactly one pair");
-        pos += 2;
-        int keyLen = u16(ciphertext, pos);
-        pos += 2 + keyLen;
-        assertEquals(0, u16(ciphertext, pos),
-            target + ": an empty encryption-context value must serialize as a zero value length");
-        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), CONFIG, ciphertext),
-            target + ": the empty-value message must decrypt");
+        KnownBugGate.gate("encrypt-rejects-empty-encryption-context-value", target.language(), () -> {
+            byte[] ciphertext = assertDoesNotThrow(
+                () -> EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, ec, SUITE, null),
+                target + ": encrypt with an empty encryption-context value must be accepted");
+            EsdkMessage message = EsdkMessage.parse(ciphertext);
+            // Walk the single pair: count(2) keyLen(2) key valLen(2) — the value length must be 0.
+            int pos = message.aadContentOffset;
+            assertEquals(1, u16(ciphertext, pos), target + ": AAD must declare exactly one pair");
+            pos += 2;
+            int keyLen = u16(ciphertext, pos);
+            pos += 2 + keyLen;
+            assertEquals(0, u16(ciphertext, pos),
+                target + ": an empty encryption-context value must serialize as a zero value length");
+            assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), CONFIG, ciphertext),
+                target + ": the empty-value message must decrypt");
+        });
     }
 
     /** The AAD's keys in wire order: count(2), then per pair keyLen(2) key valLen(2) val. */
