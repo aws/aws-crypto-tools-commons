@@ -1,11 +1,15 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,6 +65,58 @@ class RequiredEncryptionContextCmmTests {
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, FULL_CONTEXT);
         assertArrayEquals(PLAINTEXT, recovered,
             "decrypt with the required keys reproduced exactly must recover the plaintext (" + pair + ")");
+    }
+
+    /**
+     * The header's serialized encryption context MUST NOT contain the pairs listed as required
+     * encryption context keys, while pairs not listed stay serialized
+     * ({@code spec/client-apis/encrypt.md#construct-the-header}). Proven on the wire with a mixed
+     * context: the required key is absent from the header AAD, the non-required key present, and
+     * the message still round-trips with the required pair reproduced — so the dropped pair is
+     * authenticated without being stored.
+     */
+    @ParameterizedTest(name = "requiredKeysExcludedFromHeaderAad {0}")
+    @MethodSource("pairs")
+    void requiredKeysAreExcludedFromTheSerializedHeader(EndpointPair pair) {
+        FeatureGate.require(Set.of("required-encryption-context", "raw-aes"), pair);
+        ESDKClientConfig config = EsdkClientConfigs.rawAesRequiredEc(List.of("purpose"));
+        Map<String, String> context = Map.of("purpose", "test", "shared", "value");
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, context,
+            ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY, null);
+
+        List<String> headerKeys = headerAadKeys(EsdkMessage.parse(ciphertext));
+        assertFalse(headerKeys.contains("purpose"),
+            pair + ": a required encryption-context key must not be serialized in the header, got "
+                + headerKeys);
+        assertTrue(headerKeys.contains("shared"),
+            pair + ": a non-required encryption-context pair must stay serialized in the header, got "
+                + headerKeys);
+
+        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext,
+            Map.of("purpose", "test"));
+        assertArrayEquals(PLAINTEXT, recovered,
+            pair + ": the mixed-context message must round-trip with the required pair reproduced");
+    }
+
+    /** The AAD's keys in wire order: count(2), then per pair keyLen(2) key valLen(2) val. */
+    private static List<String> headerAadKeys(EsdkMessage message) {
+        byte[] b = message.bytes;
+        int pos = message.aadContentOffset;
+        if (message.aadLength == 0) {
+            return List.of();
+        }
+        int pairCount = ((b[pos] & 0xFF) << 8) | (b[pos + 1] & 0xFF);
+        pos += 2;
+        List<String> keys = new ArrayList<>();
+        for (int i = 0; i < pairCount; i++) {
+            int keyLen = ((b[pos] & 0xFF) << 8) | (b[pos + 1] & 0xFF);
+            pos += 2;
+            keys.add(new String(b, pos, keyLen, StandardCharsets.UTF_8));
+            pos += keyLen;
+            int valLen = ((b[pos] & 0xFF) << 8) | (b[pos + 1] & 0xFF);
+            pos += 2 + valLen;
+        }
+        return keys;
     }
 
     /** CMM-008: decrypt with NO reproduced context fails (the required keys are not on the wire). */
