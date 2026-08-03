@@ -22,7 +22,12 @@ import java.util.stream.Collectors;
  *   <li>each language's declared raw-RSA padding capability →
  *       {@code esdk.testserver.rawRsaPaddingSchemes} (only languages whose
  *       declaration carries {@code rawRsaPaddingSchemes}; an absent language
- *       supports every scheme).</li>
+ *       supports every scheme),</li>
+ *   <li>the run's reference implementation →
+ *       {@code esdk.testserver.referenceImplementation} (the language whose
+ *       Language_Server plays the immaterial side of single-sided Tests;
+ *       validated against the Configuration_Set's languages before the
+ *       pipeline reaches this input).</li>
  * </ul>
  *
  * <p>All values derive from the validated merged configuration artifacts;
@@ -35,12 +40,15 @@ import java.util.stream.Collectors;
  * @param featureCatalog the Feature_Catalog names, in catalog order
  * @param rawRsaPaddingSchemes language → declared raw-RSA padding schemes, only
  *                       for languages whose declaration carries the capability
+ * @param referenceImplementation the validated reference implementation
+ *                       language; never blank
  */
 public record TestRunInput(
     List<TestTarget> targets,
     Map<String, Map<String, Boolean>> features,
     List<String> featureCatalog,
-    Map<String, List<String>> rawRsaPaddingSchemes
+    Map<String, List<String>> rawRsaPaddingSchemes,
+    String referenceImplementation
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -54,6 +62,9 @@ public record TestRunInput(
         rawRsaPaddingSchemes.forEach((language, schemes) ->
             copiedSchemes.put(language, List.copyOf(schemes)));
         rawRsaPaddingSchemes = Collections.unmodifiableMap(copiedSchemes);
+        if (referenceImplementation == null || referenceImplementation.isBlank()) {
+            throw new IllegalArgumentException("referenceImplementation must be non-blank");
+        }
     }
 
     /**

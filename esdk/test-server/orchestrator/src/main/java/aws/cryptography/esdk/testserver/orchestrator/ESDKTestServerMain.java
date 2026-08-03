@@ -64,6 +64,11 @@ import java.util.Map;
  *       Requirement 3.4). Defaults to {@code aws-crypto-tools-commons} for a
  *       Commons_Run and {@code aws-crypto-tools-<lang>} for a
  *       Language_Repository_Run.</li>
+ *   <li>{@code referenceImplementation=<lang>} — the language whose
+ *       Language_Server plays the immaterial side of single-sided Tests
+ *       (default {@code java}). Must name a configured language; an unknown
+ *       value aborts the run listing the valid languages. Handed to the Tests
+ *       as {@code esdk.testserver.referenceImplementation}.</li>
  * </ul>
  *
  * <h2>Paths (JVM system properties)</h2>
@@ -187,6 +192,13 @@ public final class ESDKTestServerMain {
             "go", new GoLaunchPlan(
                 orchestratorBuildDir.resolve("launch/go"))));
 
+        // The reference implementation for single-sided Tests: the
+        // referenceImplementation=<lang> argument, defaulting to java. The
+        // pipeline validates it against the Configuration_Set's languages and
+        // aborts on an unknown value.
+        String referenceImplementation = cli.getOrDefault(
+            "referenceImplementation", ESDKTestServer.DEFAULT_REFERENCE_IMPLEMENTATION);
+
         ESDKTestServer orchestrator = new ESDKTestServer(
             set,
             context,
@@ -194,13 +206,15 @@ public final class ESDKTestServerMain {
             launchers,
             new GradleTestRunner(testsModuleDir),
             new DuplicateTestsDetector(),
-            testServerRoot);
+            testServerRoot,
+            referenceImplementation);
 
         System.out.println("==> ESDKTestServer run");
         System.out.println("    context: " + describeContext(context));
         System.out.println("    config: " + configPath);
         System.out.println("    testServerRoot: " + testServerRoot);
         System.out.println("    commonsRoot: " + commonsRoot);
+        System.out.println("    referenceImplementation: " + referenceImplementation);
         if (context.kind() == RunContext.Kind.LANGUAGE) {
             System.out.println("    languageRepoRoot: " + context.languageRepoRoot());
             CommonsOrigin origin = context.commonsOrigin();
@@ -318,7 +332,8 @@ public final class ESDKTestServerMain {
             + " | context=language:<lang> languageRepoRoot=<abs path>"
             + " commonsOrigin.url=<url> commonsOrigin.branch=<branch>"
             + " [commonsOrigin.reason=configuration-entry|invocation-override]"
-            + " [invokingRepositoryName=<name>]";
+            + " [invokingRepositoryName=<name>]"
+            + " [referenceImplementation=<lang>]";
     }
 
     /**

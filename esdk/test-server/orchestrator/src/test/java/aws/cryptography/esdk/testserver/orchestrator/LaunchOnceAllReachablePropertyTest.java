@@ -79,7 +79,10 @@ class LaunchOnceAllReachablePropertyTest {
             ESDKTestServer orchestrator = new ESDKTestServer(set, context,
                 FakeMaterializer.succeedingUnder(root, set),
                 LauncherFactory.uniform(launcher), runner,
-                new DuplicateTestsDetector(), root);
+                new DuplicateTestsDetector(), root,
+                // The generated languages need not include the default
+                // reference; any configured language works for this property.
+                set.entries().get(0).language());
 
             orchestrator.run();
 

@@ -16,6 +16,35 @@ import org.junit.jupiter.api.Test;
  */
 class ConfigurationValidationTest {
 
+    @Test
+    @DisplayName("a configured language is a valid referenceImplementation")
+    void referenceImplementationAcceptsConfiguredLanguage() {
+        ConfigurationSetValidation v = ConfigurationValidation.validateReferenceImplementation(
+            set(entry("java", 8091), entry("python", 8092)), "python");
+        assertTrue(v.valid(), "expected valid but got: " + v.errors());
+    }
+
+    @Test
+    @DisplayName("an unknown referenceImplementation is rejected naming it and the configured languages")
+    void referenceImplementationRejectsUnknownLanguage() {
+        ConfigurationSetValidation v = ConfigurationValidation.validateReferenceImplementation(
+            set(entry("java", 8091), entry("python", 8092)), "ruby");
+        assertFalse(v.valid());
+        assertTrue(v.message().contains("'ruby'"), "must name the unknown value: " + v.message());
+        assertTrue(v.message().contains("java") && v.message().contains("python"),
+            "must list the configured languages: " + v.message());
+    }
+
+    @Test
+    @DisplayName("a blank referenceImplementation is rejected listing the configured languages")
+    void referenceImplementationRejectsBlankValue() {
+        ConfigurationSetValidation v = ConfigurationValidation.validateReferenceImplementation(
+            set(entry("java", 8091)), " ");
+        assertFalse(v.valid());
+        assertTrue(v.message().contains("java"),
+            "must list the configured languages: " + v.message());
+    }
+
     private static ConfigurationEntry entry(String language, int port) {
         return new ConfigurationEntry(language, 3, port,
             new RepositoryCoordinates("repo-" + language,

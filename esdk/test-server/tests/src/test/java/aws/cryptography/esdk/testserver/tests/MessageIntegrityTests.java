@@ -29,12 +29,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/client-apis/decrypt.md#behavior}).</li>
  * </ul>
  *
- * <p>Run over the cross-language pairwise matrix and a representative suite set (a
- * committing suite and a committing+signing suite, so both the "ends at the final
- * frame" and "ends at the footer" message shapes are covered). Fully offline
- * (Raw-AES / Default CMM). ESDK-originated failures surface as {@link ESDKClientError}.
+ * <p>Both behaviors assert only the decryptor's validation, so they run
+ * decrypt-side: the reference implementation produces each message and every
+ * configured target decrypts it ({@link ReferenceImplementation#decryptSide}),
+ * over a representative suite set (a committing suite and a committing+signing
+ * suite, so both the "ends at the final frame" and "ends at the footer" message
+ * shapes are covered). Fully offline (Raw-AES / Default CMM). ESDK-originated
+ * failures surface as {@link ESDKClientError}.
  */
 class MessageIntegrityTests {
+
+    private static final Set<String> FEATURES = Set.of("raw-aes");
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server message-integrity plaintext, long enough to span a frame or two"
@@ -47,7 +52,7 @@ class MessageIntegrityTests {
 
     static List<Arguments> cases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (ReferencePair pair : ReferenceImplementation.decryptSide(FEATURES)) {
             for (ESDKAlgorithmSuiteId suite : SUITES) {
                 cases.add(Arguments.of(pair, suite));
             }
@@ -64,8 +69,8 @@ class MessageIntegrityTests {
     /** TAMPER-002: dropping the final byte of a message makes decrypt fail. */
     @ParameterizedTest(name = "truncateByOneRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTruncatedMessage(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    void decryptRejectsTruncatedMessage(ReferencePair pair, ESDKAlgorithmSuiteId suite) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         ESDKClientConfig config = config();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);
@@ -84,8 +89,8 @@ class MessageIntegrityTests {
     /** DEC-006: appending trailing bytes after a valid message makes decrypt fail. */
     @ParameterizedTest(name = "trailingBytesRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTrailingBytes(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    void decryptRejectsTrailingBytes(ReferencePair pair, ESDKAlgorithmSuiteId suite) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         ESDKClientConfig config = config();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);

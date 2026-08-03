@@ -22,11 +22,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       contains the reserved {@code aws-crypto-public-key} key
  *       ({@code spec/client-apis/encrypt.md#encryption-context}). Encrypt is a
  *       per-server property, so it runs against every target.</li>
- *   <li><b>EC-020 / EC-023</b> — decrypt verifies the reproduced encryption context
- *       against the header: the exact context recovers the plaintext, a mismatched
- *       value is rejected
- *       ({@code spec/client-apis/decrypt.md#get-the-decryption-materials}). Runs over
- *       the cross-language pairwise matrix.</li>
+ *   <li><b>EC-020</b> — decrypt with the exact reproduced context recovers the
+ *       plaintext ({@code spec/client-apis/decrypt.md#get-the-decryption-materials}).
+ *       A round trip, so it runs over the cross-language pairwise matrix.</li>
+ *   <li><b>EC-023</b> — a mismatched reproduced value is rejected (same spec
+ *       section). Decrypt-side rows ({@link ReferenceImplementation#decryptSide}).</li>
  * </ul>
  *
  * <p>Fully offline (Raw-AES / Default CMM). ESDK-originated failures surface as a
@@ -44,6 +44,10 @@ class EncryptionContextBehaviorTests {
 
     static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
+    }
+
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(Set.of("raw-aes"));
     }
 
     /**
@@ -82,12 +86,14 @@ class EncryptionContextBehaviorTests {
 
     /**
      * EC-023: decrypt must fail when the reproduced encryption context mismatches the
-     * header — here a present key given a different value. Cross-language matrix.
+     * header — here a present key given a different value. Asserts only the decryptor's
+     * verification, so it runs decrypt-side (the matching-context round trip above keeps
+     * the pairwise producer coverage).
      */
     @ParameterizedTest(name = "reproducedEcMismatchRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsMismatchedReproducedContext(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsMismatchedReproducedContext(ReferencePair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair.asEndpointPair());
         Map<String, String> ec = Map.of("purpose", "test");
         Map<String, String> wrong = Map.of("purpose", "tampered");
         ESDKClientConfig config = EsdkClientConfigs.rawAes();

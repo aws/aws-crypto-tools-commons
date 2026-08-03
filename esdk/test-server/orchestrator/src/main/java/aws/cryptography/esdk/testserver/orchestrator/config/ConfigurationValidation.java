@@ -114,6 +114,33 @@ public final class ConfigurationValidation {
         return new ConfigurationSetValidation(errors.isEmpty(), errors);
     }
 
+    /**
+     * Validate the run's reference implementation — the language whose
+     * Language_Server plays the immaterial side of single-sided Tests — against
+     * the Configuration_Set's languages. Pure, so the pipeline runs it before
+     * anything is cloned; an invalid value aborts naming it and listing the
+     * configured languages.
+     */
+    public static ConfigurationSetValidation validateReferenceImplementation(
+            ConfigurationSet set, String referenceImplementation) {
+        List<String> languages = new ArrayList<>();
+        for (ConfigurationEntry entry : set.entries()) {
+            if (entry.language() != null && !entry.language().isBlank()) {
+                languages.add(entry.language());
+            }
+        }
+        if (referenceImplementation == null || referenceImplementation.isBlank()) {
+            return new ConfigurationSetValidation(false, List.of(
+                "missing value (configured languages: " + languages + ")"));
+        }
+        if (!languages.contains(referenceImplementation)) {
+            return new ConfigurationSetValidation(false, List.of(
+                "'" + referenceImplementation + "' is not a configured language"
+                    + " (configured languages: " + languages + ")"));
+        }
+        return new ConfigurationSetValidation(true, List.of());
+    }
+
     // ------------------------------------------------------------------
     // Catalog level (Requirements 7.4, 7.5)
     // ------------------------------------------------------------------

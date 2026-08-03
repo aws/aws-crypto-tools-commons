@@ -51,10 +51,15 @@ import org.junit.jupiter.params.provider.MethodSource;
  * <ul>
  *   <li><b>Encrypt enforcement</b> is a per-server property, so it runs against
  *       <em>every target</em> ({@link LanguageServerRegistry#targets()}).</li>
- *   <li><b>Round-trip within a policy</b> and <b>decrypt enforcement</b> run over
- *       the full cross-language <em>pairwise matrix</em>
- *       ({@link LanguageServerRegistry#pairs()}) — encrypt on one target, decrypt
- *       on another — so commitment behavior is validated cross-language too.</li>
+ *   <li><b>Round-trip within a policy</b> runs over the full cross-language
+ *       <em>pairwise matrix</em> ({@link LanguageServerRegistry#pairs()}) —
+ *       encrypt on one target, decrypt on another — so commitment behavior is
+ *       validated cross-language too.</li>
+ *   <li><b>Decrypt enforcement</b> asserts only the decryptor's policy check
+ *       against a valid committing/non-committing message, so it runs
+ *       decrypt-side: the reference implementation produces each message and
+ *       every configured target decrypts it
+ *       ({@link ReferenceImplementation#decryptSide}).</li>
  * </ul>
  *
  * <p>Every case runs against each {@link CommitmentKeyring} and gates on that
@@ -247,8 +252,8 @@ class KeyCommitmentTests {
     }
 
     // -----------------------------------------------------------------------
-    // Test C: decrypt honors the commitment policy across policies, over the
-    // cross-language pairwise matrix.
+    // Test C: decrypt honors the commitment policy across policies, decrypt-side
+    // (the reference produces the message; every configured target decrypts).
     // -----------------------------------------------------------------------
 
     /** One case per (message commitment × decrypt policy). */
@@ -273,8 +278,8 @@ class KeyCommitmentTests {
 
     static List<Arguments> decryptPairCases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
-            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
+        for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
+            for (ReferencePair pair : ReferenceImplementation.decryptSide(keyring.features())) {
                 for (DecryptCase c : decryptCaseList()) {
                     cases.add(Arguments.of(pair, keyring, c));
                 }
@@ -285,8 +290,8 @@ class KeyCommitmentTests {
 
     @ParameterizedTest(name = "decrypt[{1}][{2}] {0}")
     @MethodSource("decryptPairCases")
-    void decryptHonorsCommitmentPolicy(EndpointPair pair, CommitmentKeyring keyring, DecryptCase testCase) {
-        FeatureGate.require(keyring.features(), pair);
+    void decryptHonorsCommitmentPolicy(ReferencePair pair, CommitmentKeyring keyring, DecryptCase testCase) {
+        FeatureGate.require(keyring.features(), pair.asEndpointPair());
         // Produce the committing / non-committing message once per (encrypt endpoint,
         // keyring, commitment) — permitted via REQUIRE_ENCRYPT_ALLOW_DECRYPT (committing)
         // or FORBID_ENCRYPT_ALLOW_DECRYPT (non-committing) — and reuse it across decrypt

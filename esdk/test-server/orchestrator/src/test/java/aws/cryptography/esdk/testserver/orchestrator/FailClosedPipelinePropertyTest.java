@@ -161,7 +161,10 @@ class FailClosedPipelinePropertyTest {
             RecordObservingRunner runner = new RecordObservingRunner(recordJson);
 
             ESDKTestServer orchestrator = new ESDKTestServer(set, context, materializer,
-                launcherFactory, runner, new DuplicateTestsDetector(), root);
+                launcherFactory, runner, new DuplicateTestsDetector(), root,
+                // The generated languages need not include the default
+                // reference; any configured language works for this property.
+                set.entries().get(0).language());
 
             // --- Act ---------------------------------------------------------
             Result result = orchestrator.run();

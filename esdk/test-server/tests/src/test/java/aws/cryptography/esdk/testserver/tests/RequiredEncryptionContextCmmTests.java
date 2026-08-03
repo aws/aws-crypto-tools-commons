@@ -13,9 +13,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Required-Encryption-Context CMM conformance over the cross-language pairwise matrix. The CMM
- * drops the required keys from the header on encrypt and demands them, reproduced, on decrypt.
- * Catalog behaviors (esdk-test-behavior-catalog.md):
+ * Required-Encryption-Context CMM conformance. The CMM drops the required keys from the
+ * header on encrypt and demands them, reproduced, on decrypt. The CMM-007 round trip runs
+ * over the cross-language pairwise matrix; the CMM-008 rejections assert only the
+ * decryptor's reproduction check, so they run decrypt-side
+ * ({@link ReferenceImplementation#decryptSide}). Catalog behaviors
+ * (esdk-test-behavior-catalog.md):
  *
  * <ul>
  *   <li><b>CMM-007</b> — round-trips when the required keys are reproduced exactly on decrypt
@@ -36,8 +39,14 @@ class RequiredEncryptionContextCmmTests {
     private static final Map<String, String> FULL_CONTEXT =
         Map.of("purpose", "test", "tenant", "acme");
 
+    private static final Set<String> FEATURES = Set.of("required-encryption-context", "raw-aes");
+
     static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
+    }
+
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
     }
 
     private static ESDKClientConfig config() {
@@ -46,7 +55,7 @@ class RequiredEncryptionContextCmmTests {
 
     /** Encrypt with the required-EC CMM and the full context (required keys dropped from the header). */
     private static byte[] encrypt(EndpointPair pair) {
-        FeatureGate.require(Set.of("required-encryption-context", "raw-aes"), pair);
+        FeatureGate.require(FEATURES, pair);
         return EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT, FULL_CONTEXT, null, null);
     }
 
@@ -62,9 +71,9 @@ class RequiredEncryptionContextCmmTests {
 
     /** CMM-008: decrypt with NO reproduced context fails (the required keys are not on the wire). */
     @ParameterizedTest(name = "missingReproducedEcRejected {0}")
-    @MethodSource("pairs")
-    void decryptFailsWhenNoContextReproduced(EndpointPair pair) {
-        byte[] ciphertext = encrypt(pair);
+    @MethodSource("decryptSide")
+    void decryptFailsWhenNoContextReproduced(ReferencePair pair) {
+        byte[] ciphertext = encrypt(pair.asEndpointPair());
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext),
             "decrypt without reproducing the required encryption context must fail (" + pair + ")");
@@ -72,9 +81,9 @@ class RequiredEncryptionContextCmmTests {
 
     /** CMM-008: decrypt reproducing only some of the required keys fails. */
     @ParameterizedTest(name = "partialReproducedEcRejected {0}")
-    @MethodSource("pairs")
-    void decryptFailsWhenRequiredKeyMissing(EndpointPair pair) {
-        byte[] ciphertext = encrypt(pair);
+    @MethodSource("decryptSide")
+    void decryptFailsWhenRequiredKeyMissing(ReferencePair pair) {
+        byte[] ciphertext = encrypt(pair.asEndpointPair());
         Map<String, String> partial = Map.of("purpose", "test");  // missing "tenant"
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, partial),
@@ -83,9 +92,9 @@ class RequiredEncryptionContextCmmTests {
 
     /** CMM-008: decrypt reproducing a required key with the wrong value fails. */
     @ParameterizedTest(name = "wrongReproducedEcValueRejected {0}")
-    @MethodSource("pairs")
-    void decryptFailsWhenRequiredValueWrong(EndpointPair pair) {
-        byte[] ciphertext = encrypt(pair);
+    @MethodSource("decryptSide")
+    void decryptFailsWhenRequiredValueWrong(ReferencePair pair) {
+        byte[] ciphertext = encrypt(pair.asEndpointPair());
         Map<String, String> wrong = Map.of("purpose", "test", "tenant", "WRONG");
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, wrong),

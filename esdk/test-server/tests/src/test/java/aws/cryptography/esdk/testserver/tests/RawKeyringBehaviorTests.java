@@ -11,33 +11,42 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Raw-keyring behavior conformance over the cross-language pairwise matrix. Catalog behaviors
- * (esdk-test-behavior-catalog.md):
+ * Raw-keyring behavior conformance. Catalog behaviors (esdk-test-behavior-catalog.md):
  *
  * <ul>
  *   <li><b>KEYRING-003</b> — raw-key decrypt succeeds whenever at least one supplied EDK matches a
  *       held wrapping key: a message wrapped to two keyrings decrypts under a keyring holding only
- *       the second key ({@code spec/framework/raw-aes-keyring.md#ondecrypt}).</li>
- *   <li><b>KEYRING-009</b> — an asymmetric RSA keyring built with only the public key can wrap on
- *       encrypt but cannot unwrap on decrypt ({@code spec/framework/raw-rsa-keyring.md#ondecrypt}).</li>
+ *       the second key ({@code spec/framework/raw-aes-keyring.md#ondecrypt}). Asserts only the
+ *       decryptor's EDK matching, so it runs decrypt-side
+ *       ({@link ReferenceImplementation#decryptSide}); the multi-keyring round trips in
+ *       {@code MaterialsRoundTripTests} keep the pairwise producer coverage.</li>
+ *   <li><b>KEYRING-053</b> — a multi-keyring with children but no generator cannot create a data
+ *       key, so encrypt fails ({@code spec/framework/multi-keyring.md#onencrypt}). Encrypt-time
+ *       validation is a per-server property, so it runs against every target.</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES / Raw-RSA). ESDK-originated failures surface as {@link ESDKClientError}.
+ * <p>Fully offline (Raw-AES). ESDK-originated failures surface as {@link ESDKClientError}.
  */
 class RawKeyringBehaviorTests {
+
+    private static final Set<String> FEATURES = Set.of("raw-aes", "multi");
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server raw-keyring-behavior plaintext".getBytes(StandardCharsets.UTF_8);
 
-    static List<EndpointPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
+    }
+
+    static List<LanguageServerTarget> targets() {
+        return LanguageServerRegistry.shared().targets();
     }
 
     /** KEYRING-003: a two-keyring message decrypts under a keyring holding only the second key. */
     @ParameterizedTest(name = "subsetKeyringDecrypts {0}")
-    @MethodSource("pairs")
-    void decryptSucceedsWithASubsetKeyring(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes", "multi"), pair);
+    @MethodSource("decryptSide")
+    void decryptSucceedsWithASubsetKeyring(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         // Encrypt to a multi-keyring (generator "a" + child "b") => two EDKs.
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesMulti(), PLAINTEXT);
         // Decrypt with a keyring holding only key "b" — it matches the second EDK.
@@ -52,12 +61,12 @@ class RawKeyringBehaviorTests {
      * encrypt fails (only a generator can generate material).
      */
     @ParameterizedTest(name = "childrenOnlyMultiCannotEncrypt {0}")
-    @MethodSource("pairs")
-    void childrenOnlyMultiKeyringCannotEncrypt(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes", "multi"), pair);
+    @MethodSource("targets")
+    void childrenOnlyMultiKeyringCannotEncrypt(LanguageServerTarget target) {
+        FeatureGate.require(FEATURES, new EndpointPair(target, target));
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesChildrenOnlyMulti(), PLAINTEXT),
+            () -> EsdkOps.encrypt(target.endpoint(), EsdkClientConfigs.rawAesChildrenOnlyMulti(), PLAINTEXT),
             "a multi-keyring with no generator must fail to encrypt (nothing can create a data key) ("
-                + pair + ")");
+                + target + ")");
     }
 }

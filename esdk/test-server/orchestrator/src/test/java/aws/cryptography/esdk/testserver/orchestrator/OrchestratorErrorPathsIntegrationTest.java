@@ -167,8 +167,63 @@ class OrchestratorErrorPathsIntegrationTest {
     void gradleRunnerRefusesWithoutEndpoint(@TempDir Path root) {
         GradleTestRunner runner = new GradleTestRunner(root.resolve("tests"));
         Assertions.assertThrows(MissingRuntimeConfigException.class,
-            () -> runner.run(new TestRunInput(List.of(), Map.of(), List.of(), Map.of())),
+            () -> runner.run(new TestRunInput(List.of(), Map.of(), List.of(), Map.of(), "java")),
             "the runner must refuse to run when no target is configured");
+    }
+
+    @Test
+    @DisplayName("an unknown referenceImplementation aborts naming it and the configured languages")
+    void unknownReferenceImplementationAborts(@TempDir Path root) {
+        ConfigurationSet set = javaOnly();
+        FakeLauncher launcher = FakeLauncher.succeeding();
+        StubTestRunner runner = StubTestRunner.returning(List.of());
+        RunContext context = RunContext.commonsRun(root, "aws-crypto-tools-commons");
+        ESDKTestServer orchestrator = new ESDKTestServer(set, context,
+            FakeMaterializer.succeedingUnder(root, set),
+            LauncherFactory.uniform(launcher), runner,
+            new DuplicateTestsDetector(), root, "ruby");
+
+        Result result = orchestrator.run();
+
+        assertFalse(result.succeeded());
+        assertTrue(result.summary().contains("'ruby'"),
+            "the abort must name the unknown value: " + result.summary());
+        assertTrue(result.summary().contains("java"),
+            "the abort must list the configured languages: " + result.summary());
+        assertEquals(0, launcher.launchCount(), "no server may launch on an invalid reference");
+        assertFalse(runner.wasInvoked(), "no Tests may run on an invalid reference");
+    }
+
+    @Test
+    @DisplayName("the default referenceImplementation java reaches the Tests run")
+    void defaultReferenceImplementationReachesTheTestsRun(@TempDir Path root) {
+        StubTestRunner runner = StubTestRunner.returning(List.of(
+            TestExecution.passed("RoundTrip#a")));
+
+        orchestrator(javaOnly(), FakeLauncher.succeeding(), runner, root).run();
+
+        assertTrue(runner.wasInvoked());
+        assertEquals("java", runner.lastInput().referenceImplementation());
+    }
+
+    @Test
+    @DisplayName("an explicit referenceImplementation reaches the Tests run")
+    void explicitReferenceImplementationReachesTheTestsRun(@TempDir Path root) {
+        ConfigurationSet set = new ConfigurationSet("esdk", List.of("streaming", "MPL"),
+            List.of(completeJavaEntry(8091), completeEntry("python", 8092)));
+        FakeLauncher launcher = FakeLauncher.succeeding();
+        StubTestRunner runner = StubTestRunner.returning(List.of(
+            TestExecution.passed("RoundTrip#a")));
+        RunContext context = RunContext.commonsRun(root, "aws-crypto-tools-commons");
+        ESDKTestServer orchestrator = new ESDKTestServer(set, context,
+            FakeMaterializer.succeedingUnder(root, set),
+            LauncherFactory.uniform(launcher), runner,
+            new DuplicateTestsDetector(), root, "python");
+
+        orchestrator.run();
+
+        assertTrue(runner.wasInvoked());
+        assertEquals("python", runner.lastInput().referenceImplementation());
     }
 
     @Test
@@ -239,8 +294,13 @@ class OrchestratorErrorPathsIntegrationTest {
                 List.of("OAEP_SHA3_MGF1"))));
         FakeLauncher launcher = FakeLauncher.succeeding();
         StubTestRunner runner = StubTestRunner.returning(List.of());
+        RunContext context = RunContext.commonsRun(root, "aws-crypto-tools-commons");
+        ESDKTestServer orchestrator = new ESDKTestServer(set, context,
+            FakeMaterializer.succeedingUnder(root, set),
+            LauncherFactory.uniform(launcher), runner,
+            new DuplicateTestsDetector(), root, "python");
 
-        Result result = orchestrator(set, launcher, runner, root).run();
+        Result result = orchestrator.run();
 
         assertFalse(result.succeeded());
         assertTrue(result.summary().contains("OAEP_SHA3_MGF1"),

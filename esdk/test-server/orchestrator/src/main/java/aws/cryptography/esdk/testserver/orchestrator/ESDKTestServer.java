@@ -113,6 +113,14 @@ public final class ESDKTestServer {
             ? COMMONS_CONFIGURATION_RELATIVE_PATH : configured;
     }
 
+    /**
+     * The DEFAULT reference implementation: the language whose Language_Server
+     * plays the immaterial side of single-sided Tests (the Tests read it from
+     * {@code esdk.testserver.referenceImplementation}). Overridden per
+     * invocation via the {@code referenceImplementation} CLI argument.
+     */
+    public static final String DEFAULT_REFERENCE_IMPLEMENTATION = "java";
+
     private final ConfigurationSet configurationSet;
     private final RunContext context;
     private final SourceResolver resolver;
@@ -121,8 +129,10 @@ public final class ESDKTestServer {
     private final TestRunner testRunner;
     private final DuplicateTestsDetector duplicateDetector;
     private final Path testServerRoot;
+    private final String referenceImplementation;
     private final ResultReporter reporter;
 
+    /** With the {@link #DEFAULT_REFERENCE_IMPLEMENTATION}. */
     public ESDKTestServer(
             ConfigurationSet configurationSet,
             RunContext context,
@@ -131,6 +141,19 @@ public final class ESDKTestServer {
             TestRunner testRunner,
             DuplicateTestsDetector duplicateDetector,
             Path testServerRoot) {
+        this(configurationSet, context, materializer, launcherFactory, testRunner,
+            duplicateDetector, testServerRoot, DEFAULT_REFERENCE_IMPLEMENTATION);
+    }
+
+    public ESDKTestServer(
+            ConfigurationSet configurationSet,
+            RunContext context,
+            Materializer materializer,
+            LauncherFactory launcherFactory,
+            TestRunner testRunner,
+            DuplicateTestsDetector duplicateDetector,
+            Path testServerRoot,
+            String referenceImplementation) {
         this.configurationSet = configurationSet;
         this.context = context;
         this.resolver = new SourceResolver();
@@ -139,6 +162,7 @@ public final class ESDKTestServer {
         this.testRunner = testRunner;
         this.duplicateDetector = duplicateDetector;
         this.testServerRoot = testServerRoot;
+        this.referenceImplementation = referenceImplementation;
         this.reporter = new ResultReporter();
     }
 
@@ -223,6 +247,17 @@ public final class ESDKTestServer {
             configurationSet, overrides, context.ownLanguage());
         if (!validation.valid()) {
             return PipelineOutcome.aborted("invalid Configuration_Set: " + validation.message());
+        }
+
+        // 1a'. The reference implementation must be a configured language: the
+        // Tests produce single-sided messages on its Language_Server, so an
+        // unknown value aborts before anything is cloned, naming it and the
+        // configured languages.
+        ConfigurationSetValidation reference = ConfigurationValidation
+            .validateReferenceImplementation(configurationSet, referenceImplementation);
+        if (!reference.valid()) {
+            return PipelineOutcome.aborted(
+                "invalid referenceImplementation: " + reference.message());
         }
 
         // 1b. Reject duplicate Tests definitions before running anything
@@ -518,7 +553,8 @@ public final class ESDKTestServer {
                 rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
             }
         }
-        return new TestRunInput(targets, features, catalog, rawRsaPaddingSchemes);
+        return new TestRunInput(
+            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

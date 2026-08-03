@@ -33,9 +33,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/data-format/message-body.md#regular-frame-sequence-number}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * <p>Each behavior asserts only the decryptor's validation, so these run decrypt-side:
+ * the reference implementation produces each message and every configured target
+ * decrypts it ({@link ReferenceImplementation#decryptSide}). Fully offline (Raw-AES).
+ * Rejections surface as a modeled {@link ESDKClientError}.
  */
 class HeaderFieldTamperTests {
+
+    private static final Set<String> FEATURES = Set.of("raw-aes");
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server structural-tamper plaintext that comfortably spans several small frames"
@@ -57,16 +62,16 @@ class HeaderFieldTamperTests {
     /** Long enough that FRAME_LENGTH yields at least two regular frames plus a final frame. */
     private static final byte[] LARGE_PLAINTEXT = new byte[2 * 512 + 100];
 
-    static List<EndpointPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
     }
 
-    private static byte[] encryptV2(EndpointPair pair, long frameLength) {
+    private static byte[] encryptV2(ReferencePair pair, long frameLength) {
         return EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(), V2_SUITE,
             frameLength);
     }
 
-    private static void assertRejected(EndpointPair pair, ESDKClientConfig config, byte[] tampered,
+    private static void assertRejected(ReferencePair pair, ESDKClientConfig config, byte[] tampered,
                                        String what) {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
@@ -75,9 +80,9 @@ class HeaderFieldTamperTests {
 
     /** HDR-014: content-type byte set to an unsupported value is rejected. */
     @ParameterizedTest(name = "contentTypeRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsInvalidContentType(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsInvalidContentType(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = encryptV2(pair, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
@@ -87,9 +92,9 @@ class HeaderFieldTamperTests {
 
     /** HDR-020: a header declaring zero encrypted data keys is rejected. */
     @ParameterizedTest(name = "edkCountZeroRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsZeroEdkCount(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsZeroEdkCount(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = encryptV2(pair, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.edkCount >= 1, "baseline: message must carry at least one EDK");
@@ -101,9 +106,9 @@ class HeaderFieldTamperTests {
 
     /** HDR-015: a V1 header whose 4-byte reserved field is non-zero is rejected. */
     @ParameterizedTest(name = "v1ReservedNonZeroRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsNonZeroV1Reserved(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsNonZeroV1Reserved(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_SIGNING, PLAINTEXT, Map.of(),
             V1_SUITE, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -115,9 +120,9 @@ class HeaderFieldTamperTests {
 
     /** TAMPER-003: flipping a byte of a frame's encrypted content fails the AES-GCM tag. */
     @ParameterizedTest(name = "frameContentTamperRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsTamperedFrameContent(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsTamperedFrameContent(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
             Map.of(), V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -129,9 +134,9 @@ class HeaderFieldTamperTests {
 
     /** TAMPER-004: a frame sequence number that breaks the strictly-increasing order is rejected. */
     @ParameterizedTest(name = "frameSequenceTamperRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsTamperedFrameSequenceNumber(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsTamperedFrameSequenceNumber(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
             Map.of(), V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

@@ -35,7 +35,10 @@ import org.w3c.dom.NodeList;
  *       verbatim,</li>
  *   <li>{@code -Desdk.testserver.rawRsaPaddingSchemes=...} — each language's
  *       declared raw-RSA padding capability (only languages that declare one;
- *       an absent language supports every scheme).</li>
+ *       an absent language supports every scheme),</li>
+ *   <li>{@code -Desdk.testserver.referenceImplementation=...} — the validated
+ *       reference implementation language (single-sided Tests produce their
+ *       messages on its Language_Server).</li>
  * </ul>
  *
  * The Tests definition is never altered per language.
@@ -64,6 +67,10 @@ public final class GradleTestRunner implements TestRunner {
     /** Runtime-config key: comma-separated {@code lang:SCHEME[;SCHEME…]} entries. */
     public static final String RAW_RSA_PADDING_SCHEMES_PROPERTY =
         "esdk.testserver.rawRsaPaddingSchemes";
+
+    /** Runtime-config key: the reference implementation's language. */
+    public static final String REFERENCE_IMPLEMENTATION_PROPERTY =
+        "esdk.testserver.referenceImplementation";
 
     private final Path testsModuleDir;
     private volatile String lastOutput = "";
@@ -136,6 +143,8 @@ public final class GradleTestRunner implements TestRunner {
             command.add("-D" + RAW_RSA_PADDING_SCHEMES_PROPERTY + "="
                 + TestRunInput.formatRawRsaPaddingSchemes(input.rawRsaPaddingSchemes()));
         }
+        command.add("-D" + REFERENCE_IMPLEMENTATION_PROPERTY + "="
+            + input.referenceImplementation());
         command.add("--console=plain");
         return command;
     }

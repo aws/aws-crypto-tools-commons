@@ -29,6 +29,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class MaxEncryptedDataKeysTests {
 
+    private static final Set<String> FEATURES = Set.of("raw-aes", "multi");
+
     private static final byte[] PLAINTEXT =
         "esdk-test-server max-edk plaintext".getBytes(StandardCharsets.UTF_8);
 
@@ -36,15 +38,15 @@ class MaxEncryptedDataKeysTests {
         return LanguageServerRegistry.shared().targets();
     }
 
-    static List<EndpointPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
     }
 
     /** ENC-014: encrypt with a two-EDK keyring succeeds at a cap of 2 but is rejected at a cap of 1. */
     @ParameterizedTest(name = "encryptEnforcesMaxEdks {0}")
     @MethodSource("targets")
     void encryptEnforcesMaxEncryptedDataKeys(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes", "multi"), new EndpointPair(target, target));
+        FeatureGate.require(FEATURES, new EndpointPair(target, target));
         // Cap of 2 permits the two EDKs.
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(),
             EsdkClientConfigs.rawAesMultiWithMaxEdks(2), PLAINTEXT);
@@ -59,12 +61,13 @@ class MaxEncryptedDataKeysTests {
 
     /**
      * DEC-002: a two-EDK message decrypts under a cap of 2 but is rejected under a cap of 1
-     * (before any unwrap). Cross-language matrix.
+     * (before any unwrap). Decrypt-side: the reference produces the two-EDK message and
+     * every configured target decrypts it.
      */
     @ParameterizedTest(name = "decryptEnforcesMaxEdks {0}")
-    @MethodSource("pairs")
-    void decryptEnforcesMaxEncryptedDataKeys(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes", "multi"), pair);
+    @MethodSource("decryptSide")
+    void decryptEnforcesMaxEncryptedDataKeys(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         // Encrypt a two-EDK message with no cap.
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesMulti(), PLAINTEXT);
 

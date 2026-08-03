@@ -107,13 +107,28 @@ class TestRunInputTest {
                 new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
             features,
             List.of("streaming", "MPL"),
-            Map.of());
+            Map.of(),
+            "java");
 
         assertEquals("python:4=http://127.0.0.1:8092,java:3=http://127.0.0.1:8091",
             TestRunInput.formatTargets(input.targets()));
         assertEquals("python:streaming=true;MPL=true,java:MPL=true;streaming=true",
             TestRunInput.formatFeatures(input.features()));
         assertFalse(input.featureCatalog().isEmpty());
+    }
+
+    @Test
+    @DisplayName("the reference implementation is carried verbatim and must be non-blank")
+    void carriesReferenceImplementation() {
+        List<TestTarget> targets =
+            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")));
+
+        assertEquals("python",
+            new TestRunInput(targets, Map.of(), List.of(), Map.of(), "python")
+                .referenceImplementation());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> new TestRunInput(targets, Map.of(), List.of(), Map.of(), " "),
+            "a blank reference implementation must be rejected");
     }
 
     private static Map<String, Boolean> declaration(

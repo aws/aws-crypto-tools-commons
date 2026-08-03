@@ -27,14 +27,15 @@ class GradleTestRunnerTest {
     // ---- command construction -------------------------------------------
 
     @Test
-    @DisplayName("command passes targets, features, and featureCatalog properties (Req 2.2, 9.3)")
+    @DisplayName("command passes targets, features, featureCatalog, and referenceImplementation properties (Req 2.2, 9.3)")
     void commandCarriesAllThreeProperties() {
         TestRunInput input = new TestRunInput(
             List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")),
                 new TestTarget("python", 4, URI.create("http://127.0.0.1:8092"))),
             features(),
             List.of("streaming", "MPL"),
-            Map.of("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")));
+            Map.of("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
+            "java");
 
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 
@@ -49,6 +50,8 @@ class GradleTestRunnerTest {
         assertTrue(command.contains(
                 "-Desdk.testserver.rawRsaPaddingSchemes=c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1"),
             "must pass the declared padding capabilities: " + command);
+        assertTrue(command.contains("-Desdk.testserver.referenceImplementation=java"),
+            "must pass the reference implementation: " + command);
         assertTrue(command.stream().noneMatch(a -> a.startsWith("-Desdk.testserver.endpoints")),
             "the legacy endpoints property is replaced: " + command);
     }
@@ -60,7 +63,8 @@ class GradleTestRunnerTest {
             List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
             Map.of(),
             List.of(),
-            Map.of());
+            Map.of(),
+            "java");
 
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 

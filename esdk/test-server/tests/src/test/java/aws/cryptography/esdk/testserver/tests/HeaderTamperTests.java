@@ -38,12 +38,16 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       {@code spec/client-apis/decrypt.md#decrypt-the-message-body}).</li>
  * </ul>
  *
- * <p>Run over the cross-language pairwise matrix and both message-format layouts (a
+ * <p>Each behavior asserts only the decryptor's validation, so these run decrypt-side —
+ * the reference implementation produces each message and every configured target decrypts
+ * it ({@link ReferenceImplementation#decryptSide}) — over both message-format layouts (a
  * V2 committing suite and a V1 non-committing signing suite), so the version-specific
  * header offsets are covered. Fully offline (Raw-AES). Every rejection is asserted to
  * surface as a modeled {@link ESDKClientError}.
  */
 class HeaderTamperTests {
+
+    private static final Set<String> FEATURES = Set.of("raw-aes");
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server header-tamper plaintext".getBytes(StandardCharsets.UTF_8);
@@ -81,7 +85,7 @@ class HeaderTamperTests {
 
     static List<Arguments> cases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (ReferencePair pair : ReferenceImplementation.decryptSide(FEATURES)) {
             for (Layout layout : LAYOUTS) {
                 cases.add(Arguments.of(pair, layout));
             }
@@ -89,9 +93,9 @@ class HeaderTamperTests {
         return cases;
     }
 
-    /** Encrypt one message for {@code layout} on the pair's encrypt endpoint. */
-    private static byte[] encrypt(EndpointPair pair, Layout layout) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    /** Encrypt one message for {@code layout} on the pair's (reference) encrypt endpoint. */
+    private static byte[] encrypt(ReferencePair pair, Layout layout) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), layout.config(), PLAINTEXT,
             Map.of(), layout.suite(), null);
         // Sanity: the layout's expected version byte is what the server produced.
@@ -105,7 +109,7 @@ class HeaderTamperTests {
     /** HDR-011: an unsupported version byte is rejected. */
     @ParameterizedTest(name = "versionByteRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsUnsupportedVersionByte(EndpointPair pair, Layout layout) {
+    void decryptRejectsUnsupportedVersionByte(ReferencePair pair, Layout layout) {
         byte[] ciphertext = encrypt(pair, layout);
         assertBaselineDecrypts(pair, layout, ciphertext);
 
@@ -120,7 +124,7 @@ class HeaderTamperTests {
     /** HDR-013: an unknown algorithm-suite id is rejected. */
     @ParameterizedTest(name = "suiteIdRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsUnknownSuiteId(EndpointPair pair, Layout layout) {
+    void decryptRejectsUnknownSuiteId(ReferencePair pair, Layout layout) {
         byte[] ciphertext = encrypt(pair, layout);
         byte[] tampered = ciphertext.clone();
         tampered[layout.suiteIdOffset()] = (byte) 0xFF;
@@ -134,7 +138,7 @@ class HeaderTamperTests {
     /** TAMPER-001: flipping an authenticated header byte (a message-id byte) is rejected. */
     @ParameterizedTest(name = "headerByteTamperRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTamperedHeaderByte(EndpointPair pair, Layout layout) {
+    void decryptRejectsTamperedHeaderByte(ReferencePair pair, Layout layout) {
         byte[] ciphertext = encrypt(pair, layout);
         byte[] tampered = ciphertext.clone();
         tampered[layout.messageIdByteOffset()] ^= (byte) 0xFF;
@@ -150,7 +154,7 @@ class HeaderTamperTests {
      */
     @ParameterizedTest(name = "finalByteTamperRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTamperedFinalByte(EndpointPair pair, Layout layout) {
+    void decryptRejectsTamperedFinalByte(ReferencePair pair, Layout layout) {
         byte[] ciphertext = encrypt(pair, layout);
         byte[] tampered = ciphertext.clone();
         tampered[tampered.length - 1] ^= (byte) 0xFF;
@@ -161,7 +165,7 @@ class HeaderTamperTests {
                 + layout + ")");
     }
 
-    private static void assertBaselineDecrypts(EndpointPair pair, Layout layout, byte[] ciphertext) {
+    private static void assertBaselineDecrypts(ReferencePair pair, Layout layout, byte[] ciphertext) {
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), ciphertext),
             "baseline: the untampered message must decrypt (" + pair + ", " + layout + ")");
     }

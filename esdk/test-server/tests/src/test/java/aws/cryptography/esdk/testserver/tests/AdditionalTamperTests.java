@@ -35,9 +35,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       rejected ({@code spec/data-format/message.md#structure}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * <p>Each behavior asserts only the decryptor's validation, so these run decrypt-side:
+ * the reference implementation produces each message and every configured target
+ * decrypts it ({@link ReferenceImplementation#decryptSide}). Fully offline (Raw-AES).
+ * Rejections surface as a modeled {@link ESDKClientError}.
  */
 class AdditionalTamperTests {
+
+    private static final Set<String> FEATURES = Set.of("raw-aes");
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server additional-tamper plaintext".getBytes(StandardCharsets.UTF_8);
@@ -59,8 +64,8 @@ class AdditionalTamperTests {
 
     private static final long FRAME_LENGTH = 512L;
 
-    static List<EndpointPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
     }
 
     private static void putU32(byte[] b, int offset, long value) {
@@ -70,7 +75,7 @@ class AdditionalTamperTests {
         b[offset + 3] = (byte) value;
     }
 
-    private static void assertRejected(EndpointPair pair, ESDKClientConfig config, byte[] tampered,
+    private static void assertRejected(ReferencePair pair, ESDKClientConfig config, byte[] tampered,
                                        String what) {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
@@ -79,9 +84,9 @@ class AdditionalTamperTests {
 
     /** TAMPER-005: a final-frame content length exceeding the frame length is rejected. */
     @ParameterizedTest(name = "finalFrameContentLengthOverflowRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsOverlongFinalFrameContentLength(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsOverlongFinalFrameContentLength(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         // Short plaintext (< frame length) => a single final frame carrying a content-length field.
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(),
             V2_SUITE, FRAME_LENGTH);
@@ -97,9 +102,9 @@ class AdditionalTamperTests {
 
     /** FOOT-004: a signed message with its footer signature bytes dropped is rejected. */
     @ParameterizedTest(name = "truncatedFooterRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsTruncatedFooter(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsTruncatedFooter(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
             V1_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -111,9 +116,9 @@ class AdditionalTamperTests {
 
     /** HDR-012: an unsupported V1 type byte is rejected. */
     @ParameterizedTest(name = "v1InvalidTypeRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsInvalidV1Type(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsInvalidV1Type(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
             V1_NON_SIGNING, FRAME_LENGTH);
         byte[] tampered = ciphertext.clone();
@@ -123,9 +128,9 @@ class AdditionalTamperTests {
 
     /** HDR-016: a V1 IV-length field that disagrees with the suite is rejected. */
     @ParameterizedTest(name = "v1IvLengthMismatchRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsV1IvLengthMismatch(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsV1IvLengthMismatch(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
             V1_NON_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -137,9 +142,9 @@ class AdditionalTamperTests {
 
     /** HDR-018: a V1 header carrying a committing (V2) algorithm-suite id is rejected. */
     @ParameterizedTest(name = "v1WithCommittingSuiteIdRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsV1HeaderWithCommittingSuiteId(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsV1HeaderWithCommittingSuiteId(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
             V1_NON_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -152,9 +157,9 @@ class AdditionalTamperTests {
 
     /** HDR-017: a framed header whose frame length is 0 (only valid for non-framed) is rejected. */
     @ParameterizedTest(name = "framedZeroFrameLengthRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsFramedHeaderWithZeroFrameLength(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+    @MethodSource("decryptSide")
+    void decryptRejectsFramedHeaderWithZeroFrameLength(ReferencePair pair) {
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(),
             V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
