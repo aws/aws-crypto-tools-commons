@@ -1,15 +1,18 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
+import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
+import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -123,6 +126,124 @@ class SignatureVerificationTests {
         return verifier.verify(signature);
     }
 
+    static List<Arguments> pairCases() {
+        List<Arguments> cases = new ArrayList<>();
+        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+            cases.add(Arguments.of(pair, P384));
+            cases.add(Arguments.of(pair, P256));
+        }
+        return cases;
+    }
+
+    /**
+     * A footer signature replaced with a structurally perfect ECDSA signature made by a
+     * DIFFERENT key over the same header ‖ body is rejected on decrypt
+     * ({@code spec/client-apis/decrypt.md#verify-the-signature}). This is sharper than
+     * corrupting signature bytes: a corrupted signature usually fails DER parsing, so it cannot
+     * detect a decryptor that parses the signature and then ignores the verifier's boolean
+     * result — the verification bypass fixed in the Dafny ESDK in 2022, where only parse
+     * failures propagated and {@code Success(false)} was discarded.
+     */
+    @ParameterizedTest(name = "wrongKeySignatureRejected[{1}] {0}")
+    @MethodSource("pairCases")
+    void decryptRejectsWellFormedSignatureByWrongKey(EndpointPair pair, SigningLayout layout)
+        throws Exception {
+        FeatureGate.require(Set.of("raw-aes"), pair);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), layout.config(), PLAINTEXT,
+            Map.of(), layout.suite(), null);
+        EsdkMessage message = EsdkMessage.parse(ciphertext);
+        assertTrue(message.footerOffset >= 0 && message.signatureLength > 0,
+            pair + " " + layout + ": a signing suite must produce a footer signature");
+
+        KeyPair wrongKeyPair = freshKeyPair(layout.curveName());
+        Signature signer = Signature.getInstance(layout.signatureAlgorithm());
+        signer.initSign(wrongKeyPair.getPrivate());
+        signer.update(ciphertext, 0, message.footerOffset);
+        byte[] forgedSignature = signer.sign();
+
+        byte[] forged = new byte[message.footerOffset + 2 + forgedSignature.length];
+        System.arraycopy(ciphertext, 0, forged, 0, message.footerOffset);
+        forged[message.footerOffset] = (byte) (forgedSignature.length >>> 8);
+        forged[message.footerOffset + 1] = (byte) forgedSignature.length;
+        System.arraycopy(forgedSignature, 0, forged, message.footerOffset + 2,
+            forgedSignature.length);
+
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), forged),
+            pair + " " + layout + ": a well-formed signature by a key other than the message's "
+                + "verification key must be rejected");
+    }
+
+    /**
+     * Every emitted footer signature is canonical DER: one SEQUENCE of exactly two
+     * minimally-encoded non-negative INTEGERs filling the footer's 2-byte length field.
+     * Post-2024 implementations parse the signature strictly (the signature-verification
+     * advisories fixed leniencies such as trailing bytes and non-minimal integers), so an
+     * encryptor emitting non-canonical DER produces messages that strict readers reject.
+     * Historic encoder bugs — a sign-bit mishandled when converting raw (r, s) to DER, or a
+     * component length taken from the wrong integer — appear on roughly every other message,
+     * so a small sample per suite detects them deterministically.
+     */
+    @ParameterizedTest(name = "footerSignatureCanonicalDer[{1}] {0}")
+    @MethodSource("cases")
+    void emittedFooterSignatureIsCanonicalDer(LanguageServerTarget target, SigningLayout layout) {
+        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        for (int i = 0; i < 8; i++) {
+            byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT,
+                Map.of(), layout.suite(), null);
+            EsdkMessage message = EsdkMessage.parse(ciphertext);
+            byte[] signature = Arrays.copyOfRange(ciphertext, message.footerOffset + 2,
+                message.footerOffset + 2 + message.signatureLength);
+            String problem = canonicalDerEcdsaProblem(signature);
+            assertTrue(problem == null,
+                target + " " + layout + " sample " + i + ": footer signature must be canonical "
+                    + "DER, but " + problem);
+        }
+    }
+
+    /**
+     * @return null when {@code sig} is one canonical-DER ECDSA signature (SEQUENCE of two
+     *     minimal non-negative INTEGERs, no trailing bytes), else a description of the defect.
+     */
+    private static String canonicalDerEcdsaProblem(byte[] sig) {
+        if (sig.length < 8 || (sig[0] & 0xFF) != 0x30) {
+            return "it does not start with a SEQUENCE tag";
+        }
+        int seqLen = sig[1] & 0xFF;
+        int pos = 2;
+        if (seqLen == 0x81) {
+            seqLen = sig[2] & 0xFF;
+            pos = 3;
+            if (seqLen < 0x80) {
+                return "it uses a long-form SEQUENCE length for a short value";
+            }
+        } else if (seqLen >= 0x80) {
+            return "its SEQUENCE length form is invalid for an ECDSA signature";
+        }
+        if (pos + seqLen != sig.length) {
+            return "its SEQUENCE length does not fill the signature field exactly (trailing bytes)";
+        }
+        for (int component = 0; component < 2; component++) {
+            if (pos + 2 > sig.length || (sig[pos] & 0xFF) != 0x02) {
+                return "component " + component + " is not an INTEGER";
+            }
+            int len = sig[pos + 1] & 0xFF;
+            pos += 2;
+            if (len == 0 || len >= 0x80 || pos + len > sig.length) {
+                return "component " + component + " has an invalid length";
+            }
+            int first = sig[pos] & 0xFF;
+            if ((first & 0x80) != 0) {
+                return "component " + component + " is negative (missing 0x00 pad for a high bit)";
+            }
+            if (len > 1 && first == 0x00 && (sig[pos + 1] & 0x80) == 0) {
+                return "component " + component + " has a superfluous leading 0x00 (non-minimal)";
+            }
+            pos += len;
+        }
+        return pos == sig.length ? null : "it has bytes after the second INTEGER";
+    }
+
     /** The base64 text stored under {@code aws-crypto-public-key} in the header AAD. */
     private static String verificationKeyValue(EsdkMessage message) {
         byte[] b = message.bytes;
@@ -168,8 +289,12 @@ class SignatureVerificationTests {
     }
 
     private static PublicKey freshPublicKey(String curveName) throws Exception {
+        return freshKeyPair(curveName).getPublic();
+    }
+
+    private static KeyPair freshKeyPair(String curveName) throws Exception {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
         generator.initialize(new ECGenParameterSpec(curveName));
-        return generator.generateKeyPair().getPublic();
+        return generator.generateKeyPair();
     }
 }
