@@ -11,6 +11,7 @@ import aws.cryptography.esdk.testserver.client.model.Keyring;
 import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -88,7 +89,7 @@ class ReleasedVectorDecryptTests {
             }
             JsonNode manifest = MAPPER.readTree(manifestPath.toFile());
             int version = manifest.path("manifest").path("version").asInt();
-            JsonNode keys = MAPPER.readTree(corpus.resolve("keys.json").toFile()).get("keys");
+            JsonNode keys = normalizeKeys(MAPPER.readTree(corpus.resolve("keys.json").toFile()).get("keys"));
             String corpusName = corpus.getFileName().toString();
 
             int emitted = 0;
@@ -206,6 +207,36 @@ class ReleasedVectorDecryptTests {
         }
         String value = node.asText();
         return value.startsWith("file://") ? value.substring("file://".length()) : value;
+    }
+
+    /**
+     * Normalize a corpus {@code keys.json} to the modern schema: the older corpora omit
+     * {@code key-id} (the id is the map key name) and store {@code material} as an array of lines
+     * joined by {@code line-separator}. {@link TestVectorManifestTests#keyringFor} reads a single
+     * {@code key-id} and a single {@code material} string, so fill both in here.
+     */
+    private static JsonNode normalizeKeys(JsonNode keysNode) {
+        ObjectNode out = MAPPER.createObjectNode();
+        keysNode.fields().forEachRemaining(entry -> {
+            ObjectNode key = entry.getValue().deepCopy();
+            if (!key.has("key-id")) {
+                key.put("key-id", entry.getKey());
+            }
+            JsonNode material = key.get("material");
+            if (material != null && material.isArray()) {
+                String separator = key.path("line-separator").asText("");
+                StringBuilder joined = new StringBuilder();
+                for (int i = 0; i < material.size(); i++) {
+                    if (i > 0) {
+                        joined.append(separator);
+                    }
+                    joined.append(material.get(i).asText());
+                }
+                key.put("material", joined.toString());
+            }
+            out.set(entry.getKey(), key);
+        });
+        return out;
     }
 
     private static Path resolveRoot() {
