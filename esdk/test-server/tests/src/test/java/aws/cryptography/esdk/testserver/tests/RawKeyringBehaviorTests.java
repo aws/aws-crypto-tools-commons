@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
+import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -41,8 +42,21 @@ class RawKeyringBehaviorTests {
         return ReferenceImplementation.decryptSide(FEATURES);
     }
 
+    /**
+     * Decrypt-side rows for the hard-unwrap scenario: the reference must produce the
+     * RSA+AES message, so it needs raw-rsa with the OAEP-SHA256 padding the config uses.
+     */
+    static List<ReferencePair> decryptSideRsaMulti() {
+        return ReferenceImplementation.decryptSide(
+            Set.of("raw-aes", "raw-rsa", "multi"), Set.of(PaddingScheme.OAEP_SHA256_MGF1));
+    }
+
     static List<LanguageServerTarget> targets() {
         return LanguageServerRegistry.shared().targets();
+    }
+
+    static List<EndpointPair> pairs() {
+        return LanguageServerRegistry.shared().pairs();
     }
 
     /** KEYRING-003: a two-keyring message decrypts under a keyring holding only the second key. */
@@ -84,9 +98,9 @@ class RawKeyringBehaviorTests {
      * on exactly this attempted-and-failed path until it was fixed.
      */
     @ParameterizedTest(name = "hardUnwrapFailureContinues {0}")
-    @MethodSource("pairs")
-    void decryptContinuesPastHardEdkUnwrapFailure(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes", "raw-rsa", "multi"), pair);
+    @MethodSource("decryptSideRsaMulti")
+    void decryptContinuesPastHardEdkUnwrapFailure(ReferencePair pair) {
+        FeatureGate.require(Set.of("raw-aes", "raw-rsa", "multi"), pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(),
             EsdkClientConfigs.rawRsaPlusAesMulti(), PLAINTEXT);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(),
