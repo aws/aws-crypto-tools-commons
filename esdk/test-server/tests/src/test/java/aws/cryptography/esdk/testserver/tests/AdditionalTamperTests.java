@@ -11,7 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -38,20 +39,23 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       rejected ({@code spec/data-format/message.md#structure}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * <p>These structural tampers are keyring-independent, so each pair runs once under the keyring
+ * both endpoints support ({@link ConformanceKeyring}): Raw-AES where available, otherwise the
+ * hierarchical keyring, the one the native Rust ESDK supports. Rejections surface as a modeled
+ * {@link ESDKClientError}.
  */
 class AdditionalTamperTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server additional-tamper plaintext".getBytes(StandardCharsets.UTF_8);
 
-    private static final ESDKClientConfig V2_COMMITTING =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy V2_POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
     private static final ESDKAlgorithmSuiteId V2_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
 
-    private static final ESDKClientConfig V1_FORBID =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
+    private static final ESDKCommitmentPolicy V1_POLICY =
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
     private static final ESDKAlgorithmSuiteId V1_SIGNING =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
     private static final ESDKAlgorithmSuiteId V1_NON_SIGNING =
@@ -64,6 +68,20 @@ class AdditionalTamperTests {
 
     static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
+    }
+
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message; the tamper cases
+     * span two commitment policies, so each selects its policy via {@code keyring.config}.
+     */
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
     }
 
     private static void putU32(byte[] b, int offset, long value) {
@@ -84,9 +102,10 @@ class AdditionalTamperTests {
     @ParameterizedTest(name = "finalFrameContentLengthOverflowRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsOverlongFinalFrameContentLength(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V2_POLICY);
         // Short plaintext (< frame length) => a single final frame carrying a content-length field.
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(),
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         EsdkMessage.Frame finalFrame = message.frames.get(message.frames.size() - 1);
@@ -94,7 +113,7 @@ class AdditionalTamperTests {
             "baseline: expected a single final frame with a content-length field (" + pair + ")");
         byte[] tampered = ciphertext.clone();
         putU32(tampered, finalFrame.contentLengthOffset(), FRAME_LENGTH + 1);
-        assertRejected(pair, V2_COMMITTING, tampered,
+        assertRejected(pair, config, tampered,
             "a final-frame content length greater than the frame length");
     }
 
@@ -102,14 +121,15 @@ class AdditionalTamperTests {
     @ParameterizedTest(name = "truncatedFooterRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTruncatedFooter(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V1_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V1_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.footerOffset >= 0, "baseline: signing suite must produce a footer (" + pair + ")");
         // Keep the 2-byte signature-length field, drop the signature bytes.
         byte[] tampered = Arrays.copyOf(ciphertext, message.footerOffset + 2);
-        assertRejected(pair, V1_FORBID, tampered, "a signed message whose footer signature is truncated");
+        assertRejected(pair, config, tampered, "a signed message whose footer signature is truncated");
     }
 
     /**
@@ -124,8 +144,9 @@ class AdditionalTamperTests {
     @ParameterizedTest(name = "signatureTrailingGarbageRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsSignatureWithTrailingGarbage(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V1_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V1_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.footerOffset >= 0 && message.signatureLength > 0,
@@ -140,7 +161,7 @@ class AdditionalTamperTests {
 
         KnownBugGate.gate("decrypt-accepts-signature-trailing-garbage",
             pair.decryptTarget().language(),
-            () -> assertRejected(pair, V1_FORBID, tampered,
+            () -> assertRejected(pair, config, tampered,
                 "a footer whose signature field is the valid signature plus trailing garbage"));
     }
 
@@ -148,40 +169,43 @@ class AdditionalTamperTests {
     @ParameterizedTest(name = "v1InvalidTypeRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsInvalidV1Type(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V1_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V1_NON_SIGNING, FRAME_LENGTH);
         byte[] tampered = ciphertext.clone();
         tampered[1] = 0x00;  // V1 type byte (0x80 = Customer AED) set to an unsupported value
-        assertRejected(pair, V1_FORBID, tampered, "a V1 header with an unsupported type byte");
+        assertRejected(pair, config, tampered, "a V1 header with an unsupported type byte");
     }
 
     /** HDR-016: a V1 IV-length field that disagrees with the suite is rejected. */
     @ParameterizedTest(name = "v1IvLengthMismatchRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsV1IvLengthMismatch(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V1_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V1_NON_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.ivLengthOffset > 0, "baseline: V1 message must carry an IV-length field (" + pair + ")");
         byte[] tampered = ciphertext.clone();
         tampered[message.ivLengthOffset] = 11;  // suite IV length is 12
-        assertRejected(pair, V1_FORBID, tampered, "a V1 header whose IV length does not match the suite");
+        assertRejected(pair, config, tampered, "a V1 header whose IV length does not match the suite");
     }
 
     /** HDR-018: a V1 header carrying a committing (V2) algorithm-suite id is rejected. */
     @ParameterizedTest(name = "v1WithCommittingSuiteIdRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsV1HeaderWithCommittingSuiteId(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_FORBID, PLAINTEXT, Map.of(),
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V1_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V1_NON_SIGNING, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
         tampered[message.suiteIdOffset] = (byte) (COMMITTING_SUITE_ID >>> 8);
         tampered[message.suiteIdOffset + 1] = (byte) COMMITTING_SUITE_ID;
-        assertRejected(pair, V1_FORBID, tampered,
+        assertRejected(pair, config, tampered,
             "a V1 header (version 1.0) carrying a committing V2 algorithm-suite id");
     }
 
@@ -189,13 +213,14 @@ class AdditionalTamperTests {
     @ParameterizedTest(name = "framedZeroFrameLengthRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsFramedHeaderWithZeroFrameLength(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(),
+        ConformanceKeyring keyring = keyringFor(pair);
+        ESDKClientConfig config = keyring.config(V2_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V2_SUITE, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
         putU32(tampered, message.frameLengthOffset, 0);
-        assertRejected(pair, V2_COMMITTING, tampered,
+        assertRejected(pair, config, tampered,
             "a framed header whose frame length is 0");
     }
 }

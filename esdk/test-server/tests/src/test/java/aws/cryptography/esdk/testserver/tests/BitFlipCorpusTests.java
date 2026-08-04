@@ -10,8 +10,9 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
-import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -31,15 +32,18 @@ import org.junit.jupiter.params.provider.MethodSource;
  * used so the header (commitment value + authentication tag), body (per-frame tags), and footer
  * (signature) are all integrity-protected, so a flipped bit anywhere in the message is caught.
  *
- * <p>Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * <p>Bit-flip integrity is keyring-independent, so each pair runs once under the keyring both
+ * endpoints support ({@link ConformanceKeyring}): Raw-AES where available, otherwise the
+ * hierarchical keyring, the one the native Rust ESDK supports. Rejections surface as a modeled
+ * {@link ESDKClientError}.
  */
 class BitFlipCorpusTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server bit-flip corpus plaintext, long enough to span more than one body frame"
             .getBytes(StandardCharsets.UTF_8);
-    private static final ESDKClientConfig CONFIG =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384;
     private static final long FRAME_LENGTH = 512L;
@@ -51,16 +55,29 @@ class BitFlipCorpusTests {
     }
 
     /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
+    }
+
+    /**
      * TAMPER-008: the untampered message decrypts, but flipping any one of a sampled set of bit
      * positions makes decrypt fail.
      */
     @ParameterizedTest(name = "singleBitFlipRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsAnySingleBitFlip(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE,
+        ESDKClientConfig config = configFor(pair);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(), SUITE,
             FRAME_LENGTH);
-        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, ciphertext),
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered message must decrypt, so each rejection below is the flip ("
                 + pair + ")");
 
@@ -72,7 +89,7 @@ class BitFlipCorpusTests {
             byte[] tampered = ciphertext.clone();
             tampered[bit >> 3] ^= (byte) (1 << (bit & 7));
             assertThrows(ESDKClientError.class,
-                () -> EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, tampered),
+                () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
                 "decrypt must reject the message with bit " + bit + " flipped (" + pair + ")");
         }
     }
