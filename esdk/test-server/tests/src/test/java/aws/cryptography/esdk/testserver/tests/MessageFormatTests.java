@@ -10,7 +10,8 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -40,13 +41,15 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/client-apis/encrypt.md#frame-length}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES). Uses a V2 committing, non-signing suite so the message ends at
- * the final frame (no footer), keeping the framing assertions deterministic.
+ * <p>Framing is keyring-independent, so each target runs once under the keyring it supports
+ * ({@link ConformanceKeyring}): Raw-AES where available, else the hierarchical keyring the native
+ * Rust ESDK supports. Uses a V2 committing, non-signing suite so the message ends at the final
+ * frame (no footer), keeping the framing assertions deterministic.
  */
 class MessageFormatTests {
 
-    private static final ESDKClientConfig CONFIG =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
     private static final long FRAME_LENGTH = 512L;
@@ -55,9 +58,22 @@ class MessageFormatTests {
         return LanguageServerRegistry.shared().targets();
     }
 
+    /**
+     * The single keyring the target supports (Raw-AES, else hierarchical), gated so the target is a
+     * visible skip when it supports neither. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(LanguageServerTarget target) {
+        EndpointPair pair = new EndpointPair(target, target);
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
+    }
+
     private static byte[] encrypt(LanguageServerTarget target, byte[] plaintext, Long frameLength) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        return EsdkOps.encrypt(target.endpoint(), CONFIG, plaintext, Map.of(), SUITE, frameLength);
+        return EsdkOps.encrypt(target.endpoint(), configFor(target), plaintext, Map.of(), SUITE, frameLength);
     }
 
     private static int u32(byte[] b, int i) {

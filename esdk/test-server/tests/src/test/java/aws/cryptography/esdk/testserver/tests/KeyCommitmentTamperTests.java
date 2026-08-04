@@ -11,7 +11,8 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -28,21 +29,35 @@ import org.junit.jupiter.params.provider.MethodSource;
  * gap analysis against the spec (no source ESDK suite tampers the stored commitment on the wire).
  *
  * <p>Uses the committing non-signing suite so the only integrity layers are the commitment check
- * and header auth. Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * and header auth. The commitment field is keyring-independent, so each pair runs once under the
+ * keyring both endpoints support ({@link ConformanceKeyring}): Raw-AES where available, else the
+ * hierarchical keyring the native Rust ESDK supports. Rejections surface as a modeled
+ * {@link ESDKClientError}.
  */
 class KeyCommitmentTamperTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server commitment-tamper plaintext".getBytes(StandardCharsets.UTF_8);
-    private static final ESDKClientConfig CONFIG =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
 
-    private static final Set<String> FEATURES = Set.of("raw-aes");
+    static List<EndpointPair> pairs() {
+        return LanguageServerRegistry.shared().pairs();
+    }
 
-    static List<ReferencePair> decryptSide() {
-        return ReferenceImplementation.decryptSide(FEATURES);
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
     }
 
     /**
@@ -58,19 +73,19 @@ class KeyCommitmentTamperTests {
 
     /** Flipping a byte of the stored 32-byte commitment value makes decrypt fail. */
     @ParameterizedTest(name = "commitmentValueTamperRejected {0}")
-    @MethodSource("decryptSide")
-    void decryptRejectsTamperedCommitmentValue(ReferencePair pair) {
-        FeatureGate.require(FEATURES, pair.asEndpointPair());
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE,
+    @MethodSource("pairs")
+    void decryptRejectsTamperedCommitmentValue(EndpointPair pair) {
+        ESDKClientConfig config = configFor(pair);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(), SUITE,
             null);
-        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, ciphertext),
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered committing message must decrypt (" + pair + ")");
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertEquals(2, message.version, "baseline: a committing suite must produce a V2 message");
         byte[] tampered = ciphertext.clone();
         tampered[suiteDataOffset(message)] ^= (byte) 0xFF;
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), CONFIG, tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of a message whose stored key-commitment value is corrupted must be rejected ("
                 + pair + ")");
     }

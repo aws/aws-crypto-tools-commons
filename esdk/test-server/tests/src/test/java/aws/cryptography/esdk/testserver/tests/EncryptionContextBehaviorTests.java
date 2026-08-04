@@ -6,11 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
+import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -23,21 +25,25 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       contains the reserved {@code aws-crypto-public-key} key
  *       ({@code spec/client-apis/encrypt.md#encryption-context}). Encrypt is a
  *       per-server property, so it runs against every target.</li>
- *   <li><b>EC-020</b> — decrypt with the exact reproduced context recovers the
- *       plaintext ({@code spec/client-apis/decrypt.md#get-the-decryption-materials}).
- *       A round trip, so it runs over the cross-language pairwise matrix.</li>
- *   <li><b>EC-023</b> — a mismatched reproduced value is rejected (same spec
- *       section). Decrypt-side rows ({@link ReferenceImplementation#decryptSide}).</li>
+ *   <li><b>EC-020 / EC-023</b> — decrypt verifies the reproduced encryption context
+ *       against the header: the exact context recovers the plaintext, a mismatched
+ *       value is rejected
+ *       ({@code spec/client-apis/decrypt.md#get-the-decryption-materials}). Runs over
+ *       the cross-language pairwise matrix.</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES / Default CMM). ESDK-originated failures surface as a
- * modeled {@link ESDKClientError}.
+ * <p>Encryption-context behavior is keyring-independent, so each combination runs once under the
+ * keyring both endpoints support ({@link ConformanceKeyring}): Raw-AES where available, otherwise
+ * the hierarchical keyring, the one the native Rust ESDK supports. ESDK-originated failures
+ * surface as a modeled {@link ESDKClientError}.
  */
 class EncryptionContextBehaviorTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server encryption-context plaintext".getBytes(StandardCharsets.UTF_8);
     private static final String RESERVED_KEY = "aws-crypto-public-key";
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
     static List<LanguageServerTarget> targets() {
         return LanguageServerRegistry.shared().targets();
@@ -47,8 +53,17 @@ class EncryptionContextBehaviorTests {
         return LanguageServerRegistry.shared().pairs();
     }
 
-    static List<ReferencePair> decryptSide() {
-        return ReferenceImplementation.decryptSide(Set.of("raw-aes"));
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
     }
 
     /**
@@ -58,10 +73,9 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reservedEcKeyRejected {0}")
     @MethodSource("targets")
     void encryptRejectsReservedEncryptionContextKey(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put(RESERVED_KEY, "any-value");
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
             "encrypt with a reserved '" + RESERVED_KEY + "' encryption-context key must be "
@@ -75,9 +89,8 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reproducedEcMatchDecrypts {0}")
     @MethodSource("pairs")
     void decryptSucceedsWithMatchingReproducedContext(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+        ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec);
         assertArrayEquals(PLAINTEXT, recovered,
@@ -87,17 +100,14 @@ class EncryptionContextBehaviorTests {
 
     /**
      * EC-023: decrypt must fail when the reproduced encryption context mismatches the
-     * header — here a present key given a different value. Asserts only the decryptor's
-     * verification, so it runs decrypt-side (the matching-context round trip above keeps
-     * the pairwise producer coverage).
+     * header — here a present key given a different value. Cross-language matrix.
      */
     @ParameterizedTest(name = "reproducedEcMismatchRejected {0}")
-    @MethodSource("decryptSide")
-    void decryptRejectsMismatchedReproducedContext(ReferencePair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair.asEndpointPair());
+    @MethodSource("pairs")
+    void decryptRejectsMismatchedReproducedContext(EndpointPair pair) {
+        ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("purpose", "test");
         Map<String, String> wrong = Map.of("purpose", "tampered");
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, wrong),
@@ -112,11 +122,10 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "highCodepointEcRoundTrips {0}")
     @MethodSource("pairs")
     void encryptionContextWithHighCodepointsRoundTrips(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+        ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of(
             "\u65e5\u672c\u8a9e", "value",          // CJK key
             "key-\ud83d\udd11", "\ud83d\ude80");    // astral-plane (emoji) key and value
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec);
         assertArrayEquals(PLAINTEXT, recovered,
@@ -135,14 +144,13 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reservedIdentifierEcKeysRoundTrip {0}")
     @MethodSource("pairs")
     void encryptionContextKeysCollidingWithReservedIdentifiersRoundTrip(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+        ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of(
             "__proto__", "a",
             "constructor", "b",
             "hasOwnProperty", "c",
             "toString", "d",
             "__init__", "e");
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
         if (pair.encryptTarget().language().equals(pair.decryptTarget().language())) {
             // A producer that mishandles a colliding key mishandles it the same way on its
@@ -176,10 +184,9 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reservedPrefixEcKeyRejected {0}")
     @MethodSource("targets")
     void encryptRejectsReservedPrefixEncryptionContextKey(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         KnownBugGate.gate("encrypt-accepts-reserved-prefix-encryption-context-key", target.language(),
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
@@ -196,9 +203,8 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "nonReservedPrefixBoundaryAccepted {0}")
     @MethodSource("targets")
     void encryptAcceptsKeyThatDoesNotBeginWithReservedPrefix(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> ec = Map.of("aws-crypto", "no-trailing-hyphen-is-not-reserved");
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, null, null);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), config, ciphertext),
             target + ": a key that does not begin with 'aws-crypto-' must be accepted and round-trip");

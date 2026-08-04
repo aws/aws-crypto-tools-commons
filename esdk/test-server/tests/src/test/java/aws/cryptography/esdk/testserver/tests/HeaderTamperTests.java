@@ -11,7 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -38,16 +39,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       {@code spec/client-apis/decrypt.md#decrypt-the-message-body}).</li>
  * </ul>
  *
- * <p>Each behavior asserts only the decryptor's validation, so these run decrypt-side —
- * the reference implementation produces each message and every configured target decrypts
- * it ({@link ReferenceImplementation#decryptSide}) — over both message-format layouts (a
+ * <p>Run over the cross-language pairwise matrix and both message-format layouts (a
  * V2 committing suite and a V1 non-committing signing suite), so the version-specific
- * header offsets are covered. Fully offline (Raw-AES). Every rejection is asserted to
- * surface as a modeled {@link ESDKClientError}.
+ * header offsets are covered. Header and footer tampering are keyring-independent, so
+ * each pair runs once under the keyring both endpoints support (Raw-AES where available,
+ * else the hierarchical keyring the native Rust ESDK supports). Every rejection is
+ * asserted to surface as a modeled {@link ESDKClientError}.
  */
 class HeaderTamperTests {
-
-    private static final Set<String> FEATURES = Set.of("raw-aes");
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server header-tamper plaintext".getBytes(StandardCharsets.UTF_8);
@@ -61,7 +60,7 @@ class HeaderTamperTests {
      * <p>V1 header body starts: version(1) type(1) suiteId(2) messageId(16)...
      * V2 header body starts: version(1) suiteId(2) messageId(32)...
      */
-    record Layout(String label, ESDKClientConfig config, ESDKAlgorithmSuiteId suite,
+    record Layout(String label, ESDKCommitmentPolicy policy, ESDKAlgorithmSuiteId suite,
                   byte versionByte, int suiteIdOffset, int messageIdByteOffset, boolean signed) {
         @Override
         public String toString() {
@@ -71,13 +70,13 @@ class HeaderTamperTests {
 
     private static final Layout V2_COMMITTING = new Layout(
         "v2-committing",
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT),
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT,
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY,
         (byte) 0x02, 1, 3, false);
 
     private static final Layout V1_SIGNING = new Layout(
         "v1-signing",
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT),
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384,
         (byte) 0x01, 2, 4, true);
 
@@ -85,7 +84,7 @@ class HeaderTamperTests {
 
     static List<Arguments> cases() {
         List<Arguments> cases = new ArrayList<>();
-        for (ReferencePair pair : ReferenceImplementation.decryptSide(FEATURES)) {
+        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
             for (Layout layout : LAYOUTS) {
                 cases.add(Arguments.of(pair, layout));
             }
@@ -93,10 +92,23 @@ class HeaderTamperTests {
         return cases;
     }
 
-    /** Encrypt one message for {@code layout} on the pair's (reference) encrypt endpoint. */
-    private static byte[] encrypt(ReferencePair pair, Layout layout) {
-        FeatureGate.require(FEATURES, pair.asEndpointPair());
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), layout.config(), PLAINTEXT,
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message; header and footer
+     * tampering are keyring-independent, so the pair runs once, under this keyring.
+     */
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
+    }
+
+    /** Encrypt one message for {@code layout} on the pair's encrypt endpoint under {@code config}. */
+    private static byte[] encrypt(EndpointPair pair, ESDKClientConfig config, Layout layout) {
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             Map.of(), layout.suite(), null);
         // Sanity: the layout's expected version byte is what the server produced.
         if (ciphertext[0] != layout.versionByte()) {
@@ -109,14 +121,15 @@ class HeaderTamperTests {
     /** HDR-011: an unsupported version byte is rejected. */
     @ParameterizedTest(name = "versionByteRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsUnsupportedVersionByte(ReferencePair pair, Layout layout) {
-        byte[] ciphertext = encrypt(pair, layout);
-        assertBaselineDecrypts(pair, layout, ciphertext);
+    void decryptRejectsUnsupportedVersionByte(EndpointPair pair, Layout layout) {
+        ESDKClientConfig config = keyringFor(pair).config(layout.policy());
+        byte[] ciphertext = encrypt(pair, config, layout);
+        assertBaselineDecrypts(pair, config, layout, ciphertext);
 
         byte[] tampered = ciphertext.clone();
         tampered[0] = (byte) 0xFF;
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of a message with an unsupported version byte must be rejected ("
                 + pair + ", " + layout + ")");
     }
@@ -124,13 +137,14 @@ class HeaderTamperTests {
     /** HDR-013: an unknown algorithm-suite id is rejected. */
     @ParameterizedTest(name = "suiteIdRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsUnknownSuiteId(ReferencePair pair, Layout layout) {
-        byte[] ciphertext = encrypt(pair, layout);
+    void decryptRejectsUnknownSuiteId(EndpointPair pair, Layout layout) {
+        ESDKClientConfig config = keyringFor(pair).config(layout.policy());
+        byte[] ciphertext = encrypt(pair, config, layout);
         byte[] tampered = ciphertext.clone();
         tampered[layout.suiteIdOffset()] = (byte) 0xFF;
         tampered[layout.suiteIdOffset() + 1] = (byte) 0xFF;
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of a message whose algorithm-suite id is unknown must be rejected ("
                 + pair + ", " + layout + ")");
     }
@@ -138,12 +152,13 @@ class HeaderTamperTests {
     /** TAMPER-001: flipping an authenticated header byte (a message-id byte) is rejected. */
     @ParameterizedTest(name = "headerByteTamperRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTamperedHeaderByte(ReferencePair pair, Layout layout) {
-        byte[] ciphertext = encrypt(pair, layout);
+    void decryptRejectsTamperedHeaderByte(EndpointPair pair, Layout layout) {
+        ESDKClientConfig config = keyringFor(pair).config(layout.policy());
+        byte[] ciphertext = encrypt(pair, config, layout);
         byte[] tampered = ciphertext.clone();
         tampered[layout.messageIdByteOffset()] ^= (byte) 0xFF;
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of a message with a flipped message-id (authenticated header) byte must be "
                 + "rejected (" + pair + ", " + layout + ")");
     }
@@ -154,19 +169,21 @@ class HeaderTamperTests {
      */
     @ParameterizedTest(name = "finalByteTamperRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTamperedFinalByte(ReferencePair pair, Layout layout) {
-        byte[] ciphertext = encrypt(pair, layout);
+    void decryptRejectsTamperedFinalByte(EndpointPair pair, Layout layout) {
+        ESDKClientConfig config = keyringFor(pair).config(layout.policy());
+        byte[] ciphertext = encrypt(pair, config, layout);
         byte[] tampered = ciphertext.clone();
         tampered[tampered.length - 1] ^= (byte) 0xFF;
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of a message whose final byte (" + (layout.signed() ? "footer signature"
                 : "final-frame auth tag") + ") is corrupted must be rejected (" + pair + ", "
                 + layout + ")");
     }
 
-    private static void assertBaselineDecrypts(ReferencePair pair, Layout layout, byte[] ciphertext) {
-        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), ciphertext),
+    private static void assertBaselineDecrypts(
+            EndpointPair pair, ESDKClientConfig config, Layout layout, byte[] ciphertext) {
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered message must decrypt (" + pair + ", " + layout + ")");
     }
 }

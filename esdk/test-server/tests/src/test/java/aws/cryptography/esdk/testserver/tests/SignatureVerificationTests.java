@@ -26,7 +26,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -46,8 +47,10 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       {@code spec/client-apis/decrypt.md#verify-the-signature}).</li>
  * </ul>
  *
- * <p>Per-server property (the signature is produced by the encrypt target). Fully offline (Raw-AES),
- * over a P-384 (SHA-384) and a P-256 (SHA-256) signing suite.
+ * <p>Per-server property (the signature is produced by the encrypt target). Signature verification
+ * is keyring-independent, so each combination runs once under the keyring both endpoints support
+ * ({@link ConformanceKeyring}): Raw-AES where available, else the hierarchical keyring the native
+ * Rust ESDK supports. Over a P-384 (SHA-384) and a P-256 (SHA-256) signing suite.
  */
 class SignatureVerificationTests {
 
@@ -56,7 +59,7 @@ class SignatureVerificationTests {
     private static final String PUBLIC_KEY_EC = "aws-crypto-public-key";
 
     /** A signing suite plus its JCE curve name and ECDSA signature algorithm. */
-    record SigningLayout(String label, ESDKClientConfig config, ESDKAlgorithmSuiteId suite,
+    record SigningLayout(String label, ESDKCommitmentPolicy policy, ESDKAlgorithmSuiteId suite,
                          String curveName, String signatureAlgorithm) {
         @Override
         public String toString() {
@@ -65,11 +68,11 @@ class SignatureVerificationTests {
     }
 
     private static final SigningLayout P384 = new SigningLayout("v2-ecdsa-p384",
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT),
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT,
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, "secp384r1",
         "SHA384withECDSA");
     private static final SigningLayout P256 = new SigningLayout("v1-ecdsa-p256",
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT),
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
         ESDKAlgorithmSuiteId.ALG_AES_128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256, "secp256r1",
         "SHA256withECDSA");
 
@@ -83,6 +86,19 @@ class SignatureVerificationTests {
     }
 
     /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the
+     * combination is a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ConformanceKeyring keyringFor(EndpointPair combination) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(combination);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + combination);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), combination);
+        return keyring;
+    }
+
+    /**
      * FOOT-007: the footer signature verifies independently over header ‖ body with the published
      * verification key; a perturbed signed region and a wrong key each fail to verify.
      */
@@ -90,8 +106,9 @@ class SignatureVerificationTests {
     @MethodSource("cases")
     void footerSignatureIndependentlyVerifies(LanguageServerTarget target, SigningLayout layout)
         throws Exception {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT, Map.of(),
+        ESDKClientConfig config =
+            keyringFor(new EndpointPair(target, target)).config(layout.policy());
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.footerOffset >= 0 && message.signatureLength > 0,
@@ -126,9 +143,9 @@ class SignatureVerificationTests {
         return verifier.verify(signature);
     }
 
-    static List<Arguments> decryptSideCases() {
+    static List<Arguments> pairCases() {
         List<Arguments> cases = new ArrayList<>();
-        for (ReferencePair pair : ReferenceImplementation.decryptSide(Set.of("raw-aes"))) {
+        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
             cases.add(Arguments.of(pair, P384));
             cases.add(Arguments.of(pair, P256));
         }
@@ -145,11 +162,11 @@ class SignatureVerificationTests {
      * failures propagated and {@code Success(false)} was discarded.
      */
     @ParameterizedTest(name = "wrongKeySignatureRejected[{1}] {0}")
-    @MethodSource("decryptSideCases")
-    void decryptRejectsWellFormedSignatureByWrongKey(ReferencePair pair, SigningLayout layout)
+    @MethodSource("pairCases")
+    void decryptRejectsWellFormedSignatureByWrongKey(EndpointPair pair, SigningLayout layout)
         throws Exception {
-        FeatureGate.require(Set.of("raw-aes"), pair.asEndpointPair());
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), layout.config(), PLAINTEXT,
+        ESDKClientConfig config = keyringFor(pair).config(layout.policy());
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             Map.of(), layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.footerOffset >= 0 && message.signatureLength > 0,
@@ -169,7 +186,7 @@ class SignatureVerificationTests {
             forgedSignature.length);
 
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), layout.config(), forged),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, forged),
             pair + " " + layout + ": a well-formed signature by a key other than the message's "
                 + "verification key must be rejected");
     }
@@ -187,9 +204,10 @@ class SignatureVerificationTests {
     @ParameterizedTest(name = "footerSignatureCanonicalDer[{1}] {0}")
     @MethodSource("cases")
     void emittedFooterSignatureIsCanonicalDer(LanguageServerTarget target, SigningLayout layout) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config =
+            keyringFor(new EndpointPair(target, target)).config(layout.policy());
         for (int i = 0; i < 8; i++) {
-            byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT,
+            byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT,
                 Map.of(), layout.suite(), null);
             EsdkMessage message = EsdkMessage.parse(ciphertext);
             byte[] signature = Arrays.copyOfRange(ciphertext, message.footerOffset + 2,
