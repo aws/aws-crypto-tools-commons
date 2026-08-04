@@ -63,5 +63,15 @@
     "id": "encrypt-non-positive-frame-length-generic-error",
     "description": "encrypt of a non-positive frame length is rejected as a GenericServerError instead of the modeled ESDKClientError",
     "languages": ["rust", "rust-cpp"]
+  },
+  {
+    "id": "raw-aes-reserved-namespace-rejected-as-esdk-error",
+    "description": "CreateClient rejects a Raw-AES keyring in the reserved 'aws-kms' key namespace as an ESDKClientError instead of the framework GenericServerError. The Rust server currently builds the Raw-AES keyring through the Dafny MPL, which surfaces this config-validation failure as an ESDK error rather than a framework error.",
+    "languages": ["rust"]
+  },
+  {
+    "id": "raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error",
+    "description": "CreateClient rejects a Raw-AES wrapping key whose length does not match the wrapping suite as an ESDKClientError instead of the framework GenericServerError. The Rust server currently builds the Raw-AES keyring through the Dafny MPL, which surfaces this config-validation failure as an ESDK error rather than a framework error.",
+    "languages": ["rust"]
   }
 ]

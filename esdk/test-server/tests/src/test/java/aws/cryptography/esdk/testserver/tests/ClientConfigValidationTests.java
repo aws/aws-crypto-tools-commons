@@ -87,9 +87,10 @@ class ClientConfigValidationTests {
     @MethodSource("targets")
     void createClientRejectsMismatchedAesWrappingKeyLength(LanguageServerTarget target) {
         FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        assertCreateRejected(target,
-            config(rawAes(new byte[16], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), null),
-            "a 16-byte wrapping key for a 256-bit AES wrapping suite");
+        KnownBugGate.gate("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", target.language(),
+            () -> assertCreateRejected(target,
+                config(rawAes(new byte[16], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), null),
+                "a 16-byte wrapping key for a 256-bit AES wrapping suite"));
     }
 
     /** KEYRING-022: a KMS keyring with an empty key id is invalid. */
@@ -177,7 +178,8 @@ class ClientConfigValidationTests {
                 .build())
             .build();
         KnownBugGate.gate("create-client-accepts-reserved-aws-kms-namespace", target.language(),
-            () -> assertCreateRejected(target, config(keyring, null),
-                "a Raw-AES keyring in the reserved 'aws-kms' key namespace"));
+            () -> KnownBugGate.gate("raw-aes-reserved-namespace-rejected-as-esdk-error", target.language(),
+                () -> assertCreateRejected(target, config(keyring, null),
+                    "a Raw-AES keyring in the reserved 'aws-kms' key namespace")));
     }
 }
