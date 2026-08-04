@@ -12,7 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -31,23 +32,38 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/framework/structures.md#serialization}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES). Uses a non-signing suite so the header AAD contains exactly the
- * caller's encryption context (a signing suite would add an {@code aws-crypto-public-key}
- * entry).
+ * <p>The encryption-context serialization is keyring-independent, so each per-server case runs
+ * once under the keyring the target supports ({@link ConformanceKeyring}): Raw-AES where
+ * available, otherwise the hierarchical keyring, the one the native Rust ESDK supports. Uses a
+ * non-signing suite so the header AAD contains exactly the caller's encryption context (a signing
+ * suite would add an {@code aws-crypto-public-key} entry).
  */
 class EncryptionContextFormatTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server ec-format plaintext".getBytes(StandardCharsets.UTF_8);
 
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
     /** Non-signing so the header AAD holds only the caller's context. */
-    private static final ESDKClientConfig CONFIG =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
 
     static List<LanguageServerTarget> targets() {
         return LanguageServerRegistry.shared().targets();
+    }
+
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
     }
 
     private static int u16(byte[] b, int i) {
@@ -58,8 +74,8 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "emptyEcZeroLength {0}")
     @MethodSource("targets")
     void emptyEncryptionContextSerializesToZeroLength(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, Map.of(), SUITE, null);
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertEquals(0, message.aadLength,
             target + ": an empty encryption context must serialize to a zero-length AAD");
@@ -72,13 +88,13 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "ecKeysCanonicallyOrdered {0}")
     @MethodSource("targets")
     void encryptionContextKeysAreCanonicallyOrdered(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         // Insert keys out of order; the wire form must sort them.
         Map<String, String> ec = new java.util.LinkedHashMap<>();
         ec.put("zebra", "1");
         ec.put("alpha", "2");
         ec.put("mango", "3");
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, ec, SUITE, null);
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.aadLength > 0, target + ": non-empty EC must produce a non-empty AAD");
 
@@ -111,18 +127,18 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "ecKeysSortedByUtf8Bytes {0}")
     @MethodSource("targets")
     void encryptionContextKeysSortByUtf8BytesNotUtf16(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         String bmpKey = "\uff61";                 // U+FF61,  UTF-8 EF BD A1
         String astralKey = "\ud800\udc00";        // U+10000, UTF-8 F0 90 80 80
         Map<String, String> ec = new java.util.LinkedHashMap<>();
         ec.put(astralKey, "1");                   // insert in UTF-16 order (astral first)
         ec.put(bmpKey, "2");
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, ec, SUITE, null);
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, SUITE, null);
         assertEquals(List.of(bmpKey, astralKey), parseAadKeys(EsdkMessage.parse(ciphertext)),
             target + ": keys must serialize in UTF-8 byte order (U+FF61 before U+10000), not the "
                 + "UTF-16 code-unit order");
         // Cross-check the wire order survives a real decrypt (the header is authenticated).
-        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), CONFIG, ciphertext),
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), config, ciphertext),
             target + ": the astral-key message must still decrypt");
     }
 
@@ -134,11 +150,11 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "emptyEcValueRoundTrips {0}")
     @MethodSource("targets")
     void emptyEncryptionContextValueSerializesAndRoundTrips(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> ec = Map.of("empty-value-key", "");
         KnownBugGate.gate("encrypt-rejects-empty-encryption-context-value", target.language(), () -> {
             byte[] ciphertext = assertDoesNotThrow(
-                () -> EsdkOps.encrypt(target.endpoint(), CONFIG, PLAINTEXT, ec, SUITE, null),
+                () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, SUITE, null),
                 target + ": encrypt with an empty encryption-context value must be accepted");
             EsdkMessage message = EsdkMessage.parse(ciphertext);
             // Walk the single pair: count(2) keyLen(2) key valLen(2) — the value length must be 0.
@@ -149,7 +165,7 @@ class EncryptionContextFormatTests {
             pos += 2 + keyLen;
             assertEquals(0, u16(ciphertext, pos),
                 target + ": an empty encryption-context value must serialize as a zero value length");
-            assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), CONFIG, ciphertext),
+            assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), config, ciphertext),
                 target + ": the empty-value message must decrypt");
         });
     }

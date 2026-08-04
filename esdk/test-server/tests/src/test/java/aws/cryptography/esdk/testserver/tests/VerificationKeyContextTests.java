@@ -12,7 +12,8 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -30,8 +31,10 @@ import org.junit.jupiter.params.provider.MethodSource;
  * </ul>
  *
  * <p>Both cases edit the header encryption context in place at equal byte length (renaming a key),
- * so the rest of the message stays walkable and the default-CMM suite/EC check is what fires.
- * Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * so the rest of the message stays walkable and the default-CMM suite/EC check is what fires. The
+ * check is keyring-independent, so each pair runs once under the keyring both endpoints support
+ * ({@link ConformanceKeyring}: Raw-AES where available, else the hierarchical keyring the native
+ * Rust ESDK supports). Rejections surface as a modeled {@link ESDKClientError}.
  */
 class VerificationKeyContextTests {
 
@@ -41,18 +44,27 @@ class VerificationKeyContextTests {
     /** A caller EC key of the same byte length as {@code aws-crypto-public-key} (21 bytes). */
     private static final String STRAY_PLACEHOLDER_KEY = "esdk-ts-stray-ec-key1";
 
-    private static final ESDKClientConfig SIGNING_CONFIG =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy SIGNING_POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
     private static final ESDKAlgorithmSuiteId SIGNING_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384;
 
-    private static final ESDKClientConfig NON_SIGNING_CONFIG =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
+    private static final ESDKCommitmentPolicy NON_SIGNING_POLICY =
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
     private static final ESDKAlgorithmSuiteId NON_SIGNING_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
 
     static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
+    }
+
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
     }
 
     /** Absolute offset of {@code needle} within the header AAD region, or -1 if absent. */
@@ -79,11 +91,11 @@ class VerificationKeyContextTests {
     @ParameterizedTest(name = "signedMissingVerificationKeyRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsSignedSuiteMissingVerificationKey(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), SIGNING_CONFIG, PLAINTEXT, Map.of(),
+        ESDKClientConfig config = keyringFor(pair).config(SIGNING_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             SIGNING_SUITE, null);
         assertArrayEquals(PLAINTEXT,
-            EsdkOps.decrypt(pair.decryptEndpoint(), SIGNING_CONFIG, ciphertext),
+            EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered signed message must decrypt (" + pair + ")");
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         int keyOffset = aadIndexOf(message, PUBLIC_KEY);
@@ -92,7 +104,7 @@ class VerificationKeyContextTests {
         byte[] tampered = ciphertext.clone();
         tampered[keyOffset] ^= (byte) 0x01;  // rename the key so no aws-crypto-public-key entry remains
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), SIGNING_CONFIG, tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of a signed message missing its verification key must be rejected (" + pair + ")");
     }
 
@@ -101,14 +113,14 @@ class VerificationKeyContextTests {
     @ParameterizedTest(name = "unsignedStrayVerificationKeyRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsUnsignedSuiteWithStrayVerificationKey(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
+        ESDKClientConfig config = keyringFor(pair).config(NON_SIGNING_POLICY);
         assertEquals(PUBLIC_KEY.length, STRAY_PLACEHOLDER_KEY.length(),
             "the placeholder EC key must match aws-crypto-public-key's byte length for an in-place rename");
         Map<String, String> ec = Map.of(STRAY_PLACEHOLDER_KEY, "v");
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), NON_SIGNING_CONFIG, PLAINTEXT, ec,
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec,
             NON_SIGNING_SUITE, null);
         assertArrayEquals(PLAINTEXT,
-            EsdkOps.decrypt(pair.decryptEndpoint(), NON_SIGNING_CONFIG, ciphertext),
+            EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered unsigned message must decrypt (" + pair + ")");
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         int keyOffset = aadIndexOf(message, STRAY_PLACEHOLDER_KEY.getBytes(StandardCharsets.US_ASCII));
@@ -117,7 +129,7 @@ class VerificationKeyContextTests {
         byte[] tampered = ciphertext.clone();
         System.arraycopy(PUBLIC_KEY, 0, tampered, keyOffset, PUBLIC_KEY.length);
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), NON_SIGNING_CONFIG, tampered),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt of an unsigned message carrying a stray aws-crypto-public-key must be rejected ("
                 + pair + ")");
     }

@@ -6,9 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
+import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -26,21 +27,38 @@ import org.junit.jupiter.params.provider.MethodSource;
  * visible skip. Once a message exists, decrypting it is not optional: every reader must parse
  * the 999-byte frame stride exactly.
  *
- * <p>Fully offline (Raw-AES).
+ * <p>Frame-length parsing is keyring-independent, so each pair runs once under the keyring both
+ * endpoints support ({@link ConformanceKeyring}): Raw-AES where available, otherwise the
+ * hierarchical keyring, the one the native Rust ESDK supports.
  */
 class FrameLengthInteropTests {
 
     private static final long ODD_FRAME_LENGTH = 999;
 
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
+
     static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
+    }
+
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
     }
 
     @ParameterizedTest(name = "oddFrameLengthInterop {0}")
     @MethodSource("pairs")
     void nonBlockMultipleFrameLengthInteroperates(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        ESDKClientConfig config = configFor(pair);
         byte[] plaintext = new byte[(int) (2 * ODD_FRAME_LENGTH + 501)];
         for (int i = 0; i < plaintext.length; i++) {
             plaintext[i] = (byte) (i * 31);

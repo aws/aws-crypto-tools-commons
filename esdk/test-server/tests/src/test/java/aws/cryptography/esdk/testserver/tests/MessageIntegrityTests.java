@@ -11,7 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,8 +32,10 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  * <p>Run over the cross-language pairwise matrix and a representative suite set (a
  * committing suite and a committing+signing suite, so both the "ends at the final
- * frame" and "ends at the footer" message shapes are covered). Fully offline
- * (Raw-AES / Default CMM). ESDK-originated failures surface as {@link ESDKClientError}.
+ * frame" and "ends at the footer" message shapes are covered). Whole-message integrity is
+ * keyring-independent, so each pair runs once under the keyring both endpoints support
+ * ({@link ConformanceKeyring}): Raw-AES where available, else the hierarchical keyring the native
+ * Rust ESDK supports. ESDK-originated failures surface as {@link ESDKClientError}.
  */
 class MessageIntegrityTests {
 
@@ -55,18 +58,27 @@ class MessageIntegrityTests {
         return cases;
     }
 
-    /** REQUIRE_ENCRYPT_REQUIRE_DECRYPT config (both representative suites are committing). */
-    private static ESDKClientConfig config() {
-        return EsdkClientConfigs.rawAesWithCommitmentPolicy(
-            ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
+
+    /**
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
+     * a visible skip when they share none. Resolved before producing a message.
+     */
+    private static ESDKClientConfig configFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring.config(POLICY);
     }
 
     /** TAMPER-002: dropping the final byte of a message makes decrypt fail. */
     @ParameterizedTest(name = "truncateByOneRejected[{1}] {0}")
     @MethodSource("cases")
     void decryptRejectsTruncatedMessage(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        ESDKClientConfig config = config();
+        ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);
         // Baseline: the untampered message round-trips, so the rejection below is
@@ -85,8 +97,7 @@ class MessageIntegrityTests {
     @ParameterizedTest(name = "trailingBytesRejected[{1}] {0}")
     @MethodSource("cases")
     void decryptRejectsTrailingBytes(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        ESDKClientConfig config = config();
+        ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);
 

@@ -10,7 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,7 +32,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/data-format/message-header.md#encrypted-data-keys}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES); non-signing suites so only the raw-keyring EDK is present.
+ * <p>Non-signing suites, so the header carries a single EDK and no footer. Header structure is
+ * keyring-independent, so each target runs once under the keyring it supports (Raw-AES where
+ * available, else the hierarchical keyring the native Rust ESDK supports).
  */
 class HeaderStructureTests {
 
@@ -39,7 +42,7 @@ class HeaderStructureTests {
         "esdk-test-server header-structure plaintext".getBytes(StandardCharsets.UTF_8);
 
     /** Expected header facts for a chosen suite: format version, 2-byte suite id, message-id length. */
-    record Expected(String label, ESDKClientConfig config, ESDKAlgorithmSuiteId suite,
+    record Expected(String label, ESDKCommitmentPolicy policy, ESDKAlgorithmSuiteId suite,
                     int version, int suiteId, int messageIdLength) {
         @Override
         public String toString() {
@@ -48,11 +51,11 @@ class HeaderStructureTests {
     }
 
     private static final Expected V2_COMMITTING = new Expected("v2-committing",
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT),
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT,
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY, 2, 0x0478, 32);
 
     private static final Expected V1_NON_SIGNING = new Expected("v1-nonSigning",
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT),
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT,
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256, 1, 0x0178, 16);
 
     private static final List<Expected> EXPECTATIONS = List.of(V2_COMMITTING, V1_NON_SIGNING);
@@ -67,11 +70,25 @@ class HeaderStructureTests {
         return cases;
     }
 
+    /**
+     * The single keyring the target supports (Raw-AES, else hierarchical), gated so the target is a
+     * visible skip when it supports neither. Header structure is keyring-independent, so the target
+     * runs once, under this keyring.
+     */
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
+    }
+
     @ParameterizedTest(name = "headerFields[{1}] {0}")
     @MethodSource("cases")
     void headerParsesToExpectedFields(LanguageServerTarget target, Expected expected) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), expected.config(), PLAINTEXT, Map.of(),
+        ESDKClientConfig config = keyringFor(new EndpointPair(target, target)).config(expected.policy());
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             expected.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
 
