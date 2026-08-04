@@ -282,7 +282,7 @@ class TestVectorManifestTests {
     }
 
     /** Build a keyring from a framework key description, or {@code null} if unsupported here. */
-    private static Keyring keyringFor(JsonNode desc, JsonNode keys) {
+    static Keyring keyringFor(JsonNode desc, JsonNode keys) {
         if (desc == null) {
             return null;
         }

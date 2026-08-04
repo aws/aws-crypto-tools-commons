@@ -586,6 +586,28 @@ jobs:
         working-directory: esdk/test-server
         run: make validate
 
+      - name: Fetch released decrypt test-vector corpora
+        # One download of the awslabs/aws-encryption-sdk-test-vectors
+        # awses-decrypt corpora, extracted under $RUNNER_TEMP; every
+        # Language_Server then replays them (ReleasedVectorDecryptTests). The
+        # default offline (raw-keyring) positive vectors need no KMS. A corpus
+        # that fails to fetch is skipped, not fatal — the harness runs whatever
+        # is present and skips when none is.
+        shell: bash
+        run: |
+          DIR="$RUNNER_TEMP/released-vectors"
+          mkdir -p "$DIR"
+          base="https://github.com/awslabs/aws-encryption-sdk-test-vectors/raw/master/vectors/awses-decrypt"
+          for corpus in python-1.3.5 python-1.3.7 python-1.3.8 python-2.0.0 python-2.2.0 python-2.3.0; do
+            if curl -fsSL --retry 3 -o "$DIR/$corpus.zip" "$base/$corpus.zip"; then
+              mkdir -p "$DIR/$corpus"
+              unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus" && rm -f "$DIR/$corpus.zip"
+            else
+              echo "::warning::could not fetch $corpus decrypt vectors; skipping that corpus"
+            fi
+          done
+          echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
+
       - name: Orchestrated Commons_Run (make orchestrate)
         # THE single orchestrated entry point (Requirements 2.7, 6.1): one
         # invocation resolves every language from THIS working tree's
@@ -619,6 +641,7 @@ jobs:
           ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+          ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
         run: make orchestrate
 
       - name: Rust compiler cache stats (sccache)
