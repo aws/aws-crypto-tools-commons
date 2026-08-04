@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link TestRunInput}'s property-formatting helpers and the
- * Feature_Declaration flattening (design "Runtime properties handed to the
- * Tests"; Requirements 2.2, 9.3). The formats are normative — the Tests-module
+ * Feature_Declaration flattening. The formats are normative — the Tests-module
  * parsers ({@code LanguageServerRegistry}, {@code FeatureDeclarations}) consume
  * these exact shapes.
  */

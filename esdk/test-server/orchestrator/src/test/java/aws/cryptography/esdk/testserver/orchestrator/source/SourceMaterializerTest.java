@@ -22,8 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Unit tests for the SourceMaterializer's pure parts (clone dedup, directory
  * naming, outcome shaping) plus cheap working-tree checks against the enclosing
  * real commons repository — no network, no cloning. The real-git clone
- * integration tests (fixture repos, nonexistent branches, poisoned nested
- * configs) are task 3.2.
+ * integration tests live in {@link SourceMaterializerGitIntegrationTest}.
  */
 class SourceMaterializerTest {
 
@@ -96,7 +95,7 @@ class SourceMaterializerTest {
     }
 
     // ------------------------------------------------------------------
-    // Pure: outcome shaping (what task 4.1's Resolution_Record consumes)
+    // Pure: outcome shaping (what the Resolution_Record consumes)
     // ------------------------------------------------------------------
 
     @Test
@@ -172,8 +171,7 @@ class SourceMaterializerTest {
     }
 
     // ------------------------------------------------------------------
-    // Cheap local checks against the enclosing real repository (no cloning;
-    // the fixture-repo clone integration tests are task 3.2)
+    // Cheap local checks against the enclosing real repository (no cloning)
     // ------------------------------------------------------------------
 
     /** Walk up from the test's working directory to the enclosing git repo root. */

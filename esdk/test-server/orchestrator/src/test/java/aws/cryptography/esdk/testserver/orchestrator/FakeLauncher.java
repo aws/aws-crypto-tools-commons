@@ -50,8 +50,8 @@ final class FakeLauncher implements Launcher {
         }
         URI endpoint = URI.create("http://127.0.0.1:" + entry.port());
         // An explicit always-reachable probe: the dummy server binds no real
-        // port, so the pipeline's pre-Tests reachability re-check (Requirement
-        // 2.3) must not do a live TCP connect against an unbound port.
+        // port, so the pipeline's pre-Tests reachability re-check must not do a
+        // live TCP connect against an unbound port.
         return new LaunchedServer(entry.language(), entry.port(), endpoint,
             CloseResult::stopped, () -> true);
     }
