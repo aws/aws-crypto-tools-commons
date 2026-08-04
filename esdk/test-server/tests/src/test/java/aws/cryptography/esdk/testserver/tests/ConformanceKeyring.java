@@ -9,17 +9,14 @@ import java.util.Set;
  * The keyring a keyring-agnostic conformance Test produces its message with. Such a Test's
  * assertion (frame/header/footer/commitment/signature tampering, region ordering, policy
  * enforcement) is independent of the keyring — the keyring is only the vehicle — so the Test runs
- * ONCE, under {@link #negotiate} the single keyring both endpoints support. Raw-AES is preferred
- * (offline, no KMS); the hierarchical keyring is the fallback and the one the native Rust ESDK
- * supports, since it declares only {@code hierarchical}. A pair whose languages share no keyring
- * is a visible skip.
+ * under Raw-AES, the offline keyring every language supports (the native Rust ESDK builds it
+ * through the Dafny MPL). A pair whose languages do not both support Raw-AES is a visible skip.
  *
  * <p>Tests that assert something keyring-specific (the Raw-AES EDK provider-info layout) build
  * their keyring directly instead and are correctly skipped where it is unsupported.
  */
 enum ConformanceKeyring {
-    RAW_AES(Set.of("raw-aes")),
-    HIERARCHICAL(Set.of("hierarchical"));
+    RAW_AES(Set.of("raw-aes"));
 
     private final Set<String> features;
 
@@ -34,28 +31,17 @@ enum ConformanceKeyring {
 
     /** The client config for this keyring under {@code policy}. */
     ESDKClientConfig config(ESDKCommitmentPolicy policy) {
-        return switch (this) {
-            case RAW_AES -> EsdkClientConfigs.rawAesWithCommitmentPolicy(policy);
-            case HIERARCHICAL -> EsdkClientConfigs.hierarchicalWithCommitmentPolicy(policy);
-        };
+        return EsdkClientConfigs.rawAesWithCommitmentPolicy(policy);
     }
 
     @Override
     public String toString() {
-        return switch (this) {
-            case RAW_AES -> "rawAes";
-            case HIERARCHICAL -> "hierarchical";
-        };
+        return "rawAes";
     }
 
-    /** The keyring both endpoints of {@code pair} support (Raw-AES first), or empty if none. */
+    /** Raw-AES when both endpoints of {@code pair} support it, otherwise empty. */
     static Optional<ConformanceKeyring> negotiate(EndpointPair pair) {
-        for (ConformanceKeyring keyring : values()) {
-            if (keyring.supportedBy(pair)) {
-                return Optional.of(keyring);
-            }
-        }
-        return Optional.empty();
+        return RAW_AES.supportedBy(pair) ? Optional.of(RAW_AES) : Optional.empty();
     }
 
     private boolean supportedBy(EndpointPair pair) {
