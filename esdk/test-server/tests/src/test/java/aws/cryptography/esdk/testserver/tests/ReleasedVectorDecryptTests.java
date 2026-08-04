@@ -68,6 +68,12 @@ class ReleasedVectorDecryptTests {
     private static final ESDKCommitmentPolicy DECRYPT_POLICY =
         ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
 
+    // Released vectors span every raw-RSA padding; the AWS Encryption SDK for C supports only
+    // PKCS1 and OAEP-SHA1/SHA256, so its rows for the wider OAEP hashes are visibly skipped
+    // rather than counted as failures.
+    private static final Map<String, Set<String>> UNSUPPORTED_RSA_PADDINGS = Map.of(
+        "c", Set.of("oaep-mgf1:sha384", "oaep-mgf1:sha512"));
+
     @TestFactory
     List<DynamicTest> releasedVectorsDecrypt() throws Exception {
         Path root = resolveRoot();
@@ -119,6 +125,14 @@ class ReleasedVectorDecryptTests {
                 for (LanguageServerTarget target : targets) {
                     tests.add(dynamicTest(label + " " + target, () -> {
                         FeatureGate.require(selection.features, new EndpointPair(target, target));
+                        Set<String> unsupported =
+                            UNSUPPORTED_RSA_PADDINGS.getOrDefault(target.language(), Set.of());
+                        for (String padding : selection.rsaPaddings) {
+                            if (unsupported.contains(padding)) {
+                                Assumptions.abort(target.language() + " does not support raw-RSA "
+                                    + padding + " (" + label + ")");
+                            }
+                        }
                         byte[] ciphertext = Files.readAllBytes(ciphertextPath);
                         byte[] expected = Files.readAllBytes(plaintextPath);
                         byte[] recovered = EsdkOps.decrypt(target.endpoint(), config, ciphertext);
@@ -133,14 +147,14 @@ class ReleasedVectorDecryptTests {
         if (tests.isEmpty()) {
             return List.of(dynamicTest("skipped: no selectable released vectors under " + root,
                 () -> Assumptions.abort("no positive, offline, mappable vectors found; adjust "
-                    + "includeKms/includeNegative/limitPerManifest")));
+                    + "includeKms or limitPerManifest")));
         }
         return tests;
     }
 
     /** A vector chosen for replay: its keyring, the required Features, and its file refs. */
-    private record Selection(Keyring keyring, Set<String> features, String ciphertextRef,
-                             String plaintextRef) {
+    private record Selection(Keyring keyring, Set<String> features, Set<String> rsaPaddings,
+                             String ciphertextRef, String plaintextRef) {
     }
 
     /**
@@ -168,6 +182,7 @@ class ReleasedVectorDecryptTests {
             return null;
         }
         Set<String> features = new LinkedHashSet<>();
+        Set<String> rsaPaddings = new LinkedHashSet<>();
         List<Keyring> keyrings = new ArrayList<>();
         for (JsonNode masterKey : masterKeys) {
             if (!includeKms && !"raw".equals(masterKey.path("type").asText())) {
@@ -179,12 +194,25 @@ class ReleasedVectorDecryptTests {
             }
             keyrings.add(keyring);
             features.add(featureFor(masterKey));
+            String padding = rsaPaddingLabel(masterKey);
+            if (padding != null) {
+                rsaPaddings.add(padding);
+            }
         }
 
         Keyring keyring = keyrings.size() == 1
             ? keyrings.get(0)
             : Keyring.builder().multi(MultiKeyringConfig.builder().childKeyrings(keyrings).build()).build();
-        return new Selection(keyring, features, ciphertextRef, plaintextRef);
+        return new Selection(keyring, features, rsaPaddings, ciphertextRef, plaintextRef);
+    }
+
+    /** The {@code algorithm:hash} label for a raw-RSA master key, or {@code null} if not raw-RSA. */
+    private static String rsaPaddingLabel(JsonNode masterKey) {
+        if (!"raw".equals(masterKey.path("type").asText())
+                || !"rsa".equals(masterKey.path("encryption-algorithm").asText())) {
+            return null;
+        }
+        return masterKey.path("padding-algorithm").asText() + ":" + masterKey.path("padding-hash").asText();
     }
 
     /** The Feature a master-key description depends on. */
