@@ -110,6 +110,39 @@ public final class FeatureValidation {
     }
 
     /**
+     * Validate one Language_Repository's {@code knownBugOverrides} structurally
+     * (the known-bug analogue of {@link #validateDeclaration}): no blank ids, no
+     * in-array duplicates, and no id in both {@code present} and {@code absent}.
+     * Whether an override references a real bug id — and whether it is redundant
+     * or stale against the base ledger — is decided by the Tests, which own that
+     * ledger; here the override has not yet met it.
+     *
+     * @param language the language whose override this is; named in every error
+     * @param override the parsed override, or {@code null} when the file carries none
+     * @return a {@link Result} with one error per structural violation
+     */
+    public static Result validateKnownBugOverride(String language, KnownBugOverride override) {
+        if (override == null) {
+            return Result.ok();
+        }
+        List<String> errors = new ArrayList<>();
+        List<String> present = override.present() == null ? List.of() : override.present();
+        List<String> absent = override.absent() == null ? List.of() : override.absent();
+        addBlankErrors(errors, language, "knownBugOverrides.present", present);
+        addBlankErrors(errors, language, "knownBugOverrides.absent", absent);
+        addDuplicateErrors(errors, language, "known bug", "knownBugOverrides.present", present);
+        addDuplicateErrors(errors, language, "known bug", "knownBugOverrides.absent", absent);
+        Set<String> presentSet = new LinkedHashSet<>(present);
+        for (String id : new LinkedHashSet<>(absent)) {
+            if (presentSet.contains(id)) {
+                errors.add("language " + language + ": known bug " + quote(id)
+                    + " is in both knownBugOverrides.present and knownBugOverrides.absent");
+            }
+        }
+        return Result.of(errors);
+    }
+
+    /**
      * Validate one participating language's Feature_Declaration against the
      * Feature_Catalog (Requirements 8.5–8.9).
      *
@@ -322,6 +355,17 @@ public final class FeatureValidation {
                 errors.add("language " + language + ": unknown Feature " + quote(name)
                     + " in " + arrayName
                     + ": the Feature_Catalog does not define it");
+            }
+        }
+    }
+
+    /** Name each null or blank entry in {@code array} (position-based, since it has no name). */
+    private static void addBlankErrors(
+            List<String> errors, String language, String arrayName, List<String> array) {
+        for (int i = 0; i < array.size(); i++) {
+            String value = array.get(i);
+            if (value == null || value.isBlank()) {
+                errors.add("language " + language + ": " + arrayName + " has a blank entry at index " + i);
             }
         }
     }

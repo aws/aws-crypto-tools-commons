@@ -64,7 +64,7 @@ class FrameLengthValidationTests {
     @MethodSource("targets")
     void encryptRejectsNonPositiveFrameLength(LanguageServerTarget target) {
         ESDKClientConfig config = configFor(new EndpointPair(target, target));
-        KnownBugGate.gate("encrypt-non-positive-frame-length-generic-error", target.language(),
+        KnownBugGate.gate("encrypt-non-positive-frame-length-generic-error", target,
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, -16L),
                 "encrypt with a frame length that is not greater than 0 must be rejected as an "

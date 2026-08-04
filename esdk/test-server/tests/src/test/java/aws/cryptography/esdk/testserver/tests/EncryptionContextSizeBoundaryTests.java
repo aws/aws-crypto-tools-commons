@@ -96,7 +96,7 @@ class EncryptionContextSizeBoundaryTests {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("k", asciiValue(MAX_AAD - SINGLE_ENTRY_OVERHEAD));
 
-        KnownBugGate.gate(VALUE_LENGTH_CAP_BUG, pair.encryptTarget().language(), () -> {
+        KnownBugGate.gate(VALUE_LENGTH_CAP_BUG, pair.encryptTarget(), () -> {
             byte[] ciphertext = assertDoesNotThrow(
                 () -> EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, NON_SIGNING_SUITE, null),
                 pair + ": encrypt with a maximum-size encryption context must be accepted");
@@ -104,7 +104,7 @@ class EncryptionContextSizeBoundaryTests {
             assertEquals(MAX_AAD, message.aadLength,
                 pair + ": a context serializing to the UInt16 maximum must carry AAD length 65535");
 
-            KnownBugGate.gate(VALUE_LENGTH_CAP_BUG, pair.decryptTarget().language(), () -> {
+            KnownBugGate.gate(VALUE_LENGTH_CAP_BUG, pair.decryptTarget(), () -> {
                 byte[] recovered = assertDoesNotThrow(
                     () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
                     pair + ": decrypt of a maximum-size encryption context must be accepted");

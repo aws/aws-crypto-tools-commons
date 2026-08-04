@@ -112,10 +112,11 @@ class LaunchOnceAllReachablePropertyTest {
             }
 
             // The Targets handed to the runner are exactly the launched
-            // (language, majorVersion, endpoint) set.
+            // (language, majorVersion, repository, endpoint) set.
             List<TestTarget> expectedTargets = new ArrayList<>();
             for (ConfigurationEntry entry : entries) {
                 expectedTargets.add(new TestTarget(entry.language(), entry.majorVersion(),
+                    entry.libraryRepository().name(),
                     URI.create("http://127.0.0.1:" + entry.port())));
             }
             assertEquals(expectedTargets, runner.input.targets(),

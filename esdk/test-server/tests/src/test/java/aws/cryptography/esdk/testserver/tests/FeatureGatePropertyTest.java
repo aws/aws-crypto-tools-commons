@@ -193,7 +193,8 @@ class FeatureGatePropertyTest {
         private static LanguageServerTarget target(String language) {
             // No live server: the gate must decide before any Language_Server
             // operation, so an unroutable endpoint proves nothing is contacted.
-            return new LanguageServerTarget(language, 1, URI.create("http://127.0.0.1:0/" + language));
+            return new LanguageServerTarget(language, 1, "repo-" + language,
+                URI.create("http://127.0.0.1:0/" + language));
         }
     }
 

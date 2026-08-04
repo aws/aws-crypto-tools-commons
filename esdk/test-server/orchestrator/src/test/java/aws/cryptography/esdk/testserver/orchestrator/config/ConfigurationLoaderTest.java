@@ -177,6 +177,30 @@ class ConfigurationLoaderTest {
         assertNull(config.supportedFeatures());
     }
 
+    @Test
+    @DisplayName("parses knownBugOverrides present/absent arrays")
+    void parsesKnownBugOverrides() {
+        CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration("""
+            {
+              "product": "esdk",
+              "knownBugOverrides": {
+                "present": ["bug-a"],
+                "absent": ["bug-b", "bug-c"]
+              }
+            }
+            """);
+        assertEquals(List.of("bug-a"), config.knownBugOverrides().present());
+        assertEquals(List.of("bug-b", "bug-c"), config.knownBugOverrides().absent());
+    }
+
+    @Test
+    @DisplayName("absent knownBugOverrides parses as null (base ledger unchanged)")
+    void absentKnownBugOverridesIsNull() {
+        CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration(
+            "{ \"product\": \"esdk\" }");
+        assertNull(config.knownBugOverrides());
+    }
+
     // ------------------------------------------------------------------
     // Strict duplicate detection (both file kinds)
     // ------------------------------------------------------------------

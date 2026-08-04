@@ -28,7 +28,7 @@ class FeatureGateTest {
 
     private static LanguageServerTarget target(String language, int majorVersion) {
         return new LanguageServerTarget(
-            language, majorVersion, URI.create("http://127.0.0.1:0/" + language));
+            language, majorVersion, "repo-" + language, URI.create("http://127.0.0.1:0/" + language));
     }
 
     private static EndpointPair pair(String encryptLanguage, String decryptLanguage) {

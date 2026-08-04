@@ -20,13 +20,15 @@ import org.junit.jupiter.api.Test;
 class TestRunInputTest {
 
     @Test
-    @DisplayName("targets format is the normative lang:major=url CSV (Req 2.2)")
+    @DisplayName("targets format is the normative lang:major:repo=url CSV (Req 2.2)")
     void formatsTargets() {
         List<TestTarget> targets = List.of(
-            new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")),
-            new TestTarget("python", 4, URI.create("http://127.0.0.1:8092")));
+            new TestTarget("java", 3, "aws-crypto-tools-java", URI.create("http://127.0.0.1:8091")),
+            new TestTarget("python", 4, "aws-encryption-sdk-python",
+                URI.create("http://127.0.0.1:8092")));
 
-        assertEquals("java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092",
+        assertEquals("java:3:aws-crypto-tools-java=http://127.0.0.1:8091,"
+                + "python:4:aws-encryption-sdk-python=http://127.0.0.1:8092",
             TestRunInput.formatTargets(targets));
     }
 
@@ -102,14 +104,17 @@ class TestRunInputTest {
         features.put("java", declaration("MPL", true, "streaming", true));
 
         TestRunInput input = new TestRunInput(
-            List.of(new TestTarget("python", 4, URI.create("http://127.0.0.1:8092")),
-                new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
+            List.of(new TestTarget("python", 4, "aws-encryption-sdk-python",
+                    URI.create("http://127.0.0.1:8092")),
+                new TestTarget("java", 3, "aws-crypto-tools-java",
+                    URI.create("http://127.0.0.1:8091"))),
             features,
             List.of("streaming", "MPL"),
             Map.of(),
             "java");
 
-        assertEquals("python:4=http://127.0.0.1:8092,java:3=http://127.0.0.1:8091",
+        assertEquals("python:4:aws-encryption-sdk-python=http://127.0.0.1:8092,"
+                + "java:3:aws-crypto-tools-java=http://127.0.0.1:8091",
             TestRunInput.formatTargets(input.targets()));
         assertEquals("python:streaming=true;MPL=true,java:MPL=true;streaming=true",
             TestRunInput.formatFeatures(input.features()));
@@ -120,7 +125,8 @@ class TestRunInputTest {
     @DisplayName("the reference implementation is carried verbatim and must be non-blank")
     void carriesReferenceImplementation() {
         List<TestTarget> targets =
-            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")));
+            List.of(new TestTarget("java", 3, "aws-crypto-tools-java",
+                URI.create("http://127.0.0.1:8091")));
 
         assertEquals("python",
             new TestRunInput(targets, Map.of(), List.of(), Map.of(), "python")

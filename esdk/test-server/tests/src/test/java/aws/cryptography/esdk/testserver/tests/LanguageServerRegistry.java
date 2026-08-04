@@ -16,8 +16,8 @@ import java.util.Optional;
  * is located exclusively through the endpoint supplied at run time via
  * <b>{@code esdk.testserver.targets}</b> (system property) or
  * <b>{@code ESDK_TESTSERVER_TARGETS}</b> (environment variable) — a
- * comma-separated list of {@code <language>:<majorVersion>=<endpointUrl>} entries
- * (e.g. {@code java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092}).
+ * comma-separated list of {@code <language>:<majorVersion>:<repository>=<endpointUrl>} entries
+ * (e.g. {@code java:3:aws-crypto-tools-java=http://127.0.0.1:8091,python:4:aws-encryption-sdk-python=http://127.0.0.1:8092}).
  * The orchestrator launches every configured Language_Server and supplies this
  * property; there is no managed (in-process) fallback and no legacy endpoint
  * property. When nothing is configured, resolution fails with an actionable
@@ -30,7 +30,7 @@ import java.util.Optional;
  */
 public final class LanguageServerRegistry {
 
-    /** Runtime-config key: comma-separated {@code language:major=url} target entries. */
+    /** Runtime-config key: comma-separated {@code language:major:repository=url} target entries. */
     public static final String TARGETS_PROPERTY = "esdk.testserver.targets";
     public static final String TARGETS_ENV = "ESDK_TESTSERVER_TARGETS";
 
@@ -68,9 +68,10 @@ public final class LanguageServerRegistry {
             "No Language_Server targets configured. The Tests are endpoint-only "
                 + "(Requirement 10.2): supply the targets via the -D" + TARGETS_PROPERTY
                 + " system property or the " + TARGETS_ENV + " environment variable as a "
-                + "comma-separated list of <language>:<majorVersion>=<endpointUrl> entries, "
+                + "comma-separated list of <language>:<majorVersion>:<repository>=<endpointUrl> entries, "
                 + "e.g. -D" + TARGETS_PROPERTY
-                + "=java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092. "
+                + "=java:3:aws-crypto-tools-java=http://127.0.0.1:8091,"
+                + "python:4:aws-encryption-sdk-python=http://127.0.0.1:8092. "
                 + "Run the Tests through the orchestrated entry point (`make orchestrate`), "
                 + "which launches every configured Language_Server and supplies this property."));
         return new LanguageServerRegistry(parseTargets(configured));
@@ -100,8 +101,9 @@ public final class LanguageServerRegistry {
     }
 
     /**
-     * Parse {@code language:major=url} entries into targets, preserving order and
-     * rejecting duplicates of the same {@code (language, majorVersion)} tuple.
+     * Parse {@code language:major:repository=url} entries into targets,
+     * preserving order and rejecting duplicates of the same
+     * {@code (language, majorVersion)} label.
      */
     private static List<LanguageServerTarget> parseTargets(String raw) {
         Map<String, LanguageServerTarget> byLabel = new LinkedHashMap<>();
@@ -113,24 +115,25 @@ public final class LanguageServerRegistry {
             int eq = trimmed.indexOf('=');
             if (eq < 0) {
                 throw new IllegalArgumentException(
-                    "malformed target entry (expected language:major=url): " + trimmed);
+                    "malformed target entry (expected language:major:repository=url): " + trimmed);
             }
-            String langVer = trimmed.substring(0, eq).trim();
+            String key = trimmed.substring(0, eq).trim();
             String url = trimmed.substring(eq + 1).trim();
-            int colon = langVer.indexOf(':');
-            if (colon < 0) {
+            String[] parts = key.split(":");
+            if (parts.length != 3) {
                 throw new IllegalArgumentException(
-                    "malformed target key (expected language:major): " + langVer);
+                    "malformed target key (expected language:major:repository): " + key);
             }
-            String language = langVer.substring(0, colon).trim();
+            String language = parts[0].trim();
             int majorVersion;
             try {
-                majorVersion = Integer.parseInt(langVer.substring(colon + 1).trim());
+                majorVersion = Integer.parseInt(parts[1].trim());
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("major version must be an integer: " + langVer, e);
+                throw new IllegalArgumentException("major version must be an integer: " + key, e);
             }
+            String repository = parts[2].trim();
             LanguageServerTarget target =
-                new LanguageServerTarget(language, majorVersion, URI.create(url));
+                new LanguageServerTarget(language, majorVersion, repository, URI.create(url));
             if (byLabel.putIfAbsent(target.label(), target) != null) {
                 throw new IllegalArgumentException("duplicate target: " + target.label());
             }

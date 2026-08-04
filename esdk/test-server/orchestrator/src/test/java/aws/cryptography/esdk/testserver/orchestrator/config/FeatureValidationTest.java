@@ -350,4 +350,50 @@ class FeatureValidationTest {
             assertEquals(product.errors().get(0), combined.errors().get(1));
         }
     }
+
+    @Nested
+    @DisplayName("knownBugOverrides structural validation")
+    class KnownBugOverrides {
+
+        @Test
+        @DisplayName("a null override is valid (the base ledger applies unchanged)")
+        void nullOverrideIsValid() {
+            assertTrue(FeatureValidation.validateKnownBugOverride("rust", null).valid());
+        }
+
+        @Test
+        @DisplayName("distinct present/absent ids are valid")
+        void distinctIdsAreValid() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugOverride(
+                "rust", new KnownBugOverride(List.of("bug-a"), List.of("bug-b")));
+            assertTrue(r.valid(), r.message());
+        }
+
+        @Test
+        @DisplayName("an id in both present and absent is rejected")
+        void presentAndAbsentOverlapIsRejected() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugOverride(
+                "rust", new KnownBugOverride(List.of("bug-a"), List.of("bug-a")));
+            assertFalse(r.valid());
+            assertTrue(r.message().contains("both"), r.message());
+        }
+
+        @Test
+        @DisplayName("an in-array duplicate id is rejected")
+        void duplicateIdIsRejected() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugOverride(
+                "rust", new KnownBugOverride(List.of("bug-a", "bug-a"), null));
+            assertFalse(r.valid());
+            assertTrue(r.message().contains("2 times"), r.message());
+        }
+
+        @Test
+        @DisplayName("a blank id is rejected")
+        void blankIdIsRejected() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugOverride(
+                "rust", new KnownBugOverride(List.of(" "), null));
+            assertFalse(r.valid());
+            assertTrue(r.message().contains("blank"), r.message());
+        }
+    }
 }

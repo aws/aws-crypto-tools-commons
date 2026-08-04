@@ -8,6 +8,7 @@ import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSet;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSetValidation;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationValidation;
 import aws.cryptography.esdk.testserver.orchestrator.config.FeatureValidation;
+import aws.cryptography.esdk.testserver.orchestrator.config.KnownBugOverride;
 import aws.cryptography.esdk.testserver.orchestrator.launch.CloseResult;
 import aws.cryptography.esdk.testserver.orchestrator.launch.LaunchedServer;
 import aws.cryptography.esdk.testserver.orchestrator.launch.Launcher;
@@ -231,7 +232,8 @@ public final class ESDKTestServer {
      * optional raw-RSA padding capability ({@code null} = every scheme).
      */
     private record Declaration(
-            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes) {
+            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes,
+            KnownBugOverride knownBugOverrides) {
     }
 
     private PipelineOutcome executePipeline(
@@ -298,11 +300,13 @@ public final class ESDKTestServer {
                     own.supportedFeatures(), own.unsupportedFeatures()))
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(context.ownLanguage(),
                     own.rawRsaPaddingSchemes(), own.supportedFeatures()))
+                .and(FeatureValidation.validateKnownBugOverride(
+                    context.ownLanguage(), own.knownBugOverrides()))
                 .and(FeatureValidation.validateProductMatch(context.invokingRepositoryName(),
                     own.product(), configurationSet.product()));
             declarations.put(context.ownLanguage(),
                 new Declaration(own.supportedFeatures(), own.unsupportedFeatures(),
-                    own.rawRsaPaddingSchemes()));
+                    own.rawRsaPaddingSchemes(), own.knownBugOverrides()));
         }
         for (ConfigurationEntry entry : effectiveEntries) {
             if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
@@ -315,7 +319,7 @@ public final class ESDKTestServer {
                     entry.rawRsaPaddingSchemes(), entry.supportedFeatures()));
             declarations.put(entry.language(),
                 new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures(),
-                    entry.rawRsaPaddingSchemes()));
+                    entry.rawRsaPaddingSchemes(), null));
         }
         if (!onHand.valid()) {
             return PipelineOutcome.aborted(
@@ -411,6 +415,7 @@ public final class ESDKTestServer {
                     carried.supportedFeatures(), carried.unsupportedFeatures())
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(language,
                     carried.rawRsaPaddingSchemes(), carried.supportedFeatures()))
+                .and(FeatureValidation.validateKnownBugOverride(language, carried.knownBugOverrides()))
                 .and(FeatureValidation.validateProductMatch(languageRepository,
                     carried.product(), configurationSet.product()));
             if (!crossRepo.valid()) {
@@ -419,7 +424,7 @@ public final class ESDKTestServer {
             }
             declarations.put(language,
                 new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures(),
-                    carried.rawRsaPaddingSchemes()));
+                    carried.rawRsaPaddingSchemes(), carried.knownBugOverrides()));
         }
 
         // ---- Stage 5: build + launch every server as a subprocess on its
@@ -532,7 +537,10 @@ public final class ESDKTestServer {
             ConfigurationEntry entry = entryByLanguage.get(server.language());
             int majorVersion = entry != null && entry.majorVersion() != null
                 ? entry.majorVersion() : 0;
-            targets.add(new TestTarget(server.language(), majorVersion, server.endpoint()));
+            String repository = entry != null && entry.libraryRepository() != null
+                && entry.libraryRepository().name() != null
+                ? entry.libraryRepository().name() : server.language();
+            targets.add(new TestTarget(server.language(), majorVersion, repository, server.endpoint()));
         }
 
         List<String> catalog = configurationSet.features() == null
@@ -553,8 +561,34 @@ public final class ESDKTestServer {
                 rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
             }
         }
+        // Each launched Target that carries a known-bug override contributes a
+        // `<lang>:<major>:<repo>=<sign><id>[;<sign><id>…]` entry (present -> '+',
+        // absent -> '-'); the Tests apply these on top of the committed base
+        // ledger. A Target with no override (or an empty one) contributes
+        // nothing, so a Commons_Run with no repository overrides sends none.
+        List<String> overrideEntries = new ArrayList<>();
+        for (TestTarget target : targets) {
+            Declaration declaration = declarations.get(target.language());
+            if (declaration == null || declaration.knownBugOverrides() == null
+                    || declaration.knownBugOverrides().isEmpty()) {
+                continue;
+            }
+            KnownBugOverride override = declaration.knownBugOverrides();
+            List<String> signed = new ArrayList<>();
+            if (override.present() != null) {
+                override.present().forEach(id -> signed.add("+" + id));
+            }
+            if (override.absent() != null) {
+                override.absent().forEach(id -> signed.add("-" + id));
+            }
+            overrideEntries.add(target.language() + ":" + target.majorVersion() + ":"
+                + target.repository() + "=" + String.join(";", signed));
+        }
+        String knownBugOverrides = String.join(",", overrideEntries);
+
         return new TestRunInput(
-            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation);
+            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation,
+            knownBugOverrides);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

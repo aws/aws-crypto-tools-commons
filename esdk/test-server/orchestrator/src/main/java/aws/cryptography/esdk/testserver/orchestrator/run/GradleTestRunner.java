@@ -55,7 +55,7 @@ import org.w3c.dom.NodeList;
  */
 public final class GradleTestRunner implements TestRunner {
 
-    /** Runtime-config key: comma-separated {@code language:major=url} target entries. */
+    /** Runtime-config key: comma-separated {@code language:major:repository=url} target entries. */
     public static final String TARGETS_PROPERTY = "esdk.testserver.targets";
 
     /** Runtime-config key: comma-separated {@code lang:feat=bool[;feat=bool…]} entries. */
@@ -67,6 +67,10 @@ public final class GradleTestRunner implements TestRunner {
     /** Runtime-config key: comma-separated {@code lang:SCHEME[;SCHEME…]} entries. */
     public static final String RAW_RSA_PADDING_SCHEMES_PROPERTY =
         "esdk.testserver.rawRsaPaddingSchemes";
+
+    /** Runtime-config key: comma-separated {@code lang:major:repo=<sign><id>[;…]} override entries. */
+    public static final String KNOWN_BUG_OVERRIDES_PROPERTY =
+        "esdk.testserver.knownBugOverrides";
 
     /** Runtime-config key: the reference implementation's language. */
     public static final String REFERENCE_IMPLEMENTATION_PROPERTY =
@@ -142,6 +146,9 @@ public final class GradleTestRunner implements TestRunner {
         if (!input.rawRsaPaddingSchemes().isEmpty()) {
             command.add("-D" + RAW_RSA_PADDING_SCHEMES_PROPERTY + "="
                 + TestRunInput.formatRawRsaPaddingSchemes(input.rawRsaPaddingSchemes()));
+        }
+        if (!input.knownBugOverrides().isBlank()) {
+            command.add("-D" + KNOWN_BUG_OVERRIDES_PROPERTY + "=" + input.knownBugOverrides());
         }
         command.add("-D" + REFERENCE_IMPLEMENTATION_PROPERTY + "="
             + input.referenceImplementation());
