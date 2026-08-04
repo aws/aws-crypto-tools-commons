@@ -1,6 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
@@ -143,10 +144,24 @@ class EncryptionContextBehaviorTests {
             "__init__", "e");
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
-        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec);
-        assertArrayEquals(PLAINTEXT, recovered,
-            "encryption-context keys colliding with reserved identifiers must round-trip ("
-                + pair + ")");
+        if (pair.encryptTarget().language().equals(pair.decryptTarget().language())) {
+            // A producer that mishandles a colliding key mishandles it the same way on its
+            // own decrypt, so a same-language pair round-trips regardless; only a
+            // cross-language decrypt observes the bug, so only those rows are gated.
+            assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec),
+                "encryption-context keys colliding with reserved identifiers must round-trip ("
+                    + pair + ")");
+            return;
+        }
+        KnownBugGate.gate("encrypt-mishandles-proto-encryption-context-key",
+            pair.encryptTarget().language(), () -> {
+                byte[] recovered = assertDoesNotThrow(
+                    () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec),
+                    "decrypt of a message carrying reserved-identifier EC keys (" + pair + ")");
+                assertArrayEquals(PLAINTEXT, recovered,
+                    "encryption-context keys colliding with reserved identifiers must round-trip ("
+                        + pair + ")");
+            });
     }
 
     /**

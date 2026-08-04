@@ -143,8 +143,10 @@ class AdditionalTamperTests {
         tampered[message.footerOffset] = (byte) (inflatedLength >>> 8);
         tampered[message.footerOffset + 1] = (byte) inflatedLength;
 
-        assertRejected(pair, V1_FORBID, tampered,
-            "a footer whose signature field is the valid signature plus trailing garbage");
+        KnownBugGate.gate("decrypt-accepts-signature-trailing-garbage",
+            pair.decryptTarget().language(),
+            () -> assertRejected(pair, V1_FORBID, tampered,
+                "a footer whose signature field is the valid signature plus trailing garbage"));
     }
 
     /** HDR-012: an unsupported V1 type byte is rejected. */

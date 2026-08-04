@@ -48,5 +48,15 @@
     "id": "encryption-context-value-length-capped-at-32767",
     "description": "encrypt and decrypt reject an encryption-context value of 32767 bytes or longer (\"All keys and values in encryption context must be shorter than 32767\"), though the message format permits value lengths up to 65535",
     "languages": ["java"]
+  },
+  {
+    "id": "decrypt-accepts-signature-trailing-garbage",
+    "description": "decrypt accepts a footer whose signature field is the valid ECDSA signature with garbage appended and the signature length inflated to match; lenient signature parsing ignores the trailing bytes",
+    "languages": ["net"]
+  },
+  {
+    "id": "encrypt-mishandles-proto-encryption-context-key",
+    "description": "a message encrypted with a __proto__ encryption-context key omits that key from the serialized header while still binding it into the data-key wrap, so no other implementation can decrypt it; the same-language round trip succeeds and masks it",
+    "languages": ["javascript"]
   }
 ]
