@@ -14,14 +14,11 @@ import net.jqwik.api.Provide;
  * Property-based test for commons-branch selection (design Property 4): for
  * any generated Commons_Configuration_Entry branch and optional
  * invocation-time branch override, {@link CommonsOrigin#select} picks the
- * override when a non-blank one is supplied (reason
- * {@code invocation-override}, Requirement 4.8) and the entry's branch
- * otherwise (reason {@code configuration-entry}, Requirement 4.5). The clone
- * URL always passes through from the entry unchanged.
+ * override when a non-blank one is supplied (reason {@code invocation-override})
+ * and the entry's branch otherwise (reason {@code configuration-entry}). The
+ * clone URL always passes through from the entry unchanged.
  *
  * <p>Everything under test is pure — no I/O, no git, no servers.
- *
- * <p><b>Validates: Requirements 4.5, 4.8</b>
  */
 class CommonsOriginPropertyTest {
 
@@ -45,13 +42,13 @@ class CommonsOriginPropertyTest {
         boolean overrideSupplied =
             s.overrideBranch() != null && !s.overrideBranch().isBlank();
         if (overrideSupplied) {
-            // Requirement 4.8: the invocation override wins, with its reason.
+            // The invocation override wins, with its reason.
             assertEquals(s.overrideBranch(), origin.branch(),
                 "a supplied invocation override branch must be selected");
             assertEquals(ResolutionReason.INVOCATION_OVERRIDE, origin.reason(),
                 "an override selection must carry reason invocation-override");
         } else {
-            // Requirement 4.5: the entry's branch applies, with its reason.
+            // With no override, the entry's branch applies, with its reason.
             assertEquals(s.commonsRepository().branch(), origin.branch(),
                 "with no override, the Commons_Configuration_Entry branch must be selected");
             assertEquals(ResolutionReason.CONFIGURATION_ENTRY, origin.reason(),

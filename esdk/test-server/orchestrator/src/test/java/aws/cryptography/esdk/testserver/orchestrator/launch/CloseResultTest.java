@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Shape tests for {@link CloseResult} (design "Launcher contract"): STOPPED
  * carries no language; STILL_RUNNING must name the language whose server was
- * not stopped (Requirement 2.11).
+ * not stopped.
  */
 class CloseResultTest {
 
