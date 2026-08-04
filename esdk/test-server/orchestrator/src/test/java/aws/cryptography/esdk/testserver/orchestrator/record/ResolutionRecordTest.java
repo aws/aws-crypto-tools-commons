@@ -22,11 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Unit tests for the Resolution_Record (task 4.1): assembly from mixed
- * materialization outcomes, the run-gating completeness check, the JSON
- * document shape, and the readable stdout block (Requirements 5.1, 5.2, 5.4,
- * 5.5, 5.6, 5.7). The exhaustive generated-outcome coverage is Property 5
- * (task 4.2).
+ * Unit tests for the Resolution_Record: assembly from mixed materialization
+ * outcomes, the run-gating completeness check, the JSON document shape, and the
+ * readable stdout block. The exhaustive generated-outcome coverage is Property 5.
  */
 class ResolutionRecordTest {
 
@@ -91,7 +89,7 @@ class ResolutionRecordTest {
     }
 
     // ------------------------------------------------------------------
-    // Assembly (Requirements 5.1, 5.2, 5.4, 5.7)
+    // Assembly
     // ------------------------------------------------------------------
 
     @Test
@@ -197,7 +195,7 @@ class ResolutionRecordTest {
     }
 
     // ------------------------------------------------------------------
-    // Completeness (Requirement 5.5)
+    // Completeness
     // ------------------------------------------------------------------
 
     @Test
@@ -363,7 +361,7 @@ class ResolutionRecordTest {
     }
 
     // ------------------------------------------------------------------
-    // Stdout block (Requirement 5.6)
+    // Stdout block
     // ------------------------------------------------------------------
 
     @Test

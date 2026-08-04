@@ -14,12 +14,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Integration tests for the subprocess launch path's port binding and conflict
- * behavior (design Testing Strategy; Requirements 2.1, 2.5, 2.6). These launch
- * a real subprocess that binds the configured port (a minimal stand-in server
- * — {@code python3 -m http.server}), so they exercise actual port binding,
- * TCP-connect readiness, and process-tree teardown rather than a stub. The
- * in-process Java launcher these tests previously exercised was deleted in
- * task 6.4: every Language_Server now launches as a subprocess.
+ * behavior. These launch a real subprocess that binds the configured port (a
+ * minimal stand-in server — {@code python3 -m http.server}), so they exercise
+ * actual port binding, TCP-connect readiness, and process-tree teardown rather
+ * than a stub. Every Language_Server launches as a subprocess.
  */
 class PortBindingIntegrationTest {
 

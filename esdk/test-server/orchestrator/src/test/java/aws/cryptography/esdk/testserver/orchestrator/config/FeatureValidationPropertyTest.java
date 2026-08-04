@@ -25,8 +25,6 @@ import net.jqwik.api.Provide;
  * product mismatch, the Language_Repository and both product values.
  *
  * <p>Everything under test is pure — no I/O, no git, no servers.
- *
- * <p><b>Validates: Requirements 7.2, 7.5, 8.5, 8.6, 8.7, 8.8, 8.9, 8.11</b>
  */
 class FeatureValidationPropertyTest {
 
@@ -44,12 +42,12 @@ class FeatureValidationPropertyTest {
     /** The single targeted mutation applied to an otherwise-valid scenario. */
     private enum Mutation {
         NONE,               // valid partition, matching product → must validate
-        UNDECLARED,         // drop a catalog Feature from its array (Req 8.6)
-        CONFLICT,           // put a catalog Feature in both arrays (Req 8.7)
-        UNKNOWN,            // add a non-catalog name to an array (Req 8.8)
-        DUPLICATE,          // repeat a name within its array (Req 8.9)
-        PRODUCT_MISMATCH,   // commons-configuration product differs (Req 8.11)
-        CATALOG_DUPLICATE   // duplicate a name in the catalog itself (Req 7.5)
+        UNDECLARED,         // drop a catalog Feature from its array
+        CONFLICT,           // put a catalog Feature in both arrays
+        UNKNOWN,            // add a non-catalog name to an array
+        DUPLICATE,          // repeat a name within its array
+        PRODUCT_MISMATCH,   // commons-configuration product differs
+        CATALOG_DUPLICATE   // duplicate a name in the catalog itself
     }
 
     /**
@@ -77,8 +75,8 @@ class FeatureValidationPropertyTest {
     void featureValidationAcceptsExactlyTheCatalogCompleteDeclarations(
             @ForAll("scenarios") Scenario s) {
 
-        // --- Catalog validation (Requirements 7.2, 7.5): fails naming each
-        // duplicated name exactly when two or more Features share a name.
+        // --- Catalog validation: fails naming each duplicated name exactly
+        // when two or more Features share a name.
         ConfigurationSetValidation catalogValidation = ConfigurationValidation.validate(
             new ConfigurationSet(s.product(), s.catalogForValidation(),
                 List.of(validEntry(s.language()))));
@@ -96,10 +94,10 @@ class FeatureValidationPropertyTest {
                     + catalogValidation.errors());
         }
 
-        // --- Per-language validation (Requirements 8.5–8.9, 8.11), always
-        // against the duplicate-free catalog: succeeds iff every catalog
-        // Feature is in exactly one array, no unknown names, no in-array
-        // duplicates, and the products match exactly.
+        // --- Per-language validation, always against the duplicate-free
+        // catalog: succeeds iff every catalog Feature is in exactly one array,
+        // no unknown names, no in-array duplicates, and the products match
+        // exactly.
         FeatureValidation.Result result = FeatureValidation
             .validateDeclaration(s.catalog(), s.language(), s.supported(), s.unsupported())
             .and(FeatureValidation.validateProductMatch(

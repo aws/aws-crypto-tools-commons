@@ -17,10 +17,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for {@link GradleTestRunner}'s command construction (the three
- * runtime properties, Requirements 2.2, 9.3) and JUnit XML parsing: N
- * {@code testcase} elements yield exactly N {@link TestExecution}s with exactly
- * one status each (Requirement 9.10), and {@code <skipped message>} maps to
- * {@link TestExecution#skipped} (Requirements 9.6, 2.8).
+ * runtime properties) and JUnit XML parsing: N {@code testcase} elements yield
+ * exactly N {@link TestExecution}s with exactly one status each, and
+ * {@code <skipped message>} maps to {@link TestExecution#skipped}.
  */
 class GradleTestRunnerTest {
 

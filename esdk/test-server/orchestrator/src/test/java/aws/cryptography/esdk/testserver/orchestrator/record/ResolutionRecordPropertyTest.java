@@ -26,10 +26,10 @@ import net.jqwik.api.Provide;
 import net.jqwik.api.constraints.IntRange;
 
 /**
- * Property-based test for the Resolution_Record (task 4.2), implementing the
- * design's Property 5 over generated resolution outcomes — successes and
- * failures, clone and working-tree plans, both run-context kinds. Example-based
- * coverage of the same behavior lives in {@link ResolutionRecordTest}.
+ * Property-based test for the Resolution_Record, implementing the design's
+ * Property 5 over generated resolution outcomes — successes and failures, clone
+ * and working-tree plans, both run-context kinds. Example-based coverage of the
+ * same behavior lives in {@link ResolutionRecordTest}.
  *
  * <p>Runs against in-memory {@link MaterializedSources} only — no I/O, no git,
  * nothing is cloned.
@@ -87,19 +87,13 @@ class ResolutionRecordPropertyTest {
 
     // Feature: test-server-factoring, Property 5: The Resolution_Record is complete and faithful
     //
-    // For any generated resolution outcome (successful and failed components,
-    // any run context): the produced Resolution_Record contains exactly one
-    // component for every language's library, one for every language's
-    // Language_Server, and — in a Language_Repository_Run — one for the commons
-    // clone; every successful component carries the repository, reference,
-    // resolved commit, and a reason drawn from {configuration-entry,
-    // configuration-override, working-tree, invocation-override} matching its
-    // plan; every working-tree component carries the working tree's checked-out
-    // commit and its uncommitted-modifications flag; every failed component
-    // carries its attempted coordinates (repository, reference, and path for
-    // server components) and the failure cause.
-    //
-    // Validates: Requirements 5.1, 5.2, 5.4, 5.7
+    // For any generated resolution outcome the produced Resolution_Record
+    // contains exactly one component per language library and server, plus the
+    // commons clone in a Language_Repository_Run. Every successful component
+    // carries the repository, reference, resolved commit, and a reason matching
+    // its plan; working-tree components carry the checked-out commit and the
+    // uncommitted-modifications flag; every failed component carries its
+    // attempted coordinates and the failure cause.
     @Property(tries = 300, generation = GenerationMode.RANDOMIZED)
     void theResolutionRecordIsCompleteAndFaithful(
             @ForAll("languageSubsets") List<String> langs,

@@ -9,13 +9,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for the reworked {@link ResultReporter}: the executed set excludes
- * skips (Requirement 2.8), success iff ≥1 executed and 0 failed/unreachable
- * (Requirement 2.10), failure details identify the Test and its
- * (encrypt, decrypt) combination (Requirements 10.5, 10.7), the KMS coverage
- * floor gates success over the launched pairwise product (Requirement 10.4),
- * and cleanup failures are appended naming each language without masking the
- * primary result (Requirement 2.11).
+ * Unit tests for {@link ResultReporter}: the executed set excludes skips,
+ * success iff ≥1 executed and 0 failed/unreachable, failure details identify
+ * the Test and its (encrypt, decrypt) combination, the KMS coverage floor gates
+ * success over the launched pairwise product, and cleanup failures are appended
+ * naming each language without masking the primary result.
  */
 class ResultReporterTest {
 
@@ -25,7 +23,7 @@ class ResultReporterTest {
     private static final List<String> NO_CLEANUP = List.of();
 
     // -------------------------------------------------------------------
-    // Executed set and the fail-open rule (Requirements 2.8, 2.10).
+    // Executed set and the fail-open rule.
     // -------------------------------------------------------------------
 
     @Test
@@ -47,8 +45,8 @@ class ResultReporterTest {
 
     @Test
     void skippedOnlyIsZeroExecutedAndFails() {
-        // Skips are excluded from the executed set (Requirement 2.8): a run of
-        // nothing but Feature-gated skips executed zero Tests (Requirement 2.10).
+        // Skips are excluded from the executed set: a run of nothing but
+        // Feature-gated skips executed zero Tests.
         Result result = reporter.report(List.of(
                 TestExecution.skipped("Tests#stream[rawAes+default] java-v3->python-v4",
                     "feature-gated skip: feature=streaming unsupported by [python]"),
@@ -73,7 +71,7 @@ class ResultReporterTest {
     @Test
     void failedExecutionFailsTheRunIdentifyingTestAndCombination() {
         // The test name embeds the (encrypt, decrypt) combination via the Tests'
-        // `…[<scenario>…] <encrypt>-><decrypt>` naming (Requirement 10.5).
+        // `…[<scenario>…] <encrypt>-><decrypt>` naming.
         String name = "Tests#blob[rawRsa+default] java-v3->python-v4";
         Result result = reporter.report(List.of(
                 TestExecution.passed("Tests#blob[rawAes+default] java-v3->java-v3"),
@@ -90,7 +88,7 @@ class ResultReporterTest {
     @Test
     void unreachableFailsTheRunNamingServerAndTest() {
         // An unreachable Language_Server is never a pass; the report identifies
-        // both the unresponsive server and the executing Test (Requirement 10.7).
+        // both the unresponsive server and the executing Test.
         String name = "Tests#blob[awsKms] python-v4->java-v3";
         Result result = reporter.report(List.of(
                 TestExecution.passed("Tests#blob[rawAes+default] java-v3->java-v3"),
@@ -106,13 +104,13 @@ class ResultReporterTest {
     }
 
     // -------------------------------------------------------------------
-    // KMS coverage floor (Requirement 10.4).
+    // KMS coverage floor.
     // -------------------------------------------------------------------
 
     @Test
     void requiredKmsScenariosMirrorEsdkClientConfigs() {
         // The documented constant mirrors the Tests module's EsdkClientConfigs
-        // KMS scenario labels exactly (Requirement 10.4).
+        // KMS scenario labels exactly.
         assertEquals(
             List.of("awsKms", "awsKmsMrk", "awsKmsMultiKeyring", "awsKmsMrkMultiKeyring",
                 "awsKmsRsa", "awsKmsDiscovery"),
@@ -208,7 +206,7 @@ class ResultReporterTest {
     }
 
     // -------------------------------------------------------------------
-    // Cleanup failures (Requirement 2.11).
+    // Cleanup failures.
     // -------------------------------------------------------------------
 
     @Test

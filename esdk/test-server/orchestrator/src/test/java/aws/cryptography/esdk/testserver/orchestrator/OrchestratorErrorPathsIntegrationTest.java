@@ -29,15 +29,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Integration tests for the orchestrator's fail-closed error paths (design
- * "Error Handling"; Requirements 2.5, 2.10, 3.2, 10.1, 10.2, 10.5). Each aborts
- * before running any {@code Tests}, records no partial results, and returns a
- * fail-open failure that identifies the cause. Uses {@link FakeLauncher}/{@link
- * StubTestRunner} so the paths are deterministic without cloning repos or
- * launching servers.
+ * "Error Handling"). Each aborts before running any {@code Tests}, records no
+ * partial results, and returns a fail-open failure that identifies the cause.
+ * Uses {@link FakeLauncher}/{@link StubTestRunner} so the paths are
+ * deterministic without cloning repos or launching servers.
  */
 class OrchestratorErrorPathsIntegrationTest {
 
-    /** A structurally complete entry (task 1.2 validation requires it). */
+    /** A structurally complete entry (validation requires it). */
     private static ConfigurationEntry completeJavaEntry(int port) {
         return completeEntry("java", port);
     }

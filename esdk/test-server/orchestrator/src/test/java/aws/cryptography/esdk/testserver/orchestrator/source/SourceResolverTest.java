@@ -16,9 +16,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for the pure source-resolution planner (design "Execution-context
- * resolution rules" table) and the commons-branch selection (Requirements 4.5,
- * 4.8). Example-based; the exhaustive jqwik properties are tasks 2.2 / 2.3.
+ * Example-based unit tests for the pure source-resolution planner (design
+ * "Execution-context resolution rules" table) and commons-branch selection.
+ * The exhaustive coverage lives in the jqwik property tests.
  */
 class SourceResolverTest {
 
@@ -74,7 +74,7 @@ class SourceResolverTest {
             p -> p.reason() == ResolutionReason.CONFIGURATION_ENTRY),
             "every Commons_Run component derives from a Configuration_Entry");
 
-        // Java library and server: clones at exactly (url, ref/branch) with the path (Req 3.3).
+        // Java library and server: clones at exactly (url, ref/branch) with the path.
         SourcePlan.Clone javaLib = assertInstanceOf(SourcePlan.Clone.class,
             plan.get(ComponentId.library("java")).plan());
         assertEquals("git@github.com:aws/aws-crypto-tools-java.git", javaLib.url());
@@ -88,7 +88,7 @@ class SourceResolverTest {
         assertEquals("esdk/test-server/server", javaSrv.path());
 
         // Python server's Server_Location names the invoking repository (commons):
-        // working tree, no clone (Req 3.4).
+        // working tree, no clone.
         SourcePlan.WorkingTree pySrv = assertInstanceOf(SourcePlan.WorkingTree.class,
             plan.get(ComponentId.server("python")).plan());
         assertEquals(COMMONS_ROOT, pySrv.root());
@@ -107,14 +107,14 @@ class SourceResolverTest {
 
         Map<ComponentId, ResolvedComponentPlan> plan = byComponent(plans);
 
-        // The commons component: a clone at the origin coordinates (Req 4.5).
+        // The commons component: a clone at the origin coordinates.
         ResolvedComponentPlan commons = plan.get(ComponentId.commons());
         SourcePlan.Clone commonsClone = assertInstanceOf(SourcePlan.Clone.class, commons.plan());
         assertEquals("feature-branch", commonsClone.ref());
         assertEquals(ResolutionReason.CONFIGURATION_ENTRY, commons.reason());
 
         // Own language: library and server both working-tree at the repo root +
-        // configured paths, reason working-tree, no clone (Req 4.2, 3.4).
+        // configured paths, reason working-tree, no clone.
         ResolvedComponentPlan ownLib = plan.get(ComponentId.library("java"));
         SourcePlan.WorkingTree libTree = assertInstanceOf(SourcePlan.WorkingTree.class, ownLib.plan());
         assertEquals(JAVA_ROOT, libTree.root());
@@ -127,9 +127,9 @@ class SourceResolverTest {
         assertEquals("esdk/test-server/server", srvTree.path());
         assertEquals(ResolutionReason.WORKING_TREE, ownSrv.reason());
 
-        // Other language: from the commons-clone entries (Req 4.3) — python's
-        // library clones; its server names commons, not the invoking Java repo,
-        // so it clones too (Req 3.3).
+        // Other language: from the commons-clone entries — python's library
+        // clones; its server names commons, not the invoking Java repo, so it
+        // clones too.
         assertEquals(ResolutionReason.CONFIGURATION_ENTRY,
             plan.get(ComponentId.library("python")).reason());
         SourcePlan.Clone pySrv = assertInstanceOf(SourcePlan.Clone.class,

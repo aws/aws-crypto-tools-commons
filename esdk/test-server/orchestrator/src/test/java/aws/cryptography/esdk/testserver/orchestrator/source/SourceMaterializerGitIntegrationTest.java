@@ -19,26 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Real-git integration tests for {@link SourceMaterializer} (task 3.2):
- * fixture repositories are built with real {@code git} commands under
- * {@code @TempDir} and materialized through {@code file://} URLs — hermetic,
- * no network. The pure/cheap coverage (clone dedup, directory naming, outcome
- * shaping, enclosing-repo working trees) lives in
- * {@link SourceMaterializerTest}; these tests exercise the actual clone,
- * branch, path, and dirty-detection behavior:
- *
- * <ul>
- *   <li>a clone at a specific branch succeeds with that branch's exact
- *       commit (Requirement 3.3);</li>
- *   <li>a nonexistent branch is a Failure naming the URL and branch
- *       (Requirement 4.10 analog for Server_Location clones);</li>
- *   <li>a missing Server_Location path is a Failure naming the repository,
- *       reference, and path (Requirement 3.6);</li>
- *   <li>working-tree dirt is detected honestly (Requirement 5.7);</li>
- *   <li>a poisoned nested {@code commons-configuration.json} in a
- *       materialized repository never affects resolution — one level deep by
- *       construction (Requirement 3.7).</li>
- * </ul>
+ * Real-git integration tests for {@link SourceMaterializer}: fixture
+ * repositories are built with real {@code git} commands under {@code @TempDir}
+ * and materialized through {@code file://} URLs — hermetic, no network. The
+ * pure/cheap coverage lives in {@link SourceMaterializerTest}; these exercise
+ * actual clone, branch, path, and dirty-detection behavior: branch checkout,
+ * a nonexistent branch, a missing Server_Location path, honest working-tree
+ * dirt detection, and a poisoned nested {@code commons-configuration.json}
+ * that must never affect resolution (materialization looks only one level
+ * deep by construction).
  */
 class SourceMaterializerGitIntegrationTest {
 
@@ -86,7 +75,7 @@ class SourceMaterializerGitIntegrationTest {
     }
 
     // ------------------------------------------------------------------
-    // (b) Nonexistent branch → Failure naming url + branch (Req 4.10 analog)
+    // (b) Nonexistent branch → Failure naming url + branch
     // ------------------------------------------------------------------
 
     @Test
@@ -116,7 +105,7 @@ class SourceMaterializerGitIntegrationTest {
     }
 
     // ------------------------------------------------------------------
-    // (c) Missing Server_Location path → Failure naming repo/ref/path (Req 3.6)
+    // (c) Missing Server_Location path → Failure naming repo/ref/path
     // ------------------------------------------------------------------
 
     @Test
@@ -148,7 +137,7 @@ class SourceMaterializerGitIntegrationTest {
     }
 
     // ------------------------------------------------------------------
-    // (d) Working-tree dirt is detected honestly (Req 5.7)
+    // (d) Working-tree dirt is detected honestly
     // ------------------------------------------------------------------
 
     @Test
@@ -199,7 +188,7 @@ class SourceMaterializerGitIntegrationTest {
 
     // ------------------------------------------------------------------
     // (e) A poisoned nested commons-configuration.json never affects
-    //     resolution — one level deep by construction (Req 3.7)
+    //     resolution — one level deep by construction
     // ------------------------------------------------------------------
 
     @Test

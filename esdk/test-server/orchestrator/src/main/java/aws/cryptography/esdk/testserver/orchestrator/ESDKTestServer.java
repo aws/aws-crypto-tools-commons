@@ -471,7 +471,7 @@ public final class ESDKTestServer {
             }
         }
         if (launchError != null) {
-            throw launchError;
+            return PipelineOutcome.aborted(launchError.getMessage());
         }
         if (launchFailure != null) {
             return PipelineOutcome.aborted("failed to launch the " + launchFailure.language()

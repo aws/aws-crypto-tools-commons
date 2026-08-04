@@ -25,14 +25,11 @@ import java.util.StringJoiner;
  *
  * <p>For every {@code server:<lang>} component it also writes a catalog-complete
  * {@code esdk/test-server/commons-configuration.json} under the resolved server
- * root, so the orchestrator's stage-3 cross-repository Feature validation (a
- * Commons_Run reads a language's Feature_Declaration + {@code product} from the
- * materialized commons-configuration file — design "The orchestrated run
- * pipeline", Requirements 8.4, 8.11) finds a valid declaration. The written
- * declaration lists every catalog Feature as supported with {@code product}
- * matching the run's Configuration_Set, so a language whose stored entry carries
- * no inline declaration validates cleanly and the pipeline proceeds to the
- * launch/report stages under test.
+ * root, so the orchestrator's stage-3 cross-repository Feature validation finds
+ * a valid declaration (every catalog Feature supported, {@code product}
+ * matching the run's Configuration_Set). This lets a language whose stored
+ * entry carries no inline declaration validate cleanly so the pipeline proceeds
+ * to the launch/report stages under test.
  */
 final class FakeMaterializer implements Materializer {
 

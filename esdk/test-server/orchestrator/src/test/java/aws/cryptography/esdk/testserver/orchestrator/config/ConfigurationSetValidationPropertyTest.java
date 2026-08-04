@@ -156,19 +156,14 @@ class ConfigurationSetValidationPropertyTest {
 
     // Feature: test-server-factoring, Property 1: Configuration validation accepts exactly the well-formed configurations
     //
-    // For any generated Configuration_Set and optional Configuration_Overrides
-    // in any run context (Commons_Run: ownLanguage null; Language_Repository_Run:
-    // ownLanguage set): validation succeeds iff every entry and every override
-    // has a non-empty language, majorVersion >= 1, a port in 1..65535 unique
-    // across the effective set, a complete libraryRepository (name, url, branch)
-    // and a complete Server_Location (repository, ref, path); every override
-    // names a language that has a commons-stored entry and is not the run's own
-    // language. Every failure names the offending language and each
-    // missing/invalid element. "No repository is obtained when validation
-    // fails" holds by construction: ConfigurationValidation is a pure function
-    // with no I/O, run by the pipeline before anything is cloned.
-    //
-    // Validates: Requirements 3.1, 3.2, 3.8, 4.7, 4.11
+    // In any run context, validation succeeds iff every entry and every
+    // override has a non-empty language, majorVersion >= 1, a port in 1..65535
+    // unique across the effective set, a complete libraryRepository, and a
+    // complete Server_Location; every override names a commons-stored language
+    // that is not the run's own. Every failure names the offending language and
+    // each missing/invalid element. "No repository is obtained when validation
+    // fails" holds by construction: validation is pure, with no I/O, run before
+    // anything is cloned.
     @Property(tries = 300, generation = GenerationMode.RANDOMIZED)
     void validationAcceptsExactlyTheWellFormedConfigurations(
             @ForAll("languageSubsetsMin2") List<String> langs,
@@ -317,13 +312,13 @@ class ConfigurationSetValidationPropertyTest {
                 expectedTokens.add("serverLocation missing ref");
             }
             case "override-own-language" -> {
-                // Requirement 4.7: an override must not name the run's own language.
+                // An override must not name the run's own language.
                 overrides.add(validEntry(ownLanguage, freshPort));
                 expectedTokens.add("must not name the run's own language");
                 expectedTokens.add(ownLanguage);
             }
             case "override-unknown-language" -> {
-                // Requirement 4.11: an override must name a commons-stored language.
+                // An override must name a commons-stored language.
                 overrides.add(validEntry("ruby", freshPort));
                 expectedTokens.add("no commons-stored Configuration_Entry");
                 expectedTokens.add("ruby");

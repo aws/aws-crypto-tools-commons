@@ -44,24 +44,14 @@ import net.jqwik.api.Tuple;
 import net.jqwik.api.constraints.IntRange;
 
 /**
- * Property-based test for the fail-closed pipeline (task 9.3), implementing the
- * design's Property 6: driving {@link ESDKTestServer} with fake
- * Materializer/Launcher/TestRunner over generated stage-failure outcomes. Each
- * generated scenario injects exactly one failure at a generated stage —
- * configuration validation, Feature_Catalog/product omission, an inline
- * Feature_Declaration violation, a missing/unparseable/product-mismatched
- * commons-configuration file for a cross-repository language, a source
- * materialization failure, a dropped Resolution_Record component, or a launch
- * failure in any of the four categories — or no failure at all.
- *
- * <p>Assertions: every failing scenario invokes the test runner zero times and
- * reports a failure naming the affected language (where one applies) and the
- * cause; every proceeding scenario has the Resolution_Record emitted before the
- * test runner is invoked and before the result is reported (observed through
- * the record's JSON emission target, the pipeline's ordering seam).
- *
- * <p>No git, no sockets, no subprocesses: the fakes keep every stage
- * deterministic and in-process.
+ * Property-based test for the fail-closed pipeline: drives {@link ESDKTestServer}
+ * with fake Materializer/Launcher/TestRunner, injecting exactly one failure at a
+ * generated stage (or none). Every failing scenario must invoke the test runner
+ * zero times and report a failure naming the affected language and cause; every
+ * proceeding scenario must emit the Resolution_Record before the runner is
+ * invoked and before the result is reported (observed through the record's JSON
+ * emission target, the pipeline's ordering seam). The fakes keep every stage
+ * deterministic and in-process — no git, sockets, or subprocesses.
  */
 class FailClosedPipelinePropertyTest {
 
@@ -74,44 +64,36 @@ class FailClosedPipelinePropertyTest {
     enum FailureKind {
         /** No failure: the pipeline proceeds to the test runner. */
         NONE,
-        /** Stage 1a: a Configuration_Entry with an out-of-range port (Req 3.2/3.8). */
+        /** Stage 1a: a Configuration_Entry with an out-of-range port. */
         INVALID_ENTRY_PORT,
-        /** Stage 1a: the Configuration_Set omits the Feature_Catalog (Req 7.4). */
+        /** Stage 1a: the Configuration_Set omits the Feature_Catalog. */
         CATALOG_OMITTED,
-        /** Stage 1a: the Configuration_Set omits the product (Req 7.4). */
+        /** Stage 1a: the Configuration_Set omits the product. */
         PRODUCT_OMITTED,
-        /** Stage 1c: an inline declaration names a Feature the catalog does not define (Req 8.8). */
+        /** Stage 1c: an inline declaration names a Feature the catalog does not define. */
         INLINE_DECLARATION_UNKNOWN_FEATURE,
-        /** Stage 1c: an inline declaration leaves a catalog Feature undeclared (Req 8.6). */
+        /** Stage 1c: an inline declaration leaves a catalog Feature undeclared. */
         INLINE_DECLARATION_UNDECLARED_FEATURE,
-        /** Stage 3: a cross-repo language's commons-configuration file is missing (Req 8.10). */
+        /** Stage 3: a cross-repo language's commons-configuration file is missing. */
         COMMONS_CONFIGURATION_MISSING,
-        /** Stage 3: a cross-repo language's commons-configuration file is unparseable (Req 8.10). */
+        /** Stage 3: a cross-repo language's commons-configuration file is unparseable. */
         COMMONS_CONFIGURATION_UNPARSEABLE,
-        /** Stage 3: a cross-repo commons-configuration product mismatches (Req 8.11). */
+        /** Stage 3: a cross-repo commons-configuration product mismatches. */
         COMMONS_CONFIGURATION_PRODUCT_MISMATCH,
-        /** Stage 2 gate: one component fails to materialize (Req 3.6). */
+        /** Stage 2 gate: one component fails to materialize. */
         MATERIALIZATION_FAILURE,
-        /** Stage 4 gate: one component is missing from the Resolution_Record (Req 5.5). */
+        /** Stage 4 gate: one component is missing from the Resolution_Record. */
         RECORD_COMPONENT_DROPPED,
-        /** Stage 5: one language's launch fails in a generated category (Req 2.5). */
+        /** Stage 5: one language's launch fails in a generated category. */
         LAUNCH_FAILURE
     }
 
     // Feature: test-server-factoring, Property 6: The pipeline is fail-closed — no failure runs any Test
     //
-    // For any generated pipeline outcome in which any stage fails —
-    // configuration validation, Feature_Catalog or Feature_Declaration
-    // validation (including a missing or unparseable carrying file), source
-    // materialization (unobtainable repository, missing Server_Location path),
-    // Resolution_Record production or completeness checking, server
-    // build/launch/bind failure, or readiness timeout — the orchestrator
-    // invokes the test runner zero times and reports a failure identifying the
-    // affected language (where one applies) and the cause; and in every run
-    // that does proceed, the Resolution_Record is emitted before the test
-    // runner is invoked and before the result is reported.
-    //
-    // **Validates: Requirements 2.5, 3.6, 5.5, 5.6, 7.4, 8.4, 8.10**
+    // When any stage fails, the orchestrator invokes the test runner zero times
+    // and reports a failure identifying the affected language (where one
+    // applies) and the cause; when a run proceeds, the Resolution_Record is
+    // emitted before the runner is invoked and before the result is reported.
     @Property(tries = 200)
     void thePipelineIsFailClosed(
             @ForAll("languageSubsets") List<String> langs,
@@ -171,8 +153,8 @@ class FailClosedPipelinePropertyTest {
 
             // --- Assert ------------------------------------------------------
             if (kind == FailureKind.NONE) {
-                // Every run that proceeds: the Resolution_Record is emitted
-                // before the test runner is invoked (Requirement 5.6) ...
+                // A proceeding run emits the Resolution_Record before invoking
+                // the test runner ...
                 assertEquals(1, runner.invocations(),
                     "a no-failure run must invoke the test runner exactly once");
                 assertTrue(runner.recordExistedAtEveryInvocation(),
@@ -214,16 +196,13 @@ class FailClosedPipelinePropertyTest {
     // ------------------------------------------------------------------
 
     /**
-     * A structurally valid Configuration_Set over {@code langs} — unique
-     * in-range ports, complete library repositories and Server_Locations —
-     * with exactly the {@code kind}'s configuration-level failure injected at
-     * the {@code target} language (an out-of-range port, an omitted catalog or
-     * product, or a violated inline declaration). Languages flagged inline by
-     * {@code inlineMask} carry their Feature_Declaration in their entry and a
-     * Server_Location naming the invoking (commons) repository; the rest are
-     * cross-repository (declaration read from the materialized
-     * commons-configuration file in stage 3). The target's carrier is forced
-     * to match the kind's needs.
+     * A structurally valid Configuration_Set over {@code langs} with exactly
+     * the {@code kind}'s configuration-level failure injected at the
+     * {@code target} language. Languages flagged inline by {@code inlineMask}
+     * carry their Feature_Declaration in their entry and name the commons
+     * repository; the rest are cross-repository (declaration read from the
+     * materialized commons-configuration file in stage 3). The target's carrier
+     * is forced to match the kind's needs.
      */
     private static ConfigurationSet configurationSet(
             List<String> langs, List<String> catalog, FailureKind kind,
@@ -370,9 +349,9 @@ class FailClosedPipelinePropertyTest {
     /**
      * A {@link TestRunner} that observes the pipeline's ordering seam: at every
      * invocation it records whether the Resolution_Record's JSON emission
-     * target already exists — the record must be emitted before the runner is
-     * invoked (Requirement 5.6) — and counts invocations so failing scenarios
-     * can assert the runner ran zero times.
+     * target already exists (it must be emitted before the runner is invoked)
+     * and counts invocations so failing scenarios can assert the runner ran
+     * zero times.
      */
     private static final class RecordObservingRunner implements TestRunner {
 
@@ -402,16 +381,13 @@ class FailClosedPipelinePropertyTest {
 
     /**
      * A scriptable {@link Materializer} (modeled on {@link FakeMaterializer}):
-     * every plan materializes successfully with a dummy directory and commit,
-     * except an optional single injected {@code failComponent} (returned as a
-     * {@link MaterializedSources.Failure} with the attempted coordinates and
-     * cause — Requirement 3.6) or a single {@code dropComponent} (omitted from
-     * the outcomes entirely, making the Resolution_Record incomplete —
-     * Requirement 5.5). For every server component it writes a
+     * every plan materializes successfully, except an optional single injected
+     * {@code failComponent} (returned as a {@link MaterializedSources.Failure})
+     * or a single {@code dropComponent} (omitted entirely, making the
+     * Resolution_Record incomplete). For every server component it writes a
      * commons-configuration file under the resolved root so stage-3
      * cross-repository Feature validation finds one; the {@code targetLanguage}
-     * server's file is written per the scenario's {@link ConfigMode} (valid,
-     * absent, unparseable, or product-mismatched — Requirements 8.10, 8.11).
+     * server's file is written per the scenario's {@link ConfigMode}.
      */
     private static final class ScriptedMaterializer implements Materializer {
 

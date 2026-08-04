@@ -53,11 +53,11 @@ class FailOpenReportingPropertyTest {
         if (!expectedSuccess) {
             assertFalse(result.succeeded(), "a failing/empty run must be a failure");
             if (!nonEmpty) {
-                // Zero Tests executed is a failure (Requirement 13.4).
+                // Zero Tests executed is a failure.
                 assertTrue(result.summary().toLowerCase().contains("no tests"),
                     "empty run must report zero tests executed: " + result.summary());
             } else {
-                // Every failed / unreachable execution must be identified (Req 13.2, 13.3).
+                // Every failed / unreachable execution must be identified.
                 for (TestExecution e : executions) {
                     if (e.outcome() != TestExecution.Outcome.PASSED) {
                         boolean identified = result.details().stream()
@@ -72,7 +72,7 @@ class FailOpenReportingPropertyTest {
     }
 
     // Feature: esdk-test-server, Property 14: Fail-open result reporting
-    // An unreachable server is never reported as a pass (Requirement 13.3).
+    // An unreachable server is never reported as a pass.
     @Property(tries = 200, generation = GenerationMode.RANDOMIZED)
     void anyUnreachableIsAlwaysFailure(@ForAll("executionsWithUnreachable") List<TestExecution> executions) {
         Result result = reporter.report(executions);
@@ -81,17 +81,13 @@ class FailOpenReportingPropertyTest {
     }
 
     // Feature: test-server-factoring, Property 9: Fail-open result classification
-    // For any generated multiset of test executions with outcomes in {passed,
-    // failed, unreachable, skipped}: the orchestrator reports exactly one overall
-    // result, which is success iff at least one execution is executed
-    // (passed/failed/unreachable) and none is failed or unreachable; skipped
-    // executions are excluded from the executed set; every failure detail
-    // identifies the test and its (encrypt, decrypt) combination; every
-    // unreachable execution fails the run identifying the unresponsive server's
-    // test; and parsing N JUnit testcase elements yields exactly N executions,
-    // each with exactly one status, with <skipped> elements mapped to the
-    // skipped outcome carrying their message.
-    // **Validates: Requirements 2.8, 2.10, 9.8, 9.9, 9.10, 10.5, 10.7**
+    // For any generated multiset of test executions (passed/failed/unreachable/
+    // skipped): the orchestrator reports exactly one overall result, success iff
+    // at least one execution is executed (skips excluded) and none is failed or
+    // unreachable; every failure detail identifies the test and its (encrypt,
+    // decrypt) combination; and parsing N JUnit testcase elements yields exactly
+    // N executions, each with exactly one status, with <skipped> mapped to the
+    // skipped outcome carrying its message.
     @Property(tries = 150, generation = GenerationMode.RANDOMIZED)
     void failOpenClassificationWithXmlParseFidelity(@ForAll("junitCases") List<JUnitCase> cases)
             throws IOException {
@@ -100,7 +96,7 @@ class FailOpenReportingPropertyTest {
             Files.writeString(
                 resultsDir.resolve("TEST-Tests.xml"), junitXml(cases), StandardCharsets.UTF_8);
 
-            // --- JUnit XML parse fidelity (Requirements 9.8, 9.10) -------------
+            // --- JUnit XML parse fidelity -------------
             // N generated testcase elements yield exactly N executions, in
             // document order, each carrying exactly the one generated status.
             List<TestExecution> parsed = parseViaGradleTestRunner(resultsDir);
@@ -114,14 +110,13 @@ class FailOpenReportingPropertyTest {
                 assertEquals(c.expectedOutcome(), e.outcome(),
                     "each execution must carry exactly the generated status (Requirements 9.8, 9.10)");
                 if (c.expectedOutcome() == TestExecution.Outcome.SKIPPED) {
-                    // <skipped> maps to the skipped outcome carrying its message
-                    // (Requirements 2.8, 9.6 via 9.10's parse fidelity).
+                    // <skipped> maps to the skipped outcome carrying its message.
                     assertEquals(c.message(), e.detail(),
                         "a skipped execution must carry the <skipped message>");
                 }
             }
 
-            // --- Fail-open classification (Requirements 2.8, 2.10, 10.5, 10.7) -
+            // --- Fail-open classification -
             // Empty launched-target set keeps the KMS floor vacuous (Property 10
             // covers the floor); no cleanup failures.
             Result result = reporter.report(parsed, List.of(), List.of());
@@ -145,8 +140,7 @@ class FailOpenReportingPropertyTest {
                 if (e.outcome() == TestExecution.Outcome.FAILED
                         || e.outcome() == TestExecution.Outcome.UNREACHABLE) {
                     // Every failure detail identifies the test and, through the
-                    // `…[<scenario>] <encrypt>-><decrypt>` naming, its combination
-                    // (Requirement 10.5).
+                    // `…[<scenario>] <encrypt>-><decrypt>` naming, its combination.
                     String name = e.name();
                     assertTrue(result.details().stream().anyMatch(
                             d -> d.contains(name) && d.contains(c.pair())),
@@ -154,7 +148,7 @@ class FailOpenReportingPropertyTest {
                             + "combination " + c.pair() + ": " + result.details());
                     if (e.outcome() == TestExecution.Outcome.UNREACHABLE) {
                         // The unresponsive server's test is identified and the run
-                        // fails (Requirement 10.7).
+                        // fails.
                         assertFalse(result.succeeded(),
                             "an unreachable execution must fail the run (Requirement 10.7)");
                         assertTrue(result.details().stream().anyMatch(

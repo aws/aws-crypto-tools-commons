@@ -24,10 +24,9 @@ import java.util.List;
  * </ul>
  *
  * <p>Fields are deliberately nullable so an under-specified file is
- * representable and rejected by validation with an error naming each missing
- * element, rather than failing to parse. A {@code null} feature array means the
- * array was absent from the JSON. {@code configurationOverrides} defaults to an
- * empty list when absent.
+ * representable and rejected by validation naming each missing element, rather
+ * than failing to parse. A {@code null} feature array means the array was absent
+ * from the JSON; {@code configurationOverrides} defaults to an empty list.
  *
  * @param commonsRepository   the Commons_Configuration_Entry (Requirement 4.4)
  * @param product             the product identifier; must match the
@@ -41,7 +40,7 @@ import java.util.List;
  *                            every scheme the Smithy model defines (see
  *                            {@link FeatureValidation#validateRawRsaPaddingSchemes})
  * @param configurationOverrides complete replacement Configuration_Entries for
- *                            Other languages (Requirement 4.6); never null
+ *                            Other languages; never null
  */
 public record CommonsConfiguration(
     RepositoryCoordinates commonsRepository,

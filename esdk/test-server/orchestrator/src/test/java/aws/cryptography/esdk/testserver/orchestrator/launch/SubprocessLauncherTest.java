@@ -13,11 +13,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the shared {@link SubprocessLauncher} machinery's failure
- * categories (Requirements 2.5, 2.9): a pre-bound port is a PORT failure
- * before anything is spawned; an unstartable or early-exiting process is a
- * BUILD failure; a process that never accepts a connection within the
- * (injectable) readiness window is a TIMEOUT. The success path with a real
- * fake server process is the task 6.5 integration test.
+ * categories: a pre-bound port is a PORT failure before anything is spawned;
+ * an unstartable or early-exiting process is a BUILD failure; a process that
+ * never accepts a connection within the (injectable) readiness window is a
+ * TIMEOUT. The success path with a real fake server process is covered by the
+ * launch/stop integration test.
  */
 class SubprocessLauncherTest {
 

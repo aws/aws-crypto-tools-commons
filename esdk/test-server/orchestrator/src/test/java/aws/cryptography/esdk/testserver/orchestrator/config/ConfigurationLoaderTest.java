@@ -18,7 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
  * configuration file kinds (the Configuration_Set and a Language_Repository's
  * commons-configuration file), duplicate-key rejection
  * ({@code STRICT_DUPLICATE_DETECTION}), and missing/unparseable-file errors that
- * name the expected location (Requirements 3.1, 3.2, 4.9, 7.1, 8.1, 8.10).
+ * name the expected location.
  */
 class ConfigurationLoaderTest {
 
@@ -291,7 +291,7 @@ class ConfigurationLoaderTest {
         assertNotNull(java, "the shipped set must carry a java entry");
         assertEquals(3, java.majorVersion());
         assertEquals(8091, java.port());
-        // Requirement 1.2: the Java server is hosted in aws-crypto-tools-java.
+        // The Java server is hosted in aws-crypto-tools-java.
         assertEquals("aws-crypto-tools-java", java.serverLocation().repository());
         assertEquals("esdk/test-server/server", java.serverLocation().path());
 
