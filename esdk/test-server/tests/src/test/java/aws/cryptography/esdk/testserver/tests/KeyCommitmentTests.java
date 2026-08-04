@@ -18,8 +18,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -57,15 +58,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       on another — so commitment behavior is validated cross-language too.</li>
  * </ul>
  *
- * <p>Every case runs against each {@link CommitmentKeyring} and gates on that
- * keyring's Feature via {@link FeatureGate#require} as the first statement in the
- * body: the {@code RAW_AES} variant requires {@code MPL} (offline; Java/Python),
- * the {@code HIERARCHICAL} variant requires {@code hierarchical} (online; the Rust
- * server). Commitment enforcement is keyring-independent, so the hierarchical
- * variant is deliberately redundant with Raw-AES — it is the only way to cover
- * commitment on a server that builds only the hierarchical keyring. A policy
- * violation originates inside the ESDK and surfaces as a modeled
- * {@link ESDKClientError} (Requirements 4.10, 5.6), never a bare HTTP error.
+ * <p>Commitment enforcement is keyring-independent, so each case runs ONCE under the single
+ * keyring both endpoints support ({@link ConformanceKeyring#negotiate}: Raw-AES offline where
+ * available, else the hierarchical keyring the Rust server builds), gating on that keyring's
+ * Feature via {@link FeatureGate#require} as the first statement in the body. A policy violation
+ * originates inside the ESDK and surfaces as a modeled {@link ESDKClientError}
+ * (Requirements 4.10, 5.6), never a bare HTTP error.
  */
 class KeyCommitmentTests {
 
@@ -94,42 +92,17 @@ class KeyCommitmentTests {
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
 
     /**
-     * The keyring a commitment case runs against, and the Feature the matrix gates
-     * it on. {@code RAW_AES} is offline (Raw-AES keyring; requires {@code MPL});
-     * {@code HIERARCHICAL} is online (a DynamoDB branch-key store wrapped by a KMS
-     * key; requires {@code hierarchical}). Commitment enforcement is
-     * keyring-independent, so both must reproduce the same behavior.
+     * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the
+     * combination is a visible skip when they share none. Resolved as the first statement of
+     * every case; commitment is keyring-independent, so the case runs once, under this keyring.
      */
-    enum CommitmentKeyring {
-        RAW_AES(Set.of("MPL")),
-        HIERARCHICAL(Set.of("hierarchical"));
-
-        private final Set<String> features;
-
-        CommitmentKeyring(Set<String> features) {
-            this.features = features;
-        }
-
-        /** The Feature(s) a combination's languages must support to run this keyring. */
-        Set<String> features() {
-            return features;
-        }
-
-        /** The client config for this keyring under {@code policy}. */
-        ESDKClientConfig config(ESDKCommitmentPolicy policy) {
-            return switch (this) {
-                case RAW_AES -> EsdkClientConfigs.rawAesWithCommitmentPolicy(policy);
-                case HIERARCHICAL -> EsdkClientConfigs.hierarchicalWithCommitmentPolicy(policy);
-            };
-        }
-
-        @Override
-        public String toString() {
-            return switch (this) {
-                case RAW_AES -> "rawAes";
-                case HIERARCHICAL -> "hierarchical";
-            };
-        }
+    private static ConformanceKeyring keyringFor(EndpointPair combination) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(combination);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + combination);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), combination);
+        return keyring;
     }
 
     // -----------------------------------------------------------------------
@@ -181,20 +154,17 @@ class KeyCommitmentTests {
     static List<Arguments> encryptTargetCases() {
         List<Arguments> cases = new ArrayList<>();
         for (LanguageServerTarget target : LanguageServerRegistry.shared().targets()) {
-            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
-                for (EncryptCase c : encryptCaseList()) {
-                    cases.add(Arguments.of(target, keyring, c));
-                }
+            for (EncryptCase c : encryptCaseList()) {
+                cases.add(Arguments.of(target, c));
             }
         }
         return cases;
     }
 
-    @ParameterizedTest(name = "encrypt[{1}][{2}] {0}")
+    @ParameterizedTest(name = "encrypt[{1}] {0}")
     @MethodSource("encryptTargetCases")
-    void encryptHonorsCommitmentPolicy(
-            LanguageServerTarget target, CommitmentKeyring keyring, EncryptCase testCase) {
-        FeatureGate.require(keyring.features(), new EndpointPair(target, target));
+    void encryptHonorsCommitmentPolicy(LanguageServerTarget target, EncryptCase testCase) {
+        ConformanceKeyring keyring = keyringFor(new EndpointPair(target, target));
         if (testCase.expectSuccess()) {
             byte[] ciphertext =
                 encrypt(target.endpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT);
@@ -217,23 +187,21 @@ class KeyCommitmentTests {
     static List<Arguments> roundTripPairCases() {
         List<Arguments> cases = new ArrayList<>();
         for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
-            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
-                for (EncryptCase c : encryptCaseList()) {
-                    // Every suite allowed on encrypt under a policy is also allowed on
-                    // decrypt under that same policy, so it must round-trip.
-                    if (c.expectSuccess()) {
-                        cases.add(Arguments.of(pair, keyring, c));
-                    }
+            for (EncryptCase c : encryptCaseList()) {
+                // Every suite allowed on encrypt under a policy is also allowed on
+                // decrypt under that same policy, so it must round-trip.
+                if (c.expectSuccess()) {
+                    cases.add(Arguments.of(pair, c));
                 }
             }
         }
         return cases;
     }
 
-    @ParameterizedTest(name = "roundTrip[{1}][{2}] {0}")
+    @ParameterizedTest(name = "roundTrip[{1}] {0}")
     @MethodSource("roundTripPairCases")
-    void roundTripWithinPolicy(EndpointPair pair, CommitmentKeyring keyring, EncryptCase testCase) {
-        FeatureGate.require(keyring.features(), pair);
+    void roundTripWithinPolicy(EndpointPair pair, EncryptCase testCase) {
+        ConformanceKeyring keyring = keyringFor(pair);
         // Encrypt once per (encrypt endpoint, keyring, policy, suite); reuse the
         // ciphertext across the decrypt endpoints paired with that encrypt endpoint.
         String key = pair.encryptEndpoint() + "|" + keyring + "|"
@@ -274,19 +242,17 @@ class KeyCommitmentTests {
     static List<Arguments> decryptPairCases() {
         List<Arguments> cases = new ArrayList<>();
         for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
-            for (CommitmentKeyring keyring : CommitmentKeyring.values()) {
-                for (DecryptCase c : decryptCaseList()) {
-                    cases.add(Arguments.of(pair, keyring, c));
-                }
+            for (DecryptCase c : decryptCaseList()) {
+                cases.add(Arguments.of(pair, c));
             }
         }
         return cases;
     }
 
-    @ParameterizedTest(name = "decrypt[{1}][{2}] {0}")
+    @ParameterizedTest(name = "decrypt[{1}] {0}")
     @MethodSource("decryptPairCases")
-    void decryptHonorsCommitmentPolicy(EndpointPair pair, CommitmentKeyring keyring, DecryptCase testCase) {
-        FeatureGate.require(keyring.features(), pair);
+    void decryptHonorsCommitmentPolicy(EndpointPair pair, DecryptCase testCase) {
+        ConformanceKeyring keyring = keyringFor(pair);
         // Produce the committing / non-committing message once per (encrypt endpoint,
         // keyring, commitment) — permitted via REQUIRE_ENCRYPT_ALLOW_DECRYPT (committing)
         // or FORBID_ENCRYPT_ALLOW_DECRYPT (non-committing) — and reuse it across decrypt
@@ -316,7 +282,7 @@ class KeyCommitmentTests {
     // -----------------------------------------------------------------------
 
     /** CreateClient with the keyring + policy on {@code endpoint}, then Encrypt with {@code suite}. */
-    private static byte[] encrypt(URI endpoint, CommitmentKeyring keyring, ESDKCommitmentPolicy policy,
+    private static byte[] encrypt(URI endpoint, ConformanceKeyring keyring, ESDKCommitmentPolicy policy,
                                   ESDKAlgorithmSuiteId suite, byte[] plaintext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
         String clientId = createClient(client, keyring, policy);
@@ -331,7 +297,7 @@ class KeyCommitmentTests {
     }
 
     /** CreateClient with the keyring + policy on {@code endpoint}, then Decrypt {@code ciphertext}. */
-    private static byte[] decrypt(URI endpoint, CommitmentKeyring keyring, ESDKCommitmentPolicy policy,
+    private static byte[] decrypt(URI endpoint, ConformanceKeyring keyring, ESDKCommitmentPolicy policy,
                                   byte[] ciphertext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
         String clientId = createClient(client, keyring, policy);
@@ -345,7 +311,7 @@ class KeyCommitmentTests {
     }
 
     private static String createClient(
-            ESDKTestServerClient client, CommitmentKeyring keyring, ESDKCommitmentPolicy policy) {
+            ESDKTestServerClient client, ConformanceKeyring keyring, ESDKCommitmentPolicy policy) {
         return client.createClient(
             CreateClientInput.builder()
                 .config(keyring.config(policy))
