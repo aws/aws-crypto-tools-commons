@@ -4,16 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
-import aws.cryptography.esdk.testserver.client.model.CreateClientInput;
-import aws.cryptography.esdk.testserver.client.model.DecryptInput;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
-import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
-import aws.cryptography.esdk.testserver.client.model.EncryptInput;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -284,45 +278,12 @@ class KeyCommitmentTests {
     /** CreateClient with the keyring + policy on {@code endpoint}, then Encrypt with {@code suite}. */
     private static byte[] encrypt(URI endpoint, ConformanceKeyring keyring, ESDKCommitmentPolicy policy,
                                   ESDKAlgorithmSuiteId suite, byte[] plaintext) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = createClient(client, keyring, policy);
-        ByteBuffer ciphertext = client.encrypt(
-            EncryptInput.builder()
-                .clientId(clientId)
-                .plaintext(ByteBuffer.wrap(plaintext))
-                .algorithmSuiteId(suite)
-                .build())
-            .getCiphertext();
-        return toArray(ciphertext);
+        return EsdkOps.encrypt(endpoint, keyring.config(policy), plaintext, Map.of(), suite, null);
     }
 
     /** CreateClient with the keyring + policy on {@code endpoint}, then Decrypt {@code ciphertext}. */
     private static byte[] decrypt(URI endpoint, ConformanceKeyring keyring, ESDKCommitmentPolicy policy,
                                   byte[] ciphertext) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = createClient(client, keyring, policy);
-        ByteBuffer plaintext = client.decrypt(
-            DecryptInput.builder()
-                .clientId(clientId)
-                .ciphertext(ByteBuffer.wrap(ciphertext))
-                .build())
-            .getPlaintext();
-        return toArray(plaintext);
-    }
-
-    private static String createClient(
-            ESDKTestServerClient client, ConformanceKeyring keyring, ESDKCommitmentPolicy policy) {
-        return client.createClient(
-            CreateClientInput.builder()
-                .config(keyring.config(policy))
-                .build())
-            .getClientId();
-    }
-
-    private static byte[] toArray(ByteBuffer buffer) {
-        ByteBuffer duplicate = buffer.duplicate();
-        byte[] bytes = new byte[duplicate.remaining()];
-        duplicate.get(bytes);
-        return bytes;
+        return EsdkOps.decrypt(endpoint, keyring.config(policy), ciphertext);
     }
 }
