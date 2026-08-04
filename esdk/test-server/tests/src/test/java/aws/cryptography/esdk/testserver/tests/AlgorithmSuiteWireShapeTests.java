@@ -10,7 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -43,17 +44,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  * suite-identity assertion. Encrypt legality per commitment policy is {@link KeyCommitmentTests}'
  * concern; here each suite is encrypted under a policy that permits it.
  *
- * <p>Fully offline (Raw-AES). Encrypt-side wire shape is a per-server property.
+ * <p>Wire shape is keyring-independent, so each target runs once under the keyring it supports
+ * (Raw-AES where available, else the hierarchical keyring the native Rust ESDK supports).
+ * Encrypt-side wire shape is a per-server property.
  */
 class AlgorithmSuiteWireShapeTests {
 
     private static final byte[] PLAINTEXT =
         "esdk-test-server algorithm-suite wire-shape plaintext".getBytes(StandardCharsets.UTF_8);
-
-    private static final ESDKClientConfig REQUIRE =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
-    private static final ESDKClientConfig FORBID =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
 
     /** Expected wire facts for one suite: 2-byte suite id, format version, signing bit. */
     record SuiteShape(ESDKAlgorithmSuiteId suite, int suiteId, int version, boolean signing) {
@@ -61,10 +59,12 @@ class AlgorithmSuiteWireShapeTests {
             return version == 2;
         }
 
-        ESDKClientConfig config() {
+        ESDKCommitmentPolicy policy() {
             // Committing suites are legal under REQUIRE_*; non-committing suites only under
             // FORBID_ENCRYPT_ALLOW_DECRYPT.
-            return committing() ? REQUIRE : FORBID;
+            return committing()
+                ? ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT
+                : ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
         }
 
         int messageIdLength() {
@@ -104,12 +104,26 @@ class AlgorithmSuiteWireShapeTests {
         return cases;
     }
 
+    /**
+     * The single keyring the target supports (Raw-AES, else hierarchical), gated so the target is a
+     * visible skip when it supports neither. Wire shape is keyring-independent, so the target runs
+     * once, under this keyring.
+     */
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
+    }
+
     @ParameterizedTest(name = "suiteWireShape[{1}] {0}")
     @MethodSource("cases")
     void encryptedMessageHasSuiteWireShape(LanguageServerTarget target, SuiteShape shape) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ESDKClientConfig config = keyringFor(new EndpointPair(target, target)).config(shape.policy());
         byte[] ciphertext = EsdkOps.encrypt(
-            target.endpoint(), shape.config(), PLAINTEXT, Map.of(), shape.suite(), null);
+            target.endpoint(), config, PLAINTEXT, Map.of(), shape.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
 
         assertEquals(shape.suiteId(), message.algorithmSuiteId,

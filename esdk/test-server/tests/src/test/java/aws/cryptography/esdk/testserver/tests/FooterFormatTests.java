@@ -11,7 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,7 +32,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       neither ({@code spec/data-format/message-footer.md#overview}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES), over both V1 and V2 signing/non-signing suites.
+ * <p>Footer presence is keyring-independent, so each target runs once under the keyring it supports
+ * ({@link ConformanceKeyring}): Raw-AES where available, else the hierarchical keyring the native
+ * Rust ESDK supports. Covers both V1 and V2 signing/non-signing suites.
  */
 class FooterFormatTests {
 
@@ -39,18 +42,18 @@ class FooterFormatTests {
         "esdk-test-server footer-format plaintext".getBytes(StandardCharsets.UTF_8);
     private static final byte[] PUBLIC_KEY_EC = "aws-crypto-public-key".getBytes(StandardCharsets.US_ASCII);
 
-    /** A suite layout: which config/suite to encrypt with and whether it signs. */
-    record Layout(String label, ESDKClientConfig config, ESDKAlgorithmSuiteId suite, boolean signing) {
+    /** A suite layout: which commitment policy/suite to encrypt with and whether it signs. */
+    record Layout(String label, ESDKCommitmentPolicy policy, ESDKAlgorithmSuiteId suite, boolean signing) {
         @Override
         public String toString() {
             return label;
         }
     }
 
-    private static final ESDKClientConfig REQUIRE =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
-    private static final ESDKClientConfig FORBID =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
+    private static final ESDKCommitmentPolicy REQUIRE =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
+    private static final ESDKCommitmentPolicy FORBID =
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
 
     private static final List<Layout> LAYOUTS = List.of(
         new Layout("v2-signing", REQUIRE,
@@ -70,6 +73,20 @@ class FooterFormatTests {
             }
         }
         return cases;
+    }
+
+    /**
+     * The single keyring the target supports (Raw-AES, else hierarchical), gated so the target is a
+     * visible skip when it supports neither. Resolved before producing a message.
+     */
+    private static ConformanceKeyring keyringFor(LanguageServerTarget target) {
+        EndpointPair pair = new EndpointPair(target, target);
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
     }
 
     /** True iff the raw header-AAD region contains the given ASCII key bytes. */
@@ -98,11 +115,12 @@ class FooterFormatTests {
     @ParameterizedTest(name = "footerPresentForSigning[{1}] {0}")
     @MethodSource("cases")
     void signingSuiteProducesFooterAndPublicKey(LanguageServerTarget target, Layout layout) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ConformanceKeyring keyring = keyringFor(target);
         if (!layout.signing()) {
             return;
         }
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT, Map.of(),
+        ESDKClientConfig config = keyring.config(layout.policy());
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.footerOffset >= 0, target + " " + layout + ": a signing suite must have a footer");
@@ -120,11 +138,12 @@ class FooterFormatTests {
     @ParameterizedTest(name = "noFooterForNonSigning[{1}] {0}")
     @MethodSource("cases")
     void nonSigningSuiteHasNoFooterOrPublicKey(LanguageServerTarget target, Layout layout) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        ConformanceKeyring keyring = keyringFor(target);
         if (layout.signing()) {
             return;
         }
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), layout.config(), PLAINTEXT, Map.of(),
+        ESDKClientConfig config = keyring.config(layout.policy());
+        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertEquals(-1, message.footerOffset, target + " " + layout + ": a non-signing suite must have no footer");
