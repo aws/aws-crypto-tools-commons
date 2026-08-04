@@ -3,9 +3,12 @@ package aws.cryptography.esdk.testserver.tests;
 import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
 import aws.cryptography.esdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.esdk.testserver.client.model.DecryptInput;
+import aws.cryptography.esdk.testserver.client.model.DecryptOutput;
+import aws.cryptography.esdk.testserver.client.model.DecryptStreamInput;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.EncryptInput;
+import aws.cryptography.esdk.testserver.client.model.EncryptStreamInput;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -21,6 +24,9 @@ import java.util.Map;
  * byte tampering, trailing-byte and truncation rejection — need the ciphertext as
  * an addressable {@code byte[]} on the test side, not just fed straight back into a
  * decrypt call.
+ *
+ * <p>Each RPC goes through {@link TestServerClients#withRetry} so a transient
+ * transport failure is retried on the test side rather than failing the run.
  */
 final class EsdkOps {
 
@@ -30,7 +36,7 @@ final class EsdkOps {
     /** {@code CreateClient(config)} on {@code endpoint}, returning the client id. */
     static String createClient(URI endpoint, ESDKClientConfig config) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        return client.createClient(CreateClientInput.builder().config(config).build()).getClientId();
+        return clientId(client, config);
     }
 
     /** Encrypt {@code plaintext} on {@code endpoint} under {@code config}; return the ciphertext bytes. */
@@ -47,10 +53,8 @@ final class EsdkOps {
                           Map<String, String> encryptionContext, ESDKAlgorithmSuiteId suite,
                           Long frameLength) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = client.createClient(
-            CreateClientInput.builder().config(config).build()).getClientId();
         EncryptInput.Builder input = EncryptInput.builder()
-            .clientId(clientId)
+            .clientId(clientId(client, config))
             .plaintext(ByteBuffer.wrap(plaintext));
         if (encryptionContext != null && !encryptionContext.isEmpty()) {
             input.encryptionContext(encryptionContext);
@@ -61,7 +65,8 @@ final class EsdkOps {
         if (frameLength != null) {
             input.frameLength(frameLength);
         }
-        return toArray(client.encrypt(input.build()).getCiphertext());
+        EncryptInput request = input.build();
+        return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
     }
 
     /** Decrypt {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */
@@ -75,16 +80,7 @@ final class EsdkOps {
      */
     static byte[] decrypt(URI endpoint, ESDKClientConfig config, byte[] ciphertext,
                           Map<String, String> encryptionContext) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = client.createClient(
-            CreateClientInput.builder().config(config).build()).getClientId();
-        DecryptInput.Builder input = DecryptInput.builder()
-            .clientId(clientId)
-            .ciphertext(ByteBuffer.wrap(ciphertext));
-        if (encryptionContext != null && !encryptionContext.isEmpty()) {
-            input.encryptionContext(encryptionContext);
-        }
-        return toArray(client.decrypt(input.build()).getPlaintext());
+        return toArray(decryptResponse(endpoint, config, ciphertext, encryptionContext).getPlaintext());
     }
 
     /**
@@ -92,19 +88,18 @@ final class EsdkOps {
      * response so callers can inspect the encryption context and algorithm suite the decryptor
      * exposed (both optional — a Language_Server that does not surface them leaves them null).
      */
-    static aws.cryptography.esdk.testserver.client.model.DecryptOutput decryptResponse(
+    static DecryptOutput decryptResponse(
             URI endpoint, ESDKClientConfig config, byte[] ciphertext,
             Map<String, String> encryptionContext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = client.createClient(
-            CreateClientInput.builder().config(config).build()).getClientId();
         DecryptInput.Builder input = DecryptInput.builder()
-            .clientId(clientId)
+            .clientId(clientId(client, config))
             .ciphertext(ByteBuffer.wrap(ciphertext));
         if (encryptionContext != null && !encryptionContext.isEmpty()) {
             input.encryptionContext(encryptionContext);
         }
-        return client.decrypt(input.build());
+        DecryptInput request = input.build();
+        return TestServerClients.withRetry(() -> client.decrypt(request));
     }
 
     /** EncryptStream {@code plaintext} on {@code endpoint} under {@code config}; return the ciphertext bytes. */
@@ -129,10 +124,8 @@ final class EsdkOps {
     static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext,
                                 Long plaintextLengthBound, Long frameLength) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = client.createClient(
-            CreateClientInput.builder().config(config).build()).getClientId();
-        var input = aws.cryptography.esdk.testserver.client.model.EncryptStreamInput.builder()
-            .clientId(clientId)
+        EncryptStreamInput.Builder input = EncryptStreamInput.builder()
+            .clientId(clientId(client, config))
             .plaintext(ByteBuffer.wrap(plaintext));
         if (plaintextLengthBound != null) {
             input.plaintextLengthBound(plaintextLengthBound);
@@ -140,20 +133,24 @@ final class EsdkOps {
         if (frameLength != null) {
             input.frameLength(frameLength);
         }
-        return toArray(client.encryptStream(input.build()).getCiphertext());
+        EncryptStreamInput request = input.build();
+        return toArray(TestServerClients.withRetry(() -> client.encryptStream(request)).getCiphertext());
     }
 
     /** DecryptStream {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */
     static byte[] decryptStream(URI endpoint, ESDKClientConfig config, byte[] ciphertext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        String clientId = client.createClient(
-            CreateClientInput.builder().config(config).build()).getClientId();
-        return toArray(client.decryptStream(
-            aws.cryptography.esdk.testserver.client.model.DecryptStreamInput.builder()
-                .clientId(clientId)
-                .ciphertext(ByteBuffer.wrap(ciphertext))
-                .build())
-            .getPlaintext());
+        DecryptStreamInput request = DecryptStreamInput.builder()
+            .clientId(clientId(client, config))
+            .ciphertext(ByteBuffer.wrap(ciphertext))
+            .build();
+        return toArray(TestServerClients.withRetry(() -> client.decryptStream(request)).getPlaintext());
+    }
+
+    /** {@code CreateClient(config)} on {@code client}, retried on a transient transport failure. */
+    private static String clientId(ESDKTestServerClient client, ESDKClientConfig config) {
+        return TestServerClients.withRetry(() ->
+            client.createClient(CreateClientInput.builder().config(config).build())).getClientId();
     }
 
     static byte[] toArray(ByteBuffer buffer) {

@@ -4,6 +4,8 @@ import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import software.amazon.smithy.java.client.core.error.TransportException;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 
 /**
@@ -43,5 +45,37 @@ public final class TestServerClients {
             .endpoint(endpoint.toString())
             .transport(new JavaHttpClientTransport())
             .build();
+    }
+
+    /** Attempts a Test_Client call, retrying a transport-level failure a few times. */
+    private static final int MAX_ATTEMPTS = 4;
+    private static final long BASE_BACKOFF_MILLIS = 100L;
+
+    /**
+     * Run a single Test_Client RPC, retrying only a {@link TransportException} (a dropped or
+     * reset connection, seen as {@code received no bytes} when the matrix drives thousands of
+     * calls at once). A modeled {@link aws.cryptography.esdk.testserver.client.model.ESDKClientError}
+     * or any other outcome propagates on the first attempt, so a Test asserting a modeled error is
+     * unaffected.
+     */
+    public static <T> T withRetry(Supplier<T> call) {
+        TransportException last = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                return call.get();
+            } catch (TransportException transportFailure) {
+                last = transportFailure;
+                if (attempt == MAX_ATTEMPTS) {
+                    break;
+                }
+                try {
+                    Thread.sleep(BASE_BACKOFF_MILLIS * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw transportFailure;
+                }
+            }
+        }
+        throw last;
     }
 }
