@@ -10,7 +10,8 @@ import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -33,7 +34,10 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/data-format/message-body.md#regular-frame-sequence-number}).</li>
  * </ul>
  *
- * <p>Fully offline (Raw-AES). Rejections surface as a modeled {@link ESDKClientError}.
+ * <p>Each tampered field is a header/body structural field, not the keyring's EDK, so each pair
+ * runs once under the keyring both endpoints support ({@link ConformanceKeyring}: Raw-AES where
+ * available, else the hierarchical keyring the native Rust ESDK supports). Rejections surface as a
+ * modeled {@link ESDKClientError}.
  */
 class HeaderFieldTamperTests {
 
@@ -41,13 +45,13 @@ class HeaderFieldTamperTests {
         "esdk-test-server structural-tamper plaintext that comfortably spans several small frames"
             .getBytes(StandardCharsets.UTF_8);
 
-    private static final ESDKClientConfig V2_COMMITTING =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    private static final ESDKCommitmentPolicy V2_POLICY =
+        ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
     private static final ESDKAlgorithmSuiteId V2_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
 
-    private static final ESDKClientConfig V1_SIGNING =
-        EsdkClientConfigs.rawAesWithCommitmentPolicy(ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
+    private static final ESDKCommitmentPolicy V1_POLICY =
+        ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT;
     private static final ESDKAlgorithmSuiteId V1_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384;
 
@@ -61,9 +65,18 @@ class HeaderFieldTamperTests {
         return LanguageServerRegistry.shared().pairs();
     }
 
-    private static byte[] encryptV2(EndpointPair pair, long frameLength) {
-        return EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, PLAINTEXT, Map.of(), V2_SUITE,
-            frameLength);
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+        Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
+        Assumptions.assumeTrue(negotiated.isPresent(),
+            "no keyring shared by both endpoints of " + pair);
+        ConformanceKeyring keyring = negotiated.get();
+        FeatureGate.require(keyring.features(), pair);
+        return keyring;
+    }
+
+    private static byte[] encryptV2(EndpointPair pair, ESDKClientConfig config, byte[] plaintext,
+                                    long frameLength) {
+        return EsdkOps.encrypt(pair.encryptEndpoint(), config, plaintext, Map.of(), V2_SUITE, frameLength);
     }
 
     private static void assertRejected(EndpointPair pair, ESDKClientConfig config, byte[] tampered,
@@ -77,63 +90,61 @@ class HeaderFieldTamperTests {
     @ParameterizedTest(name = "contentTypeRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsInvalidContentType(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = encryptV2(pair, 4096L);
+        ESDKClientConfig config = keyringFor(pair).config(V2_POLICY);
+        byte[] ciphertext = encryptV2(pair, config, PLAINTEXT, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
         tampered[message.contentTypeOffset] = 0x00;
-        assertRejected(pair, V2_COMMITTING, tampered, "a message with content-type byte 0x00");
+        assertRejected(pair, config, tampered, "a message with content-type byte 0x00");
     }
 
     /** HDR-020: a header declaring zero encrypted data keys is rejected. */
     @ParameterizedTest(name = "edkCountZeroRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsZeroEdkCount(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = encryptV2(pair, 4096L);
+        ESDKClientConfig config = keyringFor(pair).config(V2_POLICY);
+        byte[] ciphertext = encryptV2(pair, config, PLAINTEXT, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.edkCount >= 1, "baseline: message must carry at least one EDK");
         byte[] tampered = ciphertext.clone();
         tampered[message.edkCountOffset] = 0x00;
         tampered[message.edkCountOffset + 1] = 0x00;
-        assertRejected(pair, V2_COMMITTING, tampered, "a header declaring zero EDKs");
+        assertRejected(pair, config, tampered, "a header declaring zero EDKs");
     }
 
     /** HDR-015: a V1 header whose 4-byte reserved field is non-zero is rejected. */
     @ParameterizedTest(name = "v1ReservedNonZeroRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsNonZeroV1Reserved(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V1_SIGNING, PLAINTEXT, Map.of(),
+        ESDKClientConfig config = keyringFor(pair).config(V1_POLICY);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             V1_SUITE, 4096L);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.reservedOffset > 0, "baseline: V1 message must have a reserved field");
         byte[] tampered = ciphertext.clone();
         tampered[message.reservedOffset] = 0x01;
-        assertRejected(pair, V1_SIGNING, tampered, "a V1 header with a non-zero reserved field");
+        assertRejected(pair, config, tampered, "a V1 header with a non-zero reserved field");
     }
 
     /** TAMPER-003: flipping a byte of a frame's encrypted content fails the AES-GCM tag. */
     @ParameterizedTest(name = "frameContentTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedFrameContent(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
-            Map.of(), V2_SUITE, FRAME_LENGTH);
+        ESDKClientConfig config = keyringFor(pair).config(V2_POLICY);
+        byte[] ciphertext = encryptV2(pair, config, LARGE_PLAINTEXT, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         byte[] tampered = ciphertext.clone();
         int contentByte = message.frames.get(0).contentOffset();
         tampered[contentByte] ^= (byte) 0xFF;
-        assertRejected(pair, V2_COMMITTING, tampered, "a message with a flipped body-frame content byte");
+        assertRejected(pair, config, tampered, "a message with a flipped body-frame content byte");
     }
 
     /** TAMPER-004: a frame sequence number that breaks the strictly-increasing order is rejected. */
     @ParameterizedTest(name = "frameSequenceTamperRejected {0}")
     @MethodSource("pairs")
     void decryptRejectsTamperedFrameSequenceNumber(EndpointPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), V2_COMMITTING, LARGE_PLAINTEXT,
-            Map.of(), V2_SUITE, FRAME_LENGTH);
+        ESDKClientConfig config = keyringFor(pair).config(V2_POLICY);
+        byte[] ciphertext = encryptV2(pair, config, LARGE_PLAINTEXT, FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertTrue(message.frames.size() >= 2,
             "baseline: need at least two frames to tamper the second's sequence number");
@@ -142,7 +153,7 @@ class HeaderFieldTamperTests {
         int seqLowByte = message.frames.get(1).sequenceNumberOffset() + 3;
         tampered[seqLowByte] ^= (byte) 0x01;
         KnownBugGate.gate("decrypt-accepts-out-of-order-frame-sequence", pair.decryptTarget().language(),
-            () -> assertRejected(pair, V2_COMMITTING, tampered,
+            () -> assertRejected(pair, config, tampered,
                 "a message with an out-of-order frame sequence number"));
     }
 }
