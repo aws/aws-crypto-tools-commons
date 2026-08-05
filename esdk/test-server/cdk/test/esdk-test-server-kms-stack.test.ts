@@ -62,7 +62,7 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
     });
   });
 
-  test('creates an IAM role trusting only the two ESDK repos via OIDC', () => {
+  test('creates an IAM role trusting only the ESDK TestServer repos via OIDC', () => {
     template.hasResourceProperties('AWS::IAM::Role', {
       AssumeRolePolicyDocument: {
         Statement: Match.arrayWith([
@@ -76,6 +76,10 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
                 'token.actions.githubusercontent.com:sub': [
                   'repo:aws/aws-crypto-tools-commons:*',
                   'repo:aws/aws-crypto-tools-java:*',
+                  'repo:aws/aws-crypto-tools-rust:*',
+                  'repo:aws/aws-encryption-sdk:*',
+                  'repo:aws/aws-encryption-sdk-c:*',
+                  'repo:aws/aws-encryption-sdk-javascript:*',
                 ],
               },
             },
