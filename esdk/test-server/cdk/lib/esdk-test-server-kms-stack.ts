@@ -34,7 +34,7 @@ export interface EsdkTestServerKmsStackProps extends cdk.StackProps {
  * than a single key.
  *
  * plus a GitHub OIDC provider and an IAM role the CI workflows assume via OIDC
- * (Requirement 14.11), whose trust policy is restricted to the two ESDK repos
+ * (Requirement 14.11), whose trust policy is restricted to the ESDK TestServer repos
  * and whose permissions are least-privilege KMS actions scoped to exactly the
  * keys above (Requirement 14.12).
  *
@@ -51,6 +51,10 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
   private static readonly TRUSTED_REPOS = [
     'aws/aws-crypto-tools-commons',
     'aws/aws-crypto-tools-java',
+    'aws/aws-crypto-tools-rust',
+    'aws/aws-encryption-sdk',
+    'aws/aws-encryption-sdk-c',
+    'aws/aws-encryption-sdk-javascript',
   ];
 
   constructor(scope: Construct, id: string, props: EsdkTestServerKmsStackProps = {}) {
