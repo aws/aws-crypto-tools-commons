@@ -95,7 +95,7 @@
       "serverLocation": {
         "repository": "aws-crypto-tools-commons",
         "url": "git@github.com:aws/aws-crypto-tools-commons.git",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucmcdon/esdk-test-server-all-languages",
         "path": "esdk/test-server/servers/python"
       }
     },
