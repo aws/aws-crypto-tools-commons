@@ -129,7 +129,7 @@
         "path": "esdk/shims/aws-esdk-cpp"
       },
       "serverLocation": {
-        "repository": "aws-crypto-tools-rust",
+        "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
         "ref": "aws-crypto-rust/esdk-cpp-test-server",
         "path": "esdk-cpp-test-server"
