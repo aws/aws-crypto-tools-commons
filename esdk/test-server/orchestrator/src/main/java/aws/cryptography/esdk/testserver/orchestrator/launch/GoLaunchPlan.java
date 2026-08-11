@@ -21,10 +21,10 @@ import java.util.List;
  *       {@link MaterializedSources}; the library it replaces to is in the same
  *       clone. A missing component is a {@code RESOLVE} launch failure
  *       (Requirement 2.5).</li>
- *   <li><b>Build.</b> The server Makefile's {@code build-server} recipe:
- *       {@code go build -o esdk-test-server .} in the server directory. A
- *       non-zero build is a {@code BUILD} launch failure carrying the tool
- *       output.</li>
+ *   <li><b>Build.</b> {@code go build -buildvcs=false -o esdk-test-server .} in
+ *       the server directory ({@code -buildvcs=false} because the materialized
+ *       clone trips Go's git VCS stamping). A non-zero build is a {@code BUILD}
+ *       launch failure carrying the tool output.</li>
  *   <li><b>Launch.</b> {@code <server>/esdk-test-server <port>} via the shared
  *       {@link SubprocessLauncher} (port probe, TCP readiness, process-tree
  *       teardown).</li>
@@ -100,7 +100,7 @@ public final class GoLaunchPlan implements Launcher {
         }
 
         // 2. Build: go build -o esdk-test-server . in the server directory.
-        runBuildStep(language, "go build -o esdk-test-server .", buildCommand(go), serverDir);
+        runBuildStep(language, "go build -buildvcs=false -o esdk-test-server .", buildCommand(go), serverDir);
 
         // 3. Launch: <server>/esdk-test-server <port> from the server directory,
         //    via the shared probe/spawn/readiness/teardown.
@@ -115,9 +115,11 @@ public final class GoLaunchPlan implements Launcher {
     // Pure command construction (unit-testable without a go build).
     // ------------------------------------------------------------------
 
-    /** {@code go build -o esdk-test-server .}. */
+    /** {@code go build -buildvcs=false -o esdk-test-server .}. */
     static List<String> buildCommand(String go) {
-        return List.of(go, "build", "-o", SERVER_BINARY_NAME, ".");
+        // -buildvcs=false: the server builds from a materialized clone whose git
+        // state makes Go's VCS stamping fail (git exits 128).
+        return List.of(go, "build", "-buildvcs=false", "-o", SERVER_BINARY_NAME, ".");
     }
 
     /** {@code <server>/esdk-test-server <port>}. */

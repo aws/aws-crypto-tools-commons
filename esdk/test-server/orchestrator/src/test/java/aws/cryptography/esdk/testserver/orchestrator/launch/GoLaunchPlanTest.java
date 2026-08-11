@@ -31,9 +31,9 @@ class GoLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the server builds with go build -o esdk-test-server ., like build-server")
+    @DisplayName("the server builds with go build -buildvcs=false -o esdk-test-server .")
     void build() {
-        assertEquals(List.of("go", "build", "-o", "esdk-test-server", "."),
+        assertEquals(List.of("go", "build", "-buildvcs=false", "-o", "esdk-test-server", "."),
             GoLaunchPlan.buildCommand("go"));
     }
 
