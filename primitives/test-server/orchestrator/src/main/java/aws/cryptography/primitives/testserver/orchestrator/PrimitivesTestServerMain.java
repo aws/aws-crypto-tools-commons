@@ -104,12 +104,41 @@ public final class PrimitivesTestServerMain {
 
     private static Path resolveServerDir(ConfigurationEntry entry, Path languageRepoRoot, String context) {
         if (context.startsWith("language:") && languageRepoRoot != null) {
-            // Use the local working tree
+            // Language_Repository_Run: use the local working tree
             return languageRepoRoot.resolve(entry.serverPath());
         }
-        // For commons run, would need to git-clone; for now assume local
-        throw new UnsupportedOperationException(
-            "Commons_Run source resolution not yet implemented; use context=language:<lang>");
+        // Commons_Run: git-clone the server repo at the configured ref
+        if (entry.serverLocation() == null) {
+            throw new RuntimeException("No serverLocation configured for " + entry.language());
+        }
+        String url = entry.serverLocation().url();
+        String ref = entry.serverLocation().ref();
+        String path = entry.serverLocation().path();
+
+        Path cloneDir = Path.of(System.getProperty("java.io.tmpdir"))
+            .resolve("primitives-testserver-clones")
+            .resolve(entry.language());
+
+        System.out.println("    cloning " + url + " @ " + ref + " into " + cloneDir);
+
+        // Clean and clone
+        try {
+            if (cloneDir.toFile().exists()) {
+                new ProcessBuilder("rm", "-rf", cloneDir.toString())
+                    .inheritIO().start().waitFor();
+            }
+            int exitCode = new ProcessBuilder(
+                "git", "clone", "--depth", "1", "--single-branch", "--branch", ref, url, cloneDir.toString())
+                .inheritIO().start().waitFor();
+            if (exitCode != 0) {
+                throw new RuntimeException("git clone failed with exit code " + exitCode
+                    + " for " + url + " @ " + ref);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Failed to clone " + url + " @ " + ref, e);
+        }
+
+        return cloneDir.resolve(path);
     }
 
     private static Map<String, String> parseArgs(String[] args) {
