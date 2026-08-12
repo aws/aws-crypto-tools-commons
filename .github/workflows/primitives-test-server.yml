@@ -103,6 +103,19 @@ jobs:
           ./gradlew build
 
       - name: Orchestrate (clone Rust server from configured branch, build, launch, test)
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
         run: |
+          set -euo pipefail
+          # Clone the Rust repo here (where git config is in scope) rather
+          # than letting the JVM orchestrator do it (subprocess may not see ~/.gitconfig)
+          CLONE_DIR="/tmp/primitives-testserver-clones/rust"
+          rm -rf "$CLONE_DIR"
+          git clone --depth 1 --single-branch \
+            --branch aws-crypto-rust/primitives-test-server \
+            "https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/aws/aws-crypto-tools-rust.git" \
+            "$CLONE_DIR"
+          # Run orchestrator in language mode with the pre-cloned working tree
           cd orchestrator
-          ./gradlew --console=plain run --args="context=commons"
+          ./gradlew --console=plain run \
+            --args="context=language:rust languageRepoRoot=$CLONE_DIR"
