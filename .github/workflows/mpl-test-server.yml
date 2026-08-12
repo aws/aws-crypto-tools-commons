@@ -53,12 +53,14 @@ jobs:
 
       - name: Authenticate private repo clones
         env:
-          PAT: ${{ secrets.COMMONS_REPO_PAT }}
+          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
         run: |
-          if [ -z "$PAT" ]; then
-            echo "::warning::COMMONS_REPO_PAT secret not set — orchestrate step will fail to clone private repos"
+          set -euo pipefail
+          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
+            echo "::warning::LANGUAGE_REPO_PAT secret not set — orchestrate step will fail to clone private repos"
           else
-            git config --global url."https://x-access-token:${PAT}@github.com/".insteadOf "https://github.com/"
+            git config --global url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf "https://github.com/"
+            git config --global url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf "git@github.com:"
           fi
 
       - name: Cache Rust build artifacts
