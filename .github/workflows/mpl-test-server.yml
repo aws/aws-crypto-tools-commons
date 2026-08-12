@@ -1,0 +1,95 @@
+# MPL TestServer CI (aws-crypto-tools-commons)
+#
+# Validates the model, builds the client + tests, and builds the orchestrator.
+# The full orchestrated run (launch Rust server + run tests) will be enabled
+# once the Rust MPL server branch merges and toolchain requirements are met.
+name: MPL TestServer
+
+on:
+  pull_request:
+    paths:
+      - "mpl/test-server/**"
+      - ".github/workflows/mpl-test-server.yml"
+  push:
+    branches: [main]
+    paths:
+      - "mpl/test-server/**"
+      - ".github/workflows/mpl-test-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mpl-test-server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mpl/test-server
+
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (smithy-java 1.4.0 requires 21+)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Go (aws-lc-sys native builds need Go)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Set up Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+
+      - name: Authenticate private repo clones
+        env:
+          PAT: ${{ secrets.COMMONS_REPO_PAT }}
+        run: |
+          if [ -z "$PAT" ]; then
+            echo "::warning::COMMONS_REPO_PAT secret not set — orchestrate step will fail to clone private repos"
+          else
+            git config --global url."https://x-access-token:${PAT}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-mpl-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-mpl-
+
+      - name: Build client-java (codegen)
+        run: |
+          cd client-java
+          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
+          ./gradlew build
+
+      - name: Build tests
+        run: |
+          cd tests
+          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
+          ./gradlew build
+
+      - name: Build orchestrator
+        run: |
+          cd orchestrator
+          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
+          ./gradlew build
+
+      - name: Orchestrate (clone Rust MPL server from configured branch, build, launch, test)
+        run: |
+          cd orchestrator
+          ./gradlew --console=plain run --args="context=commons"
