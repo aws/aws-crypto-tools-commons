@@ -79,7 +79,7 @@ jobs:
           if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
           ./gradlew build
 
-      # Full orchestrate step disabled until Rust MPL server branch merges
-      # and rustc 1.94+ is available on runners.
-      # - name: Orchestrate (full cross-language run)
-      #   run: make orchestrate LANGUAGE_REPO_ROOT=...
+      - name: Orchestrate (clone Rust MPL server from configured branch, build, launch, test)
+        run: |
+          cd orchestrator
+          ./gradlew --console=plain run --args="context=commons"

@@ -27,13 +27,13 @@
       "commonsConfigurationPath": "mpl-test-server/commons-configuration.json",
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
-        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "url": "https://github.com/aws/aws-crypto-tools-rust.git",
         "branch": "aws-crypto-rust/mpl-test-server",
         "path": "mpl"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
-        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "url": "https://github.com/aws/aws-crypto-tools-rust.git",
         "ref": "aws-crypto-rust/mpl-test-server",
         "path": "mpl-test-server"
       }
