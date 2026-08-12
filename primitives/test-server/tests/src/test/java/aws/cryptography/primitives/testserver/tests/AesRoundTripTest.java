@@ -52,22 +52,22 @@ public class AesRoundTripTest {
                     .aad(ByteBuffer.wrap(AAD))
                     .build());
 
-                assertNotNull(encOut.ciphertext());
-                assertNotNull(encOut.authTag());
-                assertEquals(16, encOut.authTag().remaining());
+                assertNotNull(encOut.getCiphertext());
+                assertNotNull(encOut.getAuthTag());
+                assertEquals(16, encOut.getAuthTag().remaining());
 
                 // Decrypt
                 AesDecryptOutput decOut = decryptor.aesDecrypt(AesDecryptInput.builder()
                     .algorithm(AesAlgorithm.AES_256_GCM)
                     .key(ByteBuffer.wrap(KEY_256))
-                    .ciphertext(encOut.ciphertext())
-                    .authTag(encOut.authTag())
+                    .ciphertext(encOut.getCiphertext())
+                    .authTag(encOut.getAuthTag())
                     .iv(ByteBuffer.wrap(IV))
                     .aad(ByteBuffer.wrap(AAD))
                     .build());
 
-                byte[] recovered = new byte[decOut.plaintext().remaining()];
-                decOut.plaintext().get(recovered);
+                byte[] recovered = new byte[decOut.getPlaintext().remaining()];
+                decOut.getPlaintext().get(recovered);
                 assertArrayEquals(PLAINTEXT, recovered);
             }));
     }
