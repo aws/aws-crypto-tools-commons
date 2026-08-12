@@ -92,6 +92,16 @@ jobs:
           ./gradlew build
 
       - name: Orchestrate (clone Rust MPL server from configured branch, build, launch, test)
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
         run: |
+          set -euo pipefail
+          CLONE_DIR="/tmp/mpl-testserver-clones/rust"
+          rm -rf "$CLONE_DIR"
+          git clone --depth 1 --single-branch \
+            --branch aws-crypto-rust/mpl-test-server \
+            "https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/aws/aws-crypto-tools-rust.git" \
+            "$CLONE_DIR"
           cd orchestrator
-          ./gradlew --console=plain run --args="context=commons"
+          ./gradlew --console=plain run \
+            --args="context=language:rust languageRepoRoot=$CLONE_DIR"
