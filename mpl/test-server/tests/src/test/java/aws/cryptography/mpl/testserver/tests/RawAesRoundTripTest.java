@@ -54,15 +54,15 @@ public class RawAesRoundTripTest {
                         .wrappingKey(ByteBuffer.wrap(WRAPPING_KEY))
                         .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
                         .build());
-                assertNotNull(keyringOut.keyringId());
-                assertFalse(keyringOut.keyringId().isBlank());
+                assertNotNull(keyringOut.getKeyringId());
+                assertFalse(keyringOut.getKeyringId().isBlank());
 
                 // Create default CMM on encrypt server
                 CreateDefaultCmmOutput cmmOut = encServer.createDefaultCmm(
                     CreateDefaultCmmInput.builder()
-                        .keyringId(keyringOut.keyringId())
+                        .keyringId(keyringOut.getKeyringId())
                         .build());
-                assertNotNull(cmmOut.cmmId());
+                assertNotNull(cmmOut.getCmmId());
 
                 // GetEncryptionMaterials
                 Map<String, String> ec = new HashMap<>();
@@ -70,16 +70,16 @@ public class RawAesRoundTripTest {
 
                 GetEncryptionMaterialsOutput encMaterials = encServer.getEncryptionMaterials(
                     GetEncryptionMaterialsInput.builder()
-                        .cmmId(cmmOut.cmmId())
+                        .cmmId(cmmOut.getCmmId())
                         .encryptionContext(ec)
                         .commitmentPolicy(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
                         .build());
 
-                assertNotNull(encMaterials.plaintextDataKey());
-                assertTrue(encMaterials.plaintextDataKey().remaining() > 0);
-                assertNotNull(encMaterials.encryptedDataKeys());
-                assertFalse(encMaterials.encryptedDataKeys().isEmpty());
-                assertNotNull(encMaterials.algorithmSuiteId());
+                assertNotNull(encMaterials.getPlaintextDataKey());
+                assertTrue(encMaterials.getPlaintextDataKey().remaining() > 0);
+                assertNotNull(encMaterials.getEncryptedDataKeys());
+                assertFalse(encMaterials.getEncryptedDataKeys().isEmpty());
+                assertNotNull(encMaterials.getAlgorithmSuiteId());
 
                 // Create keyring + CMM on decrypt server (same key)
                 CreateRawAesKeyringOutput decKeyringOut = decServer.createRawAesKeyring(
@@ -92,22 +92,22 @@ public class RawAesRoundTripTest {
 
                 CreateDefaultCmmOutput decCmmOut = decServer.createDefaultCmm(
                     CreateDefaultCmmInput.builder()
-                        .keyringId(decKeyringOut.keyringId())
+                        .keyringId(decKeyringOut.getKeyringId())
                         .build());
 
                 // DecryptMaterials on server B
                 DecryptMaterialsOutput decMaterials = decServer.decryptMaterials(
                     DecryptMaterialsInput.builder()
-                        .cmmId(decCmmOut.cmmId())
-                        .algorithmSuiteId(encMaterials.algorithmSuiteId())
-                        .encryptedDataKeys(encMaterials.encryptedDataKeys())
-                        .encryptionContext(encMaterials.encryptionContext())
+                        .cmmId(decCmmOut.getCmmId())
+                        .algorithmSuiteId(encMaterials.getAlgorithmSuiteId())
+                        .encryptedDataKeys(encMaterials.getEncryptedDataKeys())
+                        .encryptionContext(encMaterials.getEncryptionContext())
                         .commitmentPolicy(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
                         .build());
 
-                assertNotNull(decMaterials.plaintextDataKey());
+                assertNotNull(decMaterials.getPlaintextDataKey());
                 // The decrypted PDK must match the one from encryption
-                assertEquals(encMaterials.plaintextDataKey(), decMaterials.plaintextDataKey());
+                assertEquals(encMaterials.getPlaintextDataKey(), decMaterials.getPlaintextDataKey());
             }));
     }
 }

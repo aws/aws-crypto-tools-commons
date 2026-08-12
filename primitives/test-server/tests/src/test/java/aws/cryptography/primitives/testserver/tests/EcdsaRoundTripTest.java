@@ -42,38 +42,38 @@ public class EcdsaRoundTripTest {
                         .algorithm(EcdsaAlgorithm.ECDSA_P384)
                         .build());
 
-                assertNotNull(keyPair.signingKey());
-                assertNotNull(keyPair.verificationKey());
-                assertEquals(49, keyPair.verificationKey().remaining()); // compressed P-384
+                assertNotNull(keyPair.getSigningKey());
+                assertNotNull(keyPair.getVerificationKey());
+                assertEquals(49, keyPair.getVerificationKey().remaining()); // compressed P-384
 
                 // Sign
                 EcdsaSignOutput signOut = signer.ecdsaSign(EcdsaSignInput.builder()
                     .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                    .signingKey(keyPair.signingKey())
+                    .signingKey(keyPair.getSigningKey())
                     .message(ByteBuffer.wrap(MESSAGE))
                     .build());
 
-                assertNotNull(signOut.signature());
+                assertNotNull(signOut.getSignature());
 
                 // Verify on (possibly different) server
                 EcdsaVerifyOutput verifyOut = verifier.ecdsaVerify(EcdsaVerifyInput.builder()
                     .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                    .verificationKey(keyPair.verificationKey())
+                    .verificationKey(keyPair.getVerificationKey())
                     .message(ByteBuffer.wrap(MESSAGE))
-                    .signature(signOut.signature())
+                    .signature(signOut.getSignature())
                     .build());
 
-                assertTrue(verifyOut.valid(), "signature must verify");
+                assertTrue(verifyOut.isValid(), "signature must verify");
 
                 // Negative: wrong message
                 EcdsaVerifyOutput badVerify = verifier.ecdsaVerify(EcdsaVerifyInput.builder()
                     .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                    .verificationKey(keyPair.verificationKey())
+                    .verificationKey(keyPair.getVerificationKey())
                     .message(ByteBuffer.wrap("wrong".getBytes()))
-                    .signature(signOut.signature())
+                    .signature(signOut.getSignature())
                     .build());
 
-                assertFalse(badVerify.valid(), "wrong message must not verify");
+                assertFalse(badVerify.isValid(), "wrong message must not verify");
             }));
     }
 }
