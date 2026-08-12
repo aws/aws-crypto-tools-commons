@@ -90,8 +90,7 @@ jobs:
           if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
           ./gradlew build
 
-      # The full orchestrated run requires cloning the Rust Language_Server
-      # repo and building it. For now, run the build gates only. The full
-      # orchestrate step will be enabled once the Rust server branch merges.
-      # - name: Orchestrate (full cross-language run)
-      #   run: make orchestrate LANGUAGE_REPO_ROOT=...
+      - name: Orchestrate (clone Rust server from configured branch, build, launch, test)
+        run: |
+          cd orchestrator
+          ./gradlew --console=plain run --args="context=commons"
