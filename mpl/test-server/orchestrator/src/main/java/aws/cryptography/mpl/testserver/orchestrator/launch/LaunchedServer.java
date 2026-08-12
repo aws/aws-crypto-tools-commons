@@ -18,7 +18,7 @@ public final class LaunchedServer {
         if (process.isAlive()) {
             process.destroy();
             try {
-                process.waitFor(java.util.concurrent.TimeUnit.SECONDS, 5);
+                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
             }
