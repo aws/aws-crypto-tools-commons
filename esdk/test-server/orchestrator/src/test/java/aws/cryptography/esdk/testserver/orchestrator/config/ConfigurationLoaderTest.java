@@ -350,7 +350,7 @@ class ConfigurationLoaderTest {
         // The remaining entries follow the same Language_Repository pattern:
         // no inline arrays, a commonsConfigurationPath next to the server.
         assertLanguageRepositoryEntry(set, "rust-cpp", 1, 8094,
-            "aws-crypto-tools-rust", "esdk-cpp-test-server",
+            "aws-crypto-tools-rust-cpp", "esdk-cpp-test-server",
             "esdk-cpp-test-server/commons-configuration.json");
         assertLanguageRepositoryEntry(set, "javascript", 5, 8095,
             "aws-encryption-sdk-javascript", "test-server",
