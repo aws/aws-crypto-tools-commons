@@ -119,8 +119,20 @@ on:
       - "esdk/test-server/**"
       - ".github/workflows/esdk-test-server.yml"
   push:
+    # `main` is the long-term default. The `lucmcdon/esdk-test-server*`
+    # integration branches are added for CACHE WARMING: GitHub Actions only lets
+    # a pull_request run restore caches saved on its own head branch, its base
+    # branch, or the default branch — never another PR's branch. Development
+    # happens on these integration branches (not `main`), so without a
+    # push-triggered run on them no shared cache exists and every PR rebuilds all
+    # nine Language_Servers from cold (~40 min of the run). Running on push to a
+    # base branch saves the materialized-clone / cargo+sccache / gradle+maven /
+    # nuget / go / npm caches, so a PR targeting that base restores them and
+    # skips the cold rebuild. Cost: each push to a base branch pays one cold run
+    # to (re)warm the cache; PRs against it then run warm.
     branches:
       - main
+      - "lucmcdon/esdk-test-server*"
     paths:
       - "esdk/test-server/**"
       - ".github/workflows/esdk-test-server.yml"
