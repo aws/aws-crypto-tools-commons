@@ -49,7 +49,7 @@ public record TestRunInput(
     List<String> featureCatalog,
     Map<String, List<String>> rawRsaPaddingSchemes,
     String referenceImplementation,
-    String knownBugOverrides
+    String knownBugFixes
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -66,16 +66,16 @@ public record TestRunInput(
         if (referenceImplementation == null || referenceImplementation.isBlank()) {
             throw new IllegalArgumentException("referenceImplementation must be non-blank");
         }
-        // Empty means "no repository overrode its base known-bug declarations";
-        // the Tests then use the committed base ledger unchanged.
-        knownBugOverrides = knownBugOverrides == null ? "" : knownBugOverrides;
+        // Empty means "no repository declared a known-bug fix"; the Tests then
+        // use the committed base ledger unchanged.
+        knownBugFixes = knownBugFixes == null ? "" : knownBugFixes;
     }
 
     /**
-     * Convenience constructor for a run with no resolved known-bug overrides —
-     * the Tests use the committed base ledger unchanged. Preserves the
-     * pre-known-bug-override {@code (…, referenceImplementation)} shape so
-     * existing call sites keep compiling.
+     * Convenience constructor for a run with no resolved known-bug fixes — the
+     * Tests use the committed base ledger unchanged. Preserves the
+     * pre-known-bug {@code (…, referenceImplementation)} shape so existing call
+     * sites keep compiling.
      */
     public TestRunInput(
             List<TestTarget> targets,

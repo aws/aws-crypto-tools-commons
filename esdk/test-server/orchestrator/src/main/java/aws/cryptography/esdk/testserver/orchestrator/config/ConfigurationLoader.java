@@ -98,7 +98,7 @@ public final class ConfigurationLoader {
             stringList(root.get("unsupportedFeatures")),
             stringList(root.get("rawRsaPaddingSchemes")),
             overrides,
-            knownBugOverride(root.get("knownBugOverrides")));
+            stringList(root.get("knownBugFixOverrides")));
     }
 
     // ------------------------------------------------------------------
@@ -119,22 +119,8 @@ public final class ConfigurationLoader {
             text(n, "commonsConfigurationPath"));
     }
 
-    /**
-     * Parse a {@code knownBugOverrides} object into a {@link KnownBugOverride}.
-     * Absent or non-object parses as {@code null} ("no override"); a present
-     * object's {@code present}/{@code absent} arrays parse leniently (absent =
-     * {@code null}, duplicates preserved) for validation to reject.
-     */
-    private static KnownBugOverride knownBugOverride(JsonNode node) {
+    private static RepositoryCoordinates coordinates(JsonNode node) {
         if (node == null || !node.isObject()) {
-            return null;
-        }
-        return new KnownBugOverride(
-            stringList(node.get("present")),
-            stringList(node.get("absent")));
-    }
-
-    private static RepositoryCoordinates coordinates(JsonNode node) {        if (node == null || !node.isObject()) {
             return null;
         }
         String path = text(node, "path");

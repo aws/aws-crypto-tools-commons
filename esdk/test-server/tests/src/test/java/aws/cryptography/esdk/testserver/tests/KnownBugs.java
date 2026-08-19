@@ -8,7 +8,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -18,25 +17,26 @@ import java.util.Set;
  * under test — wrong behavior a Test correctly fails, not missing capability (a
  * missing capability is a Feature_Declaration concern, {@link FeatureDeclarations}).
  *
- * <p>The ledger has the same two-layer shape as the Feature_Declarations: a
- * committed <em>base</em> ledger loaded from {@value #RESOURCE} in this module,
- * and per-Language_Repository <em>overrides</em> the orchestrator resolves from
- * each repository's commons-configuration file and hands the Tests via
- * {@value #OVERRIDES_PROPERTY} (mirroring {@code esdk.testserver.features}). A
- * repository speaks only for its own {@link Target}: an override marks a bug
- * {@code present} (this target exhibits a bug the base ledger did not record for
- * it) or {@code absent} (this target no longer exhibits a base-declared bug —
- * the fix is landing). This makes the "PR the override red, then fix it green"
- * workflow possible: a language repository removes its own exception, the gated
- * row starts failing, and the fix turns it green.
+ * <p>The committed <em>base</em> ledger, loaded from {@value #RESOURCE} in this
+ * module, is authoritative: it lists every bug and the {@link Target}s
+ * exhibiting it. A Language_Repository cannot add bugs here — it can only
+ * declare its own <em>fixes</em>. Its commons-configuration file's
+ * {@code knownBugs} array names base-ledger bug ids that repository's target has
+ * fixed; the orchestrator resolves those per target and hands the Tests
+ * {@value #FIXES_PROPERTY} (mirroring {@code esdk.testserver.features}).
+ * Applying a fix simply removes that target from the bug — <em>idempotently</em>:
+ * a fix for a bug the base does not attribute to the target (or no longer
+ * defines at all) is a silent no-op, never an error. That makes reconciling a
+ * merged fix into this base ledger order-independent — commons can drop the
+ * target whenever, and the repository's now-satisfied {@code knownBugs} entry
+ * keeps working as a no-op until it too is cleaned up.
  *
- * <p>Each entry carries a stable {@code id}, a one-line {@code description} of
- * the wrong behavior, and the {@link Target}s exhibiting it — the
- * {@code (language, majorVersion, repository)} triples, not bare languages, so
- * two servers of the same language from different repositories or major versions
- * are named distinctly. {@link KnownBugGate} applies expected-failure semantics
- * against this ledger: a gated row still runs its assertion, and a fixed bug
- * fails its rows loudly until the entry (or the target) is removed.
+ * <p>Each entry carries a stable {@code id}, a one-line {@code description}, and
+ * the {@link Target}s — {@code (language, majorVersion, repository)} triples,
+ * not bare languages — exhibiting it. {@link KnownBugGate} applies
+ * expected-failure semantics against the resolved ledger: a gated row still runs
+ * its assertion, and a fixed bug fails its rows loudly until the base entry (or
+ * the target) is removed.
  */
 public final class KnownBugs {
 
@@ -44,15 +44,15 @@ public final class KnownBugs {
     public static final String RESOURCE = "/known-bugs.json";
 
     /**
-     * Runtime-config key carrying the orchestrator-resolved per-repository
-     * overrides: a comma-separated list of
-     * {@code <language>:<majorVersion>:<repository>=<sign><id>[;<sign><id>…]}
-     * entries, where {@code sign} is {@code +} (present) or {@code -} (absent),
-     * e.g. {@code rust:1:aws-crypto-tools-rust=-encrypt-non-positive-frame-length-generic-error}.
-     * Absent means no repository overrode its base declarations.
+     * Runtime-config key carrying the orchestrator-resolved per-repository bug
+     * FIXES: a comma-separated list of
+     * {@code <language>:<majorVersion>:<repository>=<id>[;<id>…]} entries, e.g.
+     * {@code rust:1:aws-crypto-tools-rust=encrypt-non-positive-frame-length-generic-error}.
+     * Each id is a base-ledger bug the target has fixed; applying it removes that
+     * target from the bug. Absent means no repository declared a fix.
      */
-    public static final String OVERRIDES_PROPERTY = "esdk.testserver.knownBugOverrides";
-    public static final String OVERRIDES_ENV = "ESDK_TESTSERVER_KNOWN_BUG_OVERRIDES";
+    public static final String FIXES_PROPERTY = "esdk.testserver.knownBugFixes";
+    public static final String FIXES_ENV = "ESDK_TESTSERVER_KNOWN_BUG_FIXES";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Set<String> ENTRY_FIELDS = Set.of("id", "description", "targets");
@@ -101,7 +101,7 @@ public final class KnownBugs {
 
     /**
      * @return the process-wide ledger, loaded from {@value #RESOURCE} and
-     *     resolved against {@value #OVERRIDES_PROPERTY} on first access.
+     *     resolved against {@value #FIXES_PROPERTY} on first access.
      */
     public static KnownBugs shared() {
         KnownBugs local = instance;
@@ -109,7 +109,7 @@ public final class KnownBugs {
             synchronized (KnownBugs.class) {
                 local = instance;
                 if (local == null) {
-                    local = parse(readResource(), configuredOverrides());
+                    local = parse(readResource(), configuredFixes());
                     instance = local;
                 }
             }
@@ -128,12 +128,12 @@ public final class KnownBugs {
     }
 
     /**
-     * Parse and validate a base ledger document with no overrides applied. A
-     * JSON array of entries, each with exactly the fields {@code id} (unique,
+     * Parse and validate a base ledger document with no fixes applied. A JSON
+     * array of entries, each with exactly the fields {@code id} (unique,
      * non-blank), {@code description} (non-blank), and {@code targets}
      * (non-empty, each a distinct {@code {language, majorVersion, repository}}
-     * object). Package-private so unit tests can exercise validation without
-     * the JVM-wide singleton.
+     * object). Package-private so unit tests can exercise validation without the
+     * JVM-wide singleton.
      *
      * @throws IllegalArgumentException on any malformed or invalid document
      */
@@ -142,15 +142,17 @@ public final class KnownBugs {
     }
 
     /**
-     * Parse the base ledger and apply the {@code overridesRaw} overrides
-     * ({@code null} or blank = none). Package-private so unit tests can exercise
-     * override resolution without the JVM-wide singleton or system properties.
+     * Parse the base ledger and apply the {@code fixesRaw} fixes ({@code null}
+     * or blank = none). Package-private so unit tests can exercise fix
+     * resolution without the JVM-wide singleton or system properties.
      *
-     * @throws IllegalArgumentException on a malformed document, a malformed
-     *     override, or an override that references an unknown bug id, redundantly
-     *     marks a target present, or removes a target the base did not declare
+     * <p>Fix application is idempotent and never throws: a fix for an unknown
+     * bug id, or for a target the base does not attribute the bug to, is a
+     * silent no-op.
+     *
+     * @throws IllegalArgumentException only on a malformed base ledger document
      */
-    static KnownBugs parse(String json, String overridesRaw) {
+    static KnownBugs parse(String json, String fixesRaw) {
         JsonNode root;
         try {
             root = MAPPER.readTree(json);
@@ -168,7 +170,7 @@ public final class KnownBugs {
                 throw new IllegalArgumentException("duplicate bug id in known-bugs ledger: " + bug.id());
             }
         }
-        applyOverrides(byId, overridesRaw);
+        applyFixes(byId, fixesRaw);
         return new KnownBugs(byId);
     }
 
@@ -231,84 +233,64 @@ public final class KnownBugs {
     }
 
     /**
-     * Apply {@code overridesRaw} to {@code byId} in place. Each override entry
-     * names a Target and a signed list of bug ids: {@code +id} adds the Target
-     * to that bug (it must not already be declared), {@code -id} removes it (it
-     * must currently be declared). An override for an unknown bug id is rejected.
+     * Apply {@code fixesRaw} to {@code byId} in place: for each
+     * {@code language:major:repository=id[;id…]} entry, remove that Target from
+     * each named bug. Idempotent and total — an unknown bug id, or a target the
+     * base does not attribute the bug to, is a silent no-op; a malformed entry
+     * is skipped. The property is orchestrator-generated from validated
+     * configuration, so leniency here only guarantees a resolved fix can never
+     * fail a run.
      */
-    private static void applyOverrides(Map<String, KnownBug> byId, String overridesRaw) {
-        if (overridesRaw == null || overridesRaw.isBlank()) {
+    private static void applyFixes(Map<String, KnownBug> byId, String fixesRaw) {
+        if (fixesRaw == null || fixesRaw.isBlank()) {
             return;
         }
-        for (String entry : overridesRaw.split(",")) {
+        for (String entry : fixesRaw.split(",")) {
             String trimmed = entry.trim();
             if (trimmed.isEmpty()) {
                 continue;
             }
             int eq = trimmed.indexOf('=');
             if (eq < 0) {
-                throw new IllegalArgumentException(
-                    "malformed known-bug override entry (expected "
-                        + "language:major:repository=<sign><id>[;<sign><id>...]): " + trimmed);
+                continue;
             }
-            Target target = parseOverrideTarget(trimmed.substring(0, eq).trim());
-            for (String signed : trimmed.substring(eq + 1).split(";")) {
-                String token = signed.trim();
-                if (token.isEmpty()) {
+            Target target = parseFixTarget(trimmed.substring(0, eq).trim());
+            if (target == null) {
+                continue;
+            }
+            for (String idToken : trimmed.substring(eq + 1).split(";")) {
+                String bugId = idToken.trim();
+                if (bugId.isEmpty()) {
                     continue;
                 }
-                applyOverrideToken(byId, target, token);
+                KnownBug bug = byId.get(bugId);
+                if (bug == null || !bug.targets().contains(target)) {
+                    continue;
+                }
+                Set<Target> targets = new LinkedHashSet<>(bug.targets());
+                targets.remove(target);
+                byId.put(bugId, new KnownBug(bug.id(), bug.description(), targets));
             }
         }
     }
 
-    private static Target parseOverrideTarget(String key) {
+    /** Parse a {@code language:major:repository} fix key, or {@code null} if malformed. */
+    private static Target parseFixTarget(String key) {
         String[] parts = key.split(":");
         if (parts.length != 3) {
-            throw new IllegalArgumentException(
-                "malformed known-bug override target (expected language:major:repository): " + key);
+            return null;
         }
         int majorVersion;
         try {
             majorVersion = Integer.parseInt(parts[1].trim());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                "known-bug override target major version must be an integer: " + key, e);
+            return null;
         }
-        return new Target(parts[0].trim(), majorVersion, parts[2].trim());
-    }
-
-    private static void applyOverrideToken(Map<String, KnownBug> byId, Target target, String token) {
-        char sign = token.charAt(0);
-        if (sign != '+' && sign != '-') {
-            throw new IllegalArgumentException(
-                "known-bug override for '" + target.label() + "' must sign each id with '+' "
-                    + "(present) or '-' (absent): " + token);
+        try {
+            return new Target(parts[0].trim(), majorVersion, parts[2].trim());
+        } catch (IllegalArgumentException e) {
+            return null;
         }
-        String bugId = token.substring(1).trim();
-        if (bugId.isEmpty()) {
-            throw new IllegalArgumentException(
-                "known-bug override for '" + target.label() + "' has an empty bug id: " + token);
-        }
-        KnownBug bug = byId.get(bugId);
-        if (bug == null) {
-            throw new IllegalArgumentException(
-                "known-bug override for '" + target.label() + "' references unknown bug id '"
-                    + bugId + "'; the base ledger defines " + byId.keySet());
-        }
-        Set<Target> targets = new LinkedHashSet<>(bug.targets());
-        if (sign == '+') {
-            if (!targets.add(target)) {
-                throw new IllegalArgumentException(
-                    "redundant known-bug override: '" + target.label() + "' already declares '"
-                        + bugId + "' in the base ledger");
-            }
-        } else if (!targets.remove(target)) {
-            throw new IllegalArgumentException(
-                "stale known-bug override: '" + target.label() + "' marks '" + bugId
-                    + "' absent, but the base ledger does not declare it for that target");
-        }
-        byId.put(bugId, new KnownBug(bug.id(), bug.description(), targets));
     }
 
     private static String requireText(JsonNode entry, String field) {
@@ -320,12 +302,12 @@ public final class KnownBugs {
         return value.asText();
     }
 
-    private static String configuredOverrides() {
-        String fromProperty = System.getProperty(OVERRIDES_PROPERTY);
+    private static String configuredFixes() {
+        String fromProperty = System.getProperty(FIXES_PROPERTY);
         if (fromProperty != null && !fromProperty.isBlank()) {
             return fromProperty;
         }
-        return System.getenv(OVERRIDES_ENV);
+        return System.getenv(FIXES_ENV);
     }
 
     private static String readResource() {

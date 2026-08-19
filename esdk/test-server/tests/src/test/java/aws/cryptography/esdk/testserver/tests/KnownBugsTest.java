@@ -72,17 +72,9 @@ class KnownBugsTest {
     }
 
     @Test
-    void presentOverrideAddsATargetToABug() {
+    void fixRemovesADeclaredTarget() {
         KnownBugs ledger = KnownBugs.parse(LEDGER,
-            "c:2:aws-encryption-sdk-c=+a");
-        assertTrue(ledger.lookup("a").orElseThrow()
-            .exhibitedBy(target("c", 2, "aws-encryption-sdk-c")));
-    }
-
-    @Test
-    void absentOverrideRemovesADeclaredTarget() {
-        KnownBugs ledger = KnownBugs.parse(LEDGER,
-            "python:4:aws-encryption-sdk-python=-a");
+            "python:4:aws-encryption-sdk-python=a");
         assertFalse(ledger.lookup("a").orElseThrow()
             .exhibitedBy(target("python", 4, "aws-encryption-sdk-python")));
         // The other target is untouched.
@@ -91,38 +83,43 @@ class KnownBugsTest {
     }
 
     @Test
-    void overrideForUnknownBugIdIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(LEDGER, "c:2:aws-encryption-sdk-c=+nope"));
-        assertTrue(e.getMessage().contains("unknown bug id 'nope'"), e.getMessage());
+    void multipleFixesAcrossTargetsAndBugs() {
+        KnownBugs ledger = KnownBugs.parse(LEDGER,
+            "java:3:aws-crypto-tools-java=a,c:2:aws-encryption-sdk-c=b");
+        assertFalse(ledger.lookup("a").orElseThrow()
+            .exhibitedBy(target("java", 3, "aws-crypto-tools-java")));
+        assertTrue(ledger.lookup("a").orElseThrow()
+            .exhibitedBy(target("python", 4, "aws-encryption-sdk-python")));
+        // b's only target fixed -> the entry survives with no targets.
+        assertTrue(ledger.lookup("b").orElseThrow().targets().isEmpty());
     }
 
     @Test
-    void redundantPresentOverrideIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(LEDGER, "java:3:aws-crypto-tools-java=+a"));
-        assertTrue(e.getMessage().contains("redundant"), e.getMessage());
+    void fixForUnknownBugIdIsNoOp() {
+        // Idempotent: an id the base does not define is silently ignored, never
+        // an error (a fully-reconciled base may no longer define it).
+        KnownBugs ledger = KnownBugs.parse(LEDGER, "c:2:aws-encryption-sdk-c=nope");
+        assertTrue(ledger.lookup("a").orElseThrow()
+            .exhibitedBy(target("java", 3, "aws-crypto-tools-java")));
+        assertTrue(ledger.lookup("missing").isEmpty());
     }
 
     @Test
-    void staleAbsentOverrideIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(LEDGER, "c:2:aws-encryption-sdk-c=-a"));
-        assertTrue(e.getMessage().contains("stale"), e.getMessage());
+    void fixForUndeclaredTargetIsNoOp() {
+        // c does not exhibit 'a' in the base; asserting it is fixed is a no-op.
+        KnownBugs ledger = KnownBugs.parse(LEDGER, "c:2:aws-encryption-sdk-c=a");
+        assertTrue(ledger.lookup("a").orElseThrow()
+            .exhibitedBy(target("java", 3, "aws-crypto-tools-java")));
+        assertTrue(ledger.lookup("a").orElseThrow()
+            .exhibitedBy(target("python", 4, "aws-encryption-sdk-python")));
     }
 
     @Test
-    void unsignedOverrideTokenIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(LEDGER, "java:3:aws-crypto-tools-java=a"));
-        assertTrue(e.getMessage().contains("'+'"), e.getMessage());
-    }
-
-    @Test
-    void malformedOverrideTargetIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(LEDGER, "java:3=+a"));
-        assertTrue(e.getMessage().contains("language:major:repository"), e.getMessage());
+    void malformedFixEntryIsIgnored() {
+        // A 2-part key (no repository) is skipped rather than failing the run.
+        KnownBugs ledger = KnownBugs.parse(LEDGER, "java:3=a");
+        assertTrue(ledger.lookup("a").orElseThrow()
+            .exhibitedBy(target("java", 3, "aws-crypto-tools-java")));
     }
 
     @Test

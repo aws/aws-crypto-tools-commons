@@ -178,27 +178,23 @@ class ConfigurationLoaderTest {
     }
 
     @Test
-    @DisplayName("parses knownBugOverrides present/absent arrays")
-    void parsesKnownBugOverrides() {
+    @DisplayName("parses the knownBugFixOverrides fix list")
+    void parsesKnownBugs() {
         CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration("""
             {
               "product": "esdk",
-              "knownBugOverrides": {
-                "present": ["bug-a"],
-                "absent": ["bug-b", "bug-c"]
-              }
+              "knownBugFixOverrides": ["bug-a", "bug-b"]
             }
             """);
-        assertEquals(List.of("bug-a"), config.knownBugOverrides().present());
-        assertEquals(List.of("bug-b", "bug-c"), config.knownBugOverrides().absent());
+        assertEquals(List.of("bug-a", "bug-b"), config.knownBugs());
     }
 
     @Test
-    @DisplayName("absent knownBugOverrides parses as null (base ledger unchanged)")
-    void absentKnownBugOverridesIsNull() {
+    @DisplayName("absent knownBugFixOverrides parses as null (base ledger unchanged)")
+    void absentKnownBugsIsNull() {
         CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration(
             "{ \"product\": \"esdk\" }");
-        assertNull(config.knownBugOverrides());
+        assertNull(config.knownBugs());
     }
 
     // ------------------------------------------------------------------

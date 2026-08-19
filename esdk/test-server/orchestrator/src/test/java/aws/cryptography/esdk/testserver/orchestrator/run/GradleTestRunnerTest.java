@@ -78,13 +78,13 @@ class GradleTestRunnerTest {
                 .noneMatch(a -> a.startsWith("-Desdk.testserver.rawRsaPaddingSchemes")),
             "no padding property when no language declares one: " + command);
         assertTrue(command.stream()
-                .noneMatch(a -> a.startsWith("-Desdk.testserver.knownBugOverrides")),
-            "no known-bug-overrides property when no repository overrode its base: " + command);
+                .noneMatch(a -> a.startsWith("-Desdk.testserver.knownBugFixes")),
+            "no known-bug-fixes property when no repository declared a fix: " + command);
     }
 
     @Test
-    @DisplayName("resolved known-bug overrides are passed as the knownBugOverrides property")
-    void commandCarriesKnownBugOverridesWhenPresent() {
+    @DisplayName("resolved known-bug fixes are passed as the knownBugFixes property")
+    void commandCarriesKnownBugFixesWhenPresent() {
         TestRunInput input = new TestRunInput(
             List.of(new TestTarget("rust", 1, "aws-crypto-tools-rust",
                 URI.create("http://127.0.0.1:8093"))),
@@ -92,14 +92,14 @@ class GradleTestRunnerTest {
             List.of(),
             Map.of(),
             "rust",
-            "rust:1:aws-crypto-tools-rust=-encrypt-non-positive-frame-length-generic-error");
+            "rust:1:aws-crypto-tools-rust=encrypt-non-positive-frame-length-generic-error");
 
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 
         assertTrue(command.contains(
-                "-Desdk.testserver.knownBugOverrides="
-                    + "rust:1:aws-crypto-tools-rust=-encrypt-non-positive-frame-length-generic-error"),
-            "must pass the resolved known-bug overrides: " + command);
+                "-Desdk.testserver.knownBugFixes="
+                    + "rust:1:aws-crypto-tools-rust=encrypt-non-positive-frame-length-generic-error"),
+            "must pass the resolved known-bug fixes: " + command);
     }
 
     // ---- JUnit XML parsing ----------------------------------------------

@@ -110,35 +110,23 @@ public final class FeatureValidation {
     }
 
     /**
-     * Validate one Language_Repository's {@code knownBugOverrides} structurally
-     * (the known-bug analogue of {@link #validateDeclaration}): no blank ids, no
-     * in-array duplicates, and no id in both {@code present} and {@code absent}.
-     * Whether an override references a real bug id — and whether it is redundant
-     * or stale against the base ledger — is decided by the Tests, which own that
-     * ledger; here the override has not yet met it.
+     * Validate one Language_Repository's {@code knownBugFixOverrides} fix list structurally
+     * (the known-bug analogue of {@link #validateDeclaration}): no blank ids and
+     * no in-array duplicates. Whether an id names a real base-ledger bug is not
+     * checked here — a fix is applied idempotently by the Tests, which own that
+     * ledger, so an unknown or already-satisfied id is a harmless no-op there.
      *
-     * @param language the language whose override this is; named in every error
-     * @param override the parsed override, or {@code null} when the file carries none
+     * @param language  the language whose fix list this is; named in every error
+     * @param knownBugs the parsed fix list, or {@code null} when the file carries none
      * @return a {@link Result} with one error per structural violation
      */
-    public static Result validateKnownBugOverride(String language, KnownBugOverride override) {
-        if (override == null) {
+    public static Result validateKnownBugs(String language, List<String> knownBugs) {
+        if (knownBugs == null) {
             return Result.ok();
         }
         List<String> errors = new ArrayList<>();
-        List<String> present = override.present() == null ? List.of() : override.present();
-        List<String> absent = override.absent() == null ? List.of() : override.absent();
-        addBlankErrors(errors, language, "knownBugOverrides.present", present);
-        addBlankErrors(errors, language, "knownBugOverrides.absent", absent);
-        addDuplicateErrors(errors, language, "known bug", "knownBugOverrides.present", present);
-        addDuplicateErrors(errors, language, "known bug", "knownBugOverrides.absent", absent);
-        Set<String> presentSet = new LinkedHashSet<>(present);
-        for (String id : new LinkedHashSet<>(absent)) {
-            if (presentSet.contains(id)) {
-                errors.add("language " + language + ": known bug " + quote(id)
-                    + " is in both knownBugOverrides.present and knownBugOverrides.absent");
-            }
-        }
+        addBlankErrors(errors, language, "knownBugFixOverrides", knownBugs);
+        addDuplicateErrors(errors, language, "known bug", "knownBugFixOverrides", knownBugs);
         return Result.of(errors);
     }
 

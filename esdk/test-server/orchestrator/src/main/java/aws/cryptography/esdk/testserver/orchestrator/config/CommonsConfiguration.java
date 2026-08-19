@@ -49,7 +49,7 @@ public record CommonsConfiguration(
     List<String> unsupportedFeatures,
     List<String> rawRsaPaddingSchemes,
     List<ConfigurationEntry> configurationOverrides,
-    KnownBugOverride knownBugOverrides
+    List<String> knownBugs
 ) {
     public CommonsConfiguration {
         supportedFeatures = supportedFeatures == null ? null : List.copyOf(supportedFeatures);
@@ -58,13 +58,14 @@ public record CommonsConfiguration(
             rawRsaPaddingSchemes == null ? null : List.copyOf(rawRsaPaddingSchemes);
         configurationOverrides =
             configurationOverrides == null ? List.of() : List.copyOf(configurationOverrides);
+        knownBugs = knownBugs == null ? null : List.copyOf(knownBugs);
     }
 
     /**
-     * Convenience constructor for a file with no {@code knownBugOverrides} —
+     * Convenience constructor for a file with no {@code knownBugs} fix list —
      * the base known-bug ledger applies unchanged. Preserves the
-     * pre-known-bug-override {@code (…, configurationOverrides)} shape so
-     * existing call sites keep compiling.
+     * pre-known-bug {@code (…, configurationOverrides)} shape so existing call
+     * sites keep compiling.
      */
     public CommonsConfiguration(
             RepositoryCoordinates commonsRepository,
