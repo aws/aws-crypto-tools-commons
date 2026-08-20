@@ -1,4 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureDeclarations;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

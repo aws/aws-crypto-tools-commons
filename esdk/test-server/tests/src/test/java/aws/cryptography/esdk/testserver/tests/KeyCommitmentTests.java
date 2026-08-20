@@ -1,4 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -90,7 +94,7 @@ class KeyCommitmentTests {
      * combination is a visible skip when they share none. Resolved as the first statement of
      * every case; commitment is keyring-independent, so the case runs once, under this keyring.
      */
-    private static ConformanceKeyring keyringFor(EndpointPair combination) {
+    private static ConformanceKeyring keyringFor(TargetPair combination) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(combination);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + combination);
@@ -158,7 +162,7 @@ class KeyCommitmentTests {
     @ParameterizedTest(name = "encrypt[{1}] {0}")
     @MethodSource("encryptTargetCases")
     void encryptHonorsCommitmentPolicy(LanguageServerTarget target, EncryptCase testCase) {
-        ConformanceKeyring keyring = keyringFor(new EndpointPair(target, target));
+        ConformanceKeyring keyring = keyringFor(new TargetPair(target, target));
         if (testCase.expectSuccess()) {
             byte[] ciphertext =
                 encrypt(target.endpoint(), keyring, testCase.policy(), testCase.suite(), PLAINTEXT);
@@ -180,7 +184,7 @@ class KeyCommitmentTests {
 
     static List<Arguments> roundTripPairCases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (TargetPair pair : LanguageServerRegistry.shared().pairs()) {
             for (EncryptCase c : encryptCaseList()) {
                 // Every suite allowed on encrypt under a policy is also allowed on
                 // decrypt under that same policy, so it must round-trip.
@@ -194,7 +198,7 @@ class KeyCommitmentTests {
 
     @ParameterizedTest(name = "roundTrip[{1}] {0}")
     @MethodSource("roundTripPairCases")
-    void roundTripWithinPolicy(EndpointPair pair, EncryptCase testCase) {
+    void roundTripWithinPolicy(TargetPair pair, EncryptCase testCase) {
         ConformanceKeyring keyring = keyringFor(pair);
         // Encrypt once per (encrypt endpoint, keyring, policy, suite); reuse the
         // ciphertext across the decrypt endpoints paired with that encrypt endpoint.
@@ -235,7 +239,7 @@ class KeyCommitmentTests {
 
     static List<Arguments> decryptPairCases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (TargetPair pair : LanguageServerRegistry.shared().pairs()) {
             for (DecryptCase c : decryptCaseList()) {
                 cases.add(Arguments.of(pair, c));
             }
@@ -245,7 +249,7 @@ class KeyCommitmentTests {
 
     @ParameterizedTest(name = "decrypt[{1}] {0}")
     @MethodSource("decryptPairCases")
-    void decryptHonorsCommitmentPolicy(EndpointPair pair, DecryptCase testCase) {
+    void decryptHonorsCommitmentPolicy(TargetPair pair, DecryptCase testCase) {
         ConformanceKeyring keyring = keyringFor(pair);
         // Produce the committing / non-committing message once per (encrypt endpoint,
         // keyring, commitment) — permitted via REQUIRE_ENCRYPT_ALLOW_DECRYPT (committing)

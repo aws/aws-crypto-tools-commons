@@ -1,0 +1,97 @@
+{
+  "_comment": [
+    "The DB-ESDK TestServer Configuration_Set (design 'Data Models'): exactly",
+    "one product field, exactly one Feature_Catalog (the features list,",
+    "Requirement 7.1), and one Configuration_Entry per language (Requirements",
+    "3.1, 3.2).",
+    "",
+    "Languages: Java, Rust, .NET — each hosted in its own sibling",
+    "Language_Repository (aws-crypto-tools-java, aws-crypto-tools-rust,",
+    "aws-crypto-tools-dotnet). Each server wraps its language's published DBE",
+    "distribution behind the same rpcv2Cbor wire contract, so the generated",
+    "Java Test_Client talks to any of them and TamperTest / DbeAwsKmsRoundTripTest",
+    "iterate every (encrypt, decrypt) pair automatically.",
+    "",
+    "Feature_Catalog: 'raw-aes' and 'aws-kms', both backed by real cross-",
+    "language Tests. Each declared Feature must be supported by every launched",
+    "Language_Server for the test matrix to be sensible; adding a Feature",
+    "requires every language wrapper to expose it. The Java DBE library in",
+    "fact supports every keyring the MPL exposes; entries are added to the",
+    "catalog once all three wrappers ship the corresponding Test coverage.",
+    "",
+    "Branch pins: while each DBE test-server host branch is unmerged, the",
+    "entries pin the working-branch on their host repo. The workingTreeOverlay.*",
+    "args the Makefile passes redirect the SourceResolver to the sibling",
+    "checkout, so the branch pin is a documentation contract for reproducible",
+    "runs after those branches merge — not a runtime constraint today.",
+    "",
+    ".NET blocker: the aws/aws-crypto-tools-dotnet host repository does not",
+    "yet exist on GitHub (as of this commit, `git ls-remote` returns",
+    "'repository not found'). The .NET Language_Server code is local-only in",
+    "sibling checkouts and reaches the orchestrator via workingTreeOverlay, so",
+    "make orchestrate runs fine locally. Reproducible runs from a fresh clone",
+    "will remain blocked on the .NET entry until the repo is created and the",
+    "server tree pushed to huaye/dbesdk-test-server there."
+  ],
+  "product": "dbesdk",
+  "features": [
+    "raw-aes",
+    "aws-kms"
+  ],
+  "entries": [
+    {
+      "language": "java",
+      "majorVersion": 3,
+      "port": 8101,
+      "commonsConfigurationPath": "dbesdk/test-server/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "dbesdk/test-server/server"
+      }
+    },
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8102,
+      "commonsConfigurationPath": "dbesdk/test-server/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "dbesdk"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "dbesdk/test-server/server"
+      }
+    },
+    {
+      "language": "net",
+      "majorVersion": 4,
+      "port": 8103,
+      "commonsConfigurationPath": "dbesdk/test-server/commons-configuration.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-dotnet",
+        "url": "git@github.com:aws/aws-crypto-tools-dotnet.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-dotnet",
+        "url": "git@github.com:aws/aws-crypto-tools-dotnet.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "dbesdk/test-server/server"
+      }
+    }
+  ]
+}

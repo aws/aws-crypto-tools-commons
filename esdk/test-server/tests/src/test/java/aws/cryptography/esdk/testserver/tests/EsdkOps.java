@@ -25,7 +25,7 @@ import java.util.Map;
  * an addressable {@code byte[]} on the test side, not just fed straight back into a
  * decrypt call.
  *
- * <p>Each RPC goes through {@link TestServerClients#withRetry} so a transient
+ * <p>Each RPC goes through {@link EsdkTestServerClients#withRetry} so a transient
  * transport failure is retried on the test side rather than failing the run.
  */
 final class EsdkOps {
@@ -35,7 +35,7 @@ final class EsdkOps {
 
     /** {@code CreateClient(config)} on {@code endpoint}, returning the client id. */
     static String createClient(URI endpoint, ESDKClientConfig config) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        ESDKTestServerClient client = EsdkTestServerClients.forEndpoint(endpoint);
         return clientId(client, config);
     }
 
@@ -52,7 +52,7 @@ final class EsdkOps {
     static byte[] encrypt(URI endpoint, ESDKClientConfig config, byte[] plaintext,
                           Map<String, String> encryptionContext, ESDKAlgorithmSuiteId suite,
                           Long frameLength) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        ESDKTestServerClient client = EsdkTestServerClients.forEndpoint(endpoint);
         EncryptInput.Builder input = EncryptInput.builder()
             .clientId(clientId(client, config))
             .plaintext(ByteBuffer.wrap(plaintext));
@@ -66,7 +66,7 @@ final class EsdkOps {
             input.frameLength(frameLength);
         }
         EncryptInput request = input.build();
-        return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
+        return toArray(EsdkTestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
     }
 
     /** Decrypt {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */
@@ -91,7 +91,7 @@ final class EsdkOps {
     static DecryptOutput decryptResponse(
             URI endpoint, ESDKClientConfig config, byte[] ciphertext,
             Map<String, String> encryptionContext) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        ESDKTestServerClient client = EsdkTestServerClients.forEndpoint(endpoint);
         DecryptInput.Builder input = DecryptInput.builder()
             .clientId(clientId(client, config))
             .ciphertext(ByteBuffer.wrap(ciphertext));
@@ -99,7 +99,7 @@ final class EsdkOps {
             input.encryptionContext(encryptionContext);
         }
         DecryptInput request = input.build();
-        return TestServerClients.withRetry(() -> client.decrypt(request));
+        return EsdkTestServerClients.withRetry(() -> client.decrypt(request));
     }
 
     /** EncryptStream {@code plaintext} on {@code endpoint} under {@code config}; return the ciphertext bytes. */
@@ -123,7 +123,7 @@ final class EsdkOps {
      */
     static byte[] encryptStream(URI endpoint, ESDKClientConfig config, byte[] plaintext,
                                 Long plaintextLengthBound, Long frameLength) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        ESDKTestServerClient client = EsdkTestServerClients.forEndpoint(endpoint);
         EncryptStreamInput.Builder input = EncryptStreamInput.builder()
             .clientId(clientId(client, config))
             .plaintext(ByteBuffer.wrap(plaintext));
@@ -134,22 +134,22 @@ final class EsdkOps {
             input.frameLength(frameLength);
         }
         EncryptStreamInput request = input.build();
-        return toArray(TestServerClients.withRetry(() -> client.encryptStream(request)).getCiphertext());
+        return toArray(EsdkTestServerClients.withRetry(() -> client.encryptStream(request)).getCiphertext());
     }
 
     /** DecryptStream {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */
     static byte[] decryptStream(URI endpoint, ESDKClientConfig config, byte[] ciphertext) {
-        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        ESDKTestServerClient client = EsdkTestServerClients.forEndpoint(endpoint);
         DecryptStreamInput request = DecryptStreamInput.builder()
             .clientId(clientId(client, config))
             .ciphertext(ByteBuffer.wrap(ciphertext))
             .build();
-        return toArray(TestServerClients.withRetry(() -> client.decryptStream(request)).getPlaintext());
+        return toArray(EsdkTestServerClients.withRetry(() -> client.decryptStream(request)).getPlaintext());
     }
 
     /** {@code CreateClient(config)} on {@code client}, retried on a transient transport failure. */
     private static String clientId(ESDKTestServerClient client, ESDKClientConfig config) {
-        return TestServerClients.withRetry(() ->
+        return EsdkTestServerClients.withRetry(() ->
             client.createClient(CreateClientInput.builder().config(config).build())).getClientId();
     }
 

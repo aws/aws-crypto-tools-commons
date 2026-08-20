@@ -1,4 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
@@ -124,7 +128,7 @@ class ReleasedVectorDecryptTests {
 
                 for (LanguageServerTarget target : targets) {
                     tests.add(dynamicTest(label + " " + target, () -> {
-                        FeatureGate.require(selection.features, new EndpointPair(target, target));
+                        FeatureGate.require(selection.features, new TargetPair(target, target));
                         Set<String> unsupported =
                             UNSUPPORTED_RSA_PADDINGS.getOrDefault(target.language(), Set.of());
                         for (String padding : selection.rsaPaddings) {

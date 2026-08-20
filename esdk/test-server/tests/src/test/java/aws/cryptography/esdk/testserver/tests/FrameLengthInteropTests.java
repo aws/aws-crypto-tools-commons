@@ -1,4 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +41,7 @@ class FrameLengthInteropTests {
     private static final ESDKCommitmentPolicy POLICY =
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -46,7 +49,7 @@ class FrameLengthInteropTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -57,7 +60,7 @@ class FrameLengthInteropTests {
 
     @ParameterizedTest(name = "oddFrameLengthInterop {0}")
     @MethodSource("pairs")
-    void nonBlockMultipleFrameLengthInteroperates(EndpointPair pair) {
+    void nonBlockMultipleFrameLengthInteroperates(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] plaintext = new byte[(int) (2 * ODD_FRAME_LENGTH + 501)];
         for (int i = 0; i < plaintext.length; i++) {

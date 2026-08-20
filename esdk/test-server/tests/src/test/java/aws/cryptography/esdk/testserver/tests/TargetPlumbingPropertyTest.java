@@ -1,4 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureDeclarations;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -83,21 +87,21 @@ class TargetPlumbingPropertyTest {
         // Matrix: exactly the full pairwise (encrypt, decrypt) product,
         // including every same-target pair — size = square of the target count
         // (Requirement 10.3).
-        List<EndpointPair> pairs = registry.pairs();
+        List<TargetPair> pairs = registry.pairs();
         int n = targets.size();
         assertEquals(n * n, pairs.size(),
             "matrix size must be the square of the target count (" + n + ")");
 
-        Set<EndpointPair> expected = new HashSet<>();
+        Set<TargetPair> expected = new HashSet<>();
         for (LanguageServerTarget encrypt : targets) {
             for (LanguageServerTarget decrypt : targets) {
-                expected.add(new EndpointPair(encrypt, decrypt));
+                expected.add(new TargetPair(encrypt, decrypt));
             }
         }
         assertEquals(expected, new HashSet<>(pairs),
             "matrix must cover every ordered (encrypt, decrypt) combination exactly");
         for (LanguageServerTarget target : targets) {
-            assertTrue(pairs.contains(new EndpointPair(target, target)),
+            assertTrue(pairs.contains(new TargetPair(target, target)),
                 "matrix must include the same-target pair for " + target.label());
         }
     }

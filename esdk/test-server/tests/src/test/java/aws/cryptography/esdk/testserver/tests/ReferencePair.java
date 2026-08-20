@@ -1,4 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import java.net.URI;
 
@@ -30,11 +33,11 @@ public record ReferencePair(
     }
 
     /**
-     * @return this row as an {@link EndpointPair}, for {@link FeatureGate} and
+     * @return this row as an {@link TargetPair}, for {@link FeatureGate} and
      *     the shared encrypt/decrypt helpers.
      */
-    public EndpointPair asEndpointPair() {
-        return new EndpointPair(encryptTarget, decryptTarget);
+    public TargetPair asEndpointPair() {
+        return new TargetPair(encryptTarget, decryptTarget);
     }
 
     @Override

@@ -1,4 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,8 +37,8 @@ class PlaintextLengthBoundTests {
     }
 
     /** A single-target pair so the streaming Feature gate can be evaluated. */
-    private static EndpointPair samePair(LanguageServerTarget target) {
-        return new EndpointPair(target, target);
+    private static TargetPair samePair(LanguageServerTarget target) {
+        return new TargetPair(target, target);
     }
 
     /** ENC-007: streamed encrypt with a bound greater than or equal to the plaintext succeeds. */

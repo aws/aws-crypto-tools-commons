@@ -7,3 +7,9 @@
 # Local-only reference material (e.g. the S3EC Python workflows kept for
 # hand-implemented non-Java language servers). Never committed; do not delete.
 /temp-s3ec-py-example/
+
+# The shared orchestrator writes per-SDK runtime scratch under
+# <sdk>/test-server/build/ (materialized language-server clones, launch-plan
+# working dirs, resolution-record.json). Long-lived cache, reused across runs;
+# not a Gradle output — no gradle project builds here.
+/build/

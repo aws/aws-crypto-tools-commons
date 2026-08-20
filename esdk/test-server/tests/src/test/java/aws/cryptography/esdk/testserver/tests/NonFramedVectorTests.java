@@ -1,4 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,7 +117,7 @@ class NonFramedVectorTests {
     @ParameterizedTest(name = "nonFramedVectorDecrypts[{1}] {0}")
     @MethodSource("cases")
     void nonFramedVectorDecryptsToKnownPlaintext(LanguageServerTarget target, Vector vector) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
         byte[] ciphertext = resource(vector.ciphertextResource());
         byte[] expected = resource(vector.plaintextResource());
         assertEquals(vector.versionByte(), ciphertext[0] & 0xFF,
@@ -128,7 +132,7 @@ class NonFramedVectorTests {
     @ParameterizedTest(name = "nonFramedTamperRejected[{1}] {0}")
     @MethodSource("cases")
     void nonFramedVectorTamperRejected(LanguageServerTarget target, Vector vector) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
         byte[] tampered = resource(vector.ciphertextResource());
         tampered[tampered.length - 1] ^= (byte) 0xFF;
         assertThrows(ESDKClientError.class,
@@ -148,7 +152,7 @@ class NonFramedVectorTests {
     @ParameterizedTest(name = "nonFramedContentLengthBoundRejected[{1}] {0}")
     @MethodSource("cases")
     void nonFramedContentLengthOverBoundRejected(LanguageServerTarget target, Vector vector) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
         byte[] ciphertext = resource(vector.ciphertextResource());
         int contentLength = resource(vector.plaintextResource()).length;
         // Non-framed body (non-signing suite): ... IV(12) ‖ contentLength(8 BE) ‖ content ‖ tag(16).

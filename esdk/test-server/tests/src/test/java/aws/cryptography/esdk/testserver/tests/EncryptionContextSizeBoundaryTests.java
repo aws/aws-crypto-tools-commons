@@ -1,4 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -62,7 +67,7 @@ class EncryptionContextSizeBoundaryTests {
         return "a".repeat(length);
     }
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -74,7 +79,7 @@ class EncryptionContextSizeBoundaryTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -92,7 +97,7 @@ class EncryptionContextSizeBoundaryTests {
      */
     @ParameterizedTest(name = "maxSizeEncryptionContextRoundTrips {0}")
     @MethodSource("pairs")
-    void maxSizeEncryptionContextRoundTrips(EndpointPair pair) {
+    void maxSizeEncryptionContextRoundTrips(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("k", asciiValue(MAX_AAD - SINGLE_ENTRY_OVERHEAD));
 
@@ -123,7 +128,7 @@ class EncryptionContextSizeBoundaryTests {
     @ParameterizedTest(name = "oversizeEncryptionContextRejected {0}")
     @MethodSource("targets")
     void oversizeEncryptionContextRejected(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new TargetPair(target, target));
         Map<String, String> ec = Map.of("k", asciiValue(MAX_AAD - SINGLE_ENTRY_OVERHEAD + 1));
 
         try {

@@ -1,4 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -50,7 +55,7 @@ class FrameLengthValidationTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -63,7 +68,7 @@ class FrameLengthValidationTests {
     @ParameterizedTest(name = "nonPositiveFrameLengthRejected {0}")
     @MethodSource("targets")
     void encryptRejectsNonPositiveFrameLength(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new TargetPair(target, target));
         KnownBugGate.gate("encrypt-non-positive-frame-length-generic-error", target.language(),
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, -16L),

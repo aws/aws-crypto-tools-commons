@@ -1,4 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -80,7 +84,7 @@ class FooterFormatTests {
      * visible skip when it supports neither. Resolved before producing a message.
      */
     private static ConformanceKeyring keyringFor(LanguageServerTarget target) {
-        EndpointPair pair = new EndpointPair(target, target);
+        TargetPair pair = new TargetPair(target, target);
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);

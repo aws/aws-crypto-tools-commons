@@ -1,4 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
+import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,7 +64,7 @@ class BodyFrameIntegrityTests {
         return plaintext;
     }
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -69,7 +72,7 @@ class BodyFrameIntegrityTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -78,7 +81,7 @@ class BodyFrameIntegrityTests {
         return keyring.config(POLICY);
     }
 
-    private static byte[] encrypt(EndpointPair pair, ESDKClientConfig config) {
+    private static byte[] encrypt(TargetPair pair, ESDKClientConfig config) {
         return EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(), SUITE, FRAME_LENGTH);
     }
 
@@ -87,7 +90,7 @@ class BodyFrameIntegrityTests {
      * surgery's doing), and return its regular (non-final) frames.
      */
     private static List<EsdkMessage.Frame> regularFrames(
-            byte[] ciphertext, EndpointPair pair, ESDKClientConfig config) {
+            byte[] ciphertext, TargetPair pair, ESDKClientConfig config) {
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered multi-frame message must decrypt (" + pair + ")");
@@ -98,7 +101,7 @@ class BodyFrameIntegrityTests {
     }
 
     private static void assertRejected(
-            EndpointPair pair, ESDKClientConfig config, byte[] tampered, String what) {
+            TargetPair pair, ESDKClientConfig config, byte[] tampered, String what) {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
             "decrypt must reject " + what + " (" + pair + ")");
@@ -111,7 +114,7 @@ class BodyFrameIntegrityTests {
     /** Two adjacent regular frames swapped: each sits at a sequence/IV it was not sealed for. */
     @ParameterizedTest(name = "swappedFramesRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsSwappedFrames(EndpointPair pair) {
+    void decryptRejectsSwappedFrames(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = encrypt(pair, config);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair, config);
@@ -130,7 +133,7 @@ class BodyFrameIntegrityTests {
     /** A middle regular frame deleted: the following frame moves onto the wrong sequence number. */
     @ParameterizedTest(name = "deletedFrameRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsDeletedFrame(EndpointPair pair) {
+    void decryptRejectsDeletedFrame(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = encrypt(pair, config);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair, config);
@@ -146,7 +149,7 @@ class BodyFrameIntegrityTests {
     /** A regular frame duplicated: the replayed copy lands on the next frame's sequence number. */
     @ParameterizedTest(name = "duplicatedFrameRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsDuplicatedFrame(EndpointPair pair) {
+    void decryptRejectsDuplicatedFrame(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = encrypt(pair, config);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair, config);
@@ -163,7 +166,7 @@ class BodyFrameIntegrityTests {
     /** A body cut at a regular-frame boundary never reaches a final frame. */
     @ParameterizedTest(name = "missingFinalFrameRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsBodyTruncatedBeforeFinalFrame(EndpointPair pair) {
+    void decryptRejectsBodyTruncatedBeforeFinalFrame(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = encrypt(pair, config);
         List<EsdkMessage.Frame> regular = regularFrames(ciphertext, pair, config);
@@ -175,7 +178,7 @@ class BodyFrameIntegrityTests {
     /** A frame transplanted from another message hits a different message id and derived key. */
     @ParameterizedTest(name = "crossMessageSplicedFrameRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsFrameSplicedFromAnotherMessage(EndpointPair pair) {
+    void decryptRejectsFrameSplicedFromAnotherMessage(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] messageA = encrypt(pair, config);
         byte[] messageB = encrypt(pair, config);

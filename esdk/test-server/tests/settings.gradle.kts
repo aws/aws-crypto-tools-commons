@@ -31,3 +31,26 @@ includeBuild("../client-java") {
             .using(project(":"))
     }
 }
+
+// The shared TestServer test-support (FeatureGate, KnownBugGate, TargetPair,
+// LanguageServerTarget/Registry, TestServerClientCache, etc.). Every SDK's
+// Tests suite consumes exactly this module; the ESDK-specific wrappers
+// (EsdkTestServerClients, EsdkFeatureGate) live in this Tests module.
+includeBuild("../../../test-server/tests-support") {
+    dependencySubstitution {
+        substitute(module("aws.cryptography.testserver:commons-test-server-tests-support"))
+            .using(project(":"))
+    }
+}
+
+// The shared TestServer orchestrator, included so the ESDK-local
+// EsdkPaddingSchemeCatalogTest can pin the shared
+// FeatureValidation.RAW_RSA_PADDING_SCHEMES against the ESDK Smithy model's
+// PaddingScheme enum. No test class references the orchestrator's
+// entry-point / launcher / source-resolution classes.
+includeBuild("../../../test-server/orchestrator") {
+    dependencySubstitution {
+        substitute(module("aws.cryptography.testserver:commons-test-server-orchestrator"))
+            .using(project(":"))
+    }
+}
