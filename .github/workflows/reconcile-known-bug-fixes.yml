@@ -1,0 +1,142 @@
+# ============================================================================
+# Reusable: reconcile a Language_Repository's merged bug FIXES into the commons
+# base known-bug ledger (aws-crypto-tools-commons).
+# ----------------------------------------------------------------------------
+# A Language_Repository declares the base-ledger bugs its target has fixed in its
+# commons-configuration.json `knownBugFixOverrides` array (a TDD lever: remove the exception
+# in a PR, watch the row go red, fix it green). Once merged to that repo's main
+# branch, the fix is live but the AUTHORITATIVE list — commons known-bugs.json —
+# still attributes the bug to that target. This workflow closes that loop: on a
+# language repo merge it runs the commons reconcile script and, when the ledger
+# changes, opens a PR against commons removing the fixed target(s).
+#
+# HOW A LANGUAGE REPO USES IT (caller, e.g. aws-crypto-tools-java):
+#
+#   name: Reconcile known-bug fixes
+#   on:
+#     push:
+#       branches: [main]
+#       paths: ["esdk/test-server/commons-configuration.json"]
+#   jobs:
+#     reconcile:
+#       uses: aws/aws-crypto-tools-commons/.github/workflows/reconcile-known-bug-fixes.yml@main
+#       with:
+#         commons-config-path: esdk/test-server/commons-configuration.json
+#       secrets:
+#         commons-token: ${{ secrets.COMMONS_RECONCILE_TOKEN }}
+#
+# `commons-config-path` MUST equal the repo's `commonsConfigurationPath` in the
+# commons configuration-set.json (or the default when it sets none) — it selects
+# exactly the Configuration_Entry (hence the target) the merged file belongs to,
+# so a repo hosting several servers reconciles only the one that changed.
+#
+# CREDENTIAL: `commons-token` needs write access to aws-crypto-tools-commons
+# (push a branch + open a PR). See config/tools/README (added alongside) for the
+# recommended org GitHub App vs PAT provisioning. The caller repo's default
+# GITHUB_TOKEN cannot write to commons, which is why this is a required secret.
+# ============================================================================
+
+name: Reconcile known-bug fixes (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      commons-config-path:
+        description: >-
+          Repo-root-relative path of the caller's commons-configuration.json;
+          must equal its commonsConfigurationPath in the commons Configuration_Set.
+        required: true
+        type: string
+      commons-repository:
+        description: The Commons_Repository to reconcile and open the PR against.
+        required: false
+        type: string
+        default: aws/aws-crypto-tools-commons
+      commons-ref:
+        description: The commons branch to reconcile and target the PR at.
+        required: false
+        type: string
+        default: main
+    secrets:
+      commons-token:
+        description: Token with write access to the Commons_Repository (push + PR).
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the calling Language_Repository (its merged commons-configuration.json)
+        uses: actions/checkout@v4
+        with:
+          path: caller
+
+      - name: Checkout the Commons_Repository (the authoritative ledger)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.commons-repository }}
+          ref: ${{ inputs.commons-ref }}
+          token: ${{ secrets.commons-token }}
+          path: commons
+          # Full history so a reconcile branch can be pushed.
+          fetch-depth: 0
+
+      - name: Reconcile the caller's fixes into the commons ledger
+        id: reconcile
+        run: |
+          set +e
+          python3 commons/esdk/test-server/config/tools/reconcile_known_bug_fixes.py \
+            --ledger commons/esdk/test-server/config/known-bugs.json \
+            --config-set commons/esdk/test-server/config/configuration-set.json \
+            --repo "${GITHUB_REPOSITORY##*/}" \
+            --commons-config "caller/${{ inputs.commons-config-path }}" \
+            --commons-config-path "${{ inputs.commons-config-path }}"
+          status=$?
+          set -e
+          if [ "$status" = "2" ]; then
+            echo "::error::reconcile script failed (usage/IO); see log above" >&2
+            exit 1
+          fi
+          if [ "$status" = "1" ]; then
+            echo "The commons ledger already matches this repo's fixes; no PR needed."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open (or update) the reconciling PR against commons
+        if: steps.reconcile.outputs.changed == 'true'
+        env:
+          # gh and the branch push both authenticate as the commons-write token.
+          GH_TOKEN: ${{ secrets.commons-token }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY##*/}"
+          branch="auto/reconcile-known-bug-fixes/${repo}"
+          ledger="esdk/test-server/config/known-bugs.json"
+          cd commons
+
+          git config user.name "aws-crypto-tools-bot"
+          git config user.email "aws-crypto-tools-bot@users.noreply.github.com"
+
+          # One stable branch per caller repo: a re-run updates the same PR
+          # rather than opening duplicates.
+          git checkout -B "$branch"
+          git add "$ledger"
+          git commit -m "chore(esdk): reconcile ${repo} known-bug fixes into the ledger" \
+            -m "Auto-generated from ${GITHUB_REPOSITORY}@${GITHUB_SHA}: the fixes that repository declared in ${{ inputs.commons-config-path }} (knownBugFixOverrides) are removed from the authoritative commons ledger."
+          git push --force-with-lease origin "$branch"
+
+          if gh pr view "$branch" --repo "${{ inputs.commons-repository }}" >/dev/null 2>&1; then
+            echo "Existing PR updated by the branch push."
+          else
+            gh pr create \
+              --repo "${{ inputs.commons-repository }}" \
+              --base "${{ inputs.commons-ref }}" \
+              --head "$branch" \
+              --title "chore(esdk): reconcile ${repo} known-bug fixes into the ledger" \
+              --body "Automated reconciliation. ${GITHUB_REPOSITORY} merged a fix (its \`knownBugFixOverrides\` declaration in \`${{ inputs.commons-config-path }}\`), so its target is removed from the authoritative commons known-bug ledger. Source: ${GITHUB_REPOSITORY}@${GITHUB_SHA}."
+          fi
