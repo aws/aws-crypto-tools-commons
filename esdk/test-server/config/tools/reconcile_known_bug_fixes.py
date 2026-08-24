@@ -100,6 +100,10 @@ def main(argv=None):
                              "(its commonsConfigurationPath in configuration-set.json)")
     args = parser.parse_args(argv)
 
+    if not Path(args.commons_config).is_file():
+        print(f"no commons-configuration at {args.commons_config}; nothing to reconcile")
+        return 1
+
     try:
         ledger = _load(args.ledger)
         config_set = _load(args.config_set)
