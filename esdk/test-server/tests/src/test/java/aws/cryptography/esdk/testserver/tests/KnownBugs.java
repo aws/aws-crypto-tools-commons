@@ -40,7 +40,11 @@ import java.util.Set;
  */
 public final class KnownBugs {
 
-    /** Classpath resource holding the committed base ledger. */
+    /**
+     * Classpath resource holding the committed base ledger. Its canonical home
+     * is {@code esdk/test-server/config/known-bugs.json}; the test build copies
+     * it onto the classpath root (see the tests module {@code build.gradle.kts}).
+     */
     public static final String RESOURCE = "/known-bugs.json";
 
     /**

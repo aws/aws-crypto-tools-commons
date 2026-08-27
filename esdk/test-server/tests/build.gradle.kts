@@ -51,6 +51,14 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
 }
 
+// The known-bug base ledger's canonical home is esdk/test-server/config/ (next
+// to configuration-set.json), where it is easy to find. It is not a test source
+// resource, so copy it onto the test classpath root here; KnownBugs.shared()
+// then reads it via getResourceAsStream("/known-bugs.json") unchanged.
+tasks.named<Copy>("processTestResources") {
+    from("$projectDir/../config/known-bugs.json")
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform {
         // jqwik registers its own JUnit Platform engine; include it explicitly.
