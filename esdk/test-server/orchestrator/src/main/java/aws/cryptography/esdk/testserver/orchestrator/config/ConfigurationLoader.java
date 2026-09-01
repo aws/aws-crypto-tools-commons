@@ -97,8 +97,52 @@ public final class ConfigurationLoader {
             stringList(root.get("supportedFeatures")),
             stringList(root.get("unsupportedFeatures")),
             stringList(root.get("rawRsaPaddingSchemes")),
-            overrides,
-            stringList(root.get("knownBugFixOverrides")));
+            overrides);
+    }
+
+    // ------------------------------------------------------------------
+    // Bug-configuration file (Language_Server)
+    // ------------------------------------------------------------------
+
+    /**
+     * Load a Language_Server's {@code bug-configuration.json}: a flat JSON array
+     * of the bug ids that server currently exhibits (design "Bug Configuration").
+     * A <b>missing</b> file means the server declares no bug (empty list) — a
+     * server with zero bugs need not ship the file. A present-but-unparseable
+     * file, or a non-array top level, is a {@link ConfigurationLoadException}
+     * naming the location.
+     */
+    public static List<String> loadBugConfiguration(Path path) {
+        if (!Files.isRegularFile(path)) {
+            return List.of();
+        }
+        String json;
+        try {
+            json = Files.readString(path);
+        } catch (IOException e) {
+            throw new ConfigurationLoadException(
+                "bug-configuration file at " + path + " could not be read: " + e.getMessage(),
+                path, e);
+        }
+        JsonNode root;
+        try {
+            root = MAPPER.readTree(json);
+        } catch (JacksonException e) {
+            throw new ConfigurationLoadException(
+                "bug-configuration file at " + path + " is unparseable: " + e.getOriginalMessage(),
+                path, e);
+        }
+        if (root == null || !root.isArray()) {
+            throw new ConfigurationLoadException(
+                "bug-configuration file at " + path
+                    + " is unparseable: expected a top-level JSON array of bug id strings",
+                path);
+        }
+        List<String> ids = new ArrayList<>();
+        for (JsonNode v : root) {
+            ids.add(v.isNull() ? null : v.asText());
+        }
+        return ids;
     }
 
     // ------------------------------------------------------------------
@@ -116,7 +160,9 @@ public final class ConfigurationLoader {
             stringList(n.get("supportedFeatures")),
             stringList(n.get("unsupportedFeatures")),
             stringList(n.get("rawRsaPaddingSchemes")),
-            text(n, "commonsConfigurationPath"));
+            text(n, "commonsConfigurationPath"),
+            text(n, "bugConfigurationPath"),
+            stringList(n.get("knownBugs")));
     }
 
     private static RepositoryCoordinates coordinates(JsonNode node) {

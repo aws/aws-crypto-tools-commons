@@ -53,12 +53,23 @@
   ],
   "product": "esdk",
   "features": [
-    "streaming", "MPL", "hierarchical",
-    "raw-aes", "raw-rsa", "raw-ecdh", "multi",
-    "aws-kms", "aws-kms-multi", "aws-kms-discovery",
-    "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery",
-    "aws-kms-rsa", "aws-kms-ecdh",
-    "required-encryption-context", "caching"
+    "streaming",
+    "MPL",
+    "hierarchical",
+    "raw-aes",
+    "raw-rsa",
+    "raw-ecdh",
+    "multi",
+    "aws-kms",
+    "aws-kms-multi",
+    "aws-kms-discovery",
+    "aws-kms-mrk",
+    "aws-kms-mrk-multi",
+    "aws-kms-mrk-discovery",
+    "aws-kms-rsa",
+    "aws-kms-ecdh",
+    "required-encryption-context",
+    "caching"
   ],
   "entries": [
     {
@@ -68,24 +79,42 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "branch": "lucasmcdonald3/esdk-test-server-hierarchical",
+        "branch": "kessplas/bug-config",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "ref": "lucasmcdonald3/esdk-test-server-hierarchical",
+        "ref": "kessplas/bug-config",
         "path": "esdk/test-server/server"
-      }
+      },
+      "bugConfigurationPath": "esdk/test-server/bug-configuration.json"
     },
     {
       "language": "python",
       "majorVersion": 4,
       "port": 8092,
       "supportedFeatures": [
-        "streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "required-encryption-context"
+        "streaming",
+        "MPL",
+        "hierarchical",
+        "raw-aes",
+        "raw-rsa",
+        "multi",
+        "aws-kms",
+        "aws-kms-multi",
+        "aws-kms-discovery",
+        "aws-kms-mrk",
+        "aws-kms-mrk-multi",
+        "aws-kms-mrk-discovery",
+        "aws-kms-rsa",
+        "required-encryption-context"
       ],
-      "unsupportedFeatures": ["raw-ecdh", "aws-kms-ecdh", "caching"],
+      "unsupportedFeatures": [
+        "raw-ecdh",
+        "aws-kms-ecdh",
+        "caching"
+      ],
       "libraryRepository": {
         "name": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
@@ -97,7 +126,12 @@
         "url": "git@github.com:aws/aws-crypto-tools-commons.git",
         "ref": "lucmcdon/esdk-test-server-all-languages",
         "path": "esdk/test-server/servers/python"
-      }
+      },
+      "knownBugs": [
+        "decrypt-accepts-trailing-bytes-commit-key",
+        "decrypt-accepts-trailing-bytes-commit-key-ecdsa",
+        "encrypt-accepts-reserved-prefix-encryption-context-key"
+      ]
     },
     {
       "language": "rust",
@@ -107,15 +141,16 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "kessplas/esdk-rust-test-server",
+        "branch": "kessplas/bug-config",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "kessplas/esdk-rust-test-server",
+        "ref": "kessplas/bug-config",
         "path": "esdk-test-server"
-      }
+      },
+      "bugConfigurationPath": "esdk-test-server/bug-configuration.json"
     },
     {
       "language": "rust-cpp",
@@ -125,15 +160,16 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "aws-crypto-rust/esdk-cpp-test-server",
+        "branch": "kessplas/bug-config-cpp",
         "path": "esdk/shims/aws-esdk-cpp"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "aws-crypto-rust/esdk-cpp-test-server",
+        "ref": "kessplas/bug-config-cpp",
         "path": "esdk-cpp-test-server"
-      }
+      },
+      "bugConfigurationPath": "esdk-cpp-test-server/bug-configuration.json"
     },
     {
       "language": "javascript",
@@ -143,15 +179,16 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "branch": "lucmcdon/esdk-test-server",
+        "branch": "kessplas/bug-config",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "ref": "lucmcdon/esdk-test-server",
+        "ref": "kessplas/bug-config",
         "path": "test-server"
-      }
+      },
+      "bugConfigurationPath": "test-server/bug-configuration.json"
     },
     {
       "language": "c",
@@ -161,15 +198,16 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-c",
         "url": "https://github.com/aws/aws-encryption-sdk-c",
-        "branch": "lucmcdon/esdk-test-server",
+        "branch": "kessplas/bug-config",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-c",
         "url": "https://github.com/aws/aws-encryption-sdk-c",
-        "ref": "lucmcdon/esdk-test-server",
+        "ref": "kessplas/bug-config",
         "path": "test-server"
-      }
+      },
+      "bugConfigurationPath": "test-server/bug-configuration.json"
     },
     {
       "language": "net",
@@ -179,15 +217,16 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "lucmcdon/esdk-test-servers",
+        "branch": "kessplas/bug-config",
         "path": "AwsEncryptionSDK/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "lucmcdon/esdk-test-servers",
+        "ref": "kessplas/bug-config",
         "path": "esdk-test-servers/net"
-      }
+      },
+      "bugConfigurationPath": "esdk-test-servers/net/bug-configuration.json"
     },
     {
       "language": "rust-dafny",
@@ -197,15 +236,16 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "lucmcdon/esdk-test-servers",
+        "branch": "kessplas/bug-config",
         "path": "releases/rust/esdk"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "lucmcdon/esdk-test-servers",
+        "ref": "kessplas/bug-config",
         "path": "esdk-test-servers/rust"
-      }
+      },
+      "bugConfigurationPath": "esdk-test-servers/rust/bug-configuration.json"
     },
     {
       "language": "go",
@@ -215,15 +255,16 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "lucmcdon/esdk-test-servers",
+        "branch": "kessplas/bug-config",
         "path": "releases/go/encryption-sdk"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "lucmcdon/esdk-test-servers",
+        "ref": "kessplas/bug-config",
         "path": "esdk-test-servers/go"
-      }
+      },
+      "bugConfigurationPath": "esdk-test-servers/go/bug-configuration.json"
     }
   ]
 }

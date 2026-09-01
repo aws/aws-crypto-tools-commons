@@ -178,23 +178,27 @@ class ConfigurationLoaderTest {
     }
 
     @Test
-    @DisplayName("parses the knownBugFixOverrides fix list")
-    void parsesKnownBugs() {
-        CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration("""
+    @DisplayName("parses an entry's bugConfigurationPath and inline knownBugs")
+    void parsesEntryBugConfiguration() {
+        ConfigurationSet set = ConfigurationLoader.parseConfigurationSet("""
             {
               "product": "esdk",
-              "knownBugFixOverrides": ["bug-a", "bug-b"]
+              "features": ["raw-aes"],
+              "entries": [
+                { "language": "python", "majorVersion": 4, "port": 8092,
+                  "knownBugs": ["bug-a", "bug-b"] },
+                { "language": "rust", "majorVersion": 1, "port": 8093,
+                  "bugConfigurationPath": "esdk-test-server/bug-configuration.json" }
+              ]
             }
             """);
-        assertEquals(List.of("bug-a", "bug-b"), config.knownBugs());
-    }
-
-    @Test
-    @DisplayName("absent knownBugFixOverrides parses as null (base ledger unchanged)")
-    void absentKnownBugsIsNull() {
-        CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration(
-            "{ \"product\": \"esdk\" }");
-        assertNull(config.knownBugs());
+        ConfigurationEntry python = set.entries().get(0);
+        ConfigurationEntry rust = set.entries().get(1);
+        assertEquals(List.of("bug-a", "bug-b"), python.knownBugs());
+        assertNull(python.bugConfigurationPath(),
+            "Python declares bugs inline, not via a separate file");
+        assertEquals("esdk-test-server/bug-configuration.json", rust.bugConfigurationPath());
+        assertNull(rust.knownBugs(), "a repo-backed server has no inline knownBugs");
     }
 
     // ------------------------------------------------------------------

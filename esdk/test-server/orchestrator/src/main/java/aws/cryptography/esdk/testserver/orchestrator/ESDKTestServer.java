@@ -114,6 +114,32 @@ public final class ESDKTestServer {
     }
 
     /**
+     * The repository-root-relative path to {@code entry}'s
+     * {@code bug-configuration.json}, or {@code null} when the entry declares no
+     * {@code bugConfigurationPath} (the server exhibits no bug, or declares its
+     * bugs inline as a repo-less language does). Unlike the commons-configuration
+     * file there is no default location: a server with bugs opts in explicitly.
+     */
+    static String bugConfigurationRelativePath(ConfigurationEntry entry) {
+        String configured = entry == null ? null : entry.bugConfigurationPath();
+        return configured == null || configured.isBlank() ? null : configured;
+    }
+
+    /**
+     * The bug ids {@code entry} declares, loaded from its
+     * {@code bug-configuration.json} under {@code root}. Empty when the entry
+     * declares no {@code bugConfigurationPath} or the file is absent (a server
+     * with zero bugs need not ship one).
+     */
+    private static List<String> loadBugs(Path root, ConfigurationEntry entry) {
+        String rel = bugConfigurationRelativePath(entry);
+        if (rel == null) {
+            return List.of();
+        }
+        return ConfigurationLoader.loadBugConfiguration(root.resolve(rel));
+    }
+
+    /**
      * The DEFAULT reference implementation: the language whose Language_Server
      * plays the immaterial side of single-sided Tests (the Tests read it from
      * {@code esdk.testserver.referenceImplementation}). Overridden per
@@ -282,9 +308,9 @@ public final class ESDKTestServer {
         Map<String, Declaration> declarations = new LinkedHashMap<>();
         FeatureValidation.Result onHand = FeatureValidation.Result.ok();
         if (context.kind() == RunContext.Kind.LANGUAGE) {
+            ConfigurationEntry ownEntry = configurationSet.forLanguage(context.ownLanguage());
             Path expected = context.languageRepoRoot()
-                .resolve(commonsConfigurationRelativePath(
-                    configurationSet.forLanguage(context.ownLanguage())));
+                .resolve(commonsConfigurationRelativePath(ownEntry));
             CommonsConfiguration own;
             try {
                 own = ConfigurationLoader.loadCommonsConfiguration(expected);
@@ -294,18 +320,25 @@ public final class ESDKTestServer {
                 return PipelineOutcome.aborted(FeatureValidation.carryingFileError(
                     context.ownLanguage(), expected.toString(), e.getMessage()).message());
             }
+            List<String> ownBugs;
+            try {
+                ownBugs = loadBugs(context.languageRepoRoot(), ownEntry);
+            } catch (ConfigurationLoadException e) {
+                return PipelineOutcome.aborted(
+                    "could not read the bug-configuration for language '"
+                        + context.ownLanguage() + "': " + e.getMessage());
+            }
             onHand = onHand
                 .and(FeatureValidation.validateDeclaration(catalog, context.ownLanguage(),
                     own.supportedFeatures(), own.unsupportedFeatures()))
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(context.ownLanguage(),
                     own.rawRsaPaddingSchemes(), own.supportedFeatures()))
-                .and(FeatureValidation.validateKnownBugs(
-                    context.ownLanguage(), own.knownBugs()))
+                .and(FeatureValidation.validateKnownBugs(context.ownLanguage(), ownBugs))
                 .and(FeatureValidation.validateProductMatch(context.invokingRepositoryName(),
                     own.product(), configurationSet.product()));
             declarations.put(context.ownLanguage(),
                 new Declaration(own.supportedFeatures(), own.unsupportedFeatures(),
-                    own.rawRsaPaddingSchemes(), own.knownBugs()));
+                    own.rawRsaPaddingSchemes(), ownBugs));
         }
         for (ConfigurationEntry entry : effectiveEntries) {
             if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
@@ -315,10 +348,11 @@ public final class ESDKTestServer {
                 .and(FeatureValidation.validateDeclaration(catalog,
                     entry.language(), entry.supportedFeatures(), entry.unsupportedFeatures()))
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(entry.language(),
-                    entry.rawRsaPaddingSchemes(), entry.supportedFeatures()));
+                    entry.rawRsaPaddingSchemes(), entry.supportedFeatures()))
+                .and(FeatureValidation.validateKnownBugs(entry.language(), entry.knownBugs()));
             declarations.put(entry.language(),
                 new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures(),
-                    entry.rawRsaPaddingSchemes(), null));
+                    entry.rawRsaPaddingSchemes(), entry.knownBugs()));
         }
         if (!onHand.valid()) {
             return PipelineOutcome.aborted(
@@ -406,6 +440,14 @@ public final class ESDKTestServer {
                 return PipelineOutcome.aborted(FeatureValidation.carryingFileError(
                     language, expected.toString(), e.getMessage()).message());
             }
+            List<String> carriedBugs;
+            try {
+                carriedBugs = loadBugs(server.get().root(), entry);
+            } catch (ConfigurationLoadException e) {
+                return PipelineOutcome.aborted(
+                    "could not read the bug-configuration for language '"
+                        + language + "': " + e.getMessage());
+            }
             String languageRepository = entry.serverLocation() != null
                 && entry.serverLocation().repository() != null
                 ? entry.serverLocation().repository() : language;
@@ -414,7 +456,7 @@ public final class ESDKTestServer {
                     carried.supportedFeatures(), carried.unsupportedFeatures())
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(language,
                     carried.rawRsaPaddingSchemes(), carried.supportedFeatures()))
-                .and(FeatureValidation.validateKnownBugs(language, carried.knownBugs()))
+                .and(FeatureValidation.validateKnownBugs(language, carriedBugs))
                 .and(FeatureValidation.validateProductMatch(languageRepository,
                     carried.product(), configurationSet.product()));
             if (!crossRepo.valid()) {
@@ -423,7 +465,7 @@ public final class ESDKTestServer {
             }
             declarations.put(language,
                 new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures(),
-                    carried.rawRsaPaddingSchemes(), carried.knownBugs()));
+                    carried.rawRsaPaddingSchemes(), carriedBugs));
         }
 
         // ---- Stage 5: build + launch every server as a subprocess on its
@@ -560,26 +602,26 @@ public final class ESDKTestServer {
                 rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
             }
         }
-        // Each launched Target that carries a known-bug override contributes a
-        // `<lang>:<major>:<repo>=<id>[;<id>…]` entry naming the base-ledger bugs
-        // this Target has fixed; the Tests remove that Target from each. A Target
-        // that declared no fixes contributes nothing, so a Commons_Run with no
-        // repository fixes sends none.
-        List<String> fixEntries = new ArrayList<>();
+        // Each launched Target that declares known bugs contributes a
+        // `<lang>:<major>:<repo>=<id>[;<id>…]` entry naming the bugs it exhibits;
+        // the Tests gate exactly those rows for that Target. A Target that
+        // declares no bug contributes nothing, so a run whose servers are all
+        // clean sends none.
+        List<String> bugEntries = new ArrayList<>();
         for (TestTarget target : targets) {
             Declaration declaration = declarations.get(target.language());
             if (declaration == null || declaration.knownBugs() == null
                     || declaration.knownBugs().isEmpty()) {
                 continue;
             }
-            fixEntries.add(target.language() + ":" + target.majorVersion() + ":"
+            bugEntries.add(target.language() + ":" + target.majorVersion() + ":"
                 + target.repository() + "=" + String.join(";", declaration.knownBugs()));
         }
-        String knownBugFixes = String.join(",", fixEntries);
+        String knownBugs = String.join(",", bugEntries);
 
         return new TestRunInput(
             targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation,
-            knownBugFixes);
+            knownBugs);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

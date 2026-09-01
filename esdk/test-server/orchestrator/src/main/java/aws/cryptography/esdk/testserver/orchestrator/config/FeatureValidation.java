@@ -110,14 +110,15 @@ public final class FeatureValidation {
     }
 
     /**
-     * Validate one Language_Repository's {@code knownBugFixOverrides} fix list structurally
-     * (the known-bug analogue of {@link #validateDeclaration}): no blank ids and
-     * no in-array duplicates. Whether an id names a real base-ledger bug is not
-     * checked here — a fix is applied idempotently by the Tests, which own that
-     * ledger, so an unknown or already-satisfied id is a harmless no-op there.
+     * Validate one Language_Server's {@code bug-configuration.json} list
+     * structurally (the known-bug analogue of {@link #validateDeclaration}): no
+     * blank ids and no duplicates. There is no central catalogue of bug ids, so
+     * membership is not checked — the list is authoritative for that server; a
+     * gate on an id no server declares simply asserts live everywhere.
      *
-     * @param language  the language whose fix list this is; named in every error
-     * @param knownBugs the parsed fix list, or {@code null} when the file carries none
+     * @param language  the language whose bug list this is; named in every error
+     * @param knownBugs the parsed bug ids, or {@code null} when the server ships
+     *                  no bug-configuration file (declares no bug)
      * @return a {@link Result} with one error per structural violation
      */
     public static Result validateKnownBugs(String language, List<String> knownBugs) {
@@ -125,8 +126,8 @@ public final class FeatureValidation {
             return Result.ok();
         }
         List<String> errors = new ArrayList<>();
-        addBlankErrors(errors, language, "knownBugFixOverrides", knownBugs);
-        addDuplicateErrors(errors, language, "known bug", "knownBugFixOverrides", knownBugs);
+        addBlankErrors(errors, language, "bug-configuration", knownBugs);
+        addDuplicateErrors(errors, language, "known bug", "bug-configuration", knownBugs);
         return Result.of(errors);
     }
 

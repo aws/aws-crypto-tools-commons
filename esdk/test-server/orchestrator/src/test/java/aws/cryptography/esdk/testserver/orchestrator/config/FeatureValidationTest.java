@@ -352,17 +352,17 @@ class FeatureValidationTest {
     }
 
     @Nested
-    @DisplayName("knownBugs fix-list structural validation")
+    @DisplayName("bug-configuration list structural validation")
     class KnownBugsFixList {
 
         @Test
-        @DisplayName("a null fix list is valid (the base ledger applies unchanged)")
+        @DisplayName("a null list is valid (the server ships no bug-configuration file)")
         void nullListIsValid() {
             assertTrue(FeatureValidation.validateKnownBugs("rust", null).valid());
         }
 
         @Test
-        @DisplayName("distinct fix ids are valid")
+        @DisplayName("distinct bug ids are valid")
         void distinctIdsAreValid() {
             FeatureValidation.Result r = FeatureValidation.validateKnownBugs(
                 "rust", List.of("bug-a", "bug-b"));

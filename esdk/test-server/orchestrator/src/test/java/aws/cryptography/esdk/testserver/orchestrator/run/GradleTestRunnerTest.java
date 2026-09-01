@@ -78,13 +78,13 @@ class GradleTestRunnerTest {
                 .noneMatch(a -> a.startsWith("-Desdk.testserver.rawRsaPaddingSchemes")),
             "no padding property when no language declares one: " + command);
         assertTrue(command.stream()
-                .noneMatch(a -> a.startsWith("-Desdk.testserver.knownBugFixes")),
-            "no known-bug-fixes property when no repository declared a fix: " + command);
+                .noneMatch(a -> a.startsWith("-Desdk.testserver.knownBugs")),
+            "no known-bugs property when no server declared a bug: " + command);
     }
 
     @Test
-    @DisplayName("resolved known-bug fixes are passed as the knownBugFixes property")
-    void commandCarriesKnownBugFixesWhenPresent() {
+    @DisplayName("resolved known bugs are passed as the knownBugs property")
+    void commandCarriesKnownBugsWhenPresent() {
         TestRunInput input = new TestRunInput(
             List.of(new TestTarget("rust", 1, "aws-crypto-tools-rust",
                 URI.create("http://127.0.0.1:8093"))),
@@ -97,9 +97,9 @@ class GradleTestRunnerTest {
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 
         assertTrue(command.contains(
-                "-Desdk.testserver.knownBugFixes="
+                "-Desdk.testserver.knownBugs="
                     + "rust:1:aws-crypto-tools-rust=encrypt-non-positive-frame-length-generic-error"),
-            "must pass the resolved known-bug fixes: " + command);
+            "must pass the resolved known bugs: " + command);
     }
 
     // ---- JUnit XML parsing ----------------------------------------------

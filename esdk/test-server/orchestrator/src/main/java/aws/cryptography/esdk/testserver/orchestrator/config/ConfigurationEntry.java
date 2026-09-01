@@ -41,7 +41,9 @@ public record ConfigurationEntry(
     List<String> supportedFeatures,
     List<String> unsupportedFeatures,
     List<String> rawRsaPaddingSchemes,
-    String commonsConfigurationPath
+    String commonsConfigurationPath,
+    String bugConfigurationPath,
+    List<String> knownBugs
 ) {
     public ConfigurationEntry {
         // Defensive copies; null is preserved to mean "absent from the JSON".
@@ -49,6 +51,23 @@ public record ConfigurationEntry(
         unsupportedFeatures = unsupportedFeatures == null ? null : List.copyOf(unsupportedFeatures);
         rawRsaPaddingSchemes =
             rawRsaPaddingSchemes == null ? null : List.copyOf(rawRsaPaddingSchemes);
+        knownBugs = knownBugs == null ? null : List.copyOf(knownBugs);
+    }
+
+    /**
+     * Convenience constructor for the pre-bug-configuration shape ending in
+     * {@code commonsConfigurationPath}: no {@code bugConfigurationPath} (the
+     * entry declares no separate bug-configuration file) and no inline
+     * {@code knownBugs}. Preserves that shape so existing call sites keep
+     * compiling.
+     */
+    public ConfigurationEntry(String language, Integer majorVersion, Integer port,
+            RepositoryCoordinates libraryRepository, ServerLocation serverLocation,
+            List<String> supportedFeatures, List<String> unsupportedFeatures,
+            List<String> rawRsaPaddingSchemes, String commonsConfigurationPath) {
+        this(language, majorVersion, port, libraryRepository, serverLocation,
+            supportedFeatures, unsupportedFeatures, rawRsaPaddingSchemes,
+            commonsConfigurationPath, null, null);
     }
 
     /**
