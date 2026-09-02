@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * The model of a Language_Repository's commons-configuration file (e.g.
- * {@code aws-crypto-tools-java/esdk/test-server/commons-configuration.json},
+ * {@code aws-crypto-tools-java/esdk/test-server/server-config.json + feature-config.json},
  * design "Commons-configuration file"). It carries:
  *
  * <ul>

@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Loads the two configuration file kinds of the TestServer: the commons
- * {@code Configuration_Set} ({@code configuration-set.json}) and a
+ * {@code Configuration_Set} ({@code server-config.json}) and a
  * Language_Repository's commons-configuration file.
  *
  * <p><b>Strict duplicate detection.</b> The shared mapper enables Jackson's
@@ -42,9 +42,28 @@ public final class ConfigurationLoader {
     // Configuration_Set
     // ------------------------------------------------------------------
 
-    /** Load and parse (without validating) the Configuration_Set at {@code path}. */
-    public static ConfigurationSet loadConfigurationSet(Path path) {
-        return parseConfigurationSet(read("Configuration_Set", path), path);
+    /**
+     * Load and parse (without validating) the Configuration_Set from a config
+     * directory holding {@code server-config.json} (product + entries) and
+     * {@code feature-config.json} (the Feature_Catalog), the two living side by
+     * side. Combined into one {@link ConfigurationSet}.
+     */
+    public static ConfigurationSet loadConfigurationSet(Path configDir) {
+        Path serverFile = configDir.resolve("server-config.json");
+        Path featureFile = configDir.resolve("feature-config.json");
+        JsonNode server = readObject("server-config", read("server-config", serverFile), serverFile);
+        JsonNode feature = readObject("feature-config", read("feature-config", featureFile), featureFile);
+        List<ConfigurationEntry> entries = new ArrayList<>();
+        JsonNode entriesNode = server.get("entries");
+        if (entriesNode != null && entriesNode.isArray()) {
+            for (JsonNode n : entriesNode) {
+                entries.add(parseEntry(n));
+            }
+        }
+        return new ConfigurationSet(
+            text(server, "product"),
+            stringList(feature.get("features")),
+            entries);
     }
 
     /** Parse (without validating) a Configuration_Set from a JSON string. */
@@ -71,9 +90,33 @@ public final class ConfigurationLoader {
     // Commons-configuration file (Language_Repository)
     // ------------------------------------------------------------------
 
-    /** Load and parse (without validating) the commons-configuration file at {@code path}. */
-    public static CommonsConfiguration loadCommonsConfiguration(Path path) {
-        return parseCommonsConfiguration(read("commons-configuration", path), path);
+    /**
+     * Load and parse (without validating) a Language_Server's config from its
+     * directory, combining {@code server-config.json} (Commons_Configuration_Entry
+     * + product + any configurationOverrides) and {@code feature-config.json}
+     * (the Feature_Declaration) — the two living side by side next to the
+     * server's {@code bug-config.json} — into one {@link CommonsConfiguration}.
+     */
+    public static CommonsConfiguration loadCommonsConfiguration(Path serverDir) {
+        Path serverFile = serverDir.resolve("server-config.json");
+        Path featureFile = serverDir.resolve("feature-config.json");
+        JsonNode server = readObject("server-config", read("server-config", serverFile), serverFile);
+        JsonNode feature = readObject("feature-config", read("feature-config", featureFile), featureFile);
+        List<ConfigurationEntry> overrides = null;
+        JsonNode overridesNode = server.get("configurationOverrides");
+        if (overridesNode != null && overridesNode.isArray()) {
+            overrides = new ArrayList<>();
+            for (JsonNode n : overridesNode) {
+                overrides.add(parseEntry(n));
+            }
+        }
+        return new CommonsConfiguration(
+            coordinates(server.get("commonsRepository")),
+            text(server, "product"),
+            stringList(feature.get("supportedFeatures")),
+            stringList(feature.get("unsupportedFeatures")),
+            stringList(feature.get("rawRsaPaddingSchemes")),
+            overrides);
     }
 
     /** Parse (without validating) a commons-configuration file from a JSON string. */
@@ -105,7 +148,7 @@ public final class ConfigurationLoader {
     // ------------------------------------------------------------------
 
     /**
-     * Load a Language_Server's {@code bug-configuration.json}: a flat JSON array
+     * Load a Language_Server's {@code bug-config.json}: a flat JSON array
      * of the bug ids that server currently exhibits (design "Bug Configuration").
      * A <b>missing</b> file means the server declares no bug (empty list) — a
      * server with zero bugs need not ship the file. A present-but-unparseable
@@ -160,8 +203,7 @@ public final class ConfigurationLoader {
             stringList(n.get("supportedFeatures")),
             stringList(n.get("unsupportedFeatures")),
             stringList(n.get("rawRsaPaddingSchemes")),
-            text(n, "commonsConfigurationPath"),
-            text(n, "bugConfigurationPath"),
+            text(n, "configPath"),
             stringList(n.get("knownBugs")));
     }
 

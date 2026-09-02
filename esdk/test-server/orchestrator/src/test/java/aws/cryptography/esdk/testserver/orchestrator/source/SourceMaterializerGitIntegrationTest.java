@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
  * pure/cheap coverage lives in {@link SourceMaterializerTest}; these exercise
  * actual clone, branch, path, and dirty-detection behavior: branch checkout,
  * a nonexistent branch, a missing Server_Location path, honest working-tree
- * dirt detection, and a poisoned nested {@code commons-configuration.json}
+ * dirt detection, and a poisoned nested {@code server-config.json}
  * that must never affect resolution (materialization looks only one level
  * deep by construction).
  */
@@ -187,21 +187,21 @@ class SourceMaterializerGitIntegrationTest {
     }
 
     // ------------------------------------------------------------------
-    // (e) A poisoned nested commons-configuration.json never affects
+    // (e) A poisoned nested server-config.json never affects
     //     resolution — one level deep by construction
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("a poisoned nested commons-configuration.json does not affect resolution (Req 3.7)")
+    @DisplayName("a poisoned nested server-config.json does not affect resolution (Req 3.7)")
     void poisonedNestedConfigurationIsInert() throws Exception {
-        // Two fixtures identical except one carries a commons-configuration.json
+        // Two fixtures identical except one carries a server-config.json
         // full of absurd overrides. Materialization must treat them identically.
         Path clean = initRepo(fixtures.resolve("clean"));
         commitFile(clean, "esdk/test-server/server/marker.txt", "server", "server commit");
 
         Path poisoned = initRepo(fixtures.resolve("poisoned"));
         commitFile(poisoned, "esdk/test-server/server/marker.txt", "server", "server commit");
-        commitFile(poisoned, "esdk/test-server/commons-configuration.json", """
+        commitFile(poisoned, "esdk/test-server/server-config.json", """
             {
               "commonsRepository": {
                 "name": "evil-commons",

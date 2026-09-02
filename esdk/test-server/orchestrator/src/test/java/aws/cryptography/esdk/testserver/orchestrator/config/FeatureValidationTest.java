@@ -304,13 +304,13 @@ class FeatureValidationTest {
         @DisplayName("the error names the language and the expected location")
         void namesLanguageAndLocation() {
             FeatureValidation.Result r = FeatureValidation.carryingFileError(
-                "java", "aws-crypto-tools-java/esdk/test-server/commons-configuration.json",
+                "java", "aws-crypto-tools-java/esdk/test-server/feature-config.json",
                 "file not found");
             assertFalse(r.valid());
             assertEquals(1, r.errors().size());
             assertTrue(r.errors().get(0).contains("java"));
             assertTrue(r.errors().get(0).contains(
-                "aws-crypto-tools-java/esdk/test-server/commons-configuration.json"));
+                "aws-crypto-tools-java/esdk/test-server/feature-config.json"));
             assertTrue(r.errors().get(0).contains("file not found"));
         }
 
@@ -318,10 +318,10 @@ class FeatureValidationTest {
         @DisplayName("a null cause is omitted from the message")
         void nullCauseOmitted() {
             FeatureValidation.Result r = FeatureValidation.carryingFileError(
-                "python", "config/configuration-set.json", null);
+                "python", "config/server-config.json", null);
             assertFalse(r.valid());
             assertTrue(r.errors().get(0).contains("python"));
-            assertTrue(r.errors().get(0).contains("config/configuration-set.json"));
+            assertTrue(r.errors().get(0).contains("config/server-config.json"));
         }
     }
 

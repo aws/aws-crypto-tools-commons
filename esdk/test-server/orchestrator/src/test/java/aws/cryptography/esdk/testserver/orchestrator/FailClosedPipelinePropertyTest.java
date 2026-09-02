@@ -448,17 +448,22 @@ class FailClosedPipelinePropertyTest {
             if (mode == ConfigMode.ABSENT) {
                 return;
             }
-            Path file = serverRoot.resolve(ESDKTestServer.COMMONS_CONFIGURATION_RELATIVE_PATH);
+            Path dir = serverRoot.resolve(ESDKTestServer.DEFAULT_CONFIG_DIRECTORY);
             try {
-                Files.createDirectories(file.getParent());
-                Files.writeString(file, switch (mode) {
-                    case UNPARSEABLE -> "{ this is not JSON";
-                    case WRONG_PRODUCT -> commonsConfigurationJson(product + "-mismatched");
-                    default -> commonsConfigurationJson(product);
-                });
+                Files.createDirectories(dir);
+                if (mode == ConfigMode.UNPARSEABLE) {
+                    // server-config.json is read first, so an unparseable one
+                    // aborts before feature-config.json is even consulted.
+                    Files.writeString(dir.resolve("server-config.json"), "{ this is not JSON");
+                    return;
+                }
+                String json = commonsConfigurationJson(
+                    mode == ConfigMode.WRONG_PRODUCT ? product + "-mismatched" : product);
+                Files.writeString(dir.resolve("server-config.json"), json);
+                Files.writeString(dir.resolve("feature-config.json"), json);
             } catch (IOException e) {
                 throw new UncheckedIOException(
-                    "scripted materializer could not write " + file, e);
+                    "scripted materializer could not write config under " + dir, e);
             }
         }
 

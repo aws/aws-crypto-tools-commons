@@ -79,7 +79,7 @@ import java.util.Map;
  *       directory, which is the orchestrator module when launched via
  *       Gradle).</li>
  *   <li>{@code -Desdk.testserver.config=<path>} — the Configuration_Set JSON
- *       (default {@code config/configuration-set.json} under the TestServer
+ *       (default {@code config/ directory} under the TestServer
  *       root — the Configuration_Set's TestServer-level home).</li>
  * </ul>
  *
@@ -114,7 +114,7 @@ public final class ESDKTestServerMain {
             workingDir.getParent() != null ? workingDir.getParent().toString() : workingDir.toString()));
         Path configPath = Path.of(System.getProperty(
             "esdk.testserver.config",
-            testServerRoot.resolve("config/configuration-set.json").toString()));
+            testServerRoot.resolve("config").toString()));
         Path testsModuleDir = testServerRoot.resolve("tests");
 
         // The commons checkout the run reads shared components from: the working
@@ -297,13 +297,13 @@ public final class ESDKTestServerMain {
     private static List<ConfigurationEntry> loadOverrides(
             Path languageRepoRoot, ConfigurationEntry ownEntry) {
         Path expected = languageRepoRoot.resolve(
-            ESDKTestServer.commonsConfigurationRelativePath(ownEntry));
+            ESDKTestServer.configDirectory(ownEntry));
         try {
             CommonsConfiguration own = ConfigurationLoader.loadCommonsConfiguration(expected);
             return own.configurationOverrides();
         } catch (ConfigurationLoadException e) {
             throw new IllegalArgumentException(
-                "could not read the commons-configuration file at " + expected
+                "could not read the server config at " + expected
                     + ": " + e.getMessage());
         }
     }

@@ -1,0 +1,167 @@
+{
+  "product": "esdk",
+  "entries": [
+    {
+      "language": "java",
+      "majorVersion": 3,
+      "port": 8091,
+      "configPath": "esdk/test-server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "branch": "kessplas/bug-config",
+        "path": "esdk"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "ref": "kessplas/bug-config",
+        "path": "esdk/test-server/server"
+      }
+    },
+    {
+      "language": "python",
+      "majorVersion": 4,
+      "port": 8092,
+      "configPath": "esdk/test-server/servers/python",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk-python",
+        "url": "https://github.com/aws/aws-encryption-sdk-python",
+        "branch": "master",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-commons",
+        "url": "git@github.com:aws/aws-crypto-tools-commons.git",
+        "ref": "lucmcdon/esdk-test-server-all-languages",
+        "path": "esdk/test-server/servers/python"
+      }
+    },
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8093,
+      "configPath": "esdk-test-server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "kessplas/bug-config",
+        "path": "esdk"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "kessplas/bug-config",
+        "path": "esdk-test-server"
+      }
+    },
+    {
+      "language": "rust-cpp",
+      "majorVersion": 1,
+      "port": 8094,
+      "configPath": "esdk-cpp-test-server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "kessplas/bug-config-cpp",
+        "path": "esdk/shims/aws-esdk-cpp"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust-cpp",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "kessplas/bug-config-cpp",
+        "path": "esdk-cpp-test-server"
+      }
+    },
+    {
+      "language": "javascript",
+      "majorVersion": 5,
+      "port": 8095,
+      "configPath": "test-server",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk-javascript",
+        "url": "https://github.com/aws/aws-encryption-sdk-javascript",
+        "branch": "kessplas/bug-config",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk-javascript",
+        "url": "https://github.com/aws/aws-encryption-sdk-javascript",
+        "ref": "kessplas/bug-config",
+        "path": "test-server"
+      }
+    },
+    {
+      "language": "c",
+      "majorVersion": 2,
+      "port": 8096,
+      "configPath": "test-server",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk-c",
+        "url": "https://github.com/aws/aws-encryption-sdk-c",
+        "branch": "kessplas/bug-config",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk-c",
+        "url": "https://github.com/aws/aws-encryption-sdk-c",
+        "ref": "kessplas/bug-config",
+        "path": "test-server"
+      }
+    },
+    {
+      "language": "net",
+      "majorVersion": 5,
+      "port": 8097,
+      "configPath": "esdk-test-servers/net",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "branch": "kessplas/bug-config",
+        "path": "AwsEncryptionSDK/runtimes/net"
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "ref": "kessplas/bug-config",
+        "path": "esdk-test-servers/net"
+      }
+    },
+    {
+      "language": "rust-dafny",
+      "majorVersion": 1,
+      "port": 8098,
+      "configPath": "esdk-test-servers/rust",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "branch": "kessplas/bug-config",
+        "path": "releases/rust/esdk"
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "ref": "kessplas/bug-config",
+        "path": "esdk-test-servers/rust"
+      }
+    },
+    {
+      "language": "go",
+      "majorVersion": 1,
+      "port": 8099,
+      "configPath": "esdk-test-servers/go",
+      "libraryRepository": {
+        "name": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "branch": "kessplas/bug-config",
+        "path": "releases/go/encryption-sdk"
+      },
+      "serverLocation": {
+        "repository": "aws-encryption-sdk",
+        "url": "https://github.com/aws/aws-encryption-sdk",
+        "ref": "kessplas/bug-config",
+        "path": "esdk-test-servers/go"
+      }
+    }
+  ]
+}

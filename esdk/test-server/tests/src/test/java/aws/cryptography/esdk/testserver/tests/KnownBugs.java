@@ -12,7 +12,7 @@ import java.util.Set;
  * is a Feature_Declaration concern, {@link FeatureDeclarations}).
  *
  * <p>There is <b>no central ledger</b>. Each Language_Server declares the bugs
- * it exhibits in its own repository's {@code bug-configuration.json} (a flat
+ * it exhibits in its own repository's {@code bug-config.json} (a flat
  * array of bug ids); a language with no repository (Python) declares them inline
  * in the Configuration_Set. The orchestrator resolves those per target and hands
  * the Tests {@value #PROPERTY} (mirroring {@code esdk.testserver.features}) — a
@@ -22,7 +22,7 @@ import java.util.Set;
  * Target that declares a bug tolerates exactly the assertion that bug breaks;
  * any other Target asserts live. Because the set is authoritative and
  * per-server, fixing a bug is simply removing its id from that server's
- * {@code bug-configuration.json} — no reconciliation and no central set to keep
+ * {@code bug-config.json} — no reconciliation and no central set to keep
  * in step.
  */
 public final class KnownBugs {

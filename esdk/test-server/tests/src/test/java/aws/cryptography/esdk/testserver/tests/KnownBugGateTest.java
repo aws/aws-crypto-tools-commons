@@ -50,7 +50,7 @@ class KnownBugGateTest {
             () -> KnownBugGate.gate("decrypt-accepts-garbage", JAVA, () -> {
             }, BUGS));
         assertEquals("declared known bug did not reproduce — remove decrypt-accepts-garbage for "
-                + "java-v3 in aws-crypto-tools-java from its bug-configuration.json",
+                + "java-v3 in aws-crypto-tools-java from its bug-config.json",
             stale.getMessage());
     }
 

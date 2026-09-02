@@ -178,27 +178,19 @@ class ConfigurationLoaderTest {
     }
 
     @Test
-    @DisplayName("parses an entry's bugConfigurationPath and inline knownBugs")
-    void parsesEntryBugConfiguration() {
+    @DisplayName("parses an entry's configPath (the server's config directory)")
+    void parsesEntryConfigPath() {
         ConfigurationSet set = ConfigurationLoader.parseConfigurationSet("""
             {
               "product": "esdk",
               "features": ["raw-aes"],
               "entries": [
-                { "language": "python", "majorVersion": 4, "port": 8092,
-                  "knownBugs": ["bug-a", "bug-b"] },
                 { "language": "rust", "majorVersion": 1, "port": 8093,
-                  "bugConfigurationPath": "esdk-test-server/bug-configuration.json" }
+                  "configPath": "esdk-test-server" }
               ]
             }
             """);
-        ConfigurationEntry python = set.entries().get(0);
-        ConfigurationEntry rust = set.entries().get(1);
-        assertEquals(List.of("bug-a", "bug-b"), python.knownBugs());
-        assertNull(python.bugConfigurationPath(),
-            "Python declares bugs inline, not via a separate file");
-        assertEquals("esdk-test-server/bug-configuration.json", rust.bugConfigurationPath());
-        assertNull(rust.knownBugs(), "a repo-backed server has no inline knownBugs");
+        assertEquals("esdk-test-server", set.entries().get(0).configPath());
     }
 
     // ------------------------------------------------------------------
@@ -255,9 +247,10 @@ class ConfigurationLoaderTest {
     @Test
     @DisplayName("a missing Configuration_Set file names the expected location")
     void missingConfigurationSetNamesExpectedLocation(@TempDir Path dir) {
-        Path expected = dir.resolve("config/configuration-set.json");
+        Path configDir = dir.resolve("config");
+        Path expected = configDir.resolve("server-config.json");
         ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
-            () -> ConfigurationLoader.loadConfigurationSet(expected));
+            () -> ConfigurationLoader.loadConfigurationSet(configDir));
         assertTrue(e.getMessage().contains(expected.toString()),
             "the error must name the expected location: " + e.getMessage());
         assertEquals(expected, e.expectedLocation());
@@ -266,19 +259,19 @@ class ConfigurationLoaderTest {
     @Test
     @DisplayName("a missing commons-configuration file names the expected location (Req 4.9)")
     void missingCommonsConfigurationNamesExpectedLocation(@TempDir Path dir) {
-        Path expected = dir.resolve("commons-configuration.json");
+        Path expected = dir.resolve("server-config.json");
         ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
-            () -> ConfigurationLoader.loadCommonsConfiguration(expected));
+            () -> ConfigurationLoader.loadCommonsConfiguration(dir));
         assertTrue(e.getMessage().contains(expected.toString()));
     }
 
     @Test
     @DisplayName("malformed JSON names the expected location and the cause")
     void malformedJsonNamesExpectedLocation(@TempDir Path dir) throws Exception {
-        Path file = dir.resolve("configuration-set.json");
+        Path file = dir.resolve("server-config.json");
         Files.writeString(file, "{ not json");
         ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
-            () -> ConfigurationLoader.loadConfigurationSet(file));
+            () -> ConfigurationLoader.loadConfigurationSet(dir));
         assertTrue(e.getMessage().contains(file.toString()));
         assertTrue(e.getMessage().contains("unparseable"));
     }
@@ -295,11 +288,11 @@ class ConfigurationLoaderTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the shipped config/configuration-set.json parses to the design schema (Req 1.3, 7.1, 7.3, 8.13)")
+    @DisplayName("the shipped config/ parses to the design schema (Req 1.3, 7.1, 7.3, 8.13)")
     void shippedConfigurationSetParses() {
         // The TestServer-level home: esdk/test-server/config/, a sibling of the
         // orchestrator module (the Gradle test working directory).
-        Path shipped = Path.of("..", "config", "configuration-set.json").toAbsolutePath().normalize();
+        Path shipped = Path.of("..", "config").toAbsolutePath().normalize();
         ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(shipped);
 
         assertEquals("esdk", set.product());
@@ -323,13 +316,12 @@ class ConfigurationLoaderTest {
         assertNotNull(python, "the shipped set must carry a python entry");
         assertEquals(4, python.majorVersion());
         assertEquals(8092, python.port());
-        assertEquals(List.of(
-            "streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "multi",
-            "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk",
-            "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa",
-            "required-encryption-context"), python.supportedFeatures());
-        assertEquals(List.of("raw-ecdh", "aws-kms-ecdh", "caching"),
-            python.unsupportedFeatures());
+        // Python's Feature_Declaration and bugs moved out of the entry into its
+        // own feature-config.json / bug-config.json under commons, so the entry
+        // carries no inline arrays now.
+        assertNull(python.supportedFeatures());
+        assertNull(python.unsupportedFeatures());
+        assertEquals("esdk/test-server/servers/python", python.configPath());
         assertEquals("aws-crypto-tools-commons", python.serverLocation().repository());
         assertEquals("esdk/test-server/servers/python", python.serverLocation().path());
 
@@ -343,40 +335,39 @@ class ConfigurationLoaderTest {
         assertEquals(8093, rust.port());
         assertEquals("aws-crypto-tools-rust", rust.serverLocation().repository());
         assertEquals("esdk-test-server", rust.serverLocation().path());
-        assertEquals("esdk-test-server/commons-configuration.json", rust.commonsConfigurationPath());
+        assertEquals("esdk-test-server", rust.configPath());
         assertNull(rust.supportedFeatures());
         assertNull(rust.unsupportedFeatures());
 
         // The remaining entries follow the same Language_Repository pattern:
-        // no inline arrays, a commonsConfigurationPath next to the server.
+        // no inline arrays, a configPath directory next to the server.
         assertLanguageRepositoryEntry(set, "rust-cpp", 1, 8094,
             "aws-crypto-tools-rust-cpp", "esdk-cpp-test-server",
-            "esdk-cpp-test-server/commons-configuration.json");
+            "esdk-cpp-test-server");
         assertLanguageRepositoryEntry(set, "javascript", 5, 8095,
             "aws-encryption-sdk-javascript", "test-server",
-            "test-server/commons-configuration.json");
+            "test-server");
         assertLanguageRepositoryEntry(set, "c", 2, 8096,
             "aws-encryption-sdk-c", "test-server",
-            "test-server/commons-configuration.json");
+            "test-server");
         assertLanguageRepositoryEntry(set, "net", 5, 8097,
             "aws-encryption-sdk", "esdk-test-servers/net",
-            "esdk-test-servers/net/commons-configuration.json");
+            "esdk-test-servers/net");
         assertLanguageRepositoryEntry(set, "rust-dafny", 1, 8098,
             "aws-encryption-sdk", "esdk-test-servers/rust",
-            "esdk-test-servers/rust/commons-configuration.json");
+            "esdk-test-servers/rust");
         assertLanguageRepositoryEntry(set, "go", 1, 8099,
             "aws-encryption-sdk", "esdk-test-servers/go",
-            "esdk-test-servers/go/commons-configuration.json");
+            "esdk-test-servers/go");
     }
 
     /**
      * Assert one shipped Language_Repository-pattern entry: its coordinates,
-     * its external declaration location, and that no inline Feature_Declaration
-     * is carried.
+     * its config directory, and that no inline Feature_Declaration is carried.
      */
     private static void assertLanguageRepositoryEntry(ConfigurationSet set, String language,
             int majorVersion, int port, String serverRepository, String serverPath,
-            String commonsConfigurationPath) {
+            String configPath) {
         ConfigurationEntry entry = set.forLanguage(language);
         assertNotNull(entry, "the shipped set must carry a " + language + " entry");
         assertEquals(majorVersion, entry.majorVersion(), language + " majorVersion");
@@ -385,8 +376,7 @@ class ConfigurationLoaderTest {
             language + " serverLocation.repository");
         assertEquals(serverPath, entry.serverLocation().path(),
             language + " serverLocation.path");
-        assertEquals(commonsConfigurationPath, entry.commonsConfigurationPath(),
-            language + " commonsConfigurationPath");
+        assertEquals(configPath, entry.configPath(), language + " configPath");
         assertNull(entry.supportedFeatures(), language + " carries no inline supportedFeatures");
         assertNull(entry.unsupportedFeatures(), language + " carries no inline unsupportedFeatures");
     }

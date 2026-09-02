@@ -64,7 +64,7 @@ import java.util.concurrent.Future;
  *   <li>Complete Feature validation for declarations obtained by
  *       materialization — a language whose effective entry carries no inline
  *       declaration reads it from
- *       {@code <server root>/esdk/test-server/commons-configuration.json}
+ *       {@code <server root>/esdk/test-server/feature-config.json}
  *       (e.g. Java's in a Commons_Run), including the product match
  *       (Requirements 8.4, 8.10, 8.11).</li>
  *   <li>Produce + emit the Resolution_Record — stdout block and
@@ -97,46 +97,34 @@ public final class ESDKTestServer {
      * Configuration_Entry whose Language_Repository places the file elsewhere
      * overrides this via {@code commonsConfigurationPath}.
      */
-    static final String COMMONS_CONFIGURATION_RELATIVE_PATH =
-        "esdk/test-server/commons-configuration.json";
+    /**
+     * The DEFAULT repository-root-relative config directory holding a
+     * Language_Server's {@code server-config.json}, {@code feature-config.json},
+     * and {@code bug-config.json} (design "Configuration files"). An entry whose
+     * Language_Repository places them elsewhere overrides this via
+     * {@code configPath}.
+     */
+    static final String DEFAULT_CONFIG_DIRECTORY = "esdk/test-server";
 
     /**
-     * The repository-root-relative path to {@code entry}'s commons-configuration
-     * file: the entry's {@code commonsConfigurationPath} when set, otherwise
-     * {@link #COMMONS_CONFIGURATION_RELATIVE_PATH}. Lets a Language_Repository
-     * whose layout differs from the default (e.g. the Rust server, whose sources
-     * live under {@code esdk-test-server/}) carry its declaration alongside them.
+     * The repository-root-relative config directory for {@code entry}: its
+     * {@code configPath} when set, otherwise {@link #DEFAULT_CONFIG_DIRECTORY}.
+     * The server's three config files live side by side in this directory.
      */
-    static String commonsConfigurationRelativePath(ConfigurationEntry entry) {
-        String configured = entry == null ? null : entry.commonsConfigurationPath();
+    static String configDirectory(ConfigurationEntry entry) {
+        String configured = entry == null ? null : entry.configPath();
         return configured == null || configured.isBlank()
-            ? COMMONS_CONFIGURATION_RELATIVE_PATH : configured;
+            ? DEFAULT_CONFIG_DIRECTORY : configured;
     }
 
     /**
-     * The repository-root-relative path to {@code entry}'s
-     * {@code bug-configuration.json}, or {@code null} when the entry declares no
-     * {@code bugConfigurationPath} (the server exhibits no bug, or declares its
-     * bugs inline as a repo-less language does). Unlike the commons-configuration
-     * file there is no default location: a server with bugs opts in explicitly.
-     */
-    static String bugConfigurationRelativePath(ConfigurationEntry entry) {
-        String configured = entry == null ? null : entry.bugConfigurationPath();
-        return configured == null || configured.isBlank() ? null : configured;
-    }
-
-    /**
-     * The bug ids {@code entry} declares, loaded from its
-     * {@code bug-configuration.json} under {@code root}. Empty when the entry
-     * declares no {@code bugConfigurationPath} or the file is absent (a server
-     * with zero bugs need not ship one).
+     * The bug ids {@code entry} declares, from {@code <configDir>/bug-config.json}
+     * under {@code root}. Empty when the file is absent (a server with zero bugs
+     * need not ship one).
      */
     private static List<String> loadBugs(Path root, ConfigurationEntry entry) {
-        String rel = bugConfigurationRelativePath(entry);
-        if (rel == null) {
-            return List.of();
-        }
-        return ConfigurationLoader.loadBugConfiguration(root.resolve(rel));
+        return ConfigurationLoader.loadBugConfiguration(
+            root.resolve(configDirectory(entry)).resolve("bug-config.json"));
     }
 
     /**
@@ -310,7 +298,7 @@ public final class ESDKTestServer {
         if (context.kind() == RunContext.Kind.LANGUAGE) {
             ConfigurationEntry ownEntry = configurationSet.forLanguage(context.ownLanguage());
             Path expected = context.languageRepoRoot()
-                .resolve(commonsConfigurationRelativePath(ownEntry));
+                .resolve(configDirectory(ownEntry));
             CommonsConfiguration own;
             try {
                 own = ConfigurationLoader.loadCommonsConfiguration(expected);
@@ -432,7 +420,7 @@ public final class ESDKTestServer {
                 return PipelineOutcome.aborted("no materialized server component for language '"
                     + language + "' to locate its Feature_Declaration");
             }
-            Path expected = server.get().root().resolve(commonsConfigurationRelativePath(entry));
+            Path expected = server.get().root().resolve(configDirectory(entry));
             CommonsConfiguration carried;
             try {
                 carried = ConfigurationLoader.loadCommonsConfiguration(expected);

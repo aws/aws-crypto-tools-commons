@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------
 # Asserts the shipped factoring of the ESDK TestServer as seen from the
 # Commons_Repository. This lives in config/tests/ because the Configuration_Set
-# (config/configuration-set.json) is the primary subject, following the
+# (config/server-config.json + feature-config.json) is the primary subject, following the
 # model/tests/*.sh precedent of a tests/ subdir under the owning component
 # (esdk/test-server/tests/ is the Tests Gradle module, so it is NOT a home for
 # shell checks about the repo).
@@ -41,7 +41,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"    # aws-crypto-tools-commons/esdk/test-server
 REPO_ROOT="$(cd "$TS_DIR/../.." && pwd)"     # aws-crypto-tools-commons
-CONFIG="$TS_DIR/config/configuration-set.json"
+SERVER_CONFIG="$TS_DIR/config/server-config.json"
+FEATURE_CONFIG="$TS_DIR/config/feature-config.json"
+PYTHON_FEATURE="$TS_DIR/servers/python/feature-config.json"
 MAKEFILE="$TS_DIR/Makefile"
 
 failures=0
@@ -57,17 +59,19 @@ repo_find() {
     -o "$@" -print 2>/dev/null
 }
 
-if [ ! -f "$CONFIG" ]; then
-    fail "Configuration_Set missing: $CONFIG"
-    echo "Aborting remaining checks." >&2
-    exit 1
-fi
+for f in "$SERVER_CONFIG" "$FEATURE_CONFIG"; do
+    if [ ! -f "$f" ]; then
+        fail "config file missing: $f"
+        echo "Aborting remaining checks." >&2
+        exit 1
+    fi
+done
 
 # ----------------------------------------------------------------------------
 # Check 1: Server_Locations — Java server in aws-crypto-tools-java, Python
 # server in commons (Req 1.1, 1.3)
 # ----------------------------------------------------------------------------
-if location_errors=$(python3 - "$CONFIG" <<'PY'
+if location_errors=$(python3 - "$SERVER_CONFIG" <<'PY'
 import json, sys
 cfg = json.load(open(sys.argv[1]))
 entries = {e.get("language"): e for e in cfg.get("entries", [])}
@@ -103,7 +107,7 @@ else
     if [ -n "$location_errors" ]; then
         fail "Server_Location violation: ${location_errors//$'\n'/; } (Req 1.1, 1.3)"
     else
-        fail "configuration-set.json is not parseable JSON (Req 1.1, 1.3)"
+        fail "server-config.json is not parseable JSON (Req 1.1, 1.3)"
     fi
 fi
 
@@ -132,13 +136,14 @@ fi
 # Check 4: product is "esdk" and the Feature_Catalog is exactly
 # ["streaming", "MPL"] (Req 7.1, 7.3)
 # ----------------------------------------------------------------------------
-if catalog_errors=$(python3 - "$CONFIG" <<'PY'
+if catalog_errors=$(python3 - "$SERVER_CONFIG" "$FEATURE_CONFIG" <<'PY'
 import json, sys
-cfg = json.load(open(sys.argv[1]))
+server = json.load(open(sys.argv[1]))
+feature = json.load(open(sys.argv[2]))
 errors = []
-if cfg.get("product") != "esdk":
-    errors.append('product is %r, expected exactly "esdk"' % cfg.get("product"))
-features = cfg.get("features")
+if server.get("product") != "esdk":
+    errors.append('product is %r, expected exactly "esdk"' % server.get("product"))
+features = feature.get("features")
 if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "raw-ecdh", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "aws-kms-ecdh", "required-encryption-context", "caching"]):
     errors.append('Feature_Catalog is %r, expected exactly the per-keyring/per-CMM Feature_Catalog' % features)
 print("\n".join(errors))
@@ -150,18 +155,16 @@ else
     if [ -n "$catalog_errors" ]; then
         fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; } (Req 7.1, 7.3)"
     else
-        fail "configuration-set.json is not parseable JSON (Req 7.1, 7.3)"
+        fail "server-config.json / feature-config.json is not parseable JSON (Req 7.1, 7.3)"
     fi
 fi
 
 # ----------------------------------------------------------------------------
 # Check 5: Python Feature_Declaration supports streaming + MPL (Req 8.13)
 # ----------------------------------------------------------------------------
-if declaration_errors=$(python3 - "$CONFIG" <<'PY'
+if declaration_errors=$(python3 - "$PYTHON_FEATURE" <<'PY'
 import json, sys
-cfg = json.load(open(sys.argv[1]))
-entries = {e.get("language"): e for e in cfg.get("entries", [])}
-python = entries.get("python") or {}
+python = json.load(open(sys.argv[1]))
 supported = python.get("supportedFeatures")
 unsupported = python.get("unsupportedFeatures")
 errors = []
@@ -184,7 +187,7 @@ else
     if [ -n "$declaration_errors" ]; then
         fail "python Feature_Declaration violation: ${declaration_errors//$'\n'/; } (Req 8.13)"
     else
-        fail "configuration-set.json is not parseable JSON (Req 8.13)"
+        fail "python feature-config.json is not parseable JSON (Req 8.13)"
     fi
 fi
 

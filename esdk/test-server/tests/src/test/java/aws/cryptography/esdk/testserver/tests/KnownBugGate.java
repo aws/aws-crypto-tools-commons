@@ -16,7 +16,7 @@ import org.opentest4j.TestAbortedException;
  *       failure as its cause.</li>
  *   <li>Declared, and the assertion passes: the row FAILS — the declaration is
  *       stale, and the id must be removed from that server's
- *       {@code bug-configuration.json}.</li>
+ *       {@code bug-config.json}.</li>
  * </ul>
  *
  * <p>A bug is declared against a {@code (language, majorVersion, repository)}
@@ -36,7 +36,7 @@ public final class KnownBugGate {
      * Run {@code assertion} under expected-failure semantics for {@code bugId}
      * when {@code actingTarget} — the target whose behavior the assertion checks
      * (the decryptor for a decrypt-side Test, the single target for a per-server
-     * Test) — declares the bug in its own {@code bug-configuration.json}.
+     * Test) — declares the bug in its own {@code bug-config.json}.
      *
      * @throws AssertionError if the declared bug did not reproduce, or
      *     (propagated) if the assertion fails for a target that does not declare it
@@ -70,7 +70,7 @@ public final class KnownBugGate {
         }
         throw new AssertionError(
             "declared known bug did not reproduce — remove " + bugId + " for "
-                + target.label() + " from its bug-configuration.json");
+                + target.label() + " from its bug-config.json");
     }
 
     /** Run the assertion with every outcome propagated unchanged. */

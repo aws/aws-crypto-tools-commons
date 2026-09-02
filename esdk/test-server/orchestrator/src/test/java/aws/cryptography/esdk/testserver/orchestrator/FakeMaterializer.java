@@ -24,7 +24,7 @@ import java.util.StringJoiner;
  * materialization is exercised by the real-git integration tests).
  *
  * <p>For every {@code server:<lang>} component it also writes a catalog-complete
- * {@code esdk/test-server/commons-configuration.json} under the resolved server
+ * {@code esdk/test-server/server-config.json + feature-config.json} under the resolved server
  * root, so the orchestrator's stage-3 cross-repository Feature validation finds
  * a valid declaration (every catalog Feature supported, {@code product}
  * matching the run's Configuration_Set). This lets a language whose stored
@@ -92,19 +92,24 @@ final class FakeMaterializer implements Materializer {
     }
 
     /**
-     * Write a catalog-complete {@code commons-configuration.json} under the
+     * Write a catalog-complete {@code server-config.json + feature-config.json} under the
      * server component's resolved root (at the design's
-     * {@code esdk/test-server/commons-configuration.json} relative path) so the
+     * {@code esdk/test-server/server-config.json + feature-config.json} relative path) so the
      * orchestrator's stage-3 cross-repository Feature validation read succeeds.
      */
     private void writeCommonsConfiguration(Path serverRoot, List<String> paddingSchemes) {
-        Path file = serverRoot.resolve(ESDKTestServer.COMMONS_CONFIGURATION_RELATIVE_PATH);
+        Path dir = serverRoot.resolve(ESDKTestServer.DEFAULT_CONFIG_DIRECTORY);
+        String json = commonsConfigurationJson(paddingSchemes);
         try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, commonsConfigurationJson(paddingSchemes));
+            Files.createDirectories(dir);
+            // The loaders read each file selectively (server-config.json:
+            // commonsRepository/product; feature-config.json: the declaration),
+            // so the same catalog-complete object satisfies both.
+            Files.writeString(dir.resolve("server-config.json"), json);
+            Files.writeString(dir.resolve("feature-config.json"), json);
         } catch (IOException e) {
             throw new UncheckedIOException(
-                "fake materializer could not write " + file, e);
+                "fake materializer could not write config under " + dir, e);
         }
     }
 

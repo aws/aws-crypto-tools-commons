@@ -13,7 +13,7 @@
 # The Java Language_Server is NOT hosted here: it lives in the
 # aws-crypto-tools-java Language_Repository at esdk/test-server/server
 # (Requirement 1.2), and the orchestrated run resolves it from the java
-# entry's Server_Location in config/configuration-set.json (Requirement 1.5).
+# entry's Server_Location in config/server-config.json (Requirement 1.5).
 #
 # THE SINGLE ORCHESTRATED ENTRY POINT
 # -----------------------------------

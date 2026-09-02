@@ -27,7 +27,7 @@ import java.util.List;
  *                            every scheme the Smithy model defines (see
  *                            {@link FeatureValidation#validateRawRsaPaddingSchemes})
  * @param commonsConfigurationPath repository-root-relative path to this
- *                            language's commons-configuration.json (its external
+ *                            language's feature-config.json (its external
  *                            Feature_Declaration); {@code null} means the default
  *                            location applies (a Language_Repository whose layout
  *                            differs from the default sets this)
@@ -41,8 +41,7 @@ public record ConfigurationEntry(
     List<String> supportedFeatures,
     List<String> unsupportedFeatures,
     List<String> rawRsaPaddingSchemes,
-    String commonsConfigurationPath,
-    String bugConfigurationPath,
+    String configPath,
     List<String> knownBugs
 ) {
     public ConfigurationEntry {
@@ -55,33 +54,29 @@ public record ConfigurationEntry(
     }
 
     /**
-     * Convenience constructor for the pre-bug-configuration shape ending in
-     * {@code commonsConfigurationPath}: no {@code bugConfigurationPath} (the
-     * entry declares no separate bug-configuration file) and no inline
-     * {@code knownBugs}. Preserves that shape so existing call sites keep
-     * compiling.
+     * Convenience constructor ending in {@code configPath} (the directory
+     * holding this server's server-config.json / feature-config.json /
+     * bug-config.json), with no inline {@code knownBugs}.
      */
     public ConfigurationEntry(String language, Integer majorVersion, Integer port,
             RepositoryCoordinates libraryRepository, ServerLocation serverLocation,
             List<String> supportedFeatures, List<String> unsupportedFeatures,
-            List<String> rawRsaPaddingSchemes, String commonsConfigurationPath) {
+            List<String> rawRsaPaddingSchemes, String configPath) {
         this(language, majorVersion, port, libraryRepository, serverLocation,
             supportedFeatures, unsupportedFeatures, rawRsaPaddingSchemes,
-            commonsConfigurationPath, null, null);
+            configPath, null);
     }
 
     /**
      * Convenience constructor for an entry with no {@code rawRsaPaddingSchemes}
-     * capability — every scheme is supported. Preserves the pre-capability
-     * {@code (…, commonsConfigurationPath)} shape so existing call sites keep
-     * compiling.
+     * capability — every scheme is supported.
      */
     public ConfigurationEntry(String language, Integer majorVersion, Integer port,
             RepositoryCoordinates libraryRepository, ServerLocation serverLocation,
             List<String> supportedFeatures, List<String> unsupportedFeatures,
-            String commonsConfigurationPath) {
+            String configPath) {
         this(language, majorVersion, port, libraryRepository, serverLocation,
-            supportedFeatures, unsupportedFeatures, null, commonsConfigurationPath);
+            supportedFeatures, unsupportedFeatures, null, configPath);
     }
 
     /**

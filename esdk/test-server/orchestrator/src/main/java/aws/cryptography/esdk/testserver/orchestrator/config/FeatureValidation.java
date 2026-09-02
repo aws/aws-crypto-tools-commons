@@ -110,7 +110,7 @@ public final class FeatureValidation {
     }
 
     /**
-     * Validate one Language_Server's {@code bug-configuration.json} list
+     * Validate one Language_Server's {@code bug-config.json} list
      * structurally (the known-bug analogue of {@link #validateDeclaration}): no
      * blank ids and no duplicates. There is no central catalogue of bug ids, so
      * membership is not checked — the list is authoritative for that server; a
