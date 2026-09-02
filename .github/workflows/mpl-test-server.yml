@@ -75,12 +75,9 @@ jobs:
           sccache --version
 
       - name: Resolve the Rust Language_Server coordinates from the Configuration_Set
-        # Single source of truth: the url/ref the orchestrate step clones come
-        # from config/configuration-set.json, not from a literal in this file,
-        # so the two can never drift. The resolved tip commit also keys the
-        # caches below, so a push to the Rust branch invalidates only its
-        # entries. An unresolvable tip degrades to a per-run key: the cache
-        # misses and the run builds cold.
+        # Single source of truth: the url and ref the orchestrate step clones
+        # come from config/configuration-set.json, not from a literal in this
+        # file, so the workflow and the Configuration_Set cannot drift.
         id: rust
         run: |
           set -euo pipefail
@@ -91,17 +88,11 @@ jobs:
             echo "::error::could not read the rust serverLocation url/ref from $config" >&2
             exit 1
           fi
-          tip=$(git ls-remote "$url" "refs/heads/$ref" | cut -f1 || true)
-          if [ -z "$tip" ]; then
-            echo "::warning::could not resolve $url @ $ref — the Rust caches miss this run"
-            tip="unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          fi
           {
             echo "url=$url"
             echo "ref=$ref"
-            echo "tip=$tip"
           } >> "$GITHUB_OUTPUT"
-          echo "rust Language_Server: $url @ $ref -> $tip"
+          echo "rust Language_Server: $url @ $ref"
 
       - name: Restore the cargo downloads + sccache compiler cache
         # Explicit restore/save split rather than actions/cache: the orchestrate
