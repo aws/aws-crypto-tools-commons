@@ -1,8 +1,9 @@
 # MPL TestServer CI (aws-crypto-tools-commons)
 #
-# Validates the model, builds the client + tests, and builds the orchestrator.
-# The full orchestrated run (launch Rust server + run tests) will be enabled
-# once the Rust MPL server branch merges and toolchain requirements are met.
+# A Commons_Run: validate the model, build the Test_Client + Tests +
+# Orchestrator, then run the single orchestrated pipeline, which clones the
+# Rust Language_Server at the ref in its Configuration_Entry, builds it,
+# launches it, and runs the Tests over the target matrix.
 name: MPL TestServer
 
 on:
@@ -28,7 +29,17 @@ jobs:
         working-directory: mpl/test-server
 
     env:
+      # No Gradle daemon: a daemon captures its environment at start and reuses
+      # it, so any per-step environment the orchestrator's forked JVMs need
+      # would go stale.
       GRADLE_OPTS: -Dorg.gradle.daemon=false
+      # sccache rather than caching target/: the orchestrated run clones the
+      # Rust repo fresh each run, giving every source a new mtime, so a
+      # restored target/ produces an incorrect incremental build. sccache keys
+      # on a hash of the compiler inputs, so it survives the fresh clone.
+      RUSTC_WRAPPER: sccache
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_IDLE_TIMEOUT: "0"
 
     steps:
       - uses: actions/checkout@v4
@@ -51,57 +62,156 @@ jobs:
           rustup default stable
           cargo --version
 
-      - name: Authenticate private repo clones
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
+      - name: Set up sccache (Rust compiler cache)
         run: |
           set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "::warning::LANGUAGE_REPO_PAT secret not set — orchestrate step will fail to clone private repos"
-          else
-            git config --global url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf "https://github.com/"
-            git config --global url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf "git@github.com:"
-          fi
+          SCCACHE_VERSION="v0.8.2"
+          base="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
+          url="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${base}.tar.gz"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/sccache.tar.gz"
+          tar -xzf "$tmp/sccache.tar.gz" -C "$tmp"
+          sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
+          sccache --version
 
-      - name: Cache Rust build artifacts
-        uses: actions/cache@v4
+      - name: Resolve the Rust Language_Server coordinates from the Configuration_Set
+        # Single source of truth: the url/ref the orchestrate step clones come
+        # from config/configuration-set.json, not from a literal in this file,
+        # so the two can never drift. The resolved tip commit also keys the
+        # caches below, so a push to the Rust branch invalidates only its
+        # entries. An unresolvable tip degrades to a per-run key: the cache
+        # misses and the run builds cold.
+        id: rust
+        run: |
+          set -euo pipefail
+          config=config/configuration-set.json
+          url=$(jq -r '.entries[] | select(.language=="rust") | .serverLocation.url' "$config")
+          ref=$(jq -r '.entries[] | select(.language=="rust") | .serverLocation.ref' "$config")
+          if [ -z "$url" ] || [ "$url" = "null" ] || [ -z "$ref" ] || [ "$ref" = "null" ]; then
+            echo "::error::could not read the rust serverLocation url/ref from $config" >&2
+            exit 1
+          fi
+          tip=$(git ls-remote "$url" "refs/heads/$ref" | cut -f1 || true)
+          if [ -z "$tip" ]; then
+            echo "::warning::could not resolve $url @ $ref — the Rust caches miss this run"
+            tip="unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          fi
+          {
+            echo "url=$url"
+            echo "ref=$ref"
+            echo "tip=$tip"
+          } >> "$GITHUB_OUTPUT"
+          echo "rust Language_Server: $url @ $ref -> $tip"
+
+      - name: Restore the cargo downloads + sccache compiler cache
+        # Explicit restore/save split rather than actions/cache: the orchestrate
+        # step exits non-zero on a failed Test, and the combined action's
+        # implicit post step only saves on job SUCCESS — so it never saved
+        # anything here. The matching save step runs `if: always()`.
+        id: cargo-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-mpl-${{ hashFiles('**/Cargo.lock') }}
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-mpl-test-server-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            ${{ runner.os }}-cargo-mpl-
+            ${{ runner.os }}-cargo-mpl-test-server-
+
+      - name: Restore the Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ runner.os }}-gradle-mpl-test-server-${{ hashFiles(
+              'mpl/test-server/*/build.gradle.kts',
+              'mpl/test-server/*/settings.gradle.kts',
+              'mpl/test-server/*/gradle.properties',
+              'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-mpl-test-server-
 
       - name: Build client-java (codegen)
-        run: |
-          cd client-java
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
-          ./gradlew build
+        run: cd client-java && ./gradlew build
 
       - name: Build tests
-        run: |
-          cd tests
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
-          ./gradlew build
+        run: cd tests && ./gradlew build
 
       - name: Build orchestrator
-        run: |
-          cd orchestrator
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
-          ./gradlew build
+        run: cd orchestrator && ./gradlew build
 
-      - name: Orchestrate (clone Rust MPL server from configured branch, build, launch, test)
+      - name: Orchestrate (clone the Rust MPL server, build, launch, test)
         env:
           LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
+          RUST_SERVER_URL: ${{ steps.rust.outputs.url }}
+          RUST_SERVER_REF: ${{ steps.rust.outputs.ref }}
         run: |
           set -euo pipefail
+          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
+            echo "::error::the LANGUAGE_REPO_PAT secret is empty or unset." >&2
+            echo "aws-crypto-tools-rust is private and the default Actions token only" >&2
+            echo "reaches this repo, so the Rust Language_Server clone cannot succeed." >&2
+            echo "Add a repository/org secret named LANGUAGE_REPO_PAT with read access to" >&2
+            echo "its contents (a fine-grained PAT with 'Contents: Read', or a classic PAT" >&2
+            echo "with the 'repo' scope)." >&2
+            exit 1
+          fi
+          # Rewrite the configured URL to an authenticated HTTPS clone. The PAT
+          # is never inlined in the command, so it is not echoed and does not
+          # land in the clone's .git/config as a remote URL.
+          auth_url="${RUST_SERVER_URL/https:\/\/github.com\//https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/}"
           CLONE_DIR="/tmp/mpl-testserver-clones/rust"
           rm -rf "$CLONE_DIR"
           git clone --depth 1 --single-branch \
-            --branch aws-crypto-rust/mpl-test-server \
-            "https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/aws/aws-crypto-tools-rust.git" \
-            "$CLONE_DIR"
+            --branch "$RUST_SERVER_REF" "$auth_url" "$CLONE_DIR"
+          git -C "$CLONE_DIR" remote set-url origin "$RUST_SERVER_URL"
           cd orchestrator
           ./gradlew --console=plain run \
             --args="context=language:rust languageRepoRoot=$CLONE_DIR"
+
+      - name: Rust compiler cache stats (sccache)
+        if: always()
+        run: sccache --show-stats || true
+
+      - name: Upload the server log + test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpl-test-server-reports
+          path: |
+            /tmp/mpl-testserver-clones/rust/mpl-test-server/.server.log
+            mpl/test-server/tests/build/reports/tests
+            mpl/test-server/tests/build/test-results
+          if-no-files-found: ignore
+
+      # Cache saves run `if: always()` because the orchestrate step exits
+      # non-zero on a failed Test; a save gated on job success would never run.
+      - name: Save the cargo downloads + sccache compiler cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-mpl-test-server-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save the Gradle cache
+        if: always() && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ runner.os }}-gradle-mpl-test-server-${{ hashFiles(
+              'mpl/test-server/*/build.gradle.kts',
+              'mpl/test-server/*/settings.gradle.kts',
+              'mpl/test-server/*/gradle.properties',
+              'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
