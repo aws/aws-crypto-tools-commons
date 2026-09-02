@@ -137,7 +137,7 @@ public final class NodeLaunchPlan implements Launcher {
         //    clone — root npm ci + npm run build-node, then tsc in the server.
         //    Skipped when the stamp shows a successful build of this exact
         //    commit already sits in the (reused) clone.
-        if (!buildUpToDate(serverDir, server.commit(), buildStampName)) {
+        if (!buildUpToDate(serverDir, server.commit(), server.dirty(), buildStampName)) {
             runBuildStep(language, "npm ci --unsafe-perm", installCommand(npm), repoRoot);
             runBuildStep(language, "npm run build-node", buildModulesCommand(npm), repoRoot);
             runBuildStep(language, "npx tsc -p tsconfig.json", buildServerCommand(), serverDir);
@@ -183,10 +183,17 @@ public final class NodeLaunchPlan implements Launcher {
 
     /**
      * Whether {@code serverDir} already holds a successful build of
-     * {@code commit}: the stamp records exactly that commit and the compiled
-     * entry point exists.
+     * {@code commit}: the stamp records exactly that commit, the compiled
+     * entry point exists, <em>and</em> the source is not modified since the
+     * stamp was written. A working-tree component whose {@code dirty} flag
+     * is {@code true} always forces a rebuild — commit hash alone cannot
+     * capture uncommitted source edits. {@code null} dirty indicates a
+     * clone component (never dirty).
      */
-    static boolean buildUpToDate(Path serverDir, String commit, String buildStampName) {
+    static boolean buildUpToDate(Path serverDir, String commit, Boolean dirty, String buildStampName) {
+        if (dirty != null && dirty) {
+            return false;
+        }
         Path stamp = serverDir.resolve(buildStampName);
         if (!Files.isRegularFile(stamp)
                 || !Files.isRegularFile(serverDir.resolve(SERVER_ENTRY))) {

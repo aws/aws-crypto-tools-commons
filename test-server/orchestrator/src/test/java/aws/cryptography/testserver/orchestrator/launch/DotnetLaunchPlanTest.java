@@ -123,28 +123,35 @@ class DotnetLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the build is up to date only when the stamp holds the exact commit and the assembly exists")
+    @DisplayName("the build is up to date only when the stamp holds the exact commit, the assembly exists, and the source is clean")
     void buildUpToDate(@TempDir Path serverDir) throws Exception {
         String commit = "0123456789abcdef0123456789abcdef01234567";
+        String dllPath = "bin/Release/net8.0/EsdkTestServer.dll";
 
-        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp", "bin/Release/net8.0/EsdkTestServer.dll"),
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp", dllPath),
             "no stamp, no assembly: build required");
 
-        Path dll = serverDir.resolve("bin/Release/net8.0/EsdkTestServer.dll");
+        Path dll = serverDir.resolve(dllPath);
         Files.createDirectories(dll.getParent());
         Files.writeString(dll, "assembly");
-        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp", "bin/Release/net8.0/EsdkTestServer.dll"),
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp", dllPath),
             "assembly without a stamp: build required");
 
         Files.writeString(serverDir.resolve(".esdk-build-stamp"), commit + "\n");
-        assertTrue(DotnetLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp", "bin/Release/net8.0/EsdkTestServer.dll"),
-            "matching stamp + assembly: build skipped");
+        assertTrue(DotnetLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp", dllPath),
+            "matching stamp + assembly (clone): build skipped");
 
-        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, "f".repeat(40), ".esdk-build-stamp", "bin/Release/net8.0/EsdkTestServer.dll"),
+        assertTrue(DotnetLaunchPlan.buildUpToDate(serverDir, commit, Boolean.FALSE, ".esdk-build-stamp", dllPath),
+            "matching stamp + assembly + clean working tree: build skipped");
+
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, Boolean.TRUE, ".esdk-build-stamp", dllPath),
+            "matching stamp but dirty working tree: build required (uncommitted source may not match the stamped commit)");
+
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, "f".repeat(40), null, ".esdk-build-stamp", dllPath),
             "a different commit never reuses the stamped build");
 
         Files.delete(dll);
-        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp", "bin/Release/net8.0/EsdkTestServer.dll"),
+        assertFalse(DotnetLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp", dllPath),
             "matching stamp without the assembly: build required");
     }
 

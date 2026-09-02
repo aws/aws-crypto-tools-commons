@@ -87,27 +87,33 @@ class NodeLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the build is up to date only when the stamp holds the exact commit and the entry point exists")
+    @DisplayName("the build is up to date only when the stamp holds the exact commit, the entry point exists, and the source is clean")
     void buildUpToDate(@TempDir Path serverDir) throws Exception {
         String commit = "0123456789abcdef0123456789abcdef01234567";
 
-        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp"),
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp"),
             "no stamp, no entry point: build required");
 
         Files.createDirectories(serverDir.resolve("build/src"));
         Files.writeString(serverDir.resolve(NodeLaunchPlan.SERVER_ENTRY), "// entry");
-        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp"),
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp"),
             "entry point without a stamp: build required");
 
         Files.writeString(serverDir.resolve(".esdk-build-stamp"), commit + "\n");
-        assertTrue(NodeLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp"),
-            "matching stamp + entry point: build skipped");
+        assertTrue(NodeLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp"),
+            "matching stamp + entry point (clone): build skipped");
 
-        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, "f".repeat(40), ".esdk-build-stamp"),
+        assertTrue(NodeLaunchPlan.buildUpToDate(serverDir, commit, Boolean.FALSE, ".esdk-build-stamp"),
+            "matching stamp + entry point + clean working tree: build skipped");
+
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, Boolean.TRUE, ".esdk-build-stamp"),
+            "matching stamp but dirty working tree: build required (uncommitted source may not match the stamped commit)");
+
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, "f".repeat(40), null, ".esdk-build-stamp"),
             "a different commit never reuses the stamped build");
 
         Files.delete(serverDir.resolve(NodeLaunchPlan.SERVER_ENTRY));
-        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, ".esdk-build-stamp"),
+        assertFalse(NodeLaunchPlan.buildUpToDate(serverDir, commit, null, ".esdk-build-stamp"),
             "matching stamp without the entry point: build required");
     }
 
