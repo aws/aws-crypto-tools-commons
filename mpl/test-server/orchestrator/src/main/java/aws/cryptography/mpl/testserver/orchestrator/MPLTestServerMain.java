@@ -58,6 +58,7 @@ public final class MPLTestServerMain {
         }
 
         List<LaunchedServer> servers = new ArrayList<>();
+        int exitCode;
         try {
             for (ConfigurationEntry entry : config.entries()) {
                 System.out.println("    launching " + entry.language() + " on port " + entry.port());
@@ -73,19 +74,23 @@ public final class MPLTestServerMain {
                 .collect(Collectors.joining(","));
 
             System.out.println("==> Running tests");
-            int exitCode = GradleTestRunner.run(testsModuleDir, Map.of(
+            exitCode = GradleTestRunner.run(testsModuleDir, Map.of(
                 "mpl.testserver.targets", targets,
                 "mpl.testserver.featureCatalog", String.join(",", config.features())
             ));
 
             System.out.println("==> Result: " + (exitCode == 0 ? "SUCCESS" : "FAILURE"));
-            System.exit(exitCode);
 
         } finally {
             for (LaunchedServer server : servers) {
                 server.stop();
             }
         }
+
+        // Exit AFTER the finally block has torn every server down: System.exit
+        // starts JVM shutdown immediately and finally blocks do not run, so
+        // exiting inside the try above would leak every launched subprocess.
+        System.exit(exitCode);
     }
 
     private static Path resolveServerDir(ConfigurationEntry entry, Path languageRepoRoot, String context) {
