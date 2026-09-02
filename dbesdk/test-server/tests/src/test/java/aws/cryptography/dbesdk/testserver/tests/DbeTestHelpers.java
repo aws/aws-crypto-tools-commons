@@ -37,8 +37,9 @@ import java.util.Map;
  *   <li>Attribute-name constants ({@link #PK}, {@link #SECRET}, {@link #PUBLIC},
  *       {@link #HEAD}, {@link #FOOT}, {@link #TABLE}) used by all tests to
  *       stay consistent with the schema.</li>
- *   <li>{@link #standardActions()} — the SIGN_ONLY / ENCRYPT_AND_SIGN /
- *       SIGN_ONLY action map used across the suite.</li>
+ *   <li>{@link #standardActions()} — the SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT /
+ *       ENCRYPT_AND_SIGN / SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT action map
+ *       used across the suite (v2 configuration).</li>
  *   <li>{@link #canonicalPlaintext()} — the shared 3-attribute plaintext used
  *       for encrypt-then-decrypt across every test.</li>
  *   <li>{@link #newKmsClient(DBESDKTestServerClient, String, String, Map, List)}
@@ -98,15 +99,32 @@ final class DbeTestHelpers {
     // ------------------------------------------------------------------
 
     /**
-     * @return the standard action map: {@code PK}=SIGN_ONLY,
-     *     {@code secret}=ENCRYPT_AND_SIGN, {@code public}=SIGN_ONLY.
+     * @return the standard action map (v2 configuration): {@code PK} and
+     *     {@code public}={@code SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT},
+     *     {@code secret}={@code ENCRYPT_AND_SIGN}. Any attribute using
+     *     {@code SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT} implies v2, which
+     *     requires the partition (and sort, if present) key to use the same
+     *     action, and causes the DBE library to emit
+     *     {@code aws-crypto-attr.<NAME>} entries plus an
+     *     {@code aws-crypto-legend} entry into the header's Encryption Context.
      */
     static Map<String, CryptoAction> standardActions() {
         Map<String, CryptoAction> actions = new LinkedHashMap<>();
-        actions.put(PK, CryptoAction.SIGN_ONLY);
+        actions.put(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
-        actions.put(PUBLIC, CryptoAction.SIGN_ONLY);
+        actions.put(PUBLIC, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
         return actions;
+    }
+
+    /**
+     * @return true if {@code actions} contains at least one
+     *     {@code SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT} attribute — the
+     *     condition under which the DBE library emits a non-empty header
+     *     Encryption Context (an {@code aws-crypto-attr.<NAME>} entry per such
+     *     attribute plus the {@code aws-crypto-legend} entry).
+     */
+    static boolean hasContextAttribute(Map<String, CryptoAction> actions) {
+        return actions.containsValue(CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
     }
 
     /**

@@ -34,16 +34,16 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * DB-ESDK cross-language tamper tests — 42 mutations, each run once per
+ * DB-ESDK cross-language tamper tests — 45 mutations, each run once per
  * launched {@code (encryptTarget, decryptTarget)} pair. Each test method
  * receives a pre-built {@link TestContext} (both endpoints' clients + the
  * per-pair encrypted item), mutates the wire bytes, and asserts decrypt on
  * the pair's decrypt target refuses the mutation with a
  * {@link DBESDKClientError}.
  *
- * <p>Categories (from the DB-ESDK Test Plan §0.3.1):
+ * <p>Categories:
  * <ul>
- *   <li>Section 1 — Header field tamper (11 mutations)</li>
+ *   <li>Section 1 — Header field tamper (14 mutations)</li>
  *   <li>Section 2 — Footer field tamper (6 mutations)</li>
  *   <li>Section 3 — Attribute-level tamper (9 mutations)</li>
  *   <li>Section 4 — Cross-record splice (5 mutations)</li>
@@ -51,7 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  *   <li>Section 6 — Schema promotion (3 decrypt-side schema mismatches)</li>
  * </ul>
  *
- * <p>Test count = {@code 42 mutations × pairs²} — 378 tests today with three
+ * <p>Test count = {@code 45 mutations × pairs²} — 405 tests today with three
  * launched targets. Adding a language expands the matrix automatically.
  *
  * <p>All mutations use the AWS-KMS keyring pinned to the ESDK-shared symmetric
@@ -70,13 +70,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 class TamperTests {
 
     // =====================================================================
-    // §0.3.1.1 — Header field tamper (11 mutations of aws_dbe_head).
+    // Header field tamper (14 mutations of aws_dbe_head).
     // =====================================================================
 
     /** Version byte set to an out-of-range value (0xFF). */
     @ParameterizedTest(name = "1. Version byte → invalid value 0xFF {0}")
-    @MethodSource("testContexts")
-    void versionByteInvalid(TestContext ctx) {
+    @MethodSource("testPairs")
+    void versionByteInvalid(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[0] = (byte) 0xFF;
         //= specification/structured-encryption/header.md#format-version
@@ -87,8 +88,9 @@ class TamperTests {
 
     /** Version byte flipped between the two legal values (0x01 ↔ 0x02). */
     @ParameterizedTest(name = "2. Version byte → 0x01↔0x02 flipped between two legal values {0}")
-    @MethodSource("testContexts")
-    void versionByteFlippedLegal(TestContext ctx) {
+    @MethodSource("testPairs")
+    void versionByteFlippedLegal(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[0] = (byte) (header[0] == 0x01 ? 0x02 : 0x01);
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
@@ -99,8 +101,9 @@ class TamperTests {
 
     /** Format flavor byte set to an unsupported value (0xFF). */
     @ParameterizedTest(name = "3. Format flavor byte → invalid value 0xFF {0}")
-    @MethodSource("testContexts")
-    void flavorByteInvalid(TestContext ctx) {
+    @MethodSource("testPairs")
+    void flavorByteInvalid(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[1] = (byte) 0xFF;
         //= specification/structured-encryption/header.md#format-flavor
@@ -112,8 +115,9 @@ class TamperTests {
 
     /** Message ID byte flipped mid-field. */
     @ParameterizedTest(name = "4. Message ID byte (mid-field) {0}")
-    @MethodSource("testContexts")
-    void messageIdMidFieldFlip(TestContext ctx) {
+    @MethodSource("testPairs")
+    void messageIdMidFieldFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[16] ^= (byte) 0xFF;
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
@@ -124,8 +128,9 @@ class TamperTests {
 
     /** Encrypt Legend Length byte (big-endian UInt16 after message ID). */
     @ParameterizedTest(name = "5. Encrypt Legend Length (big-endian UInt16 after message ID) {0}")
-    @MethodSource("testContexts")
-    void encryptLegendLengthFlip(TestContext ctx) {
+    @MethodSource("testPairs")
+    void encryptLegendLengthFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[34] ^= (byte) 0xFF;
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
@@ -136,8 +141,9 @@ class TamperTests {
 
     /** First byte of the Encrypt Legend contents. */
     @ParameterizedTest(name = "6. Encrypt Legend Bytes (first legend character) {0}")
-    @MethodSource("testContexts")
-    void encryptLegendByteFlip(TestContext ctx) {
+    @MethodSource("testPairs")
+    void encryptLegendByteFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[36] ^= (byte) 0xFF;
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
@@ -146,10 +152,24 @@ class TamperTests {
         assertDecryptFails(ctx, withHeader(ctx, header), "encrypt legend byte flip accepted");
     }
 
+    /** First legend byte swapped to a different valid CryptoAction (SIGN_ONLY ↔ ENCRYPT_AND_SIGN). */
+    @ParameterizedTest(name = "7. Encrypt Legend byte swapped to a different valid CryptoAction {0}")
+    @MethodSource("testPairs")
+    void encryptLegendActionSwap(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[36] = (header[36] == (byte) 0x73) ? (byte) 0x65 : (byte) 0x73;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "swapped-valid legend action accepted");
+    }
+
     /** Encryption Context count (2 bytes after the legend). */
-    @ParameterizedTest(name = "7. Encryption Context count (2 bytes after the legend) {0}")
-    @MethodSource("testContexts")
-    void encryptionContextCountFlip(TestContext ctx) {
+    @ParameterizedTest(name = "8. Encryption Context count (2 bytes after the legend) {0}")
+    @MethodSource("testPairs")
+    void encryptionContextCountFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         int legendLen = ((header[34] & 0xFF) << 8) | (header[35] & 0xFF);
         int ecCountOffset = 36 + legendLen;
@@ -160,31 +180,42 @@ class TamperTests {
         assertDecryptFails(ctx, withHeader(ctx, header), "EC count flip accepted");
     }
 
-    /** Byte inside the first Encryption Context entry. */
-    @ParameterizedTest(name = "8. Encryption Context entry bytes (inside first EC pair) {0}")
-    @MethodSource("testContexts")
-    void encryptionContextEntryFlip(TestContext ctx) {
+    /** Byte inside the first Encryption Context entry's key content. */
+    @ParameterizedTest(name = "9. Encryption Context entry bytes (inside first EC pair) {0}")
+    @MethodSource("testPairs")
+    void encryptionContextEntryFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         int legendLen = ((header[34] & 0xFF) << 8) | (header[35] & 0xFF);
         int ecCountOffset = 36 + legendLen;
         int ecCount = ((header[ecCountOffset] & 0xFF) << 8) | (header[ecCountOffset + 1] & 0xFF);
         if (ecCount == 0) {
-            header[ecCountOffset] ^= (byte) 0xFF;
-        } else {
-            int keyLenOffset = ecCountOffset + 2;
-            int keyLen = ((header[keyLenOffset] & 0xFF) << 8) | (header[keyLenOffset + 1] & 0xFF);
-            header[keyLenOffset + 2 + Math.min(1, keyLen - 1)] ^= (byte) 0xFF;
+            fail("test #9 requires at least one Encryption Context entry, but the baseline has none. "
+                + "Configure the DbeTestHelpers schema to include a "
+                + "SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT attribute so this test exercises "
+                + "an actual EC entry.");
         }
+        // First EC entry layout: [2-byte key length | key bytes | 2-byte value length | value bytes].
+        int keyLenOffset = ecCountOffset + 2;
+        int keyLen = ((header[keyLenOffset] & 0xFF) << 8) | (header[keyLenOffset + 1] & 0xFF);
+        if (keyLen < 1) {
+            fail("test #9 requires the first EC key to be non-empty, but keyLen = " + keyLen);
+        }
+        // Flip the first byte of the first EC key's content — a well-defined
+        // position inside real EC data, not the count metadata or a length prefix.
+        int firstKeyByteOffset = keyLenOffset + 2;
+        header[firstKeyByteOffset] ^= (byte) 0xFF;
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
         //= type=test
         //# The header field value MUST be [verified](header.md#commitment-verification)
-        assertDecryptFails(ctx, withHeader(ctx, header), "EC entry flip accepted");
+        assertDecryptFails(ctx, withHeader(ctx, header), "EC entry key byte flip accepted");
     }
 
     /** Encrypted Data Key count set to 0 — spec MUST-not condition. */
-    @ParameterizedTest(name = "9. Encrypted Data Key count {0}")
-    @MethodSource("testContexts")
-    void encryptedDataKeyCountZero(TestContext ctx) {
+    @ParameterizedTest(name = "10. Encrypted Data Key count {0}")
+    @MethodSource("testPairs")
+    void encryptedDataKeyCountZero(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[edkCountOffset(header)] = 0x00;
         //= specification/structured-encryption/header.md#encrypted-data-key-count
@@ -193,23 +224,50 @@ class TamperTests {
         assertDecryptFails(ctx, withHeader(ctx, header), "EDK count = 0 accepted");
     }
 
-    /** Byte inside the first Encrypted Data Key ciphertext. */
-    @ParameterizedTest(name = "10. Encrypted Data Key entry bytes (first EDK ciphertext) {0}")
-    @MethodSource("testContexts")
-    void encryptedDataKeyEntryFlip(TestContext ctx) {
+    /** Byte inside the first Encrypted Data Key's Key Provider ID. */
+    @ParameterizedTest(name = "11. Encrypted Data Key — Key Provider ID byte {0}")
+    @MethodSource("testPairs")
+    void edkKeyProviderIdFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
-        int firstEdkOffset = edkCountOffset(header) + 1;
-        header[firstEdkOffset + 10] ^= (byte) 0xFF;
+        header[firstEdkFieldOffsets(header)[0]] ^= (byte) 0xFF;
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
         //= type=test
         //# The header field value MUST be [verified](header.md#commitment-verification)
-        assertDecryptFails(ctx, withHeader(ctx, header), "EDK entry flip accepted");
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK Key Provider ID flip accepted");
+    }
+
+    /** Byte inside the first Encrypted Data Key's Key Provider Information. */
+    @ParameterizedTest(name = "12. Encrypted Data Key — Key Provider Information byte {0}")
+    @MethodSource("testPairs")
+    void edkKeyProviderInfoFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[firstEdkFieldOffsets(header)[1]] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK Key Provider Information flip accepted");
+    }
+
+    /** Byte inside the first Encrypted Data Key ciphertext. */
+    @ParameterizedTest(name = "13. Encrypted Data Key — ciphertext byte {0}")
+    @MethodSource("testPairs")
+    void edkCiphertextFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[firstEdkFieldOffsets(header)[2]] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK ciphertext flip accepted");
     }
 
     /** Byte in the header commitment (last 32 bytes). */
-    @ParameterizedTest(name = "11. Header Commitment (last 32 bytes of the header) {0}")
-    @MethodSource("testContexts")
-    void headerCommitmentFlip(TestContext ctx) {
+    @ParameterizedTest(name = "14. Header Commitment (last 32 bytes of the header) {0}")
+    @MethodSource("testPairs")
+    void headerCommitmentFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         header[header.length - 1] ^= (byte) 0xFF;
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
@@ -219,12 +277,13 @@ class TamperTests {
     }
 
     // =====================================================================
-    // §0.3.1.2 — Footer field tamper (6 mutations of aws_dbe_foot).
+    // Footer field tamper (6 mutations of aws_dbe_foot).
     // =====================================================================
 
     @ParameterizedTest(name = "1. Flip a byte inside a Recipient Tag {0}")
-    @MethodSource("testContexts")
-    void recipientTagByteFlip(TestContext ctx) {
+    @MethodSource("testPairs")
+    void recipientTagByteFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] footer = footerBytes(ctx);
         footer[10] ^= (byte) 0xFF;
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -235,8 +294,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "2. Zero the entire Recipient Tag block {0}")
-    @MethodSource("testContexts")
-    void recipientTagZeroed(TestContext ctx) {
+    @MethodSource("testPairs")
+    void recipientTagZeroed(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] footer = footerBytes(ctx);
         for (int i = 0; i < footer.length; i++) footer[i] = 0;
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -247,8 +307,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "3. Truncate the last byte of the Recipient Tag {0}")
-    @MethodSource("testContexts")
-    void recipientTagSingleByteTruncated(TestContext ctx) {
+    @MethodSource("testPairs")
+    void recipientTagSingleByteTruncated(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] footer = footerBytes(ctx);
         byte[] trunc = new byte[footer.length - 1];
         System.arraycopy(footer, 0, trunc, 0, trunc.length);
@@ -260,8 +321,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "4. Add 96 bytes of fake signature on a non-signing (flavor 0x00) footer {0}")
-    @MethodSource("testContexts")
-    void spuriousSignatureOnNonSigningFooter(TestContext ctx) {
+    @MethodSource("testPairs")
+    void spuriousSignatureOnNonSigningFooter(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] footer = footerBytes(ctx);
         byte[] extended = new byte[footer.length + 96];
         System.arraycopy(footer, 0, extended, 0, footer.length);
@@ -276,8 +338,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "5. Empty footer (0 bytes) {0}")
-    @MethodSource("testContexts")
-    void emptyFooter(TestContext ctx) {
+    @MethodSource("testPairs")
+    void emptyFooter(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         //= specification/structured-encryption/decrypt-path-structure.md#verify-signatures
         //= type=test
         //# The footer field value MUST be [verified](footer.md#footer-verification).
@@ -285,8 +348,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "6. Extra trailing byte after the Recipient Tag {0}")
-    @MethodSource("testContexts")
-    void extraTrailingByte(TestContext ctx) {
+    @MethodSource("testPairs")
+    void extraTrailingByte(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] footer = footerBytes(ctx);
         byte[] extended = new byte[footer.length + 1];
         System.arraycopy(footer, 0, extended, 0, footer.length);
@@ -299,12 +363,13 @@ class TamperTests {
     }
 
     // =====================================================================
-    // §0.3.1.3 — Attribute-level tamper (9 mutations of per-attribute values).
+    // Attribute-level tamper (9 mutations of per-attribute values).
     // =====================================================================
 
     @ParameterizedTest(name = "1. Flip a byte in the ciphertext of an encrypted attribute {0}")
-    @MethodSource("testContexts")
-    void ciphertextByteFlip(TestContext ctx) {
+    @MethodSource("testPairs")
+    void ciphertextByteFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         byte[] bytes = bytesOf(item.get(SECRET));
         bytes[5] ^= (byte) 0xFF;
@@ -317,8 +382,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "2. Flip a byte in a sign-only plaintext attribute {0}")
-    @MethodSource("testContexts")
-    void signOnlyPlaintextFlip(TestContext ctx) {
+    @MethodSource("testPairs")
+    void signOnlyPlaintextFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.put(PUBLIC, AttributeValue.builder().s(item.get(PUBLIC).getS() + "!").build());
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -329,8 +395,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "3. Delete a signed attribute {0}")
-    @MethodSource("testContexts")
-    void deleteSignedAttribute(TestContext ctx) {
+    @MethodSource("testPairs")
+    void deleteSignedAttribute(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.remove(PUBLIC);
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -341,8 +408,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "4. Add an extra signed attribute not present at encrypt time {0}")
-    @MethodSource("testContexts")
-    void addExtraSignedAttribute(TestContext ctx) {
+    @MethodSource("testPairs")
+    void addExtraSignedAttribute(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.put("intruder", AttributeValue.builder().s("added").build());
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -353,8 +421,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "5. Rename an attribute (move a value to a different key) {0}")
-    @MethodSource("testContexts")
-    void renameAttribute(TestContext ctx) {
+    @MethodSource("testPairs")
+    void renameAttribute(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         AttributeValue value = item.remove(PUBLIC);
         item.put("public_renamed", value);
@@ -366,8 +435,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "6. Swap two sign-only attribute VALUES (keep both keys) {0}")
-    @MethodSource("testContexts")
-    void swapSignOnlyValues(TestContext ctx) {
+    @MethodSource("testPairs")
+    void swapSignOnlyValues(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         String pk = item.get(PK).getS();
         String pub = item.get(PUBLIC).getS();
@@ -381,8 +451,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "7. Change the 2-byte TypeID prefix on an encrypted attribute value {0}")
-    @MethodSource("testContexts")
-    void typeIdMutation(TestContext ctx) {
+    @MethodSource("testPairs")
+    void typeIdMutation(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         byte[] bytes = bytesOf(item.get(SECRET));
         bytes[0] ^= (byte) 0xFF;
@@ -396,8 +467,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "8. Change the partition key value (sign-only) {0}")
-    @MethodSource("testContexts")
-    void partitionKeyMutation(TestContext ctx) {
+    @MethodSource("testPairs")
+    void partitionKeyMutation(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.put(PK, AttributeValue.builder().s("intruder-pk").build());
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -408,8 +480,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "9. Replace encrypted attribute with plaintext string {0}")
-    @MethodSource("testContexts")
-    void encryptedToPlaintextSwap(TestContext ctx) {
+    @MethodSource("testPairs")
+    void encryptedToPlaintextSwap(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.put(SECRET, AttributeValue.builder().s("hunter2").build());
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -420,12 +493,13 @@ class TamperTests {
     }
 
     // =====================================================================
-    // §0.3.1.4 — Cross-record splice (5 mixings of head/foot/attrs).
+    // Cross-record splice (5 mixings of head/foot/attrs).
     // =====================================================================
 
     @ParameterizedTest(name = "1. Splice: header from record1, attributes+footer from record2 {0}")
-    @MethodSource("testContexts")
-    void spliceHeaderFromRecord1(TestContext ctx) {
+    @MethodSource("testPairs")
+    void spliceHeaderFromRecord1(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> other = encryptOther(ctx);
         Map<String, AttributeValue> item = copy(other);
         item.put(HEAD, ctx.encryptedItem().get(HEAD));
@@ -437,8 +511,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "2. Splice: footer from record1, header+attributes from record2 {0}")
-    @MethodSource("testContexts")
-    void spliceFooterFromRecord1(TestContext ctx) {
+    @MethodSource("testPairs")
+    void spliceFooterFromRecord1(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> other = encryptOther(ctx);
         Map<String, AttributeValue> item = copy(other);
         item.put(FOOT, ctx.encryptedItem().get(FOOT));
@@ -450,8 +525,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "3. Splice: header+footer from record1, attributes from record2 {0}")
-    @MethodSource("testContexts")
-    void spliceHeadAndFootFromRecord1(TestContext ctx) {
+    @MethodSource("testPairs")
+    void spliceHeadAndFootFromRecord1(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> other = encryptOther(ctx);
         Map<String, AttributeValue> item = copy(other);
         item.put(HEAD, ctx.encryptedItem().get(HEAD));
@@ -464,8 +540,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "4. Splice: single encrypted attribute from record2 into record1 {0}")
-    @MethodSource("testContexts")
-    void spliceEncryptedAttributeFromRecord2(TestContext ctx) {
+    @MethodSource("testPairs")
+    void spliceEncryptedAttributeFromRecord2(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> other = encryptOther(ctx);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.put(SECRET, other.get(SECRET));
@@ -477,8 +554,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "5. Splice: header/footer from a different logical table {0}")
-    @MethodSource("testContexts")
-    void spliceFromDifferentTable(TestContext ctx) {
+    @MethodSource("testPairs")
+    void spliceFromDifferentTable(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         // A separate encrypt-side client whose logical table differs by name
         // only — same keyring, so its EDKs unwrap fine, but the canonical
         // path prefix differs and the signature should reject.
@@ -497,12 +575,13 @@ class TamperTests {
     }
 
     // =====================================================================
-    // §0.3.1.5 — Truncation (8 head/foot truncations + additions).
+    // Truncation (8 head/foot truncations + additions).
     // =====================================================================
 
     @ParameterizedTest(name = "1. Header truncated mid-way (drop last 33 bytes = commitment + 1) {0}")
-    @MethodSource("testContexts")
-    void headerTruncatedMidCommitment(TestContext ctx) {
+    @MethodSource("testPairs")
+    void headerTruncatedMidCommitment(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         byte[] trunc = new byte[header.length - 33];
         System.arraycopy(header, 0, trunc, 0, trunc.length);
@@ -513,8 +592,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "2. Header truncated to the commitment boundary (last 32 bytes stripped) {0}")
-    @MethodSource("testContexts")
-    void headerTruncatedAtCommitmentBoundary(TestContext ctx) {
+    @MethodSource("testPairs")
+    void headerTruncatedAtCommitmentBoundary(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         byte[] trunc = new byte[header.length - 32];
         System.arraycopy(header, 0, trunc, 0, trunc.length);
@@ -525,8 +605,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "3. Header missing entirely (aws_dbe_head attribute removed) {0}")
-    @MethodSource("testContexts")
-    void headerAttributeRemoved(TestContext ctx) {
+    @MethodSource("testPairs")
+    void headerAttributeRemoved(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.remove(HEAD);
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
@@ -536,8 +617,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "4. Header truncated to a single byte {0}")
-    @MethodSource("testContexts")
-    void headerTruncatedToSingleByte(TestContext ctx) {
+    @MethodSource("testPairs")
+    void headerTruncatedToSingleByte(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] trunc = new byte[] { headerBytes(ctx)[0] };
         //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
         //= type=test
@@ -546,8 +628,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "5. Header extended with 16 extra trailing bytes {0}")
-    @MethodSource("testContexts")
-    void headerExtendedWithTrailingBytes(TestContext ctx) {
+    @MethodSource("testPairs")
+    void headerExtendedWithTrailingBytes(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] header = headerBytes(ctx);
         byte[] extended = new byte[header.length + 16];
         System.arraycopy(header, 0, extended, 0, header.length);
@@ -559,8 +642,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "6. Footer truncated to a single byte {0}")
-    @MethodSource("testContexts")
-    void footerTruncatedToSingleByte(TestContext ctx) {
+    @MethodSource("testPairs")
+    void footerTruncatedToSingleByte(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         byte[] footer = footerBytes(ctx);
         byte[] trunc = new byte[] { footer[0] };
         //= specification/structured-encryption/decrypt-path-structure.md#verify-signatures
@@ -570,8 +654,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "7. Footer missing entirely (aws_dbe_foot attribute removed) {0}")
-    @MethodSource("testContexts")
-    void footerAttributeRemoved(TestContext ctx) {
+    @MethodSource("testPairs")
+    void footerAttributeRemoved(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.remove(FOOT);
         //= specification/structured-encryption/decrypt-path-structure.md#verify-signatures
@@ -581,8 +666,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "8. Both aws_dbe_head and aws_dbe_foot removed {0}")
-    @MethodSource("testContexts")
-    void bothHeadAndFootRemoved(TestContext ctx) {
+    @MethodSource("testPairs")
+    void bothHeadAndFootRemoved(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         Map<String, AttributeValue> item = copy(ctx.encryptedItem());
         item.remove(HEAD);
         item.remove(FOOT);
@@ -593,17 +679,20 @@ class TamperTests {
     }
 
     // =====================================================================
-    // §0.3.1.6 — Schema promotion (3 decrypt-side schema mismatches).
+    // Schema promotion (3 decrypt-side schema mismatches).
     // Instead of mutating bytes on the wire the tests build a second
     // decrypt-side client with a different schema and decrypt the pair's
     // baseline against it; the recipient-tag check must catch every mismatch.
     // =====================================================================
 
     @ParameterizedTest(name = "1. Decrypt schema marks a formerly-signed attribute as unsigned {0}")
-    @MethodSource("testContexts")
-    void signedToUnsignedPromotion(TestContext ctx) {
-        // Encrypt used PUBLIC as SIGN_ONLY; decrypt now claims PUBLIC is
-        // unsigned via allowedUnsignedAttributes. Signature scope shift.
+    @MethodSource("testPairs")
+    void signedToUnsignedPromotion(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        // Encrypt used PUBLIC as SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT (v2);
+        // decrypt now claims PUBLIC is unsigned via allowedUnsignedAttributes
+        // (v1 config, since no attribute uses the v2 action). Signature scope
+        // shift plus config version mismatch — either alone MUST fail decrypt.
         Map<String, CryptoAction> reduced = new LinkedHashMap<>();
         reduced.put(PK, CryptoAction.SIGN_ONLY);
         reduced.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
@@ -618,8 +707,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "2. Decrypt uses a different partitionKeyName {0}")
-    @MethodSource("testContexts")
-    void differentPartitionKeyName(TestContext ctx) {
+    @MethodSource("testPairs")
+    void differentPartitionKeyName(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         String otherClientId = newKmsClient(
             ctx.decryptClient(), TABLE, PUBLIC, standardActions(), List.of());
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -631,8 +721,9 @@ class TamperTests {
     }
 
     @ParameterizedTest(name = "3. Decrypt uses a different logicalTableName {0}")
-    @MethodSource("testContexts")
-    void differentLogicalTableName(TestContext ctx) {
+    @MethodSource("testPairs")
+    void differentLogicalTableName(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
         String otherClientId = newKmsClient(
             ctx.decryptClient(), "different-table-name", PK, standardActions(), List.of());
         //= specification/structured-encryption/footer.md#recipient-tag-verification
@@ -677,19 +768,34 @@ class TamperTests {
     }
 
     // =====================================================================
-    // TestContext provider (the @MethodSource every test above binds to) +
-    // per-pair cache. Each pair's baseline is built lazily on first request
-    // and shared by all 42 tests that receive it.
+    // TargetPair provider (the @MethodSource every test above binds to) +
+    // per-pair TestContext cache. Each pair's baseline is built lazily on
+    // the first test that requests it via contextFor(pair), and shared by
+    // all 45 tests that see the same pair.
     //
-    // Every test method receives TestContext directly — no forPair(pair) lookup
-    // inside the method body.
+    // The @MethodSource yields TargetPair (not TestContext) so any per-pair
+    // setup failure (unreachable server, CreateClient rejection, baseline
+    // round-trip failure) surfaces as a per-test failure visible in the
+    // JUnit XML — instead of throwing out of argument assembly and aborting
+    // the entire class's XML output (which the orchestrator sees as
+    // "zero tests executed").
     // =====================================================================
 
     private static final Map<TargetPair, TestContext> CONTEXTS = new ConcurrentHashMap<>();
 
-    static Stream<TestContext> testContexts() {
-        return DbeTestHelpers.pairs().stream()
-            .map(pair -> CONTEXTS.computeIfAbsent(pair, TamperTests::buildContext));
+    static Stream<TargetPair> testPairs() {
+        return DbeTestHelpers.pairs().stream();
+    }
+
+    /**
+     * Resolve the pre-built {@link TestContext} for {@code pair}, building it
+     * on first request and caching the result. Called from every test
+     * method's body — not the {@code @MethodSource} — so a build failure
+     * surfaces as a per-test failure that Gradle writes to the JUnit XML,
+     * instead of aborting argument assembly for the whole class.
+     */
+    private static TestContext contextFor(TargetPair pair) {
+        return CONTEXTS.computeIfAbsent(pair, TamperTests::buildContext);
     }
 
     private static TestContext buildContext(TargetPair pair) {
@@ -699,6 +805,14 @@ class TamperTests {
         // that want a decrypt-side schema mismatch build their own client via
         // DbeTestHelpers.newKmsClient(...).
         Map<String, CryptoAction> actions = standardActions();
+        // Precondition for test #9 (EC entry tamper): the baseline schema MUST
+        // carry a non-empty header Encryption Context, which the DBE library
+        // emits only for SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT attributes.
+        // Assert it here so a schema edit that drops those actions fails at
+        // baseline construction instead of surfacing deep inside test #9.
+        assertTrue(DbeTestHelpers.hasContextAttribute(actions),
+            "baseline schema must include a SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT attribute "
+                + "so the header carries a non-empty Encryption Context (required by test #9)");
         String encryptClientId = newKmsClient(encryptClient, TABLE, PK, actions, List.of());
         String decryptClientId = newKmsClient(decryptClient, TABLE, PK, actions, List.of());
         Map<String, AttributeValue> plaintext = canonicalPlaintext();
@@ -710,7 +824,7 @@ class TamperTests {
         // Prove the untampered baseline actually round-trips before any tamper
         // test runs against this pair. Without this, a broken decrypt path
         // that refuses every input would pass every mutation-refused assertion
-        // in the tamper suite (378 tests) for the wrong reason. Failing here
+        // in the tamper suite (405 tests) for the wrong reason. Failing here
         // once per pair fails the first tamper test that requests the pair's
         // baseline with a clear "baseline round-trip failed" cause, and every
         // subsequent tamper test for the same pair fails identically —
@@ -827,5 +941,26 @@ class TamperTests {
             off += 2 + valLen;
         }
         return off;
+    }
+
+    /**
+     * Content offsets of the three variable-length fields inside the FIRST
+     * Encrypted Data Key entry, returned as
+     * {@code {keyProviderId, keyProviderInformation, ciphertext}}. Entry layout
+     * per the DBE spec (header.md#encrypted-data-key-entries):
+     * {@code [2 provIdLen | provId | 2 provInfoLen | provInfo | 2 cipherLen | ciphertext]},
+     * and the EDK count is a single byte, so the first entry begins at
+     * {@code edkCountOffset + 1}.
+     */
+    private static int[] firstEdkFieldOffsets(byte[] header) {
+        int provIdLenOffset = edkCountOffset(header) + 1;
+        int provIdLen = ((header[provIdLenOffset] & 0xFF) << 8) | (header[provIdLenOffset + 1] & 0xFF);
+        int provIdOffset = provIdLenOffset + 2;
+        int provInfoLenOffset = provIdOffset + provIdLen;
+        int provInfoLen = ((header[provInfoLenOffset] & 0xFF) << 8) | (header[provInfoLenOffset + 1] & 0xFF);
+        int provInfoOffset = provInfoLenOffset + 2;
+        int cipherLenOffset = provInfoOffset + provInfoLen;
+        int cipherOffset = cipherLenOffset + 2;
+        return new int[] { provIdOffset, provInfoOffset, cipherOffset };
     }
 }

@@ -51,7 +51,9 @@ operation CreateClient {
 
 /// Encrypt one DDB item with the referenced DBE item encryptor. Fields
 /// configured as ENCRYPT_AND_SIGN are encrypted and included in the item
-/// signature; SIGN_ONLY fields are signed but stay in the clear; DO_NOTHING
+/// signature; SIGN_ONLY fields are signed but stay in the clear;
+/// SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT fields are signed, stay in the
+/// clear, and are bound into the header's Encryption Context; DO_NOTHING
 /// fields are passed through untouched.
 operation EncryptItem {
     input: EncryptItemRequest
@@ -106,8 +108,8 @@ structure EncryptItemRequest {
 @output
 structure EncryptItemResponse {
     /// The encrypted DDB item (same attribute names; encrypted attributes are
-    /// now `B` (binary) values; SIGN_ONLY and DO_NOTHING attributes retain
-    /// their original values).
+    /// now `B` (binary) values; SIGN_ONLY, SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT,
+    /// and DO_NOTHING attributes retain their original values).
     @required
     encryptedItem: DDBItem
 }
@@ -205,12 +207,16 @@ structure DBEClientConfig {
     @required
     logicalTableName: String
 
-    /// The partition attribute's name. Its CryptoAction must be SIGN_ONLY.
+    /// The partition attribute's name. Its CryptoAction must be SIGN_ONLY
+    /// (v1 configuration) or SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT
+    /// (v2 configuration — implied when any attribute uses that action).
     @required
     partitionKeyName: String
 
     /// The sort attribute's name (optional — some tables have none). If
-    /// present, its CryptoAction must be SIGN_ONLY.
+    /// present, its CryptoAction must be SIGN_ONLY (v1 configuration) or
+    /// SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT (v2 configuration — implied
+    /// when any attribute uses that action).
     sortKeyName: String
 
     /// Per-attribute action taken during encrypt. Every attribute that will
@@ -256,6 +262,13 @@ enum CryptoAction {
 
     /// Attribute is NOT encrypted but IS included in the signature scope.
     SIGN_ONLY
+
+    /// Attribute is NOT encrypted, IS included in the signature scope, and
+    /// its value is bound into the header's Encryption Context as an
+    /// `aws-crypto-attr.NAME` entry. Any attribute with this action implies
+    /// a v2 Configuration Version; v2 additionally requires the partition
+    /// (and, if present, sort) key attribute to use this same action.
+    SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT
 
     /// Attribute is NOT encrypted and NOT signed.
     DO_NOTHING
