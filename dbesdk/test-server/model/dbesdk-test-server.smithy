@@ -34,6 +34,9 @@ service DBESDKTestServer {
         ScanOutputTransform
         QueryOutputTransform
         BatchGetItemOutputTransform
+        ExecuteStatementInputTransform
+        BatchExecuteStatementInputTransform
+        ExecuteTransactionInputTransform
     ]
     errors: [
         GenericServerError
@@ -177,6 +180,42 @@ operation QueryOutputTransform {
 operation BatchGetItemOutputTransform {
     input: BatchGetItemOutputTransformRequest
     output: BatchGetItemOutputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Validate-before hook for a PartiQL ExecuteStatement: the DBE library rejects
+/// the request (raising a DBESDKClientError) when the statement targets an
+/// encrypted table, because a PartiQL statement cannot be transformed to
+/// operate over encrypted attributes. A statement targeting a non-encrypted
+/// table passes through unchanged.
+operation ExecuteStatementInputTransform {
+    input: ExecuteStatementInputTransformRequest
+    output: ExecuteStatementInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Validate-before hook for a PartiQL BatchExecuteStatement: rejected when any
+/// statement targets an encrypted table.
+operation BatchExecuteStatementInputTransform {
+    input: BatchExecuteStatementInputTransformRequest
+    output: BatchExecuteStatementInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Validate-before hook for a PartiQL ExecuteTransaction: rejected when any
+/// transact statement targets an encrypted table.
+operation ExecuteTransactionInputTransform {
+    input: ExecuteTransactionInputTransformRequest
+    output: ExecuteTransactionInputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -402,6 +441,60 @@ structure BatchGetItemOutputTransformResponse {
     transformedOutput: BatchGetItemOutput
 }
 
+@input
+structure ExecuteStatementInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB ExecuteStatement input to validate (validate-before).
+    @required
+    sdkInput: ExecuteStatementInput
+}
+
+@output
+structure ExecuteStatementInputTransformResponse {
+    /// The unchanged ExecuteStatement input (only returned when the statement
+    /// targets no encrypted table; an encrypted-table target fails instead).
+    @required
+    transformedInput: ExecuteStatementInput
+}
+
+@input
+structure BatchExecuteStatementInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB BatchExecuteStatement input to validate (validate-before).
+    @required
+    sdkInput: BatchExecuteStatementInput
+}
+
+@output
+structure BatchExecuteStatementInputTransformResponse {
+    /// The unchanged BatchExecuteStatement input (only returned when no
+    /// statement targets an encrypted table).
+    @required
+    transformedInput: BatchExecuteStatementInput
+}
+
+@input
+structure ExecuteTransactionInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB ExecuteTransaction input to validate (validate-before).
+    @required
+    sdkInput: ExecuteTransactionInput
+}
+
+@output
+structure ExecuteTransactionInputTransformResponse {
+    /// The unchanged ExecuteTransaction input (only returned when no transact
+    /// statement targets an encrypted table).
+    @required
+    transformedInput: ExecuteTransactionInput
+}
+
 // ===========================================================================
 // Minimal DynamoDB wire shapes for the transform operations. These carry only
 // the fields the encrypt-before / decrypt-after round-trip needs; each server
@@ -557,6 +650,46 @@ structure BatchGetItemOutput {
 map BatchGetResponseMap {
     key: String
     value: ItemList
+}
+
+/// A DynamoDB ExecuteStatement input. Only the PartiQL `statement` is modeled —
+/// validate-before parses the target table out of the statement text and needs
+/// nothing else.
+structure ExecuteStatementInput {
+    @required
+    statement: String
+}
+
+/// A DynamoDB BatchExecuteStatement input: the batch of PartiQL statements.
+structure BatchExecuteStatementInput {
+    @required
+    statements: BatchStatementRequestList
+}
+
+list BatchStatementRequestList {
+    member: BatchStatementRequest
+}
+
+/// One statement in a BatchExecuteStatement.
+structure BatchStatementRequest {
+    @required
+    statement: String
+}
+
+/// A DynamoDB ExecuteTransaction input: the transactional PartiQL statements.
+structure ExecuteTransactionInput {
+    @required
+    transactStatements: ParameterizedStatementList
+}
+
+list ParameterizedStatementList {
+    member: ParameterizedStatement
+}
+
+/// One statement in an ExecuteTransaction.
+structure ParameterizedStatement {
+    @required
+    statement: String
 }
 
 // ===========================================================================
