@@ -26,6 +26,9 @@ service DBESDKTestServer {
         CreateClient
         EncryptItem
         DecryptItem
+        CreateTransformsClient
+        PutItemInputTransform
+        GetItemOutputTransform
     ]
     errors: [
         GenericServerError
@@ -70,6 +73,48 @@ operation EncryptItem {
 operation DecryptItem {
     input: DecryptItemRequest
     output: DecryptItemResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Construct and register a DBE DDB-SDK transforms client bound to a single
+/// physical table, returning a non-empty ClientId that the transform
+/// operations pass to reference it. Distinct from CreateClient's item
+/// encryptor: a transforms client wraps the DBE `DynamoDbEncryptionTransforms`
+/// surface, built from a `DynamoDbTablesEncryptionConfig` (one table name → one
+/// crypto config). The crypto config reuses `DBEClientConfig`; `tableName` is
+/// the physical DDB table the wire PutItemInput/GetItemInput reference.
+operation CreateTransformsClient {
+    input: CreateTransformsClientRequest
+    output: CreateTransformsClientResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Encrypt-before hook: transform a DynamoDB PutItem input, encrypting the item
+/// according to the table's Crypto Actions before it would be written. The
+/// item-level dual of EncryptItem, reached through the DDB SDK integration
+/// surface rather than the item encryptor.
+operation PutItemInputTransform {
+    input: PutItemInputTransformRequest
+    output: PutItemInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt-after hook: transform a DynamoDB GetItem output, decrypting the
+/// returned item. The item-level dual of DecryptItem, reached through the DDB
+/// SDK integration surface. A GetItem output with no item (the key matched
+/// nothing) passes through unchanged.
+operation GetItemOutputTransform {
+    input: GetItemOutputTransformRequest
+    output: GetItemOutputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -129,6 +174,102 @@ structure DecryptItemResponse {
     /// The plaintext DDB item recovered from the encrypted item.
     @required
     plaintextItem: DDBItem
+}
+
+@input
+structure CreateTransformsClientRequest {
+    /// The crypto configuration for the table this transforms client is bound
+    /// to. Reuses the item-encryptor config shape; the transforms client keys
+    /// it under `tableName`.
+    @required
+    config: DBEClientConfig
+
+    /// The physical DDB table name the transforms client is bound to. Wire
+    /// PutItemInput / GetItemInput requests must reference this same name.
+    @required
+    tableName: String
+}
+
+@output
+structure CreateTransformsClientResponse {
+    /// A non-empty, collision-resistant identifier referencing exactly one
+    /// registered transforms client.
+    @required
+    clientId: ClientId
+}
+
+@input
+structure PutItemInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB PutItem input to transform (encrypt-before).
+    @required
+    sdkInput: PutItemInput
+}
+
+@output
+structure PutItemInputTransformResponse {
+    /// The transformed PutItem input, whose item is now encrypted per the
+    /// table's Crypto Actions (encrypted attributes are `B` binary values;
+    /// SIGN_ONLY / SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT / DO_NOTHING
+    /// attributes retain their original values, plus the `aws_dbe_head` and
+    /// `aws_dbe_foot` attributes).
+    @required
+    transformedInput: PutItemInput
+}
+
+@input
+structure GetItemOutputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB GetItem output to transform (decrypt-after).
+    @required
+    sdkOutput: GetItemOutput
+
+    /// The original DynamoDB GetItem input that produced `sdkOutput`.
+    @required
+    originalInput: GetItemInput
+}
+
+@output
+structure GetItemOutputTransformResponse {
+    /// The transformed GetItem output, whose item (when present) is now
+    /// decrypted.
+    @required
+    transformedOutput: GetItemOutput
+}
+
+// ===========================================================================
+// Minimal DynamoDB wire shapes for the transform operations. These carry only
+// the fields the encrypt-before / decrypt-after round-trip needs; each server
+// maps them onto the real AWS SDK DynamoDB request/response types the DBE
+// transforms API consumes.
+// ===========================================================================
+
+/// A DynamoDB PutItem input: the target table and the item to write.
+structure PutItemInput {
+    @required
+    tableName: String
+
+    @required
+    item: DDBItem
+}
+
+/// A DynamoDB GetItem input: the target table and the primary key to read.
+structure GetItemInput {
+    @required
+    tableName: String
+
+    @required
+    key: DDBItem
+}
+
+/// A DynamoDB GetItem output: the returned item, absent when the key matched
+/// no item.
+structure GetItemOutput {
+    item: DDBItem
 }
 
 // ===========================================================================
