@@ -29,6 +29,8 @@ service DBESDKTestServer {
         CreateTransformsClient
         PutItemInputTransform
         GetItemOutputTransform
+        BatchWriteItemInputTransform
+        TransactWriteItemsInputTransform
     ]
     errors: [
         GenericServerError
@@ -115,6 +117,30 @@ operation PutItemInputTransform {
 operation GetItemOutputTransform {
     input: GetItemOutputTransformRequest
     output: GetItemOutputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Encrypt-before hook for a batch write: transform a DynamoDB BatchWriteItem
+/// input, encrypting the item of every PutRequest across all tables. Delete
+/// requests pass through unchanged.
+operation BatchWriteItemInputTransform {
+    input: BatchWriteItemInputTransformRequest
+    output: BatchWriteItemInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Encrypt-before hook for a transactional write: transform a DynamoDB
+/// TransactWriteItems input, encrypting the item of every Put in the
+/// transaction.
+operation TransactWriteItemsInputTransform {
+    input: TransactWriteItemsInputTransformRequest
+    output: TransactWriteItemsInputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -241,6 +267,42 @@ structure GetItemOutputTransformResponse {
     transformedOutput: GetItemOutput
 }
 
+@input
+structure BatchWriteItemInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB BatchWriteItem input to transform (encrypt-before).
+    @required
+    sdkInput: BatchWriteItemInput
+}
+
+@output
+structure BatchWriteItemInputTransformResponse {
+    /// The transformed BatchWriteItem input, whose PutRequest items are now
+    /// encrypted.
+    @required
+    transformedInput: BatchWriteItemInput
+}
+
+@input
+structure TransactWriteItemsInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB TransactWriteItems input to transform (encrypt-before).
+    @required
+    sdkInput: TransactWriteItemsInput
+}
+
+@output
+structure TransactWriteItemsInputTransformResponse {
+    /// The transformed TransactWriteItems input, whose Put items are now
+    /// encrypted.
+    @required
+    transformedInput: TransactWriteItemsInput
+}
+
 // ===========================================================================
 // Minimal DynamoDB wire shapes for the transform operations. These carry only
 // the fields the encrypt-before / decrypt-after round-trip needs; each server
@@ -269,6 +331,73 @@ structure GetItemInput {
 /// A DynamoDB GetItem output: the returned item, absent when the key matched
 /// no item.
 structure GetItemOutput {
+    item: DDBItem
+}
+
+/// A DynamoDB BatchWriteItem input: a map of table name → the write requests
+/// against that table.
+structure BatchWriteItemInput {
+    @required
+    requestItems: WriteRequestMap
+}
+
+/// Map of table name → its list of write requests, mirroring the DynamoDB
+/// BatchWriteItem `RequestItems` shape.
+map WriteRequestMap {
+    key: String
+    value: WriteRequestList
+}
+
+list WriteRequestList {
+    member: WriteRequest
+}
+
+/// One BatchWriteItem write request: exactly one of a put or a delete, matching
+/// the DynamoDB WriteRequest shape. The encrypt-before transform encrypts a
+/// PutRequest's item and passes a DeleteRequest through unchanged.
+structure WriteRequest {
+    putRequest: PutRequest
+    deleteRequest: DeleteRequest
+}
+
+/// A BatchWriteItem PutRequest: the item to write (the table is the enclosing
+/// WriteRequestMap key).
+structure PutRequest {
+    @required
+    item: DDBItem
+}
+
+/// A BatchWriteItem DeleteRequest: the primary key to delete.
+structure DeleteRequest {
+    @required
+    key: DDBItem
+}
+
+/// A DynamoDB TransactWriteItems input: the list of transactional write
+/// actions.
+structure TransactWriteItemsInput {
+    @required
+    transactItems: TransactWriteItemList
+}
+
+list TransactWriteItemList {
+    member: TransactWriteItem
+}
+
+/// One action in a TransactWriteItems transaction. Only the `Put` action is
+/// modeled — the encrypt-before transform encrypts a Put's item; the
+/// Update / Delete / ConditionCheck actions carry no full item to encrypt and
+/// are added in a later sub-round.
+structure TransactWriteItem {
+    put: Put
+}
+
+/// A TransactWriteItems Put action: the target table and the item to write.
+structure Put {
+    @required
+    tableName: String
+
+    @required
     item: DDBItem
 }
 

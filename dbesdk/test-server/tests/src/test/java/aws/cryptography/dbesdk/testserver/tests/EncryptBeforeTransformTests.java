@@ -8,7 +8,6 @@ import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.TABLE;
 import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.canonicalPlaintext;
 import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.standardActions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,45 +15,51 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import aws.cryptography.dbesdk.testserver.client.client.DBESDKTestServerClient;
 import aws.cryptography.dbesdk.testserver.client.model.AttributeValue;
 import aws.cryptography.dbesdk.testserver.client.model.AwsKmsKeyringConfig;
+import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemInput;
+import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemInputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.CreateTransformsClientInput;
 import aws.cryptography.dbesdk.testserver.client.model.DBEClientConfig;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.Keyring;
+import aws.cryptography.dbesdk.testserver.client.model.Put;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.PutRequest;
+import aws.cryptography.dbesdk.testserver.client.model.TransactWriteItem;
+import aws.cryptography.dbesdk.testserver.client.model.TransactWriteItemsInput;
+import aws.cryptography.dbesdk.testserver.client.model.TransactWriteItemsInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.WriteRequest;
 import aws.cryptography.testserver.tests.TargetPair;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Cross-language pair tests for the DDB SDK transform round-trip (§0.3.3, core
- * encrypt-before / decrypt-after). This is the transform-surface dual of
- * {@link DbeRoundTripTests}: instead of the item-encryptor {@code EncryptItem}
- * / {@code DecryptItem}, it drives {@code PutItemInputTransform} (encrypt an
- * item as it would be written by a {@code PutItem}) and
- * {@code GetItemOutputTransform} (decrypt an item as it would be returned by a
- * {@code GetItem}).
+ * Cross-language pair tests for the DDB SDK write-path (encrypt-before)
+ * transforms (§0.3.3). The bounded property under test: <em>a write-path input
+ * transform encrypts the item(s) it would write, and the resulting encrypted
+ * item is decrypted back to the original plaintext by another language's
+ * transform.</em>
  *
- * <p>The bounded property under test: <em>a PutItem input transformed by one
- * language's transforms client is decrypted back to the original plaintext by
- * another language's GetItem output transform.</em> Because both sides build a
- * transforms client over the same AWS-KMS keyring and the same table crypto
- * config, a cross-language pair proves the transform surface produces and
- * consumes a wire-compatible encrypted item, exactly as the item-encryptor
- * round-trip does for {@code EncryptItem} / {@code DecryptItem}.
+ * <p>Covered write ops: {@code PutItemInputTransform},
+ * {@code BatchWriteItemInputTransform} (per PutRequest), and
+ * {@code TransactWriteItemsInputTransform} (per Put action). Each item is
+ * encrypted on one language's transforms client and recovered on another's
+ * {@code GetItemOutputTransform}, so a cross-language pair proves the write
+ * transforms produce a wire-compatible encrypted item — the transform-surface
+ * dual of {@link DbeRoundTripTests}.
  *
- * <p>No real DynamoDB is involved: {@code PutItemInputTransform} returns the
- * encrypted item it would have written, and that item is fed straight into
- * {@code GetItemOutputTransform} as the item a {@code GetItem} would have
- * returned — the same technique the DBE library's own transform unit tests use.
+ * <p>No real DynamoDB is involved: the encrypted item a write transform would
+ * have written is fed straight into {@code GetItemOutputTransform} as the item
+ * a {@code GetItem} would have returned — the technique the DBE library's own
+ * transform unit tests use.
  *
- * <p>Later sub-rounds extend §0.3.3 with the remaining encrypt-before APIs
- * (BatchWrite / TransactWrite / Update / Delete), the remaining decrypt-after
- * APIs (Scan / Query / BatchGet / TransactGet), PartiQL rejection, passthrough
- * guards, and the beacon rewrite.
+ * <p>Later sub-rounds add the decrypt-after output transforms (Scan / Query /
+ * BatchGet / TransactGet), PartiQL rejection, passthrough guards, and the
+ * beacon rewrite.
  */
 class EncryptBeforeTransformTests {
 
@@ -63,53 +68,68 @@ class EncryptBeforeTransformTests {
     void putItemInputTransformEncryptsItem(TargetPair pair) {
         DBESDKTestServerClient encryptClient =
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
-
         Map<String, AttributeValue> encrypted =
             putItemInputTransform(encryptClient, canonicalPlaintext());
-
-        assertTrue(encrypted.containsKey(HEAD),
-            "transformed PutItem input must carry the DBE header attribute on " + pair);
-        assertTrue(encrypted.containsKey(FOOT),
-            "transformed PutItem input must carry the DBE footer attribute on " + pair);
-        assertNotNull(encrypted.get(SECRET).getB(),
-            "ENCRYPT_AND_SIGN 'secret' must become a binary value on " + pair);
-        assertNull(encrypted.get(SECRET).getS(),
-            "ENCRYPT_AND_SIGN 'secret' must not retain its plaintext string on " + pair);
-        assertEquals("item-1", encrypted.get(PK).getS(),
-            "signed partition key 'PK' must be preserved verbatim on " + pair);
+        assertEncryptedItem(encrypted, pair);
     }
 
-    @ParameterizedTest(name = "[transform] Put→Get transform round-trip {0}")
+    @ParameterizedTest(name = "[transform] PutItem→Get transform round-trip {0}")
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void putThenGetOutputTransformRoundTripsPlaintext(TargetPair pair) {
         DBESDKTestServerClient encryptClient =
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
-        DBESDKTestServerClient decryptClient =
-            DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
-
         Map<String, AttributeValue> plaintext = canonicalPlaintext();
         Map<String, AttributeValue> encrypted = putItemInputTransform(encryptClient, plaintext);
+        assertRecovers(plaintext, encrypted, pair);
+    }
 
-        String decryptClientId = createTransformsClient(decryptClient);
-        GetItemOutput transformed = decryptClient.getItemOutputTransform(
-            GetItemOutputTransformInput.builder()
-                .clientId(decryptClientId)
-                .originalInput(GetItemInput.builder()
-                    .tableName(TABLE)
-                    .key(Map.of(PK, plaintext.get(PK)))
-                    .build())
-                .sdkOutput(GetItemOutput.builder().item(encrypted).build())
-                .build()).getTransformedOutput();
+    @ParameterizedTest(name = "[transform] BatchWriteItemInputTransform encrypts {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void batchWriteItemInputTransformEncryptsAndRoundTrips(TargetPair pair) {
+        DBESDKTestServerClient encryptClient =
+            DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        Map<String, AttributeValue> plaintext = canonicalPlaintext();
 
-        Map<String, AttributeValue> recovered = transformed.getItem();
-        assertNotNull(recovered, "GetItemOutputTransform returned no item on " + pair);
-        for (Map.Entry<String, AttributeValue> entry : plaintext.entrySet()) {
-            AttributeValue actual = recovered.get(entry.getKey());
-            assertNotNull(actual,
-                "recovered item missing attribute '" + entry.getKey() + "' on " + pair);
-            assertEquals(entry.getValue().getS(), actual.getS(),
-                "attribute '" + entry.getKey() + "' did not round-trip on " + pair);
-        }
+        String clientId = createTransformsClient(encryptClient);
+        BatchWriteItemInput input = BatchWriteItemInput.builder()
+            .requestItems(Map.of(TABLE, List.of(
+                WriteRequest.builder()
+                    .putRequest(PutRequest.builder().item(plaintext).build())
+                    .build())))
+            .build();
+        Map<String, List<WriteRequest>> transformed = encryptClient.batchWriteItemInputTransform(
+            BatchWriteItemInputTransformInput.builder()
+                .clientId(clientId)
+                .sdkInput(input)
+                .build()).getTransformedInput().getRequestItems();
+
+        Map<String, AttributeValue> encrypted =
+            transformed.get(TABLE).get(0).getPutRequest().getItem();
+        assertEncryptedItem(encrypted, pair);
+        assertRecovers(plaintext, encrypted, pair);
+    }
+
+    @ParameterizedTest(name = "[transform] TransactWriteItemsInputTransform encrypts {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void transactWriteItemsInputTransformEncryptsAndRoundTrips(TargetPair pair) {
+        DBESDKTestServerClient encryptClient =
+            DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        Map<String, AttributeValue> plaintext = canonicalPlaintext();
+
+        String clientId = createTransformsClient(encryptClient);
+        TransactWriteItemsInput input = TransactWriteItemsInput.builder()
+            .transactItems(List.of(TransactWriteItem.builder()
+                .put(Put.builder().tableName(TABLE).item(plaintext).build())
+                .build()))
+            .build();
+        Map<String, AttributeValue> encrypted = encryptClient.transactWriteItemsInputTransform(
+            TransactWriteItemsInputTransformInput.builder()
+                .clientId(clientId)
+                .sdkInput(input)
+                .build()).getTransformedInput().getTransactItems().get(0).getPut().getItem();
+
+        assertEncryptedItem(encrypted, pair);
+        assertRecovers(plaintext, encrypted, pair);
     }
 
     // ---------------------------------------------------------------------
@@ -150,5 +170,53 @@ class EncryptBeforeTransformTests {
         Map<String, AttributeValue> encrypted = transformed.getItem();
         assertNotNull(encrypted, "PutItemInputTransform returned no item");
         return encrypted;
+    }
+
+    /** Assert an encrypted item carries the DBE envelope and hides the secret. */
+    private static void assertEncryptedItem(
+            Map<String, AttributeValue> encrypted, TargetPair pair) {
+        assertTrue(encrypted.containsKey(HEAD),
+            "encrypted item must carry the DBE header attribute on " + pair);
+        assertTrue(encrypted.containsKey(FOOT),
+            "encrypted item must carry the DBE footer attribute on " + pair);
+        assertNotNull(encrypted.get(SECRET).getB(),
+            "ENCRYPT_AND_SIGN 'secret' must become a binary value on " + pair);
+        assertNull(encrypted.get(SECRET).getS(),
+            "ENCRYPT_AND_SIGN 'secret' must not retain its plaintext string on " + pair);
+        assertEquals("item-1", encrypted.get(PK).getS(),
+            "signed partition key 'PK' must be preserved verbatim on " + pair);
+    }
+
+    /**
+     * Decrypt {@code encrypted} on the pair's decrypt endpoint via
+     * GetItemOutputTransform and assert every attribute of {@code plaintext} is
+     * recovered.
+     */
+    private static void assertRecovers(
+            Map<String, AttributeValue> plaintext,
+            Map<String, AttributeValue> encrypted,
+            TargetPair pair) {
+        DBESDKTestServerClient decryptClient =
+            DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        String decryptClientId = createTransformsClient(decryptClient);
+        GetItemOutput transformed = decryptClient.getItemOutputTransform(
+            GetItemOutputTransformInput.builder()
+                .clientId(decryptClientId)
+                .originalInput(GetItemInput.builder()
+                    .tableName(TABLE)
+                    .key(Map.of(PK, plaintext.get(PK)))
+                    .build())
+                .sdkOutput(GetItemOutput.builder().item(encrypted).build())
+                .build()).getTransformedOutput();
+
+        Map<String, AttributeValue> recovered = transformed.getItem();
+        assertNotNull(recovered, "GetItemOutputTransform returned no item on " + pair);
+        for (Map.Entry<String, AttributeValue> entry : plaintext.entrySet()) {
+            AttributeValue actual = recovered.get(entry.getKey());
+            assertNotNull(actual,
+                "recovered item missing attribute '" + entry.getKey() + "' on " + pair);
+            assertEquals(entry.getValue().getS(), actual.getS(),
+                "attribute '" + entry.getKey() + "' did not round-trip on " + pair);
+        }
     }
 }
