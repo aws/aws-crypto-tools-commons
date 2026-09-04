@@ -9,6 +9,7 @@ import aws.cryptography.dbesdk.testserver.client.model.AttributeValue;
 import aws.cryptography.dbesdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.dbesdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.dbesdk.testserver.client.model.CreateClientOutput;
+import aws.cryptography.dbesdk.testserver.client.model.CreateTransformsClientInput;
 import aws.cryptography.dbesdk.testserver.client.model.CryptoAction;
 import aws.cryptography.dbesdk.testserver.client.model.DBEClientConfig;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemOutput;
@@ -191,6 +192,28 @@ final class DbeTestHelpers {
         CreateClientOutput created = client.createClient(
             CreateClientInput.builder().config(builder.build()).build());
         return created.getClientId();
+    }
+
+    /**
+     * Build a DDB-SDK transforms client on {@code client} bound to
+     * {@code tableName}, over the shared AWS-KMS key with the standard (v2)
+     * action map. Both sides of a cross-language pair build against the same
+     * key and table config, so an item one side's write transform encrypts,
+     * the other side's read transform decrypts.
+     */
+    static String newTransformsClient(DBESDKTestServerClient client, String tableName) {
+        DBEClientConfig config = DBEClientConfig.builder()
+            .logicalTableName(tableName)
+            .partitionKeyName(PK)
+            .attributeActionsOnEncrypt(standardActions())
+            .allowedUnsignedAttributePrefix(":")
+            .keyring(Keyring.builder()
+                .awsKms(AwsKmsKeyringConfig.builder().kmsKeyId(resolveKmsKeyArn()).build())
+                .build())
+            .build();
+        return client.createTransformsClient(
+            CreateTransformsClientInput.builder().config(config).tableName(tableName).build())
+            .getClientId();
     }
 
     /**

@@ -14,15 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.dbesdk.testserver.client.client.DBESDKTestServerClient;
 import aws.cryptography.dbesdk.testserver.client.model.AttributeValue;
-import aws.cryptography.dbesdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemInputTransformInput;
-import aws.cryptography.dbesdk.testserver.client.model.CreateTransformsClientInput;
-import aws.cryptography.dbesdk.testserver.client.model.DBEClientConfig;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutputTransformInput;
-import aws.cryptography.dbesdk.testserver.client.model.Keyring;
 import aws.cryptography.dbesdk.testserver.client.model.Put;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
@@ -90,7 +86,7 @@ class EncryptBeforeTransformTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         Map<String, AttributeValue> plaintext = canonicalPlaintext();
 
-        String clientId = createTransformsClient(encryptClient);
+        String clientId = DbeTestHelpers.newTransformsClient(encryptClient, TABLE);
         BatchWriteItemInput input = BatchWriteItemInput.builder()
             .requestItems(Map.of(TABLE, List.of(
                 WriteRequest.builder()
@@ -116,7 +112,7 @@ class EncryptBeforeTransformTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         Map<String, AttributeValue> plaintext = canonicalPlaintext();
 
-        String clientId = createTransformsClient(encryptClient);
+        String clientId = DbeTestHelpers.newTransformsClient(encryptClient, TABLE);
         TransactWriteItemsInput input = TransactWriteItemsInput.builder()
             .transactItems(List.of(TransactWriteItem.builder()
                 .put(Put.builder().tableName(TABLE).item(plaintext).build())
@@ -136,31 +132,13 @@ class EncryptBeforeTransformTests {
     // Helpers.
     // ---------------------------------------------------------------------
 
-    /** Build a transforms client on {@code client} over the shared AWS-KMS key. */
-    private static String createTransformsClient(DBESDKTestServerClient client) {
-        DBEClientConfig config = DBEClientConfig.builder()
-            .logicalTableName(TABLE)
-            .partitionKeyName(PK)
-            .attributeActionsOnEncrypt(standardActions())
-            .allowedUnsignedAttributePrefix(":")
-            .keyring(Keyring.builder()
-                .awsKms(AwsKmsKeyringConfig.builder()
-                    .kmsKeyId(DbeTestHelpers.resolveKmsKeyArn())
-                    .build())
-                .build())
-            .build();
-        return client.createTransformsClient(
-            CreateTransformsClientInput.builder().config(config).tableName(TABLE).build())
-            .getClientId();
-    }
-
     /**
      * Create a transforms client on {@code client} and run PutItemInputTransform
      * on {@code plaintext}, returning the encrypted item.
      */
     private static Map<String, AttributeValue> putItemInputTransform(
             DBESDKTestServerClient client, Map<String, AttributeValue> plaintext) {
-        String clientId = createTransformsClient(client);
+        String clientId = DbeTestHelpers.newTransformsClient(client, TABLE);
         PutItemInput transformed = client.putItemInputTransform(
             PutItemInputTransformInput.builder()
                 .clientId(clientId)
@@ -198,7 +176,7 @@ class EncryptBeforeTransformTests {
             TargetPair pair) {
         DBESDKTestServerClient decryptClient =
             DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
-        String decryptClientId = createTransformsClient(decryptClient);
+        String decryptClientId = DbeTestHelpers.newTransformsClient(decryptClient, TABLE);
         GetItemOutput transformed = decryptClient.getItemOutputTransform(
             GetItemOutputTransformInput.builder()
                 .clientId(decryptClientId)

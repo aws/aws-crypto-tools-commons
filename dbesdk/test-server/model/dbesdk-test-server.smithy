@@ -31,6 +31,9 @@ service DBESDKTestServer {
         GetItemOutputTransform
         BatchWriteItemInputTransform
         TransactWriteItemsInputTransform
+        ScanOutputTransform
+        QueryOutputTransform
+        BatchGetItemOutputTransform
     ]
     errors: [
         GenericServerError
@@ -141,6 +144,39 @@ operation BatchWriteItemInputTransform {
 operation TransactWriteItemsInputTransform {
     input: TransactWriteItemsInputTransformRequest
     output: TransactWriteItemsInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt-after hook for a scan: transform a DynamoDB Scan output, decrypting
+/// every returned item.
+operation ScanOutputTransform {
+    input: ScanOutputTransformRequest
+    output: ScanOutputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt-after hook for a query: transform a DynamoDB Query output, decrypting
+/// every returned item.
+operation QueryOutputTransform {
+    input: QueryOutputTransformRequest
+    output: QueryOutputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt-after hook for a batch get: transform a DynamoDB BatchGetItem output,
+/// decrypting every returned item across all tables.
+operation BatchGetItemOutputTransform {
+    input: BatchGetItemOutputTransformRequest
+    output: BatchGetItemOutputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -303,6 +339,69 @@ structure TransactWriteItemsInputTransformResponse {
     transformedInput: TransactWriteItemsInput
 }
 
+@input
+structure ScanOutputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB Scan output to transform (decrypt-after).
+    @required
+    sdkOutput: ScanOutput
+
+    /// The original DynamoDB Scan input that produced `sdkOutput`.
+    @required
+    originalInput: ScanInput
+}
+
+@output
+structure ScanOutputTransformResponse {
+    /// The transformed Scan output, whose items are now decrypted.
+    @required
+    transformedOutput: ScanOutput
+}
+
+@input
+structure QueryOutputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB Query output to transform (decrypt-after).
+    @required
+    sdkOutput: QueryOutput
+
+    /// The original DynamoDB Query input that produced `sdkOutput`.
+    @required
+    originalInput: QueryInput
+}
+
+@output
+structure QueryOutputTransformResponse {
+    /// The transformed Query output, whose items are now decrypted.
+    @required
+    transformedOutput: QueryOutput
+}
+
+@input
+structure BatchGetItemOutputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB BatchGetItem output to transform (decrypt-after).
+    @required
+    sdkOutput: BatchGetItemOutput
+
+    /// The original DynamoDB BatchGetItem input that produced `sdkOutput`.
+    @required
+    originalInput: BatchGetItemInput
+}
+
+@output
+structure BatchGetItemOutputTransformResponse {
+    /// The transformed BatchGetItem output, whose items are now decrypted.
+    @required
+    transformedOutput: BatchGetItemOutput
+}
+
 // ===========================================================================
 // Minimal DynamoDB wire shapes for the transform operations. These carry only
 // the fields the encrypt-before / decrypt-after round-trip needs; each server
@@ -399,6 +498,65 @@ structure Put {
 
     @required
     item: DDBItem
+}
+
+/// An ordered list of DDB items, used by the read-path output transforms.
+list ItemList {
+    member: DDBItem
+}
+
+/// A DynamoDB Scan input: the scanned table (the transform needs it to find the
+/// table's crypto config).
+structure ScanInput {
+    @required
+    tableName: String
+}
+
+/// A DynamoDB Scan output: the returned items (absent when the scan matched
+/// nothing).
+structure ScanOutput {
+    items: ItemList
+}
+
+/// A DynamoDB Query input: the queried table.
+structure QueryInput {
+    @required
+    tableName: String
+}
+
+/// A DynamoDB Query output: the returned items (absent when the query matched
+/// nothing).
+structure QueryOutput {
+    items: ItemList
+}
+
+/// A DynamoDB BatchGetItem input: a map of table name → the keys requested from
+/// that table.
+structure BatchGetItemInput {
+    @required
+    requestItems: KeysAndAttributesMap
+}
+
+map KeysAndAttributesMap {
+    key: String
+    value: KeysAndAttributes
+}
+
+/// The keys requested from one table in a BatchGetItem.
+structure KeysAndAttributes {
+    @required
+    keys: ItemList
+}
+
+/// A DynamoDB BatchGetItem output: a map of table name → the items returned for
+/// that table.
+structure BatchGetItemOutput {
+    responses: BatchGetResponseMap
+}
+
+map BatchGetResponseMap {
+    key: String
+    value: ItemList
 }
 
 // ===========================================================================
