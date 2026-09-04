@@ -51,8 +51,10 @@ public final class ConfigurationLoader {
     public static ConfigurationSet loadConfigurationSet(Path configDir) {
         Path serverFile = configDir.resolve("server-config.json");
         Path featureFile = configDir.resolve("feature-config.json");
+        Path bugFile = configDir.resolve("bug-config.json");
         JsonNode server = readObject("server-config", read("server-config", serverFile), serverFile);
         JsonNode feature = readObject("feature-config", read("feature-config", featureFile), featureFile);
+        JsonNode bug = readObject("bug-config", read("bug-config", bugFile), bugFile);
         List<ConfigurationEntry> entries = new ArrayList<>();
         JsonNode entriesNode = server.get("entries");
         if (entriesNode != null && entriesNode.isArray()) {
@@ -60,10 +62,19 @@ public final class ConfigurationLoader {
                 entries.add(parseEntry(n));
             }
         }
+        List<BugLedgerEntry> ledger = new ArrayList<>();
+        JsonNode bugsNode = bug.get("bugs");
+        if (bugsNode != null && bugsNode.isArray()) {
+            for (JsonNode n : bugsNode) {
+                ledger.add(new BugLedgerEntry(
+                    text(n, "id"), text(n, "description"), text(n, "ticketId")));
+            }
+        }
         return new ConfigurationSet(
             text(server, "product"),
             stringList(feature.get("features")),
-            entries);
+            entries,
+            ledger);
     }
 
     /** Parse (without validating) a Configuration_Set from a JSON string. */

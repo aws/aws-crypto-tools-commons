@@ -361,6 +361,20 @@ class ConfigurationLoaderTest {
             "esdk-test-servers/go");
     }
 
+    @Test
+    @DisplayName("the shipped bug ledger loads as a catalog of {id, description, ticketId}")
+    void shippedBugLedgerLoads() {
+        Path shipped = Path.of("..", "config").toAbsolutePath().normalize();
+        ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(shipped);
+        assertTrue(!set.bugLedger().isEmpty(), "the shipped bug ledger must be populated");
+        BugLedgerEntry bug = set.bugLedger().stream()
+            .filter(b -> "encrypt-non-positive-frame-length-generic-error".equals(b.id()))
+            .findFirst().orElseThrow();
+        assertTrue(bug.description() != null && !bug.description().isBlank(),
+            "ledger entries carry a description");
+        assertEquals("", bug.ticketId(), "ticketId is blank until a ticket is filed");
+    }
+
     /**
      * Assert one shipped Language_Repository-pattern entry: its coordinates,
      * its config directory, and that no inline Feature_Declaration is carried.
