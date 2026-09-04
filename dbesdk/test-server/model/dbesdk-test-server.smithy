@@ -169,9 +169,9 @@ map DDBItem {
 /// exactly one member is expected to be set at runtime. Matches the DDB Data
 /// Plane AttributeValue shape.
 ///
-/// MVP: scalars only (S / N / B / BOOL / NULL). L (list), M (map), and typed
-/// sets (SS / NS / BS) are a mechanical extension — leaving them out keeps
-/// the codec small until a test needs them.
+/// Scalars (S / N / B / BOOL / NULL), typed sets (SS / NS / BS), and the
+/// recursive collection types (L / M) are all modeled. L and M reference
+/// AttributeValue recursively, so arbitrarily nested items round-trip.
 structure AttributeValue {
     /// String value.
     S: String
@@ -187,6 +187,47 @@ structure AttributeValue {
 
     /// Null attribute. When present, the boolean is always `true`.
     NULL: Boolean
+
+    /// String set. DDB sets are unordered and carry no duplicates.
+    SS: StringSetAttributeValue
+
+    /// Number set. Each element is a string, matching N.
+    NS: NumberSetAttributeValue
+
+    /// Binary set.
+    BS: BinarySetAttributeValue
+
+    /// List of AttributeValues (ordered, heterogeneous). Recursive.
+    L: ListAttributeValue
+
+    /// Map of String to AttributeValue. Recursive.
+    M: MapAttributeValue
+}
+
+/// String set member type for AttributeValue.SS.
+list StringSetAttributeValue {
+    member: String
+}
+
+/// Number set member type for AttributeValue.NS.
+list NumberSetAttributeValue {
+    member: String
+}
+
+/// Binary set member type for AttributeValue.BS.
+list BinarySetAttributeValue {
+    member: Blob
+}
+
+/// List member type for AttributeValue.L (recursive).
+list ListAttributeValue {
+    member: AttributeValue
+}
+
+/// Map member type for AttributeValue.M (recursive).
+map MapAttributeValue {
+    key: String
+    value: AttributeValue
 }
 
 // ===========================================================================
