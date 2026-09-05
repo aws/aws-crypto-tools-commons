@@ -37,6 +37,7 @@ service DBESDKTestServer {
         ExecuteStatementInputTransform
         BatchExecuteStatementInputTransform
         ExecuteTransactionInputTransform
+        BatchWriteItemOutputTransform
     ]
     errors: [
         GenericServerError
@@ -216,6 +217,21 @@ operation BatchExecuteStatementInputTransform {
 operation ExecuteTransactionInputTransform {
     input: ExecuteTransactionInputTransformRequest
     output: ExecuteTransactionInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt-after hook for a batch write: transform a DynamoDB BatchWriteItem
+/// output. Any items DynamoDB could not process are returned in
+/// UnprocessedItems still in their encrypted form; each such PutRequest item
+/// MUST be restored to its original plaintext value (matched against the
+/// original request by primary key) so a caller can resubmit it. A response
+/// with no UnprocessedItems is returned unchanged.
+operation BatchWriteItemOutputTransform {
+    input: BatchWriteItemOutputTransformRequest
+    output: BatchWriteItemOutputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -495,6 +511,29 @@ structure ExecuteTransactionInputTransformResponse {
     transformedInput: ExecuteTransactionInput
 }
 
+@input
+structure BatchWriteItemOutputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB BatchWriteItem output to transform (decrypt-after).
+    @required
+    sdkOutput: BatchWriteItemOutput
+
+    /// The original (plaintext) DynamoDB BatchWriteItem input, used to restore
+    /// each unprocessed item to its plaintext value by primary-key match.
+    @required
+    originalInput: BatchWriteItemInput
+}
+
+@output
+structure BatchWriteItemOutputTransformResponse {
+    /// The transformed BatchWriteItem output, whose UnprocessedItems (if any)
+    /// are now restored to their plaintext values.
+    @required
+    transformedOutput: BatchWriteItemOutput
+}
+
 // ===========================================================================
 // Minimal DynamoDB wire shapes for the transform operations. These carry only
 // the fields the encrypt-before / decrypt-after round-trip needs; each server
@@ -563,6 +602,13 @@ structure PutRequest {
 structure DeleteRequest {
     @required
     key: DDBItem
+}
+
+/// A DynamoDB BatchWriteItem output: the items DynamoDB could not process,
+/// keyed by table name (same shape as the input's requestItems). Absent when
+/// everything was written.
+structure BatchWriteItemOutput {
+    unprocessedItems: WriteRequestMap
 }
 
 /// A DynamoDB TransactWriteItems input: the list of transactional write

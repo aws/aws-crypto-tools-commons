@@ -13,13 +13,19 @@ import aws.cryptography.dbesdk.testserver.client.model.AttributeValue;
 import aws.cryptography.dbesdk.testserver.client.model.BatchGetItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.BatchGetItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.BatchGetItemOutputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemInput;
+import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemOutput;
+import aws.cryptography.dbesdk.testserver.client.model.BatchWriteItemOutputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.KeysAndAttributes;
+import aws.cryptography.dbesdk.testserver.client.model.PutRequest;
 import aws.cryptography.dbesdk.testserver.client.model.QueryInput;
 import aws.cryptography.dbesdk.testserver.client.model.QueryOutput;
 import aws.cryptography.dbesdk.testserver.client.model.QueryOutputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.ScanInput;
 import aws.cryptography.dbesdk.testserver.client.model.ScanOutput;
 import aws.cryptography.dbesdk.testserver.client.model.ScanOutputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.WriteRequest;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +45,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  * transform as the item a Scan / Query / BatchGet would have returned, and
  * asserts the transform recovers the plaintext — the decrypt-after,
  * cross-language dual of the encrypt-before tests.
+ *
+ * <p>Also covers the write-path decrypt-after regression
+ * ({@code BatchWriteItemOutputTransform}): DynamoDB returns items it could not
+ * process in {@code UnprocessedItems} still encrypted, and the transform must
+ * restore each to its original plaintext so a caller can resubmit it
+ * (fix 7c7c8a11).
  *
  * <p>No real DynamoDB is involved: the encrypted item is fed directly into the
  * output transform as the read response, the technique the DBE library's own
@@ -141,9 +153,58 @@ class DecryptAfterTransformTests {
             "empty ScanOutputTransform must yield no items on " + pair);
     }
 
+    @ParameterizedTest(name = "[transform] BatchWriteItem UnprocessedItems restored to plaintext {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void batchWriteItemOutputTransformRestoresUnprocessedItemsToPlaintext(TargetPair pair) {
+        DBESDKTestServerClient encryptClient =
+            DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        DBESDKTestServerClient decryptClient =
+            DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        Map<String, AttributeValue> plaintext = canonicalPlaintext();
+
+        // Encrypt the item exactly as a BatchWriteItem PutRequest would send it.
+        String encryptClientId = DbeTestHelpers.newTransformsClient(encryptClient, TABLE);
+        Map<String, List<WriteRequest>> encryptedRequestItems =
+            encryptClient.batchWriteItemInputTransform(
+                BatchWriteItemInputTransformInput.builder()
+                    .clientId(encryptClientId)
+                    .sdkInput(BatchWriteItemInput.builder()
+                        .requestItems(Map.of(TABLE, List.of(putRequest(plaintext))))
+                        .build())
+                    .build()).getTransformedInput().getRequestItems();
+        Map<String, AttributeValue> encryptedItem =
+            encryptedRequestItems.get(TABLE).get(0).getPutRequest().getItem();
+
+        // Simulate DynamoDB returning that encrypted item as an unprocessed
+        // write; the output transform must restore it to plaintext, matched
+        // against the original request by primary key.
+        String decryptClientId = DbeTestHelpers.newTransformsClient(decryptClient, TABLE);
+        Map<String, List<WriteRequest>> restored =
+            decryptClient.batchWriteItemOutputTransform(
+                BatchWriteItemOutputTransformInput.builder()
+                    .clientId(decryptClientId)
+                    .originalInput(BatchWriteItemInput.builder()
+                        .requestItems(Map.of(TABLE, List.of(putRequest(plaintext))))
+                        .build())
+                    .sdkOutput(BatchWriteItemOutput.builder()
+                        .unprocessedItems(Map.of(TABLE, List.of(putRequest(encryptedItem))))
+                        .build())
+                    .build()).getTransformedOutput().getUnprocessedItems();
+
+        assertNotNull(restored, "UnprocessedItems missing after transform on " + pair);
+        Map<String, AttributeValue> recovered =
+            restored.get(TABLE).get(0).getPutRequest().getItem();
+        assertItemRoundTrips(plaintext, recovered, pair);
+    }
+
     // ---------------------------------------------------------------------
     // Helpers.
     // ---------------------------------------------------------------------
+
+    /** A BatchWriteItem PutRequest carrying {@code item}. */
+    private static WriteRequest putRequest(Map<String, AttributeValue> item) {
+        return WriteRequest.builder().putRequest(PutRequest.builder().item(item).build()).build();
+    }
 
     /** Encrypt {@code plaintext} with the item encryptor on the encrypt endpoint. */
     private static Map<String, AttributeValue> encryptItem(
