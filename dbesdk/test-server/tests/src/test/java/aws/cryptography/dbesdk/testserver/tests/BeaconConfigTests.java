@@ -7,6 +7,7 @@ import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.canonicalP
 import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.standardActions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,6 +25,10 @@ import aws.cryptography.dbesdk.testserver.client.model.GetItemOutputTransformInp
 import aws.cryptography.dbesdk.testserver.client.model.Keyring;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.QueryInput;
+import aws.cryptography.dbesdk.testserver.client.model.QueryInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.ScanInput;
+import aws.cryptography.dbesdk.testserver.client.model.ScanInputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.SearchConfig;
 import aws.cryptography.dbesdk.testserver.client.model.SingleKeyStore;
 import aws.cryptography.dbesdk.testserver.client.model.StandardBeacon;
@@ -103,6 +108,58 @@ class BeaconConfigTests {
         }
         assertFalse(recovered.containsKey(SECRET_BEACON),
             "beacon attribute must be stripped from the decrypted item on " + pair);
+    }
+
+    @ParameterizedTest(name = "[beacon] ScanInputTransform rewrites beacon filter {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void scanInputTransformRewritesBeaconFilter(TargetPair pair) {
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        String clientId = createBeaconTransformsClient(client);
+
+        ScanInput transformed = client.scanInputTransform(
+            ScanInputTransformInput.builder()
+                .clientId(clientId)
+                .sdkInput(ScanInput.builder()
+                    .tableName(TABLE)
+                    .filterExpression("#s = :s")
+                    .expressionAttributeNames(Map.of("#s", SECRET))
+                    .expressionAttributeValues(Map.of(":s",
+                        AttributeValue.builder().s("hunter2").build()))
+                    .build())
+                .build()).getTransformedInput();
+
+        assertEquals(SECRET_BEACON, transformed.getExpressionAttributeNames().get("#s"),
+            "the beaconed attribute name must be rewritten to its beacon on " + pair);
+        assertNotEquals("hunter2", transformed.getExpressionAttributeValues().get(":s").getS(),
+            "the compared value must be replaced by its beacon on " + pair);
+    }
+
+    @ParameterizedTest(name = "[beacon] QueryInputTransform rewrites beacon filter {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void queryInputTransformRewritesBeaconFilter(TargetPair pair) {
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        String clientId = createBeaconTransformsClient(client);
+
+        QueryInput transformed = client.queryInputTransform(
+            QueryInputTransformInput.builder()
+                .clientId(clientId)
+                .sdkInput(QueryInput.builder()
+                    .tableName(TABLE)
+                    .keyConditionExpression("#p = :p")
+                    .filterExpression("#s = :s")
+                    .expressionAttributeNames(Map.of("#p", PK, "#s", SECRET))
+                    .expressionAttributeValues(Map.of(
+                        ":p", AttributeValue.builder().s("item-1").build(),
+                        ":s", AttributeValue.builder().s("hunter2").build()))
+                    .build())
+                .build()).getTransformedInput();
+
+        assertEquals(SECRET_BEACON, transformed.getExpressionAttributeNames().get("#s"),
+            "the beaconed filter attribute must be rewritten to its beacon on " + pair);
+        assertEquals(PK, transformed.getExpressionAttributeNames().get("#p"),
+            "the non-beaconed partition key must be left unchanged on " + pair);
+        assertNotEquals("hunter2", transformed.getExpressionAttributeValues().get(":s").getS(),
+            "the compared beacon value must be replaced by its beacon on " + pair);
     }
 
     /**

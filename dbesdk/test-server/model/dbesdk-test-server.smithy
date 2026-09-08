@@ -38,6 +38,8 @@ service DBESDKTestServer {
         BatchExecuteStatementInputTransform
         ExecuteTransactionInputTransform
         BatchWriteItemOutputTransform
+        ScanInputTransform
+        QueryInputTransform
     ]
     errors: [
         GenericServerError
@@ -232,6 +234,32 @@ operation ExecuteTransactionInputTransform {
 operation BatchWriteItemOutputTransform {
     input: BatchWriteItemOutputTransformRequest
     output: BatchWriteItemOutputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Modify-before hook for a scan: transform a DynamoDB Scan input, rewriting
+/// any FilterExpression reference to a beaconed attribute into the beacon
+/// attribute (`aws_dbe_b_<name>`) and replacing the compared value with its
+/// beacon. A scan against a table with no matching beacon config passes
+/// through unchanged.
+operation ScanInputTransform {
+    input: ScanInputTransformRequest
+    output: ScanInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Modify-before hook for a query: transform a DynamoDB Query input, rewriting
+/// KeyCondition/Filter expression references to beaconed attributes into their
+/// beacons.
+operation QueryInputTransform {
+    input: QueryInputTransformRequest
+    output: QueryInputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -534,6 +562,40 @@ structure BatchWriteItemOutputTransformResponse {
     transformedOutput: BatchWriteItemOutput
 }
 
+@input
+structure ScanInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    sdkInput: ScanInput
+}
+
+@output
+structure ScanInputTransformResponse {
+    /// The transformed Scan input, whose beacon-attribute filter references are
+    /// rewritten to the beacon.
+    @required
+    transformedInput: ScanInput
+}
+
+@input
+structure QueryInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    sdkInput: QueryInput
+}
+
+@output
+structure QueryInputTransformResponse {
+    /// The transformed Query input, whose beacon-attribute expression
+    /// references are rewritten to the beacon.
+    @required
+    transformedInput: QueryInput
+}
+
 // ===========================================================================
 // Minimal DynamoDB wire shapes for the transform operations. These carry only
 // the fields the encrypt-before / decrypt-after round-trip needs; each server
@@ -645,10 +707,18 @@ list ItemList {
 }
 
 /// A DynamoDB Scan input: the scanned table (the transform needs it to find the
-/// table's crypto config).
+/// table's crypto config). For the input (modify-before) transform it also
+/// carries the optional FilterExpression and its name/value maps, whose
+/// beacon-attribute references are rewritten to beacons.
 structure ScanInput {
     @required
     tableName: String
+
+    filterExpression: String
+
+    expressionAttributeNames: ExpressionAttributeNameMap
+
+    expressionAttributeValues: DDBItem
 }
 
 /// A DynamoDB Scan output: the returned items (absent when the scan matched
@@ -657,10 +727,26 @@ structure ScanOutput {
     items: ItemList
 }
 
-/// A DynamoDB Query input: the queried table.
+/// A DynamoDB Query input. For the input (modify-before) transform it carries
+/// the optional KeyCondition/Filter expressions and their name/value maps,
+/// whose beacon-attribute references are rewritten to beacons.
 structure QueryInput {
     @required
     tableName: String
+
+    keyConditionExpression: String
+
+    filterExpression: String
+
+    expressionAttributeNames: ExpressionAttributeNameMap
+
+    expressionAttributeValues: DDBItem
+}
+
+/// DynamoDB ExpressionAttributeNames: placeholder (`#x`) → real attribute name.
+map ExpressionAttributeNameMap {
+    key: String
+    value: String
 }
 
 /// A DynamoDB Query output: the returned items (absent when the query matched
