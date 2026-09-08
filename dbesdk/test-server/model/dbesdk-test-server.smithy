@@ -893,6 +893,95 @@ structure DBEClientConfig {
     /// The cryptographic-materials manager backing this client (mutually
     /// exclusive with `keyring`).
     cmm: CryptographicMaterialsManager
+
+    /// Optional searchable-encryption (beacon) configuration. Only honored by a
+    /// transforms client (CreateTransformsClient); the item encryptor ignores
+    /// it. When present, encrypted/signed attributes named by its beacons gain
+    /// an `aws_dbe_b_<name>` beacon attribute on write, and Scan/Query
+    /// FilterExpression references to those attributes are rewritten to the
+    /// beacon on the read path.
+    search: SearchConfig
+}
+
+// ===========================================================================
+// Searchable encryption (beacons). Minimal shape: a single beacon version with
+// standard beacons keyed by a single beacon key store. Compound / virtual
+// beacons and multi key stores are added in later sub-rounds.
+// ===========================================================================
+structure SearchConfig {
+    /// The beacon versions. DBE currently supports exactly one.
+    @required
+    versions: BeaconVersionList
+
+    /// The beacon version written on encrypt (1-based). Defaults to 1.
+    writeVersion: Integer
+}
+
+list BeaconVersionList {
+    member: BeaconVersion
+}
+
+structure BeaconVersion {
+    /// The beacon version number (1-based).
+    @required
+    version: Integer
+
+    /// The branch-key store that holds the beacon keys.
+    @required
+    keyStore: BeaconKeyStore
+
+    /// Where the beacon key material comes from.
+    @required
+    keySource: BeaconKeySource
+
+    /// The standard (single-attribute) beacons defined for this version.
+    standardBeacons: StandardBeaconList
+}
+
+/// Configuration for the DynamoDB branch-key store that holds beacon keys —
+/// the same key store the AWS KMS Hierarchical keyring uses. The DynamoDB and
+/// KMS clients are constructed server-side from these serializable fields.
+structure BeaconKeyStore {
+    @required
+    ddbTableName: String
+
+    @required
+    logicalKeyStoreName: String
+
+    @required
+    kmsKeyArn: String
+}
+
+/// The beacon key source. Exactly one variant is expected to be set at runtime;
+/// this sub-round wires the single-key-store source.
+structure BeaconKeySource {
+    single: SingleKeyStore
+}
+
+structure SingleKeyStore {
+    /// The branch-key id whose beacon key derives the beacons.
+    @required
+    keyId: String
+
+    /// Beacon-key cache TTL, in seconds.
+    @required
+    cacheTtlSeconds: Integer
+}
+
+list StandardBeaconList {
+    member: StandardBeacon
+}
+
+/// A standard beacon over one attribute, making it queryable by equality
+/// without decryption.
+structure StandardBeacon {
+    /// The name of the beacon, and of the attribute it beacons.
+    @required
+    name: String
+
+    /// The beacon length in bits (the truncated-HMAC output width).
+    @required
+    length: Integer
 }
 
 map AttributeActionsOnEncrypt {
