@@ -1147,6 +1147,22 @@ structure BeaconVersion {
 
     /// The standard (single-attribute) beacons defined for this version.
     standardBeacons: StandardBeaconList
+
+    /// The compound beacons (assembled from encrypted/signed parts) defined for
+    /// this version.
+    compoundBeacons: CompoundBeaconList
+
+    /// The virtual fields (values derived from other attributes) defined for
+    /// this version. A standard beacon can then be built over a virtual field.
+    virtualFields: VirtualFieldList
+
+    /// Encrypted parts available to any compound beacon in this version. Each
+    /// references a standard beacon by name and carries a prefix.
+    encryptedParts: EncryptedPartList
+
+    /// Signed (plaintext) parts available to any compound beacon in this
+    /// version. Each carries a prefix and an optional source location.
+    signedParts: SignedPartList
 }
 
 /// Configuration for the DynamoDB branch-key store that holds beacon keys —
@@ -1193,6 +1209,119 @@ structure StandardBeacon {
     /// The beacon length in bits (the truncated-HMAC output width).
     @required
     length: Integer
+
+    /// Optional DynamoDB document path to the value this beacon calculates over.
+    /// Defaults to the attribute named by `name`; set it to beacon over a
+    /// virtual field (whose name is not a stored attribute).
+    loc: String
+}
+
+list CompoundBeaconList {
+    member: CompoundBeacon
+}
+
+/// A compound beacon assembled from ordered parts (each an encrypted or signed
+/// part), joined by a split character. Written to `aws_dbe_b_<name>`.
+structure CompoundBeacon {
+    /// The name of the compound beacon.
+    @required
+    name: String
+
+    /// The single character joining parts of the assembled beacon value. Must
+    /// not appear in any part's prefix or signed value.
+    @required
+    split: String
+
+    /// The ordered constructors; the first whose required parts are all present
+    /// builds the beacon.
+    constructors: ConstructorList
+
+    /// Encrypted parts local to this compound beacon (an alternative to the
+    /// version-level `encryptedParts`).
+    encrypted: EncryptedPartList
+
+    /// Signed parts local to this compound beacon (an alternative to the
+    /// version-level `signedParts`).
+    signed: SignedPartList
+}
+
+list ConstructorList {
+    member: Constructor
+}
+
+/// One way to construct a compound beacon: an ordered list of parts.
+structure Constructor {
+    @required
+    parts: ConstructorPartList
+}
+
+list ConstructorPartList {
+    member: ConstructorPart
+}
+
+/// A part of a compound-beacon construction, naming an encrypted or signed part
+/// and whether it is required for this construction.
+structure ConstructorPart {
+    @required
+    name: String
+
+    @required
+    required: Boolean
+}
+
+list EncryptedPartList {
+    member: EncryptedPart
+}
+
+/// An encrypted part of a compound beacon: the name of a standard beacon whose
+/// value it holds, plus the prefix written with it.
+structure EncryptedPart {
+    @required
+    name: String
+
+    @required
+    prefix: String
+}
+
+list SignedPartList {
+    member: SignedPart
+}
+
+/// A signed (plaintext) part of a compound beacon: a name, the prefix written
+/// with it, and an optional source location (defaults to `name`).
+structure SignedPart {
+    @required
+    name: String
+
+    @required
+    prefix: String
+
+    loc: String
+}
+
+list VirtualFieldList {
+    member: VirtualField
+}
+
+/// A virtual field: a value derived by concatenating other attributes' values,
+/// usable as the source for a standard beacon.
+structure VirtualField {
+    @required
+    name: String
+
+    @required
+    parts: VirtualPartList
+}
+
+list VirtualPartList {
+    member: VirtualPart
+}
+
+/// One part of a virtual field: the DynamoDB document path of a source
+/// attribute.
+structure VirtualPart {
+    @required
+    loc: String
 }
 
 map AttributeActionsOnEncrypt {
