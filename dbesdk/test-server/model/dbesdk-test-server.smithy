@@ -40,6 +40,8 @@ service DBESDKTestServer {
         BatchWriteItemOutputTransform
         ScanInputTransform
         QueryInputTransform
+        UpdateItemInputTransform
+        DeleteItemInputTransform
     ]
     errors: [
         GenericServerError
@@ -260,6 +262,34 @@ operation ScanInputTransform {
 operation QueryInputTransform {
     input: QueryInputTransformRequest
     output: QueryInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Validate-before hook for an UpdateItem: the DBE library rejects the request
+/// (raising a DBESDKClientError) when the UpdateExpression references any signed
+/// attribute, because updating a signed attribute would invalidate the item
+/// signature. An UpdateExpression touching only unsigned (DO_NOTHING /
+/// unconfigured) attributes passes through unchanged.
+operation UpdateItemInputTransform {
+    input: UpdateItemInputTransformRequest
+    output: UpdateItemInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Validate-before hook for a DeleteItem: the DBE library rejects the request
+/// (raising a DBESDKClientError) when the ConditionExpression references any
+/// encrypted attribute, because an encrypted attribute's ciphertext cannot be
+/// compared server-side. A ConditionExpression over only non-encrypted
+/// (signed-but-not-encrypted or unsigned) attributes passes through unchanged.
+operation DeleteItemInputTransform {
+    input: DeleteItemInputTransformRequest
+    output: DeleteItemInputTransformResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -596,6 +626,43 @@ structure QueryInputTransformResponse {
     transformedInput: QueryInput
 }
 
+@input
+structure UpdateItemInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB UpdateItem input to validate (validate-before).
+    @required
+    sdkInput: UpdateItemInput
+}
+
+@output
+structure UpdateItemInputTransformResponse {
+    /// The unchanged UpdateItem input (only returned when the UpdateExpression
+    /// references no signed attribute; a signed-attribute update fails instead).
+    @required
+    transformedInput: UpdateItemInput
+}
+
+@input
+structure DeleteItemInputTransformRequest {
+    @required
+    clientId: ClientId
+
+    /// The DynamoDB DeleteItem input to validate (validate-before).
+    @required
+    sdkInput: DeleteItemInput
+}
+
+@output
+structure DeleteItemInputTransformResponse {
+    /// The unchanged DeleteItem input (only returned when the ConditionExpression
+    /// references no encrypted attribute; an encrypted-attribute condition fails
+    /// instead).
+    @required
+    transformedInput: DeleteItemInput
+}
+
 // ===========================================================================
 // Minimal DynamoDB wire shapes for the transform operations. These carry only
 // the fields the encrypt-before / decrypt-after round-trip needs; each server
@@ -625,6 +692,43 @@ structure GetItemInput {
 /// no item.
 structure GetItemOutput {
     item: DDBItem
+}
+
+/// A DynamoDB UpdateItem input. Carries the primary key plus the optional
+/// UpdateExpression / ConditionExpression and their name/value maps — the
+/// validate-before transform inspects the UpdateExpression for references to
+/// signed attributes.
+structure UpdateItemInput {
+    @required
+    tableName: String
+
+    @required
+    key: DDBItem
+
+    updateExpression: String
+
+    conditionExpression: String
+
+    expressionAttributeNames: ExpressionAttributeNameMap
+
+    expressionAttributeValues: DDBItem
+}
+
+/// A DynamoDB DeleteItem input. Carries the primary key plus the optional
+/// ConditionExpression and its name/value maps — the validate-before transform
+/// inspects the ConditionExpression for references to encrypted attributes.
+structure DeleteItemInput {
+    @required
+    tableName: String
+
+    @required
+    key: DDBItem
+
+    conditionExpression: String
+
+    expressionAttributeNames: ExpressionAttributeNameMap
+
+    expressionAttributeValues: DDBItem
 }
 
 /// A DynamoDB BatchWriteItem input: a map of table name → the write requests
