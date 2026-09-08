@@ -11,6 +11,7 @@ import aws.cryptography.dbesdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.dbesdk.testserver.client.model.CreateClientOutput;
 import aws.cryptography.dbesdk.testserver.client.model.CreateTransformsClientInput;
 import aws.cryptography.dbesdk.testserver.client.model.CryptoAction;
+import aws.cryptography.dbesdk.testserver.client.model.DBEAlgorithmSuiteId;
 import aws.cryptography.dbesdk.testserver.client.model.DBEClientConfig;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.EncryptItemInput;
@@ -202,18 +203,35 @@ final class DbeTestHelpers {
      * the other side's read transform decrypts.
      */
     static String newTransformsClient(DBESDKTestServerClient client, String tableName) {
-        DBEClientConfig config = DBEClientConfig.builder()
-            .logicalTableName(tableName)
+        return client.createTransformsClient(
+            CreateTransformsClientInput.builder()
+                .config(transformsConfig(tableName, null))
+                .tableName(tableName)
+                .build())
+            .getClientId();
+    }
+
+    /**
+     * Build the transforms-client {@link DBEClientConfig} used across the DDB
+     * SDK transform tests: the standard (v2) action map over the shared AWS-KMS
+     * key, bound to {@code logicalTableName}. When {@code algorithmSuiteId} is
+     * non-null it is set on the config, so a multi-table transforms client can
+     * give each table its own suite.
+     */
+    static DBEClientConfig transformsConfig(
+            String logicalTableName, DBEAlgorithmSuiteId algorithmSuiteId) {
+        DBEClientConfig.Builder builder = DBEClientConfig.builder()
+            .logicalTableName(logicalTableName)
             .partitionKeyName(PK)
             .attributeActionsOnEncrypt(standardActions())
             .allowedUnsignedAttributePrefix(":")
             .keyring(Keyring.builder()
                 .awsKms(AwsKmsKeyringConfig.builder().kmsKeyId(resolveKmsKeyArn()).build())
-                .build())
-            .build();
-        return client.createTransformsClient(
-            CreateTransformsClientInput.builder().config(config).tableName(tableName).build())
-            .getClientId();
+                .build());
+        if (algorithmSuiteId != null) {
+            builder.algorithmSuiteId(algorithmSuiteId);
+        }
+        return builder.build();
     }
 
     /**

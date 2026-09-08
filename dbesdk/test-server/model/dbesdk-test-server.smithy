@@ -363,6 +363,27 @@ structure CreateTransformsClientRequest {
     /// PutItemInput / GetItemInput requests must reference this same name.
     @required
     tableName: String
+
+    /// Optional additional (table name → crypto config) entries. When present,
+    /// the transforms client is built from a `DynamoDbTablesEncryptionConfig`
+    /// holding the primary table plus each of these — so one transforms client
+    /// spans several tables, each with its own independent crypto config
+    /// (including its own `algorithmSuiteId`).
+    additionalTables: TransformsTableConfigList
+}
+
+/// One additional (table name, crypto config) entry for a multi-table
+/// transforms client.
+structure TransformsTableConfig {
+    @required
+    tableName: String
+
+    @required
+    config: DBEClientConfig
+}
+
+list TransformsTableConfigList {
+    member: TransformsTableConfig
 }
 
 @output
