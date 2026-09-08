@@ -1163,6 +1163,17 @@ structure BeaconVersion {
     /// Signed (plaintext) parts available to any compound beacon in this
     /// version. Each carries a prefix and an optional source location.
     signedParts: SignedPartList
+
+    /// The maximum number of partitions any beacon in this version may be
+    /// divided across. Only honored by servers supporting the
+    /// `beacon-partitions` feature.
+    maximumNumberOfPartitions: Integer
+
+    /// The partitions applied to any beacon that does not set its own
+    /// `numberOfPartitions`. Must satisfy 0 < default < maximum, and may only be
+    /// set when `maximumNumberOfPartitions` is also set. Only honored by servers
+    /// supporting the `beacon-partitions` feature.
+    defaultNumberOfPartitions: Integer
 }
 
 /// Configuration for the DynamoDB branch-key store that holds beacon keys —
@@ -1214,6 +1225,12 @@ structure StandardBeacon {
     /// Defaults to the attribute named by `name`; set it to beacon over a
     /// virtual field (whose name is not a stored attribute).
     loc: String
+
+    /// Optional number of partitions this beacon is divided across. Must be less
+    /// than the version's `maximumNumberOfPartitions`. Only honored by servers
+    /// whose library supports beacon partitions (the `beacon-partitions`
+    /// feature); a server that declares that feature unsupported ignores it.
+    numberOfPartitions: Integer
 }
 
 list CompoundBeaconList {

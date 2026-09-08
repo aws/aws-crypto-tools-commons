@@ -36,7 +36,8 @@
   "product": "dbesdk",
   "features": [
     "raw-aes",
-    "aws-kms"
+    "aws-kms",
+    "beacon-partitions"
   ],
   "entries": [
     {
