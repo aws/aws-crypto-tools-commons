@@ -99,6 +99,9 @@ class BeaconStyleTests {
                 .style(BeaconStyle.builder().shared(Shared.builder().other(FIRST).build()).build())
                 .build())));
         Map<String, AttributeValue> sharedItem = encrypt(client, actions, shared, item);
+        //= specification/searchable-encryption/beacons.md#shared-initialization
+        //= type=test
+        //# This beacon MUST calculate its [value](#beacon-value) as if it were the `other` beacon.
         assertEquals(sharedItem.get("aws_dbe_b_" + FIRST), sharedItem.get("aws_dbe_b_" + ALIAS),
             "a shared beacon must equal the beacon it shares with for an equal value on " + pair);
 
@@ -144,6 +147,9 @@ class BeaconStyleTests {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         Map<String, AttributeValue> encrypted = encrypt(client, actions, search, item);
 
+        //= specification/searchable-encryption/beacons.md#partonly-initialization
+        //= type=test
+        //# The Standard Beacon MUST NOT be stored in the item for a PartOnly beacon.
         assertFalse(encrypted.containsKey("aws_dbe_b_" + FIRST),
             "a partOnly beacon must NOT be stored standalone on " + pair);
         assertTrue(encrypted.containsKey("aws_dbe_b_" + LAST),
@@ -173,6 +179,10 @@ class BeaconStyleTests {
 
         AttributeValue beacon = encrypted.get("aws_dbe_b_" + TAGS);
         assertNotNull(beacon, "the asSet beacon must be written on " + pair);
+        //= specification/searchable-encryption/beacons.md#asset-initialization
+        //= type=test
+        //# The Standard Beacon MUST be stored in the item as a Set,
+        //# comprised of the [beacon values](#beacon-value) of all the elements in the original Set.
         assertNotNull(beacon.getSs(), "the asSet beacon must be stored as a String Set on " + pair);
         assertEquals(elements.size(), beacon.getSs().size(),
             "the asSet beacon must have one beacon value per Set element on " + pair);
@@ -206,6 +216,9 @@ class BeaconStyleTests {
         Map<String, AttributeValue> sharedItem = encrypt(client, actions, sharedSet, item);
         AttributeValue tagsBeacon = sharedItem.get("aws_dbe_b_" + TAGS);
         AttributeValue aliasBeacon = sharedItem.get("aws_dbe_b_" + TAGS_ALIAS);
+        //= specification/searchable-encryption/beacons.md#sharedset-initialization
+        //= type=test
+        //# A SharedSet Beacon MUST behave both as [Shared](#shared-initialization) and [AsSet](#asset-initialization).
         assertNotNull(aliasBeacon.getSs(), "a sharedSet beacon must be stored as a Set on " + pair);
         assertEquals(elements.size(), aliasBeacon.getSs().size(),
             "a sharedSet beacon must have one value per Set element on " + pair);

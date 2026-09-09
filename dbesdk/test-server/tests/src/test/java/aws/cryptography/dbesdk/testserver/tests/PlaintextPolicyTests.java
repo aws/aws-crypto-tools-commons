@@ -70,6 +70,12 @@ class PlaintextPolicyTests {
             .plaintextItem(plaintext)
             .build()).getEncryptedItem();
 
+        //= specification/dynamodb-encryption-client/encrypt-item.md#behavior
+        //= type=test
+        //# If a [Plaintext Policy](./ddb-table-encryption-config.md#plaintext-policy) of
+        //# `FORCE_PLAINTEXT_WRITE_ALLOW_PLAINTEXT_READ` is specified,
+        //# this operation MUST NOT encrypt the input item,
+        //# and MUST passthrough that item as the output.
         assertFalse(written.containsKey("aws_dbe_head"),
             "FORCE_PLAINTEXT_WRITE must not add the aws_dbe_head header on " + pair);
         assertEquals(plaintext.get(SECRET).getS(), written.get(SECRET).getS(),
@@ -90,6 +96,13 @@ class PlaintextPolicyTests {
             .encryptedItem(plaintext)
             .build()).getPlaintextItem();
 
+        //= specification/dynamodb-encryption-client/decrypt-item.md#behavior
+        //= type=test
+        //# If a [Plaintext Policy](./ddb-table-encryption-config.md#plaintext-policy) of
+        //# `FORCE_PLAINTEXT_WRITE_ALLOW_PLAINTEXT_READ` or `FORBID_PLAINTEXT_WRITE_ALLOW_PLAINTEXT_READ` is specified,
+        //# and the input item [is a plaintext item](#determining-plaintext-items)
+        //# this operation MUST NOT decrypt the input item,
+        //# and MUST passthrough that item as the output.
         for (Map.Entry<String, AttributeValue> entry : plaintext.entrySet()) {
             AttributeValue actual = recovered.get(entry.getKey());
             assertNotNull(actual, "ALLOW_PLAINTEXT_READ dropped attribute '" + entry.getKey()
@@ -108,6 +121,10 @@ class PlaintextPolicyTests {
             .config(plaintextConfig(null))
             .build()).getClientId();
 
+        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md#plaintext-policy
+        //= type=test
+        //= reason=with no override the default attempts to decrypt the plaintext item, which has no header and fails
+        //# If not specified, encryption and decryption MUST behave according to `FORBID_PLAINTEXT_WRITE_FORBID_PLAINTEXT_READ`.
         assertThrows(DBESDKClientError.class, () ->
             client.decryptItem(DecryptItemInput.builder()
                 .clientId(clientId)

@@ -69,6 +69,9 @@ class HeaderStructureTests {
         byte[] hdr2 = bytesOf(encryptOnce(encryptClient, encryptClientId, canonicalPlaintext()).get(HEAD));
         byte[] msgId1 = Arrays.copyOfRange(hdr1, 2, 34);
         byte[] msgId2 = Arrays.copyOfRange(hdr2, 2, 34);
+        //= specification/structured-encryption/header.md#message-id
+        //= type=test
+        //# Implementations MUST generate a fresh 256-bit random MessageID, from a cryptographically secure source, for each record encrypted.
         assertFalse(Arrays.equals(msgId1, msgId2),
             "two independent encrypts of identical plaintext must produce distinct 32-byte "
                 + "message IDs (" + pair + ")");
@@ -88,6 +91,10 @@ class HeaderStructureTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String encryptClientId = newKmsClient(encryptClient, TABLE, PK, standardActions(), List.of());
         byte[] header = bytesOf(encryptOnce(encryptClient, encryptClientId, canonicalPlaintext()).get(HEAD));
+        //= specification/structured-encryption/header.md#format-flavor
+        //= type=test
+        //# The algorithm suite indicated by the flavor MUST be a
+        //# [DBE supported algorithm suite](../../submodules/MaterialProviders/aws-encryption-sdk-specification/framework/algorithm-suites.md#supported-algorithm-suites-enum).
         assertEquals(FLAVOR_ECDSA_SIGNING, header[1],
             "header byte 1 (flavor) must be 0x01 for the default ECDSA-signed algorithm suite ("
                 + pair + ")");

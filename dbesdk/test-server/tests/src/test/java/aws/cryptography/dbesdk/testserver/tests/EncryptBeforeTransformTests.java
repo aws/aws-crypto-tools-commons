@@ -66,6 +66,12 @@ class EncryptBeforeTransformTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         Map<String, AttributeValue> encrypted =
             putItemInputTransform(encryptClient, canonicalPlaintext());
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#encrypt-before-putitem
+        //= type=test
+        //# The PutItem request's `Item` field MUST be replaced
+        //# with a value that is equivalent to
+        //# the output of the [add encrypted beacons](ddb-support.md#addencryptedbeacons) operation
+        //# calculated above.
         assertEncryptedItem(encrypted, pair);
     }
 
@@ -76,6 +82,12 @@ class EncryptBeforeTransformTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         Map<String, AttributeValue> plaintext = canonicalPlaintext();
         Map<String, AttributeValue> encrypted = putItemInputTransform(encryptClient, plaintext);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#decrypt-after-getitem
+        //= type=test
+        //# The [Item Encryptor](./ddb-item-encryptor.md) MUST perform
+        //# [Decrypt Item](./decrypt-item.md) where the input
+        //# [DynamoDB Item](./decrypt-item.md#dynamodb-item)
+        //# is the `Item` field in the original response
         assertRecovers(plaintext, encrypted, pair);
     }
 
@@ -101,6 +113,12 @@ class EncryptBeforeTransformTests {
 
         Map<String, AttributeValue> encrypted =
             transformed.get(TABLE).get(0).getPutRequest().getItem();
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#encrypt-before-batchwriteitem
+        //= type=test
+        //# The PutRequest request's `Item` field MUST be replaced
+        //# with a value that is equivalent to
+        //# the result [Encrypted DynamoDB Item](./encrypt-item.md#encrypted-dynamodb-item)
+        //# calculated above.
         assertEncryptedItem(encrypted, pair);
         assertRecovers(plaintext, encrypted, pair);
     }
@@ -124,6 +142,12 @@ class EncryptBeforeTransformTests {
                 .sdkInput(input)
                 .build()).getTransformedInput().getTransactItems().get(0).getPut().getItem();
 
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#encrypt-before-transactwriteitems
+        //= type=test
+        //# - The PutItem request's `Item` field MUST be replaced
+        //#   with a value that is equivalent to
+        //#   the result [Encrypted DynamoDB Item](./encrypt-item.md#encrypted-dynamodb-item)
+        //#   calculated above.
         assertEncryptedItem(encrypted, pair);
         assertRecovers(plaintext, encrypted, pair);
     }

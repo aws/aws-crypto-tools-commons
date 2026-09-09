@@ -55,6 +55,13 @@ class PartiQlRejectionTests {
     void executeStatementRejectsEncryptedTable(TargetPair pair) {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String clientId = DbeTestHelpers.newTransformsClient(client, TABLE);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#validate-before-executestatement
+        //= type=test
+        //# The request MUST fail, and the client make no network call to DynamoDB,
+        //# if there exists an Item Encryptor
+        //# specified within the [DynamoDB Encryption Client Config](#dynamodb-encryption-client-configuration)
+        //# with a [DynamoDB Table Name](./ddb-item-encryptor.md#dynamodb-table-name)
+        //# equal to table named in the request.
         assertThrows(DBESDKClientError.class, () -> client.executeStatementInputTransform(
             ExecuteStatementInputTransformInput.builder()
                 .clientId(clientId)
@@ -77,6 +84,11 @@ class PartiQlRejectionTests {
                     .statement(UNENCRYPTED_TABLE_STATEMENT)
                     .build())
                 .build()).getTransformedInput();
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#validate-before-executestatement
+        //= type=test
+        //# If no such Item Encryptor exists,
+        //# there MUST NOT be any modification
+        //# to the ExecuteStatement request.
         assertEquals(UNENCRYPTED_TABLE_STATEMENT, transformed.getStatement(),
             "an unencrypted-table statement must pass through unchanged on " + pair);
     }
@@ -86,6 +98,13 @@ class PartiQlRejectionTests {
     void batchExecuteStatementRejectsEncryptedTable(TargetPair pair) {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String clientId = DbeTestHelpers.newTransformsClient(client, TABLE);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#validate-before-batchexecutestatement
+        //= type=test
+        //# The request MUST fail, and the client make no network call to DynamoDB,
+        //# if there exists an Item Encryptor
+        //# specified within the [DynamoDB Encryption Client Config](#dynamodb-encryption-client-configuration)
+        //# with a [DynamoDB Table Name](./ddb-item-encryptor.md#dynamodb-table-name)
+        //# equal to table named in any of the `Statements` of the request.
         assertThrows(DBESDKClientError.class, () -> client.batchExecuteStatementInputTransform(
             BatchExecuteStatementInputTransformInput.builder()
                 .clientId(clientId)
@@ -103,6 +122,13 @@ class PartiQlRejectionTests {
     void executeTransactionRejectsEncryptedTable(TargetPair pair) {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String clientId = DbeTestHelpers.newTransformsClient(client, TABLE);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#validate-before-executetransaction
+        //= type=test
+        //# The request MUST fail, and the client make no network call to DynamoDB,
+        //# if there exists an Item Encryptor
+        //# specified within the [DynamoDB Encryption Client Config](#dynamodb-encryption-client-configuration)
+        //# with a [DynamoDB Table Name](./ddb-item-encryptor.md#dynamodb-table-name)
+        //# equal to table named in any of the `TransactStatements` of the request.
         assertThrows(DBESDKClientError.class, () -> client.executeTransactionInputTransform(
             ExecuteTransactionInputTransformInput.builder()
                 .clientId(clientId)

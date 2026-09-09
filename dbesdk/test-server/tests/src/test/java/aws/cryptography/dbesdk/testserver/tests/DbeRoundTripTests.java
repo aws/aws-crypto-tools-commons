@@ -102,10 +102,23 @@ class DbeRoundTripTests {
                 .build());
         Map<String, AttributeValue> encryptedItem = encrypted.getEncryptedItem();
         assertNotNull(encryptedItem, "EncryptItem returned a null encrypted item");
+        //= specification/structured-encryption/structures.md#encrypt
+        //= type=test
+        //# During [Encrypt Structure](encrypt-structure.md#encrypt-structure),
+        //# ENCRYPT signifies that the [Terminal Value](#terminal-value) in the [Terminal Data](#terminal-data)
+        //# MUST be encrypted in the resulting encrypted [Structured Data](#structured-data).
         assertNotEquals(
             plaintext.get(SECRET).getS(),
             encryptedItem.get(SECRET).getS(),
             "encrypted 'secret' attribute unexpectedly equals the plaintext value");
+        //= specification/structured-encryption/structures.md#do_not_encrypt
+        //= type=test
+        //# During [Encrypt Structure](encrypt-structure.md#encrypt-structure)
+        //# and [Decrypt Structure](decrypt-structure.md#decrypt-structure),
+        //# DO_NOT_ENCRYPT signifies that the [Terminal Data](#terminal-data)
+        //# MUST have an equal [Terminal Value](#terminal-value) and
+        //# [Terminal Type Id](#terminal-type-id) as the the Terminal Data
+        //# in the same location in the resulting encrypted [Structured Data](#structured-data).
         assertEquals(
             plaintext.get(PK).getS(),
             encryptedItem.get(PK).getS(),
@@ -125,6 +138,10 @@ class DbeRoundTripTests {
 
         for (Map.Entry<String, AttributeValue> entry : plaintext.entrySet()) {
             AttributeValue actual = recovered.get(entry.getKey());
+            //= specification/structured-encryption/decrypt-path-structure.md#construct-decrypted-structured-data
+            //= type=test
+            //# - For every entry in the [input Auth List](#auth-list), other than the header and footer,
+            //#   an entry MUST exist with the same key in the output Crypto List.
             assertNotNull(actual, "recovered item missing attribute '" + entry.getKey() + "'");
             assertEquals(
                 entry.getValue().getS(),

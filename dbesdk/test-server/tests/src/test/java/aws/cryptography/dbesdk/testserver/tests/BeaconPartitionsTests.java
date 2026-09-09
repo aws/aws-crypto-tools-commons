@@ -140,6 +140,9 @@ class BeaconPartitionsTests {
             .maximumNumberOfPartitions(3)
             .defaultNumberOfPartitions(5)
             .standardBeacons(List.of(StandardBeacon.builder().name(SECRET).length(24).build())));
+        //= specification/searchable-encryption/search-config.md#beacon-version-initialization
+        //= type=test
+        //# Initialization MUST fail if [default number of partitions](#default-partitions) is greater than or equal to [maximum number of partitions](#max-partitions).
         assertThrows(DBESDKTestServerException.class,
             () -> createBeaconClient(client, search),
             "defaultNumberOfPartitions >= maximumNumberOfPartitions must be rejected on " + pair);
@@ -158,6 +161,10 @@ class BeaconPartitionsTests {
                 .length(24)
                 .numberOfPartitions(10)
                 .build())));
+        //= specification/searchable-encryption/beacons.md#standard-beacon-initialization
+        //= type=test
+        //# Initialization MUST fail if [number of partitions](#beacon-constraint) is specified, and is greater than or equal to
+        //# the maximum number of partitions specified in the [beacon version](search-config.md#beacon-version-initialization).
         assertThrows(DBESDKTestServerException.class,
             () -> createBeaconClient(client, search),
             "a beacon's numberOfPartitions >= maximumNumberOfPartitions must be rejected on " + pair);

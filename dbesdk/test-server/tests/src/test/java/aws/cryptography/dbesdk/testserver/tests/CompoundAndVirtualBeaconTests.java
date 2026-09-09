@@ -221,6 +221,10 @@ class CompoundAndVirtualBeaconTests {
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void upperVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
         // Upper("john") -> "JOHN": changes the virtual-field input, so a different beacon.
+        //= specification/searchable-encryption/virtual.md#upper-transform-initialization
+        //= type=test
+        //= reason=Upper("john")->"JOHN" changes the virtual-field input, so the beacon differs from untransformed
+        //# The Upper transform MUST convert all ascii lowercase characters into their uppercase equivalents.
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder().upper(Upper.builder().build()).build(),
             beaconPlaintext(), "Upper");
@@ -230,6 +234,10 @@ class CompoundAndVirtualBeaconTests {
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void lowerVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
         // Lower needs an upper-case input to have an effect: Lower("JOHN") -> "john".
+        //= specification/searchable-encryption/virtual.md#lower-transform-initialization
+        //= type=test
+        //= reason=Lower("JOHN")->"john" changes the virtual-field input, so the beacon differs from untransformed
+        //# The Lower transform MUST convert all ascii uppercase characters into their lowercase equivalents.
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder().lower(Lower.builder().build()).build(),
             beaconPlaintextWithFirst("JOHN"), "Lower");
@@ -239,6 +247,10 @@ class CompoundAndVirtualBeaconTests {
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void insertVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
         // Insert appends a literal: "john" -> "john-x".
+        //= specification/searchable-encryption/virtual.md#insert-transform-initialization
+        //= type=test
+        //= reason=Insert appends "-x" to the virtual-field input, so the beacon differs from untransformed
+        //# The Insert transform MUST append this string to its input
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder().insert(Insert.builder().literal("-x").build()).build(),
             beaconPlaintext(), "Insert");
@@ -248,6 +260,11 @@ class CompoundAndVirtualBeaconTests {
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void substringVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
         // GetSubstring(0, 2) keeps the first two characters: "john" -> "jo".
+        //= specification/searchable-encryption/virtual.md#getsubstring-transform-initialization
+        //= type=test
+        //= reason=GetSubstring(0,2) keeps "jo" of the virtual-field input, so the beacon differs from untransformed
+        //# The GetSubstring transform MUST return the range of characters
+        //# from low (inclusive) to high (exclusive)
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder().substring(GetSubstring.builder().low(0).high(2).build()).build(),
             beaconPlaintext(), "GetSubstring");
@@ -257,6 +274,11 @@ class CompoundAndVirtualBeaconTests {
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void segmentVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
         // Split "a.b.c" on "." and take segment 1: "a.b.c" -> "b".
+        //= specification/searchable-encryption/virtual.md#getsegment-transform-initialization
+        //= type=test
+        //= reason=GetSegment(".",1) yields "b" from "a.b.c", so the beacon differs from untransformed
+        //# The GetSegment transform MUST split the input string on the given character,
+        //# and return the item in the resulting list the corresponds to the given position.
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder()
                 .segment(GetSegment.builder().split(".").index(1).build()).build(),
@@ -267,6 +289,11 @@ class CompoundAndVirtualBeaconTests {
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void segmentsVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
         // Split "a.b.c" on "." and take the [0, 2) segment range: "a.b.c" -> "a.b".
+        //= specification/searchable-encryption/virtual.md#getsegments-transform-initialization
+        //= type=test
+        //= reason=GetSegments(".",0,2) yields "a.b" from "a.b.c", so the beacon differs from untransformed
+        //# GetSegments MUST return the range of parts from low (inclusive) to high (exclusive),
+        //# joined on the `split` character.
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder()
                 .segments(GetSegments.builder().split(".").low(0).high(2).build()).build(),

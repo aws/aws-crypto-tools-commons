@@ -137,6 +137,12 @@ class V1EncryptionContextBehaviorTests {
             .clientId(decryptClientId)
             .encryptedItem(contextFor(pair).encryptedItem())
             .build());
+        //= specification/structured-encryption/structures.md#encrypt
+        //= type=test
+        //= reason=round-trip recovers the ENCRYPT_AND_SIGN 'secret' value, proving it was decrypted
+        //# During [Decrypt Structure](decrypt-structure.md#decrypt-structure),
+        //# ENCRYPT signifies that the [Terminal Value](#terminal-value) in the [Terminal Data](#terminal-data)
+        //# MUST be attempted to be decrypted.
         assertPlaintextPreserved("v1", decrypted, pair);
     }
 
@@ -154,6 +160,10 @@ class V1EncryptionContextBehaviorTests {
             .clientId(decryptClientId)
             .encryptedItem(contextFor(pair).encryptedItem())
             .build());
+        //= specification/dynamodb-encryption-client/decrypt-item.md#dynamodb-item-base-context
+        //= type=test
+        //= reason=v1 item decrypts under a v2-config client, proving base context follows the header version byte
+        //# If the Version Number is 1, the base context MUST be the [version 1](./encrypt-item.md#dynamodb-item-base-context-version-1) context.
         assertPlaintextPreserved("v1→v2", decrypted, pair);
     }
 
@@ -185,6 +195,13 @@ class V1EncryptionContextBehaviorTests {
             .clientId(decryptClientId)
             .encryptedItem(item)
             .build());
+        //= specification/structured-encryption/structures.md#do_not_encrypt
+        //= type=test
+        //= reason=every attribute is SIGN_ONLY (DO_NOT_ENCRYPT); round-trip returns each value unchanged
+        //# DO_NOT_ENCRYPT signifies that the [Terminal Data](#terminal-data)
+        //# MUST have an equal [Terminal Value](#terminal-value) and
+        //# [Terminal Type Id](#terminal-type-id) as the the Terminal Data
+        //# in the same location in the resulting encrypted [Structured Data](#structured-data).
         assertPlaintextPreserved("v1 all-SIGN_ONLY", decrypted, pair);
     }
 }

@@ -75,6 +75,9 @@ class ConditionAndUpdateExpressionTests {
     void updateItemRejectsUpdateExpressionOverSignedAttribute(TargetPair pair) {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String clientId = DbeTestHelpers.newTransformsClient(client, TABLE);
+        //= specification/dynamodb-encryption-client/ddb-support.md#testupdateexpression
+        //= type=test
+        //# TestUpdateExpression MUST fail if any operand in the update expression is a signed attribute name.
         assertThrows(DBESDKClientError.class, () -> client.updateItemInputTransform(
             UpdateItemInputTransformInput.builder()
                 .clientId(clientId)
@@ -108,6 +111,9 @@ class ConditionAndUpdateExpressionTests {
                         Map.of(":v", AttributeValue.builder().s("changed").build()))
                     .build())
                 .build()).getTransformedInput();
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#validate-before-updateitem
+        //= type=test
+        //# If all of the above validation succeeds, the UpdateItem request MUST be unchanged.
         assertEquals("SET #n = :v", transformed.getUpdateExpression(),
             "an UpdateExpression over an unconfigured (unsigned) attribute must pass through"
                 + " unchanged on " + pair);
@@ -118,6 +124,9 @@ class ConditionAndUpdateExpressionTests {
     void deleteItemRejectsConditionExpressionOverEncryptedAttribute(TargetPair pair) {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String clientId = DbeTestHelpers.newTransformsClient(client, TABLE);
+        //= specification/dynamodb-encryption-client/ddb-support.md#testconditionexpression
+        //= type=test
+        //# TestConditionExpression MUST fail if any operand in the condition expression is an encrypted attribute name.
         assertThrows(DBESDKClientError.class, () -> client.deleteItemInputTransform(
             DeleteItemInputTransformInput.builder()
                 .clientId(clientId)
@@ -151,6 +160,9 @@ class ConditionAndUpdateExpressionTests {
                         Map.of(":v", AttributeValue.builder().s("hello world").build()))
                     .build())
                 .build()).getTransformedInput();
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#validate-before-deleteitem
+        //= type=test
+        //# If all of the above validation succeeds, the DeleteItem request MUST be unchanged.
         assertEquals("#p = :v", transformed.getConditionExpression(),
             "a ConditionExpression over the signed-but-not-encrypted attribute '" + PUBLIC
                 + "' must pass through unchanged on " + pair);

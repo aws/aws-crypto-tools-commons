@@ -80,6 +80,10 @@ class BeaconConfigValidationTests {
             .standardBeacons(List.of(
                 StandardBeacon.builder().name(PUBLIC).length(10).build())));
 
+        //= specification/searchable-encryption/search-config.md#beacon-version-initialization
+        //= type=test
+        //# Initialization MUST fail if the [terminal location](virtual.md#terminal-location)
+        //# reference by a [standard beacon](beacons.md#standard-beacon) is not `encrypted`.
         assertThrows(DBESDKTestServerException.class,
             () -> createBeaconClient(pair, standardActions(), search),
             "a standard beacon over the non-encrypted attribute '" + PUBLIC
@@ -107,6 +111,9 @@ class BeaconConfigValidationTests {
                     .build()))
                 .build())));
 
+        //= specification/searchable-encryption/beacons.md#compound-beacon
+        //= type=test
+        //# The name MUST be the name of a configured standard beacon.
         assertThrows(DBESDKTestServerException.class,
             () -> createBeaconClient(pair, beaconActions(), search),
             "a compound beacon whose encrypted part references an unconfigured standard"
@@ -134,6 +141,10 @@ class BeaconConfigValidationTests {
                     .build()))
                 .build())));
 
+        //= specification/searchable-encryption/beacons.md#initialization-failure
+        //= type=test
+        //# Initialization MUST fail if any `prefix` in any [part](#part) is a prefix of
+        //# the `prefix` of any other [part](#part).
         assertThrows(DBESDKTestServerException.class,
             () -> createBeaconClient(pair, beaconActions(), search),
             "a compound beacon with duplicate part prefixes must be rejected on " + pair);

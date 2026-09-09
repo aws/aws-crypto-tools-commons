@@ -89,6 +89,10 @@ class StructuredEncryptionTests {
                 .build()).getPlaintextStructure();
 
         for (String field : plaintext.keySet()) {
+            //= specification/structured-encryption/decrypt-path-structure.md#construct-decrypted-structured-data
+            //= type=test
+            //# - For every entry in the [input Auth List](#auth-list), other than the header and footer,
+            //#   an entry MUST exist with the same key in the output Crypto List.
             assertNotNull(recovered.get(field),
                 "recovered structure missing '" + field + "' on " + pair);
             assertArrayEquals(bytes(plaintext.get(field)), bytes(recovered.get(field)),
@@ -111,8 +115,20 @@ class StructuredEncryptionTests {
                 .cryptoSchema(cryptoSchema())
                 .build()).getEncryptedStructure();
 
+        //= specification/structured-encryption/encrypt-path-structure.md#encrypted-structured-data
+        //= type=test
+        //# - The [Header Field](#header-field) MUST exist in the final Encrypted Structured Data
+        //
+        //= specification/structured-encryption/encrypt-path-structure.md#encrypted-structured-data
+        //= type=test
+        //# - The [Footer Field](#footer-field) MUST exist in the final Encrypted Structured Data
         assertTrue(encrypted.size() > plaintext.size(),
             "EncryptStructure must add header/footer terminals on " + pair);
+        //= specification/structured-encryption/structures.md#encrypt
+        //= type=test
+        //# During [Encrypt Structure](encrypt-structure.md#encrypt-structure),
+        //# ENCRYPT signifies that the [Terminal Value](#terminal-value) in the [Terminal Data](#terminal-data)
+        //# MUST be encrypted in the resulting encrypted [Structured Data](#structured-data).
         assertFalse(java.util.Arrays.equals(bytes(plaintext.get(SECRET)), bytes(encrypted.get(SECRET))),
             "the ENCRYPT_AND_SIGN terminal's bytes must be encrypted on " + pair);
     }
@@ -144,6 +160,10 @@ class StructuredEncryptionTests {
         for (PathCryptoItem source : plaintext) {
             String field = pathKey(source);
             PathCryptoItem got = findByPath(recovered, field);
+            //= specification/structured-encryption/decrypt-path-structure.md#construct-decrypted-structured-data
+            //= type=test
+            //# - For every entry in the [input Auth List](#auth-list), other than the header and footer,
+            //#   an entry MUST exist with the same key in the output Crypto List.
             assertNotNull(got, "recovered path structure missing '" + field + "' on " + pair);
             assertArrayEquals(bytes(source.getData()), bytes(got.getData()),
                 "terminal '" + field + "' did not round-trip on " + pair);
@@ -174,6 +194,10 @@ class StructuredEncryptionTests {
                 .headerBytes(ByteBuffer.wrap(header))
                 .build()).getCryptoActions();
 
+        //= specification/structured-encryption/resolve-auth-actions.md#output
+        //= type=test
+        //# [Crypto List](./structures.md#crypto-list): Input terminal data and the Crypto Schema for each Terminal,
+        //# calculated using the Crypto Legend in the header, the signature scope used for decryption, and the data in the input structure.
         assertEquals(CryptoAction.ENCRYPT_AND_SIGN.getValue(),
             findByPath(resolved, SECRET).getAction().getValue(),
             "the secret terminal must resolve to ENCRYPT_AND_SIGN on " + pair);

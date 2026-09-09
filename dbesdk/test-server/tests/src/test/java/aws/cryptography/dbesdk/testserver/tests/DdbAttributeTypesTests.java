@@ -95,6 +95,10 @@ class DdbAttributeTypesTests {
         plaintext.put(VALUE, set);
 
         DecryptItemOutput decrypted = roundTrip(pair, pkPlus(VALUE, CryptoAction.ENCRYPT_AND_SIGN), plaintext);
+        //= specification/dynamodb-encryption-client/ddb-attribute-serialization.md#set
+        //= type=test
+        //= reason=cross-language round-trip fails if the Set wire format is wrong
+        //# A Set MUST be serialized as:
         assertAttributeEquals(set, decrypted.getPlaintextItem().get(VALUE), "SS", pair);
     }
 
@@ -107,6 +111,10 @@ class DdbAttributeTypesTests {
         plaintext.put(VALUE, set);
 
         DecryptItemOutput decrypted = roundTrip(pair, pkPlus(VALUE, CryptoAction.ENCRYPT_AND_SIGN), plaintext);
+        //= specification/dynamodb-encryption-client/ddb-attribute-serialization.md#set
+        //= type=test
+        //= reason=cross-language round-trip fails if the Set wire format is wrong
+        //# A Set MUST be serialized as:
         assertAttributeEquals(set, decrypted.getPlaintextItem().get(VALUE), "NS", pair);
     }
 
@@ -123,6 +131,10 @@ class DdbAttributeTypesTests {
         plaintext.put(VALUE, set);
 
         DecryptItemOutput decrypted = roundTrip(pair, pkPlus(VALUE, CryptoAction.ENCRYPT_AND_SIGN), plaintext);
+        //= specification/dynamodb-encryption-client/ddb-attribute-serialization.md#set
+        //= type=test
+        //= reason=cross-language round-trip fails if the Set wire format is wrong
+        //# A Set MUST be serialized as:
         assertAttributeEquals(set, decrypted.getPlaintextItem().get(VALUE), "BS", pair);
     }
 
@@ -146,6 +158,11 @@ class DdbAttributeTypesTests {
         plaintext.put(VALUE, list);
 
         DecryptItemOutput decrypted = roundTrip(pair, pkPlus(VALUE, CryptoAction.ENCRYPT_AND_SIGN), plaintext);
+        //= specification/dynamodb-encryption-client/ddb-attribute-serialization.md#list-entries
+        //= type=test
+        //= reason=cross-language round-trip fails if list element order is not preserved
+        //# The order of these serialized list entries MUST match
+        //# the order of the entries in the original list.
         assertAttributeEquals(list, decrypted.getPlaintextItem().get(VALUE), "L", pair);
     }
 
@@ -165,6 +182,10 @@ class DdbAttributeTypesTests {
         plaintext.put(VALUE, map);
 
         DecryptItemOutput decrypted = roundTrip(pair, pkPlus(VALUE, CryptoAction.ENCRYPT_AND_SIGN), plaintext);
+        //= specification/dynamodb-encryption-client/ddb-attribute-serialization.md#map-attribute
+        //= type=test
+        //= reason=cross-language round-trip fails if the Map wire format is wrong
+        //# Map MUST be serialized as:
         assertAttributeEquals(map, decrypted.getPlaintextItem().get(VALUE), "M", pair);
     }
 
@@ -208,6 +229,10 @@ class DdbAttributeTypesTests {
 
         DecryptItemOutput decrypted = decryptClient.decryptItem(DecryptItemInput.builder()
             .clientId(decryptClientId).encryptedItem(item).build());
+        //= specification/dynamodb-encryption-client/ddb-attribute-serialization.md#set-entries
+        //= type=test
+        //= reason=reordered on-wire SS still verifies because entries are canonically re-sorted before signing
+        //# Entries in a String Set MUST be ordered in ascending [UTF-16 binary order](./string-ordering.md#utf-16-binary-order).
         assertAttributeEquals(
             AttributeValue.builder().ss(elements).build(),
             decrypted.getPlaintextItem().get(TAGS),

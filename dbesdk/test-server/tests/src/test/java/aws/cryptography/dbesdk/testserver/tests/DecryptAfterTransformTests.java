@@ -77,6 +77,11 @@ class DecryptAfterTransformTests {
         assertNotNull(transformed.getItems(), "ScanOutputTransform returned no items on " + pair);
         assertEquals(1, transformed.getItems().size(),
             "ScanOutputTransform must return one item on " + pair);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#decrypt-after-scan
+        //= type=test
+        //# the corresponding Item Encryptor MUST perform [Decrypt Item](./decrypt-item.md)
+        //# where the input [DynamoDB Item](./decrypt-item.md#dynamodb-item)
+        //# is this list entry.
         assertItemRoundTrips(plaintext, transformed.getItems().get(0), pair);
     }
 
@@ -99,6 +104,11 @@ class DecryptAfterTransformTests {
         assertNotNull(transformed.getItems(), "QueryOutputTransform returned no items on " + pair);
         assertEquals(1, transformed.getItems().size(),
             "QueryOutputTransform must return one item on " + pair);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#decrypt-after-query
+        //= type=test
+        //# the corresponding Item Encryptor MUST perform [Decrypt Item](./decrypt-item.md)
+        //# where the input [DynamoDB Item](./decrypt-item.md#dynamodb-item)
+        //# is this list entry.
         assertItemRoundTrips(plaintext, transformed.getItems().get(0), pair);
     }
 
@@ -130,6 +140,11 @@ class DecryptAfterTransformTests {
         assertNotNull(items, "BatchGetItemOutputTransform returned no items for the table on " + pair);
         assertEquals(1, items.size(),
             "BatchGetItemOutputTransform must return one item on " + pair);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#decrypt-after-batchgetitem
+        //= type=test
+        //# that Item Encryptor MUST perform [Decrypt Item](./decrypt-item.md) where the input
+        //# [DynamoDB Item](./decrypt-item.md#dynamodb-item)
+        //# is the `Item` field in the original response.
         assertItemRoundTrips(plaintext, items.get(0), pair);
     }
 
@@ -194,6 +209,9 @@ class DecryptAfterTransformTests {
         assertNotNull(restored, "UnprocessedItems missing after transform on " + pair);
         Map<String, AttributeValue> recovered =
             restored.get(TABLE).get(0).getPutRequest().getItem();
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#decrypt-after-batchwriteitem
+        //= type=test
+        //# Each item in UnprocessedItems MUST be replaced by its original plaintext value.
         assertItemRoundTrips(plaintext, recovered, pair);
     }
 

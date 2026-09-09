@@ -109,6 +109,11 @@ class MultiTableConfigTests {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String clientId = twoTableClient(client);
         Map<String, String> ec = headerEcAfterPut(client, clientId, TABLE_B);
+        //= specification/dynamodb-encryption-client/ddb-sdk-integration.md#dynamodb-table-encryption-configs
+        //= type=test
+        //# During initialization, this client MUST construct a
+        //# [DynamoDb Item Encryptor](./ddb-table-encryption-config.md)
+        //# per configured table, using these table encryption configs.
         assertFalse(ec.containsKey(AWS_CRYPTO_PUBLIC_KEY),
             "the symmetric-only suite table must NOT write '" + AWS_CRYPTO_PUBLIC_KEY
                 + "' — its per-table algorithmSuiteId must not fall back to the ECDSA default"

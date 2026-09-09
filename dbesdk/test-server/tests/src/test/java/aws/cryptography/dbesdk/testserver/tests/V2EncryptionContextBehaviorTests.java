@@ -143,6 +143,12 @@ class V2EncryptionContextBehaviorTests {
             .clientId(decryptClientId)
             .encryptedItem(contextFor(pair).encryptedItem())
             .build());
+        //= specification/structured-encryption/structures.md#encrypt
+        //= type=test
+        //= reason=round-trip recovers the ENCRYPT_AND_SIGN 'secret' value, proving it was decrypted
+        //# During [Decrypt Structure](decrypt-structure.md#decrypt-structure),
+        //# ENCRYPT signifies that the [Terminal Value](#terminal-value) in the [Terminal Data](#terminal-data)
+        //# MUST be attempted to be decrypted.
         assertPlaintextPreserved("v2", decrypted, pair);
     }
 
@@ -161,6 +167,10 @@ class V2EncryptionContextBehaviorTests {
             .clientId(decryptClientId)
             .encryptedItem(contextFor(pair).encryptedItem())
             .build());
+        //= specification/dynamodb-encryption-client/decrypt-item.md#dynamodb-item-base-context
+        //= type=test
+        //= reason=v2 item decrypts under a v1-config client, proving base context follows the header version byte
+        //# If the Version Number is 2, then the base context MUST be the [version 2](./encrypt-item.md#dynamodb-item-base-context-version-2) context.
         assertPlaintextPreserved("v2→v1", decrypted, pair);
     }
 

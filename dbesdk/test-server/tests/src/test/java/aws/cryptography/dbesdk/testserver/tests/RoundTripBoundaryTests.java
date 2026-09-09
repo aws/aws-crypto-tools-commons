@@ -164,6 +164,11 @@ class RoundTripBoundaryTests {
         Map<String, AttributeValue> item = encryptOnce(encryptClient, encryptClientId, plaintext);
         DecryptItemOutput decrypted = decryptClient.decryptItem(DecryptItemInput.builder()
             .clientId(decryptClientId).encryptedItem(item).build());
+        //= specification/structured-encryption/header.md#canonical-path
+        //= type=test
+        //= reason=cross-language round-trip of a multi-byte attribute name proves the key length is measured in bytes
+        //# For Structured Data in Structured Data Maps, this MUST be a 0x24 byte ($ in UTF-8),
+        //# followed by the length of the key, followed by the key as a UTF8 string.
         assertPlaintextPreserved("utf8-attr-name", plaintext, decrypted, pair);
     }
 }

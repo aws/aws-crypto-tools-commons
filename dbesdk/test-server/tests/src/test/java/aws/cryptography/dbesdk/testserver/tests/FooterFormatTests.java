@@ -55,6 +55,13 @@ class FooterFormatTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String encryptClientId = newKmsClient(encryptClient, TABLE, PK, standardActions(), List.of());
         Map<String, AttributeValue> item = encryptOnce(encryptClient, encryptClientId, canonicalPlaintext());
+        //= specification/structured-encryption/encrypt-path-structure.md#encrypted-structured-data
+        //= type=test
+        //# - The [Footer Field](#footer-field) MUST exist in the final Encrypted Structured Data
+        //
+        //= specification/structured-encryption/encrypt-path-structure.md#footer-field
+        //= type=test
+        //# The Footer Field name MUST be `aws_dbe_foot`
         assertNotNull(item.get(FOOT),
             "encrypted item must carry an aws_dbe_foot attribute (" + pair + ")");
     }
@@ -73,6 +80,10 @@ class FooterFormatTests {
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         String encryptClientId = newKmsClient(encryptClient, TABLE, PK, standardActions(), List.of());
         byte[] footer = bytesOf(encryptOnce(encryptClient, encryptClientId, canonicalPlaintext()).get(FOOT));
+        //= specification/structured-encryption/footer.md#recipient-tags
+        //= type=test
+        //= reason=one 48-byte Recipient Tag per Encrypted Data Key sets the footer's 48-byte floor
+        //# There MUST be one Recipient Tag for each Encrypted Data Key in the [header](./header.md#encrypted-data-keys)
         assertTrue(footer.length >= RECIPIENT_TAG_LEN,
             "footer must contain at least a 48-byte Recipient Tag; got " + footer.length
                 + " bytes (" + pair + ")");
