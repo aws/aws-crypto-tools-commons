@@ -1,0 +1,14 @@
+{
+  "_comment": [
+    "DB-ESDK TestServer commons feature-config.json (design 'Feature Configuration'):",
+    "the authoritative Feature_Catalog. Each language's commons server declares the",
+    "supported/unsupported half of every feature here in its own feature-config.json;",
+    "the union must equal this catalog."
+  ],
+  "product": "dbesdk",
+  "features": [
+    "raw-aes",
+    "aws-kms",
+    "beacon-partitions"
+  ]
+}

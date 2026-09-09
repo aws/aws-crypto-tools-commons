@@ -44,7 +44,44 @@ public final class ConfigurationLoader {
 
     /** Load and parse (without validating) the Configuration_Set at {@code path}. */
     public static ConfigurationSet loadConfigurationSet(Path path) {
+        // The doc's split "trio" takes precedence when a sibling
+        // server-config.json is present in the same directory; otherwise the
+        // consolidated configuration-set.json is read. This keeps every
+        // product that still uses the consolidated file working unchanged.
+        Path dir = path.getParent();
+        if (dir != null && Files.isRegularFile(dir.resolve("server-config.json"))) {
+            return loadConfigurationSetTrio(dir);
+        }
         return parseConfigurationSet(read("Configuration_Set", path), path);
+    }
+
+    /**
+     * Assemble a {@link ConfigurationSet} from the split commons trio in
+     * {@code dir}: {@code server-config.json} ({@code product} + {@code entries}
+     * [+ optional {@code requiredKmsScenarios}]) and {@code feature-config.json}
+     * ({@code features} — the Feature_Catalog). Produces the same record the
+     * consolidated {@code configuration-set.json} yields.
+     */
+    private static ConfigurationSet loadConfigurationSetTrio(Path dir) {
+        Path serverPath = dir.resolve("server-config.json");
+        Path featurePath = dir.resolve("feature-config.json");
+        JsonNode server = readObject(
+            "server-config.json", read("server-config.json", serverPath), serverPath);
+        JsonNode feature = readObject(
+            "feature-config.json", read("feature-config.json", featurePath), featurePath);
+        List<ConfigurationEntry> entries = new ArrayList<>();
+        JsonNode entriesNode = server.get("entries");
+        if (entriesNode != null && entriesNode.isArray()) {
+            for (JsonNode n : entriesNode) {
+                entries.add(parseEntry(n));
+            }
+        }
+        return new ConfigurationSet(
+            text(server, "product"),
+            stringList(feature.get("features")),
+            entries,
+            server.get("requiredKmsScenarios") == null
+                ? null : stringList(server.get("requiredKmsScenarios")));
     }
 
     /** Parse (without validating) a Configuration_Set from a JSON string. */
@@ -76,7 +113,47 @@ public final class ConfigurationLoader {
 
     /** Load and parse (without validating) the commons-configuration file at {@code path}. */
     public static CommonsConfiguration loadCommonsConfiguration(Path path) {
+        // As with the Configuration_Set, the split trio wins when a sibling
+        // server-config.json is present; otherwise the consolidated
+        // commons-configuration.json is read (leaving other products untouched).
+        Path dir = path.getParent();
+        if (dir != null && Files.isRegularFile(dir.resolve("server-config.json"))) {
+            return loadCommonsConfigurationTrio(dir);
+        }
         return parseCommonsConfiguration(read("commons-configuration", path), path);
+    }
+
+    /**
+     * Assemble a {@link CommonsConfiguration} from a Language_Repository's split
+     * trio in {@code dir}: {@code server-config.json} ({@code commonsRepository},
+     * {@code product} [+ optional {@code configurationOverrides}]) and
+     * {@code feature-config.json} (the {@code supportedFeatures} /
+     * {@code unsupportedFeatures} Feature_Declaration [+ optional
+     * {@code rawRsaPaddingSchemes}]). Produces the same record the consolidated
+     * {@code commons-configuration.json} yields.
+     */
+    private static CommonsConfiguration loadCommonsConfigurationTrio(Path dir) {
+        Path serverPath = dir.resolve("server-config.json");
+        Path featurePath = dir.resolve("feature-config.json");
+        JsonNode server = readObject(
+            "server-config.json", read("server-config.json", serverPath), serverPath);
+        JsonNode feature = readObject(
+            "feature-config.json", read("feature-config.json", featurePath), featurePath);
+        List<ConfigurationEntry> overrides = null;
+        JsonNode overridesNode = server.get("configurationOverrides");
+        if (overridesNode != null && overridesNode.isArray()) {
+            overrides = new ArrayList<>();
+            for (JsonNode n : overridesNode) {
+                overrides.add(parseEntry(n));
+            }
+        }
+        return new CommonsConfiguration(
+            coordinates(server.get("commonsRepository")),
+            text(server, "product"),
+            stringList(feature.get("supportedFeatures")),
+            stringList(feature.get("unsupportedFeatures")),
+            stringList(feature.get("rawRsaPaddingSchemes")),
+            overrides);
     }
 
     /** Parse (without validating) a commons-configuration file from a JSON string. */

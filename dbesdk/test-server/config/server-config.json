@@ -1,0 +1,67 @@
+{
+  "_comment": [
+    "DB-ESDK TestServer commons server-config.json (design 'Server Configuration'):",
+    "product + one Configuration_Entry per language. The Feature_Catalog lives in",
+    "the sibling feature-config.json and the bug ledger in bug-config.json (the doc's",
+    "three-file layout). The shared orchestrator's ConfigurationLoader auto-detects",
+    "this trio by the presence of server-config.json; products still using the",
+    "consolidated configuration-set.json are read unchanged."
+  ],
+  "product": "dbesdk",
+  "entries": [
+    {
+      "language": "java",
+      "majorVersion": 3,
+      "port": 8101,
+      "commonsConfigurationPath": "dbesdk/test-server/server-config.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "dbesdk/test-server/server"
+      }
+    },
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8102,
+      "commonsConfigurationPath": "dbesdk/test-server/server-config.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "dbesdk"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "dbesdk/test-server/server"
+      }
+    },
+    {
+      "language": "net",
+      "majorVersion": 4,
+      "port": 8103,
+      "commonsConfigurationPath": "dbesdk/test-server/server-config.json",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-dotnet",
+        "url": "git@github.com:aws/aws-crypto-tools-dotnet.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "."
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-dotnet",
+        "url": "git@github.com:aws/aws-crypto-tools-dotnet.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "dbesdk/test-server/server"
+      }
+    }
+  ]
+}
