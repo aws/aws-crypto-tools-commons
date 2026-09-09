@@ -24,6 +24,8 @@ import aws.cryptography.dbesdk.testserver.client.model.EncryptedPart;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.GetSegment;
+import aws.cryptography.dbesdk.testserver.client.model.GetSegments;
 import aws.cryptography.dbesdk.testserver.client.model.GetSubstring;
 import aws.cryptography.dbesdk.testserver.client.model.Insert;
 import aws.cryptography.dbesdk.testserver.client.model.Keyring;
@@ -249,6 +251,26 @@ class CompoundAndVirtualBeaconTests {
         assertVirtualTransformChangesBeacon(pair,
             VirtualTransform.builder().substring(GetSubstring.builder().low(0).high(2).build()).build(),
             beaconPlaintext(), "GetSubstring");
+    }
+
+    @ParameterizedTest(name = "[beacon] GetSegment virtual-part transform changes the beacon value {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void segmentVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
+        // Split "a.b.c" on "." and take segment 1: "a.b.c" -> "b".
+        assertVirtualTransformChangesBeacon(pair,
+            VirtualTransform.builder()
+                .segment(GetSegment.builder().split(".").index(1).build()).build(),
+            beaconPlaintextWithFirst("a.b.c"), "GetSegment");
+    }
+
+    @ParameterizedTest(name = "[beacon] GetSegments virtual-part transform changes the beacon value {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void segmentsVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
+        // Split "a.b.c" on "." and take the [0, 2) segment range: "a.b.c" -> "a.b".
+        assertVirtualTransformChangesBeacon(pair,
+            VirtualTransform.builder()
+                .segments(GetSegments.builder().split(".").low(0).high(2).build()).build(),
+            beaconPlaintextWithFirst("a.b.c"), "GetSegments");
     }
 
     /**

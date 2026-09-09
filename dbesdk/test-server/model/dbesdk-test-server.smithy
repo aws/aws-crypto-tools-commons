@@ -1348,8 +1348,8 @@ list VirtualTransformList {
 }
 
 /// A virtual-part transformation (exactly one member set). Models the Upper,
-/// Lower, Insert, GetPrefix, GetSuffix, and GetSubstring transforms; transforms
-/// treat the value as a string.
+/// Lower, Insert, GetPrefix, GetSuffix, GetSubstring, GetSegment, and GetSegments
+/// transforms; transforms treat the value as a string.
 structure VirtualTransform {
     upper: Upper
     lower: Lower
@@ -1357,6 +1357,8 @@ structure VirtualTransform {
     prefix: GetPrefix
     suffix: GetSuffix
     substring: GetSubstring
+    segment: GetSegment
+    segments: GetSegments
 }
 
 /// Convert ASCII characters to upper case (no parameters).
@@ -1386,6 +1388,29 @@ structure GetSuffix {
 /// Keep the {@code [low, high)} character range, 0-based; negative indices count
 /// from the end (-1 is the last character).
 structure GetSubstring {
+    @required
+    low: Integer
+
+    @required
+    high: Integer
+}
+
+/// Split the value on {@code split} and return one segment ({@code index},
+/// 0-based; negative counts from the end).
+structure GetSegment {
+    @required
+    split: String
+
+    @required
+    index: Integer
+}
+
+/// Split the value on {@code split} and return the {@code [low, high)} segment
+/// range (0-based; negative indices count from the end).
+structure GetSegments {
+    @required
+    split: String
+
     @required
     low: Integer
 
