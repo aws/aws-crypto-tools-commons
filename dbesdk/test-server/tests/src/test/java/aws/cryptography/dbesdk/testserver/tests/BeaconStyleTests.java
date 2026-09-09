@@ -29,6 +29,7 @@ import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.SearchConfig;
 import aws.cryptography.dbesdk.testserver.client.model.Shared;
+import aws.cryptography.dbesdk.testserver.client.model.SharedSet;
 import aws.cryptography.dbesdk.testserver.client.model.SingleKeyStore;
 import aws.cryptography.dbesdk.testserver.client.model.StandardBeacon;
 import aws.cryptography.testserver.tests.TargetPair;
@@ -70,6 +71,7 @@ class BeaconStyleTests {
     private static final String ALIAS = "alias";
     private static final String LAST = "last";
     private static final String TAGS = "tags";
+    private static final String TAGS_ALIAS = "tagsAlias";
 
     static java.util.stream.Stream<TargetPair> testPairs() {
         return DbeTestHelpers.pairs().stream();
@@ -174,6 +176,54 @@ class BeaconStyleTests {
         assertNotNull(beacon.getSs(), "the asSet beacon must be stored as a String Set on " + pair);
         assertEquals(elements.size(), beacon.getSs().size(),
             "the asSet beacon must have one beacon value per Set element on " + pair);
+    }
+
+    @ParameterizedTest(name = "[beacon] sharedSet beacon is a stored Set that matches the beacon it shares with {0}")
+    @MethodSource("testPairs")
+    void sharedSetBeaconIsAStoredSetThatMatchesTheBeaconItSharesWith(TargetPair pair) {
+        // Two Set attributes with equal elements. `tagsAlias` is sharedSet(other=tags):
+        // both AsSet (stored as a Set) and Shared (element beacons computed as tags).
+        Map<String, CryptoAction> actions = new LinkedHashMap<>();
+        actions.put(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
+        actions.put(TAGS, CryptoAction.ENCRYPT_AND_SIGN);
+        actions.put(TAGS_ALIAS, CryptoAction.ENCRYPT_AND_SIGN);
+        List<String> elements = List.of("alpha", "beta");
+        Map<String, AttributeValue> item = new LinkedHashMap<>();
+        item.put(PK, AttributeValue.builder().s("item-1").build());
+        item.put(TAGS, AttributeValue.builder().ss(elements).build());
+        item.put(TAGS_ALIAS, AttributeValue.builder().ss(elements).build());
+
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+
+        // SharedSet: tagsAlias's element beacons compute as tags, so the two Sets match.
+        SearchConfig sharedSet = beaconSearch(BeaconVersion.builder().standardBeacons(List.of(
+            StandardBeacon.builder().name(TAGS).length(10)
+                .style(BeaconStyle.builder().asSet(AsSet.builder().build()).build()).build(),
+            StandardBeacon.builder().name(TAGS_ALIAS).length(10)
+                .style(BeaconStyle.builder()
+                    .sharedSet(SharedSet.builder().other(TAGS).build()).build())
+                .build())));
+        Map<String, AttributeValue> sharedItem = encrypt(client, actions, sharedSet, item);
+        AttributeValue tagsBeacon = sharedItem.get("aws_dbe_b_" + TAGS);
+        AttributeValue aliasBeacon = sharedItem.get("aws_dbe_b_" + TAGS_ALIAS);
+        assertNotNull(aliasBeacon.getSs(), "a sharedSet beacon must be stored as a Set on " + pair);
+        assertEquals(elements.size(), aliasBeacon.getSs().size(),
+            "a sharedSet beacon must have one value per Set element on " + pair);
+        assertEquals(
+            new java.util.HashSet<>(tagsBeacon.getSs()), new java.util.HashSet<>(aliasBeacon.getSs()),
+            "a sharedSet beacon must match the Set beacon it shares with on " + pair);
+
+        // Control: an independent asSet beacon on equal elements differs (per-name keys).
+        SearchConfig independent = beaconSearch(BeaconVersion.builder().standardBeacons(List.of(
+            StandardBeacon.builder().name(TAGS).length(10)
+                .style(BeaconStyle.builder().asSet(AsSet.builder().build()).build()).build(),
+            StandardBeacon.builder().name(TAGS_ALIAS).length(10)
+                .style(BeaconStyle.builder().asSet(AsSet.builder().build()).build()).build())));
+        Map<String, AttributeValue> independentItem = encrypt(client, actions, independent, item);
+        assertNotEquals(
+            new java.util.HashSet<>(independentItem.get("aws_dbe_b_" + TAGS).getSs()),
+            new java.util.HashSet<>(independentItem.get("aws_dbe_b_" + TAGS_ALIAS).getSs()),
+            "independent Set beacons on equal elements must differ (control) on " + pair);
     }
 
     /** Encrypt {@code item} through a transforms client built from {@code actions} + {@code search}. */

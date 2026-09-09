@@ -1238,12 +1238,14 @@ structure StandardBeacon {
 
 /// A standard beacon's style (exactly one member set). Models PartOnly (usable
 /// only within a compound beacon, never stored standalone), Shared (calculates
-/// its value as another named beacon so the two are comparable), and AsSet
-/// (beacons a Set attribute element-wise, stored as a Set).
+/// its value as another named beacon so the two are comparable), AsSet (beacons
+/// a Set attribute element-wise, stored as a Set), and SharedSet (both Shared
+/// and AsSet).
 structure BeaconStyle {
     partOnly: PartOnly
     shared: Shared
     asSet: AsSet
+    sharedSet: SharedSet
 }
 
 /// A beacon usable only as part of a compound beacon; never stored standalone.
@@ -1255,6 +1257,13 @@ structure AsSet {}
 /// A beacon that calculates its value as the {@code other} beacon (same length),
 /// so the two beacons are directly comparable.
 structure Shared {
+    @required
+    other: String
+}
+
+/// Both {@code Shared} and {@code AsSet}: a beacon over a Set attribute that
+/// calculates its element values as the {@code other} beacon.
+structure SharedSet {
     @required
     other: String
 }
