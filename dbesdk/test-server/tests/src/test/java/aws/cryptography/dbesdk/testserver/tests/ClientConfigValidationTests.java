@@ -64,10 +64,9 @@ class ClientConfigValidationTests {
         actions.put(PK, CryptoAction.ENCRYPT_AND_SIGN); // illegal under v1
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(PUBLIC, CryptoAction.SIGN_ONLY);
-        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md
+        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md#key-action
         //= type=test
-        //# Under a v1 configuration, the partition key MUST be configured with the
-        //# SIGN_ONLY Crypto Action.
+        //# otherwise, the key action MUST be [SIGN_ONLY](../structured-encryption/structures.md#signonly).
         assertRejectsCreateClient(pair, actions, List.of(),
             "v1 schema with PK=ENCRYPT_AND_SIGN must be rejected — v1 requires PK=SIGN_ONLY");
     }
@@ -86,10 +85,10 @@ class ClientConfigValidationTests {
         actions.put(PK, CryptoAction.SIGN_ONLY); // illegal under v2
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(PUBLIC, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT); // triggers v2
-        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md
+        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md#key-action
         //= type=test
-        //# Under a v2 configuration, the partition key MUST be configured with the
-        //# SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT Crypto Action.
+        //# if the [configuration version](#configuration-version) is 2, then
+        //# the key action MUST be [SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT](../structured-encryption/structures.md#contextandsign);
         assertRejectsCreateClient(pair, actions, List.of(),
             "v2 schema with PK=SIGN_ONLY must be rejected — v2 requires "
                 + "PK=SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT");
@@ -107,9 +106,11 @@ class ClientConfigValidationTests {
         actions.put(PK, CryptoAction.DO_NOTHING); // illegal for primary key
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(PUBLIC, CryptoAction.SIGN_ONLY);
-        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md
+        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md#key-action
         //= type=test
-        //# The partition key MUST NOT be configured with the DO_NOTHING Crypto Action.
+        //# if the [configuration version](#configuration-version) is 2, then
+        //# the key action MUST be [SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT](../structured-encryption/structures.md#contextandsign);
+        //# otherwise, the key action MUST be [SIGN_ONLY](../structured-encryption/structures.md#signonly).
         assertRejectsCreateClient(pair, actions, List.of(PK),
             "schema with PK=DO_NOTHING must be rejected — primary key can't be unsigned");
     }
@@ -126,9 +127,10 @@ class ClientConfigValidationTests {
         // PK deliberately omitted
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(PUBLIC, CryptoAction.SIGN_ONLY);
-        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md
+        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md#attribute-actions
         //= type=test
-        //# The partition key attribute MUST be included in the attribute actions map.
+        //# The [Key Action](#key-action)
+        //# MUST be configured to the partition attribute and, if present, sort attribute.
         assertRejectsCreateClient(pair, actions, List.of(),
             "schema missing the declared partition key attribute must be rejected");
     }
@@ -151,10 +153,6 @@ class ClientConfigValidationTests {
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(PUBLIC, CryptoAction.SIGN_ONLY);
         actions.put(OPTIONAL_ATTR, CryptoAction.DO_NOTHING); // DO_NOTHING but not in allowedUnsigned
-        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md
-        //= type=test
-        //# Every DO_NOTHING attribute MUST also be listed in the
-        //# allowedUnsignedAttributes list (or covered by an allowedUnsignedAttributePrefix).
         assertRejectsCreateClient(pair, actions, List.of(),
             "DO_NOTHING attribute not listed in allowedUnsignedAttributes must be rejected");
     }
@@ -172,10 +170,6 @@ class ClientConfigValidationTests {
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(PUBLIC, CryptoAction.SIGN_ONLY);
         actions.put(OPTIONAL_ATTR, CryptoAction.SIGN_ONLY); // in allowedUnsigned but not DO_NOTHING
-        //= specification/dynamodb-encryption-client/ddb-table-encryption-config.md
-        //= type=test
-        //# Every attribute listed in allowedUnsignedAttributes MUST have the
-        //# DO_NOTHING Crypto Action.
         assertRejectsCreateClient(pair, actions, List.of(OPTIONAL_ATTR),
             "attribute in allowedUnsignedAttributes with non-DO_NOTHING action must be rejected");
     }

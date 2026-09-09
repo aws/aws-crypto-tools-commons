@@ -108,13 +108,11 @@ class V1EncryptionContextBehaviorTests {
     @MethodSource("testPairs")
     void v1EncryptLegendEncodesActionsAsExpected(TargetPair pair) {
         byte[] legend = encryptLegendBytes(contextFor(pair).encryptedItem());
-        //= specification/structured-encryption/header.md#encrypt-legend
+        //= specification/structured-encryption/header.md#encrypt-legend-bytes
         //= type=test
-        //# The Encrypt Legend Bytes MUST have 1 byte for every authenticated field ...
-        //# and MUST use the same order as those fields, encoding each as:
-        //# - 0x65 'e' ENCRYPT_AND_SIGN
-        //# - 0x73 's' SIGN_ONLY
-        //# - 0x63 'c' SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT
+        //# - `0x65` (`e` in UTF-8, for "Encrypt and Sign") means that a particular field was encrypted
+        //# - `0x73` (`s` in UTF-8, for "Sign Only") means that a particular field was not encrypted,
+        //# - `0x63` (`c` in UTF-8, for "Context") means that a particular field was not encrypted,
         assertEquals(3, legend.length,
             "v1 encrypt legend must have one byte per authenticated attribute (schema has 3): "
                 + pair);
