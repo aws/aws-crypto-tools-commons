@@ -27,6 +27,7 @@ import aws.cryptography.dbesdk.testserver.client.model.Keyring;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.SearchConfig;
+import aws.cryptography.dbesdk.testserver.client.model.SignedPart;
 import aws.cryptography.dbesdk.testserver.client.model.SingleKeyStore;
 import aws.cryptography.dbesdk.testserver.client.model.StandardBeacon;
 import aws.cryptography.dbesdk.testserver.client.model.VirtualField;
@@ -42,7 +43,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Cross-language pair tests for compound and virtual-field beacons (§0.3.6),
  * building on the standard-beacon configuration proven by {@link BeaconConfigTests}.
  *
- * <p>Two bounded properties, one per test:
+ * <p>Three bounded properties, one per test:
  * <ul>
  *   <li><em>Compound beacon.</em> A compound beacon assembled from two encrypted
  *       parts (each a standard beacon on an {@code ENCRYPT_AND_SIGN} attribute)
@@ -51,16 +52,20 @@ import org.junit.jupiter.params.provider.MethodSource;
  *   <li><em>Virtual field.</em> A standard beacon over a virtual field (a value
  *       derived by concatenating two attributes) is written to
  *       {@code aws_dbe_b_<virtualFieldName>}, and the item still round-trips.</li>
+ *   <li><em>Compound beacon with a signed part.</em> A compound beacon mixing an
+ *       encrypted part (hashed) with a signed part over a {@code SIGN_ONLY}
+ *       attribute (included in cleartext) is written and round-trips.</li>
  * </ul>
  *
- * <p>Both exercise the live beacon key store (a DynamoDB branch-key store whose
+ * <p>All exercise the live beacon key store (a DynamoDB branch-key store whose
  * keys are wrapped by KMS), so they prove the compound/virtual beacon plumbing
  * works end to end and cross-language. Configs are grounded in the DBE library's
- * own {@code CompoundBeaconSearchableEncryptionExample} and
- * {@code VirtualBeaconSearchableEncryptionExample}.
+ * own {@code CompoundBeaconSearchableEncryptionExample},
+ * {@code VirtualBeaconSearchableEncryptionExample}, and
+ * {@code BeaconStylesSearchableEncryptionExample}.
  *
- * <p>Both beaconed source attributes ({@link #FIRST}, {@link #LAST}) are
- * {@code ENCRYPT_AND_SIGN}, as required for any attribute used in a beacon.
+ * <p>An attribute used as an encrypted part is {@code ENCRYPT_AND_SIGN}; a signed
+ * part references a {@code SIGN_ONLY} attribute (see {@link #signedPartActions()}).
  */
 class CompoundAndVirtualBeaconTests {
 
@@ -76,6 +81,7 @@ class CompoundAndVirtualBeaconTests {
     private static final String LAST = "last";
     private static final String COMPOUND_NAME = "firstLast";
     private static final String VIRTUAL_NAME = "fullName";
+    private static final String SIGNED_COMPOUND_NAME = "firstLastSigned";
 
     @ParameterizedTest(name = "[beacon] compound beacon written + round-trip {0}")
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
@@ -99,7 +105,7 @@ class CompoundAndVirtualBeaconTests {
                     .build()))
                 .build())));
 
-        assertBeaconWrittenAndRoundTrips(pair, search, "aws_dbe_b_" + COMPOUND_NAME);
+        assertBeaconWrittenAndRoundTrips(pair, search, "aws_dbe_b_" + COMPOUND_NAME, beaconActions());
     }
 
     @ParameterizedTest(name = "[beacon] virtual-field beacon written + round-trip {0}")
@@ -116,7 +122,30 @@ class CompoundAndVirtualBeaconTests {
             .standardBeacons(List.of(
                 StandardBeacon.builder().name(VIRTUAL_NAME).length(10).build())));
 
-        assertBeaconWrittenAndRoundTrips(pair, search, "aws_dbe_b_" + VIRTUAL_NAME);
+        assertBeaconWrittenAndRoundTrips(pair, search, "aws_dbe_b_" + VIRTUAL_NAME, beaconActions());
+    }
+
+    @ParameterizedTest(name = "[beacon] compound beacon with a signed part written + round-trip {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void compoundBeaconWithSignedPartWrittenAndItemRoundTrips(TargetPair pair) {
+        // A compound beacon that concatenates an ENCRYPTED part (a standard beacon
+        // over the encrypted `first`, hashed) with a SIGNED part (the plaintext,
+        // SIGN_ONLY `last`, included verbatim): "F-<hash(first)>.L-<last>". The
+        // signed part is the property under test — it references a signed,
+        // non-encrypted attribute and contributes its cleartext value to the
+        // beacon (grounded in the DBE BeaconStylesSearchableEncryptionExample).
+        SearchConfig search = beaconSearch(BeaconVersion.builder()
+            .standardBeacons(List.of(
+                StandardBeacon.builder().name(FIRST).length(10).build()))
+            .compoundBeacons(List.of(CompoundBeacon.builder()
+                .name(SIGNED_COMPOUND_NAME)
+                .split(".")
+                .encrypted(List.of(EncryptedPart.builder().name(FIRST).prefix("F-").build()))
+                .signed(List.of(SignedPart.builder().name(LAST).prefix("L-").build()))
+                .build())));
+
+        assertBeaconWrittenAndRoundTrips(
+            pair, search, "aws_dbe_b_" + SIGNED_COMPOUND_NAME, signedPartActions());
     }
 
     /**
@@ -126,14 +155,15 @@ class CompoundAndVirtualBeaconTests {
      * attribute round-trips and the beacon attribute is stripped.
      */
     private void assertBeaconWrittenAndRoundTrips(
-            TargetPair pair, SearchConfig search, String beaconAttr) {
+            TargetPair pair, SearchConfig search, String beaconAttr,
+            Map<String, CryptoAction> actions) {
         DBESDKTestServerClient encryptClient =
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
         DBESDKTestServerClient decryptClient =
             DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
         Map<String, AttributeValue> plaintext = beaconPlaintext();
 
-        String encryptClientId = createBeaconClient(encryptClient, search);
+        String encryptClientId = createBeaconClient(encryptClient, search, actions);
         Map<String, AttributeValue> encrypted = encryptClient.putItemInputTransform(
             PutItemInputTransformInput.builder()
                 .clientId(encryptClientId)
@@ -143,7 +173,7 @@ class CompoundAndVirtualBeaconTests {
         assertTrue(encrypted.containsKey(beaconAttr),
             "beacon attribute '" + beaconAttr + "' must be written on encrypt on " + pair);
 
-        String decryptClientId = createBeaconClient(decryptClient, search);
+        String decryptClientId = createBeaconClient(decryptClient, search, actions);
         Map<String, AttributeValue> recovered = decryptClient.getItemOutputTransform(
             GetItemOutputTransformInput.builder()
                 .clientId(decryptClientId)
@@ -172,6 +202,21 @@ class CompoundAndVirtualBeaconTests {
         actions.put(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
         actions.put(FIRST, CryptoAction.ENCRYPT_AND_SIGN);
         actions.put(LAST, CryptoAction.ENCRYPT_AND_SIGN);
+        return actions;
+    }
+
+    /**
+     * Schema for the signed-part compound beacon: {@code first} is
+     * {@code ENCRYPT_AND_SIGN} (its standard beacon backs the encrypted part),
+     * while {@code last} is {@code SIGN_ONLY} — a signed, non-encrypted attribute
+     * a signed part may reference (an {@code ENCRYPT_AND_SIGN} attribute would
+     * have to be an encrypted part instead).
+     */
+    private static Map<String, CryptoAction> signedPartActions() {
+        Map<String, CryptoAction> actions = new LinkedHashMap<>();
+        actions.put(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
+        actions.put(FIRST, CryptoAction.ENCRYPT_AND_SIGN);
+        actions.put(LAST, CryptoAction.SIGN_ONLY);
         return actions;
     }
 
@@ -205,11 +250,12 @@ class CompoundAndVirtualBeaconTests {
             .build();
     }
 
-    private static String createBeaconClient(DBESDKTestServerClient client, SearchConfig search) {
+    private static String createBeaconClient(
+            DBESDKTestServerClient client, SearchConfig search, Map<String, CryptoAction> actions) {
         DBEClientConfig config = DBEClientConfig.builder()
             .logicalTableName(TABLE)
             .partitionKeyName(PK)
-            .attributeActionsOnEncrypt(beaconActions())
+            .attributeActionsOnEncrypt(actions)
             .allowedUnsignedAttributePrefix(":")
             .keyring(Keyring.builder()
                 .awsKms(AwsKmsKeyringConfig.builder()
