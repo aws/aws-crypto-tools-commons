@@ -24,7 +24,10 @@ import aws.cryptography.dbesdk.testserver.client.model.EncryptedPart;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.GetItemOutputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.GetSubstring;
+import aws.cryptography.dbesdk.testserver.client.model.Insert;
 import aws.cryptography.dbesdk.testserver.client.model.Keyring;
+import aws.cryptography.dbesdk.testserver.client.model.Lower;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.QueryInput;
@@ -215,35 +218,75 @@ class CompoundAndVirtualBeaconTests {
     @ParameterizedTest(name = "[beacon] Upper virtual-part transform changes the beacon value {0}")
     @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
     void upperVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
-        // A virtual field fullName = first + last. One client applies an Upper
-        // transform to the `first` part ("john" -> "JOHN"); the other applies
-        // none. Beacons are deterministic (same key + same input -> same beacon),
-        // so the two encrypts under the untransformed config must produce the SAME
-        // beacon (the control that makes the comparison value-based), and the
-        // Upper config must produce a DIFFERENT beacon — proving the transform is
-        // actually applied rather than silently ignored.
+        // Upper("john") -> "JOHN": changes the virtual-field input, so a different beacon.
+        assertVirtualTransformChangesBeacon(pair,
+            VirtualTransform.builder().upper(Upper.builder().build()).build(),
+            beaconPlaintext(), "Upper");
+    }
+
+    @ParameterizedTest(name = "[beacon] Lower virtual-part transform changes the beacon value {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void lowerVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
+        // Lower needs an upper-case input to have an effect: Lower("JOHN") -> "john".
+        assertVirtualTransformChangesBeacon(pair,
+            VirtualTransform.builder().lower(Lower.builder().build()).build(),
+            beaconPlaintextWithFirst("JOHN"), "Lower");
+    }
+
+    @ParameterizedTest(name = "[beacon] Insert virtual-part transform changes the beacon value {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void insertVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
+        // Insert appends a literal: "john" -> "john-x".
+        assertVirtualTransformChangesBeacon(pair,
+            VirtualTransform.builder().insert(Insert.builder().literal("-x").build()).build(),
+            beaconPlaintext(), "Insert");
+    }
+
+    @ParameterizedTest(name = "[beacon] GetSubstring virtual-part transform changes the beacon value {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void substringVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
+        // GetSubstring(0, 2) keeps the first two characters: "john" -> "jo".
+        assertVirtualTransformChangesBeacon(pair,
+            VirtualTransform.builder().substring(GetSubstring.builder().low(0).high(2).build()).build(),
+            beaconPlaintext(), "GetSubstring");
+    }
+
+    /**
+     * Encrypt {@code plaintext} under a {@code fullName} virtual field with no
+     * transform and under one applying {@code firstTransform} to the {@code first}
+     * part. Beacons are deterministic, so the two untransformed encrypts must
+     * produce the SAME beacon (the control that makes the comparison value-based),
+     * and the transformed config must produce a DIFFERENT beacon — proving the
+     * transform is actually applied rather than silently ignored.
+     */
+    private void assertVirtualTransformChangesBeacon(
+            TargetPair pair, VirtualTransform firstTransform,
+            Map<String, AttributeValue> plaintext, String label) {
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
-        String plainId = createBeaconClient(client, virtualFieldSearch(false), beaconActions());
-        String upperId = createBeaconClient(client, virtualFieldSearch(true), beaconActions());
+        String plainId = createBeaconClient(client, virtualFieldSearch(null), beaconActions());
+        String transformedId =
+            createBeaconClient(client, virtualFieldSearch(firstTransform), beaconActions());
         String beaconAttr = "aws_dbe_b_" + VIRTUAL_NAME;
 
-        AttributeValue plain1 = encryptAndGetBeacon(client, plainId, beaconAttr, pair);
-        AttributeValue plain2 = encryptAndGetBeacon(client, plainId, beaconAttr, pair);
-        AttributeValue upper = encryptAndGetBeacon(client, upperId, beaconAttr, pair);
+        AttributeValue plain1 = encryptAndGetBeacon(client, plainId, plaintext, beaconAttr, pair);
+        AttributeValue plain2 = encryptAndGetBeacon(client, plainId, plaintext, beaconAttr, pair);
+        AttributeValue transformed =
+            encryptAndGetBeacon(client, transformedId, plaintext, beaconAttr, pair);
 
         assertEquals(plain1, plain2,
             "an untransformed virtual-field beacon must be deterministic (control) on " + pair);
-        assertNotEquals(plain1, upper,
-            "the Upper transform must change the virtual-field beacon on " + pair);
+        assertNotEquals(plain1, transformed,
+            "the " + label + " transform must change the virtual-field beacon on " + pair);
     }
 
-    /** Encrypt the beacon plaintext and return the written beacon attribute value. */
+    /** Encrypt the given plaintext and return the written beacon attribute value. */
     private static AttributeValue encryptAndGetBeacon(
-            DBESDKTestServerClient client, String clientId, String beaconAttr, TargetPair pair) {
+            DBESDKTestServerClient client, String clientId,
+            Map<String, AttributeValue> plaintext, String beaconAttr, TargetPair pair) {
         Map<String, AttributeValue> encrypted = client.putItemInputTransform(
             PutItemInputTransformInput.builder()
                 .clientId(clientId)
-                .sdkInput(PutItemInput.builder().tableName(TABLE).item(beaconPlaintext()).build())
+                .sdkInput(PutItemInput.builder().tableName(TABLE).item(plaintext).build())
                 .build()).getTransformedInput().getItem();
         AttributeValue beacon = encrypted.get(beaconAttr);
         assertNotNull(beacon, "beacon '" + beaconAttr + "' must be written on " + pair);
@@ -252,13 +295,13 @@ class CompoundAndVirtualBeaconTests {
 
     /**
      * A SearchConfig with a standard beacon over a {@code fullName} virtual field
-     * (first + last). When {@code upperFirst} is set, an {@link Upper} transform
-     * is applied to the {@code first} part.
+     * (first + last). When {@code firstTransform} is non-null it is applied to the
+     * {@code first} part.
      */
-    private static SearchConfig virtualFieldSearch(boolean upperFirst) {
+    private static SearchConfig virtualFieldSearch(VirtualTransform firstTransform) {
         VirtualPart.Builder firstPart = VirtualPart.builder().loc(FIRST);
-        if (upperFirst) {
-            firstPart.trans(List.of(VirtualTransform.builder().upper(Upper.builder().build()).build()));
+        if (firstTransform != null) {
+            firstPart.trans(List.of(firstTransform));
         }
         return beaconSearch(BeaconVersion.builder()
             .virtualFields(List.of(VirtualField.builder()
@@ -267,6 +310,13 @@ class CompoundAndVirtualBeaconTests {
                 .build()))
             .standardBeacons(List.of(
                 StandardBeacon.builder().name(VIRTUAL_NAME).length(10).build())));
+    }
+
+    /** The beacon plaintext with the {@code first} attribute set to {@code firstValue}. */
+    private static Map<String, AttributeValue> beaconPlaintextWithFirst(String firstValue) {
+        Map<String, AttributeValue> item = beaconPlaintext();
+        item.put(FIRST, AttributeValue.builder().s(firstValue).build());
+        return item;
     }
 
     /**

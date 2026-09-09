@@ -1348,15 +1348,28 @@ list VirtualTransformList {
 }
 
 /// A virtual-part transformation (exactly one member set). Models the Upper,
-/// GetPrefix, and GetSuffix transforms; transforms treat the value as a string.
+/// Lower, Insert, GetPrefix, GetSuffix, and GetSubstring transforms; transforms
+/// treat the value as a string.
 structure VirtualTransform {
     upper: Upper
+    lower: Lower
+    insert: Insert
     prefix: GetPrefix
     suffix: GetSuffix
+    substring: GetSubstring
 }
 
 /// Convert ASCII characters to upper case (no parameters).
 structure Upper {}
+
+/// Convert ASCII characters to lower case (no parameters).
+structure Lower {}
+
+/// Append a literal string to the value.
+structure Insert {
+    @required
+    literal: String
+}
 
 /// Keep the first {@code length} characters (negative excludes from the end).
 structure GetPrefix {
@@ -1368,6 +1381,16 @@ structure GetPrefix {
 structure GetSuffix {
     @required
     length: Integer
+}
+
+/// Keep the {@code [low, high)} character range, 0-based; negative indices count
+/// from the end (-1 is the last character).
+structure GetSubstring {
+    @required
+    low: Integer
+
+    @required
+    high: Integer
 }
 
 map AttributeActionsOnEncrypt {
