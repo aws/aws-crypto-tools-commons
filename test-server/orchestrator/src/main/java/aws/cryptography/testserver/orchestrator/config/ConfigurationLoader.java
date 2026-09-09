@@ -69,6 +69,15 @@ public final class ConfigurationLoader {
             "server-config.json", read("server-config.json", serverPath), serverPath);
         JsonNode feature = readObject(
             "feature-config.json", read("feature-config.json", featurePath), featurePath);
+        // Validate the bug ledger (design "Bug Configuration") when present: a
+        // JSON array of { id, description, ticketId? } with unique, non-blank
+        // ids. Structural validation only — the ledger is consumed once the
+        // known-bug injection lands; validating here fails a malformed ledger
+        // fast, at load, before anything is cloned.
+        Path bugPath = dir.resolve("bug-config.json");
+        if (Files.isRegularFile(bugPath)) {
+            validateBugLedger(readObject("bug-config.json", read("bug-config.json", bugPath), bugPath), bugPath);
+        }
         List<ConfigurationEntry> entries = new ArrayList<>();
         JsonNode entriesNode = server.get("entries");
         if (entriesNode != null && entriesNode.isArray()) {
@@ -139,6 +148,15 @@ public final class ConfigurationLoader {
             "server-config.json", read("server-config.json", serverPath), serverPath);
         JsonNode feature = readObject(
             "feature-config.json", read("feature-config.json", featurePath), featurePath);
+        // Validate this server's exhibited-bug list (design "Bug Configuration")
+        // when present: a JSON array of non-blank, unique bug-id strings. The
+        // cross-check that each id is defined in the commons ledger runs where
+        // both are in hand (with the known-bug injection); here we fail a
+        // malformed list fast, at load.
+        Path bugPath = dir.resolve("bug-config.json");
+        if (Files.isRegularFile(bugPath)) {
+            validatePerServerBugIds(read("bug-config.json", bugPath), bugPath);
+        }
         List<ConfigurationEntry> overrides = null;
         JsonNode overridesNode = server.get("configurationOverrides");
         if (overridesNode != null && overridesNode.isArray()) {
@@ -255,6 +273,76 @@ public final class ConfigurationLoader {
     private static String text(JsonNode node, String field) {
         JsonNode v = node.get(field);
         return (v == null || v.isNull()) ? null : v.asText();
+    }
+
+    /**
+     * Validate a commons bug ledger (design "Bug Configuration"): a {@code bugs}
+     * array of {@code { id, description, ticketId? }} with unique, non-blank ids
+     * and non-blank descriptions. Structural validation at load, before
+     * anything is cloned; throws {@link ConfigurationLoadException} naming the
+     * file on any violation.
+     */
+    private static void validateBugLedger(JsonNode root, Path location) {
+        JsonNode bugs = root.get("bugs");
+        if (bugs == null || !bugs.isArray()) {
+            throw new ConfigurationLoadException(
+                "bug-config.json at " + location + " must have a 'bugs' array", location);
+        }
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        for (JsonNode bug : bugs) {
+            if (!bug.isObject()) {
+                throw new ConfigurationLoadException(
+                    "bug-config.json at " + location + ": each bug must be an object", location);
+            }
+            String id = text(bug, "id");
+            if (id == null || id.isBlank()) {
+                throw new ConfigurationLoadException(
+                    "bug-config.json at " + location + ": each bug needs a non-blank 'id'", location);
+            }
+            if (!ids.add(id)) {
+                throw new ConfigurationLoadException(
+                    "bug-config.json at " + location + ": duplicate bug id '" + id + "'", location);
+            }
+            String description = text(bug, "description");
+            if (description == null || description.isBlank()) {
+                throw new ConfigurationLoadException(
+                    "bug-config.json at " + location + ": bug '" + id
+                        + "' needs a non-blank 'description'", location);
+            }
+        }
+    }
+
+    /**
+     * Validate a per-server exhibited-bug list (design "Bug Configuration"): a
+     * JSON array of non-blank, unique id strings. Throws
+     * {@link ConfigurationLoadException} on any violation.
+     */
+    private static void validatePerServerBugIds(String json, Path location) {
+        JsonNode root;
+        try {
+            root = MAPPER.readTree(json);
+        } catch (JacksonException e) {
+            throw new ConfigurationLoadException(
+                "bug-config.json at " + location + " is unparseable: " + e.getOriginalMessage(),
+                location, e);
+        }
+        if (root == null || !root.isArray()) {
+            throw new ConfigurationLoadException(
+                "bug-config.json at " + location + " must be a JSON array of bug ids", location);
+        }
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        for (JsonNode idNode : root) {
+            if (!idNode.isTextual() || idNode.asText().isBlank()) {
+                throw new ConfigurationLoadException(
+                    "bug-config.json at " + location + ": each bug id must be a non-blank string",
+                    location);
+            }
+            if (!ids.add(idNode.asText())) {
+                throw new ConfigurationLoadException(
+                    "bug-config.json at " + location + ": duplicate bug id '" + idNode.asText() + "'",
+                    location);
+            }
+        }
     }
 
     private static Integer integer(JsonNode node, String field) {

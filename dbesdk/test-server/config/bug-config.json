@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "DB-ESDK TestServer commons bug-config.json (design 'Bug Configuration'):",
+    "the authoritative ledger of known bugs across the DB-ESDK Language_Servers.",
+    "Each entry is { id, description, ticketId }. A server declares the bug ids",
+    "it currently exhibits in its own bug-config.json; every such id MUST be",
+    "defined here. Empty today — no DB-ESDK bug is currently tolerated; an entry",
+    "is added together with the test whose assertion the bug breaks (design",
+    "Scenario A)."
+  ],
+  "product": "dbesdk",
+  "bugs": []
+}
