@@ -9,6 +9,7 @@
   "features": [
     "raw-aes",
     "aws-kms",
-    "beacon-partitions"
+    "beacon-partitions",
+    "structured-encryption"
   ]
 }

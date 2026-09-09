@@ -42,6 +42,9 @@ service DBESDKTestServer {
         QueryInputTransform
         UpdateItemInputTransform
         DeleteItemInputTransform
+        CreateStructuredClient
+        EncryptStructure
+        DecryptStructure
     ]
     errors: [
         GenericServerError
@@ -290,6 +293,41 @@ operation UpdateItemInputTransform {
 operation DeleteItemInputTransform {
     input: DeleteItemInputTransformRequest
     output: DeleteItemInputTransformResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Construct and register a Structured Encryption client (the raw structured
+/// layer beneath the item encryptor), returning a ClientId. The keyring/CMM in
+/// the config builds the CMM the Encrypt/DecryptStructure operations use.
+operation CreateStructuredClient {
+    input: CreateStructuredClientRequest
+    output: CreateStructuredClientResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Encrypt a raw structured-data map with the referenced Structured Encryption
+/// client, per the given Crypto Schema (per-field ENCRYPT_AND_SIGN / SIGN_ONLY /
+/// SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT / DO_NOTHING).
+operation EncryptStructure {
+    input: EncryptStructureRequest
+    output: EncryptStructureResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt a raw structured-data map produced by EncryptStructure, verifying the
+/// signature per the given Authenticate Schema and decrypting encrypted terminals.
+operation DecryptStructure {
+    input: DecryptStructureRequest
+    output: DecryptStructureResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -682,6 +720,108 @@ structure DeleteItemInputTransformResponse {
     /// instead).
     @required
     transformedInput: DeleteItemInput
+}
+
+// ===========================================================================
+// Structured Encryption (§0.3.5) request / response + data shapes.
+// ===========================================================================
+
+@input
+structure CreateStructuredClientRequest {
+    /// Crypto config whose keyring/CMM builds the CMM used by Encrypt/Decrypt
+    /// Structure. Reuses the item-encryptor config shape; only the keyring/cmm
+    /// (and optional algorithmSuiteId) are consulted.
+    @required
+    config: DBEClientConfig
+}
+
+@output
+structure CreateStructuredClientResponse {
+    @required
+    clientId: ClientId
+}
+
+@input
+structure EncryptStructureRequest {
+    @required
+    clientId: ClientId
+
+    /// A logical table name bound into the structured-encryption context.
+    @required
+    tableName: String
+
+    /// The plaintext structured data: a map of field name to a terminal
+    /// (opaque value bytes + a 2-byte type id).
+    @required
+    plaintextStructure: StructuredDataMap
+
+    /// Per-field Crypto Action.
+    @required
+    cryptoSchema: CryptoSchemaMap
+}
+
+@output
+structure EncryptStructureResponse {
+    /// The encrypted structured data: ENCRYPT_AND_SIGN terminals now hold
+    /// ciphertext, plus the added header/footer terminals.
+    @required
+    encryptedStructure: StructuredDataMap
+}
+
+@input
+structure DecryptStructureRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    tableName: String
+
+    /// The encrypted structured data produced by EncryptStructure.
+    @required
+    encryptedStructure: StructuredDataMap
+
+    /// Per-field Authenticate Action (which fields are within the signature
+    /// scope), as required to verify + decrypt.
+    @required
+    authenticateSchema: AuthenticateSchemaMap
+}
+
+@output
+structure DecryptStructureResponse {
+    /// The recovered plaintext structured data (header/footer terminals stripped).
+    @required
+    plaintextStructure: StructuredDataMap
+}
+
+/// One structured-data terminal: opaque value bytes plus a 2-byte type id the
+/// caller uses to interpret the value.
+structure StructuredDataTerminal {
+    @required
+    value: Blob
+
+    @required
+    typeId: Blob
+}
+
+map StructuredDataMap {
+    key: String
+    value: StructuredDataTerminal
+}
+
+map CryptoSchemaMap {
+    key: String
+    value: CryptoAction
+}
+
+/// Whether a field is within the signature scope on decrypt.
+enum AuthenticateAction {
+    SIGN
+    DO_NOT_SIGN
+}
+
+map AuthenticateSchemaMap {
+    key: String
+    value: AuthenticateAction
 }
 
 // ===========================================================================
