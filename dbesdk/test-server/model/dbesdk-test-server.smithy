@@ -45,6 +45,9 @@ service DBESDKTestServer {
         CreateStructuredClient
         EncryptStructure
         DecryptStructure
+        EncryptPathStructure
+        DecryptPathStructure
+        ResolveAuthActions
     ]
     errors: [
         GenericServerError
@@ -328,6 +331,40 @@ operation EncryptStructure {
 operation DecryptStructure {
     input: DecryptStructureRequest
     output: DecryptStructureResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Encrypt a raw structured-data list keyed by Path (the path-based form of
+/// EncryptStructure): each Crypto Item carries a Path, a terminal, and a Crypto
+/// Action, and the encrypted list is returned in the same shape.
+operation EncryptPathStructure {
+    input: EncryptPathStructureRequest
+    output: EncryptPathStructureResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Decrypt a path-keyed structured-data list produced by EncryptPathStructure,
+/// verifying the signature per each Auth Item's Authenticate Action.
+operation DecryptPathStructure {
+    input: DecryptPathStructureRequest
+    output: DecryptPathStructureResponse
+    errors: [
+        GenericServerError
+        DBESDKClientError
+    ]
+}
+
+/// Resolve, from an Auth List and the serialized header bytes, the Crypto Action
+/// the header's Crypto Legend assigns to each terminal. Needs no CMM.
+operation ResolveAuthActions {
+    input: ResolveAuthActionsRequest
+    output: ResolveAuthActionsResponse
     errors: [
         GenericServerError
         DBESDKClientError
@@ -791,6 +828,104 @@ structure DecryptStructureResponse {
     /// The recovered plaintext structured data (header/footer terminals stripped).
     @required
     plaintextStructure: StructuredDataMap
+}
+
+structure EncryptPathStructureRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    tableName: String
+
+    /// The plaintext structured data as a list of Crypto Items (Path + terminal
+    /// + Crypto Action) rather than a flat map.
+    @required
+    plaintextStructure: PathCryptoList
+}
+
+structure EncryptPathStructureResponse {
+    /// The encrypted Crypto List: ENCRYPT_AND_SIGN terminals now hold ciphertext,
+    /// plus the added header/footer items.
+    @required
+    encryptedStructure: PathCryptoList
+}
+
+structure DecryptPathStructureRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    tableName: String
+
+    /// The encrypted data as an Auth List (Path + terminal + Authenticate
+    /// Action) produced from an EncryptPathStructure result.
+    @required
+    encryptedStructure: PathAuthList
+}
+
+structure DecryptPathStructureResponse {
+    /// The recovered plaintext Crypto List (header/footer items stripped).
+    @required
+    plaintextStructure: PathCryptoList
+}
+
+structure ResolveAuthActionsRequest {
+    @required
+    tableName: String
+
+    /// The Auth List whose per-terminal Crypto Actions are to be resolved.
+    @required
+    authActions: PathAuthList
+
+    /// The serialized structured-encryption header (the aws_dbe_head terminal's
+    /// value), carrying the Crypto Legend that assigns each terminal's action.
+    @required
+    headerBytes: Blob
+}
+
+structure ResolveAuthActionsResponse {
+    /// Each input terminal with the Crypto Action resolved from the header.
+    @required
+    cryptoActions: PathCryptoList
+}
+
+/// A Path: an ordered list of structure-member names locating a terminal. Only
+/// structure segments (member names) are modeled, matching the DBE Path union's
+/// single supported variant.
+list PathSegments {
+    member: String
+}
+
+/// One path-keyed Crypto Item: a Path, its terminal, and a Crypto Action.
+structure PathCryptoItem {
+    @required
+    path: PathSegments
+
+    @required
+    data: StructuredDataTerminal
+
+    @required
+    action: CryptoAction
+}
+
+list PathCryptoList {
+    member: PathCryptoItem
+}
+
+/// One path-keyed Auth Item: a Path, its terminal, and an Authenticate Action.
+structure PathAuthItem {
+    @required
+    path: PathSegments
+
+    @required
+    data: StructuredDataTerminal
+
+    @required
+    action: AuthenticateAction
+}
+
+list PathAuthList {
+    member: PathAuthItem
 }
 
 /// One structured-data terminal: opaque value bytes plus a 2-byte type id the

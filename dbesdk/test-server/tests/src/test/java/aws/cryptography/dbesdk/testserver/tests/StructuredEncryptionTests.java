@@ -4,6 +4,7 @@ import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.PK;
 import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.TABLE;
 import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.resolveKmsKeyArn;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -14,15 +15,22 @@ import aws.cryptography.dbesdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.dbesdk.testserver.client.model.CreateStructuredClientInput;
 import aws.cryptography.dbesdk.testserver.client.model.CryptoAction;
 import aws.cryptography.dbesdk.testserver.client.model.DBEClientConfig;
+import aws.cryptography.dbesdk.testserver.client.model.DecryptPathStructureInput;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptStructureInput;
+import aws.cryptography.dbesdk.testserver.client.model.EncryptPathStructureInput;
 import aws.cryptography.dbesdk.testserver.client.model.EncryptStructureInput;
 import aws.cryptography.dbesdk.testserver.client.model.Keyring;
+import aws.cryptography.dbesdk.testserver.client.model.PathAuthItem;
+import aws.cryptography.dbesdk.testserver.client.model.PathCryptoItem;
+import aws.cryptography.dbesdk.testserver.client.model.ResolveAuthActionsInput;
 import aws.cryptography.dbesdk.testserver.client.model.StructuredDataTerminal;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -109,6 +117,71 @@ class StructuredEncryptionTests {
             "the ENCRYPT_AND_SIGN terminal's bytes must be encrypted on " + pair);
     }
 
+    @ParameterizedTest(name = "[structured] path structure round-trip preserves terminals {0}")
+    @MethodSource("testPairs")
+    void pathStructureRoundTripPreservesTerminals(TargetPair pair) {
+        FeatureGate.require(Set.of(FEATURE), pair);
+        DBESDKTestServerClient encryptClient =
+            DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        DBESDKTestServerClient decryptClient =
+            DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        List<PathCryptoItem> plaintext = plaintextCryptoList();
+
+        List<PathCryptoItem> encrypted = encryptClient.encryptPathStructure(
+            EncryptPathStructureInput.builder()
+                .clientId(newStructuredClient(encryptClient))
+                .tableName(TABLE)
+                .plaintextStructure(plaintext)
+                .build()).getEncryptedStructure();
+
+        List<PathCryptoItem> recovered = decryptClient.decryptPathStructure(
+            DecryptPathStructureInput.builder()
+                .clientId(newStructuredClient(decryptClient))
+                .tableName(TABLE)
+                .encryptedStructure(authListFromEncrypted(encrypted))
+                .build()).getPlaintextStructure();
+
+        for (PathCryptoItem source : plaintext) {
+            String field = pathKey(source);
+            PathCryptoItem got = findByPath(recovered, field);
+            assertNotNull(got, "recovered path structure missing '" + field + "' on " + pair);
+            assertArrayEquals(bytes(source.getData()), bytes(got.getData()),
+                "terminal '" + field + "' did not round-trip on " + pair);
+        }
+    }
+
+    @ParameterizedTest(name = "[structured] ResolveAuthActions recovers per-terminal Crypto Actions {0}")
+    @MethodSource("testPairs")
+    void resolveAuthActionsRecoversCryptoActions(TargetPair pair) {
+        FeatureGate.require(Set.of(FEATURE), pair);
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+
+        List<PathCryptoItem> encrypted = client.encryptPathStructure(
+            EncryptPathStructureInput.builder()
+                .clientId(newStructuredClient(client))
+                .tableName(TABLE)
+                .plaintextStructure(plaintextCryptoList())
+                .build()).getEncryptedStructure();
+
+        // The header terminal carries the Crypto Legend and must be present in
+        // the Auth List; the full list (header/footer DO_NOT_SIGN) satisfies that.
+        byte[] header = bytes(findByPath(encrypted, "aws_dbe_head").getData());
+
+        List<PathCryptoItem> resolved = client.resolveAuthActions(
+            ResolveAuthActionsInput.builder()
+                .tableName(TABLE)
+                .authActions(authListFromEncrypted(encrypted))
+                .headerBytes(ByteBuffer.wrap(header))
+                .build()).getCryptoActions();
+
+        assertEquals(CryptoAction.ENCRYPT_AND_SIGN.getValue(),
+            findByPath(resolved, SECRET).getAction().getValue(),
+            "the secret terminal must resolve to ENCRYPT_AND_SIGN on " + pair);
+        assertEquals(CryptoAction.SIGN_ONLY.getValue(),
+            findByPath(resolved, PUBLIC).getAction().getValue(),
+            "the public terminal must resolve to SIGN_ONLY on " + pair);
+    }
+
     /** A structured client over an AWS-KMS keyring on the shared item key. */
     private static String newStructuredClient(DBESDKTestServerClient client) {
         DBEClientConfig config = DBEClientConfig.builder()
@@ -163,6 +236,55 @@ class StructuredEncryptionTests {
             .value(ByteBuffer.wrap(value.getBytes(StandardCharsets.UTF_8)))
             .typeId(ByteBuffer.wrap(TYPE_ID))
             .build();
+    }
+
+    /** The same PK/secret/public fields as {@link #plaintextStructure}, as a Crypto List. */
+    private static List<PathCryptoItem> plaintextCryptoList() {
+        return List.of(
+            cryptoItem(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT, "item-1"),
+            cryptoItem(SECRET, CryptoAction.ENCRYPT_AND_SIGN, "hunter2"),
+            cryptoItem(PUBLIC, CryptoAction.SIGN_ONLY, "visible"));
+    }
+
+    private static PathCryptoItem cryptoItem(String field, CryptoAction action, String value) {
+        return PathCryptoItem.builder()
+            .path(List.of(field))
+            .data(terminal(value))
+            .action(action)
+            .build();
+    }
+
+    /**
+     * Build the decrypt Auth List from an encrypted Crypto List: every terminal
+     * is in the signature scope ({@code SIGN}) except the DBE-added
+     * {@code aws_dbe_*} header/footer terminals ({@code DO_NOT_SIGN}).
+     */
+    private static List<PathAuthItem> authListFromEncrypted(List<PathCryptoItem> encrypted) {
+        List<PathAuthItem> auth = new ArrayList<>(encrypted.size());
+        for (PathCryptoItem item : encrypted) {
+            auth.add(PathAuthItem.builder()
+                .path(item.getPath())
+                .data(item.getData())
+                .action(pathKey(item).startsWith("aws_dbe_")
+                    ? AuthenticateAction.DO_NOT_SIGN
+                    : AuthenticateAction.SIGN)
+                .build());
+        }
+        return auth;
+    }
+
+    /** The single-segment path name of a flat Crypto Item. */
+    private static String pathKey(PathCryptoItem item) {
+        return item.getPath().get(0);
+    }
+
+    private static PathCryptoItem findByPath(List<PathCryptoItem> items, String field) {
+        for (PathCryptoItem item : items) {
+            if (pathKey(item).equals(field)) {
+                return item;
+            }
+        }
+        return null;
     }
 
     private static byte[] bytes(StructuredDataTerminal terminal) {
