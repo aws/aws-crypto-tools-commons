@@ -1,5 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
 
 import java.util.Optional;
 

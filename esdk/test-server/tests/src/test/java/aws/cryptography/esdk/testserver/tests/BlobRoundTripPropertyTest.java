@@ -1,6 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
@@ -34,7 +32,7 @@ import net.jqwik.api.lifecycle.BeforeContainer;
  */
 class BlobRoundTripPropertyTest {
 
-    private static TargetPair pair;
+    private static EndpointPair pair;
 
     @BeforeContainer
     static void bootEndpoints() {

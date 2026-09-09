@@ -1,7 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
@@ -28,14 +25,14 @@ class StreamCrossModeTests {
         "esdk-test-server cross-mode streaming plaintext, spanning more than one frame or so"
             .getBytes(StandardCharsets.UTF_8);
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
     /** STREAM-002: one-shot encrypt, streamed decrypt round-trips. */
     @ParameterizedTest(name = "oneShotEncryptStreamDecrypt {0}")
     @MethodSource("pairs")
-    void oneShotEncryptDecryptsUnderStreaming(TargetPair pair) {
+    void oneShotEncryptDecryptsUnderStreaming(EndpointPair pair) {
         FeatureGate.require(Set.of("streaming"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT);
@@ -47,7 +44,7 @@ class StreamCrossModeTests {
     /** STREAM-002: streamed encrypt, one-shot decrypt round-trips. */
     @ParameterizedTest(name = "streamEncryptOneShotDecrypt {0}")
     @MethodSource("pairs")
-    void streamedEncryptDecryptsOneShot(TargetPair pair) {
+    void streamedEncryptDecryptsOneShot(EndpointPair pair) {
         FeatureGate.require(Set.of("streaming"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encryptStream(pair.encryptEndpoint(), config, PLAINTEXT);
@@ -69,7 +66,7 @@ class StreamCrossModeTests {
      */
     @ParameterizedTest(name = "multiFrameStreamAssemblyExact {0}")
     @MethodSource("pairs")
-    void multiFrameStreamingReproducesExactPlaintext(TargetPair pair) {
+    void multiFrameStreamingReproducesExactPlaintext(EndpointPair pair) {
         FeatureGate.require(Set.of("streaming", "raw-aes"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         long frameLength = 1024;

@@ -60,14 +60,6 @@
     "aws-kms-rsa", "aws-kms-ecdh",
     "required-encryption-context", "caching"
   ],
-  "requiredKmsScenarios": [
-    "awsKms",
-    "awsKmsMrk",
-    "awsKmsMultiKeyring",
-    "awsKmsMrkMultiKeyring",
-    "awsKmsRsa",
-    "awsKmsDiscovery"
-  ],
   "entries": [
     {
       "language": "java",

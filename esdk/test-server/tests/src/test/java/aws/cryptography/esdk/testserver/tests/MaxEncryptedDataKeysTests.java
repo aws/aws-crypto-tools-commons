@@ -1,8 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,7 +51,7 @@ class MaxEncryptedDataKeysTests {
     @ParameterizedTest(name = "encryptEnforcesMaxEdks {0}")
     @MethodSource("targets")
     void encryptEnforcesMaxEncryptedDataKeys(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, new TargetPair(target, target));
+        FeatureGate.require(FEATURES, new EndpointPair(target, target));
         // Cap of 2 permits the two EDKs.
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(),
             EsdkClientConfigs.rawAesMultiWithMaxEdks(2), PLAINTEXT);

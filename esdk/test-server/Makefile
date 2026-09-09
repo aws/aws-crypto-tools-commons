@@ -8,12 +8,7 @@
 #   client-java/   the generated Java Test_Client   (root: esdk-test-server-client-java)
 #   servers/python/ the Python Language_Server      (hand-implemented, no build)
 #   tests/         the single Java Tests suite       (root: esdk-test-server-tests)
-#
-# The shared Orchestrator core lives at ../../test-server/orchestrator/ and
-# runs against this SDK's data when invoked with
-# `-Dtestserver.root=$(MAKEFILE_DIR)` (see `make orchestrate` below). Its
-# runtime scratch — materialized clones, launch dirs, resolution record —
-# lives under this Makefile's sibling `build/` directory, gitignored.
+#   orchestrator/  the Orchestrator core            (root: esdk-test-server-orchestrator)
 #
 # The Java Language_Server is NOT hosted here: it lives in the
 # aws-crypto-tools-java Language_Repository at esdk/test-server/server
@@ -56,10 +51,7 @@ MAKEFILE_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 MODEL_DIR  := $(MAKEFILE_DIR)/model
 CLIENT_DIR := $(MAKEFILE_DIR)/client-java
 TESTS_DIR  := $(MAKEFILE_DIR)/tests
-# Shared orchestrator (product-neutral, one per repo, at the top of the tree).
-# The ESDK invocation points it at this SDK's config/tests via
-# `-Dtestserver.root=$(MAKEFILE_DIR)`.
-ORCH_DIR   := $(MAKEFILE_DIR)/../../test-server/orchestrator
+ORCH_DIR   := $(MAKEFILE_DIR)/orchestrator
 CDK_DIR    := $(MAKEFILE_DIR)/cdk
 
 # ----------------------------------------------------------------------------
@@ -90,7 +82,7 @@ CREATE_OIDC_PROVIDER ?= false
 # Makefile-owned scratch directory for temp files. Kept separate from the
 # per-module Gradle `build/` dirs to avoid confusion, and ignored via the
 # sibling .gitignore. (The orchestrated run keeps its own scratch under
-# build/; this is only used by `clean`.)
+# orchestrator/build/; this is only used by `clean`.)
 TMP_DIR    := $(MAKEFILE_DIR)/.make-tmp
 
 # ----------------------------------------------------------------------------
@@ -209,15 +201,15 @@ build-tests: check-java ## Build the Tests suite (tests, skips tests)
 # present (e.g. run `creds`); export ESDK_TESTSERVER_KMS_* to point at a
 # non-default key set.
 orchestrate: check-java ## Run the complete cross-language Commons_Run (all servers, full matrix); needs AWS creds
-	@echo "==> Running the shared TestServer orchestrator (test-server/orchestrator/, product=esdk) — complete cross-language run"
+	@echo "==> Running the ESDKTestServer orchestrator (orchestrator/) — complete cross-language run"
 	@echo "    Launches every configured Language_Server on its port, runs the Tests over the"
 	@echo "    full pairwise matrix, prints the Resolution_Record, and reports one fail-open Result."
 	@echo "    The KMS keyring scenarios are REQUIRED: valid AWS credentials must be present"
 	@echo "    (e.g. run \`creds\`); export ESDK_TESTSERVER_KMS_* to use a non-default key set."
-	@cd "$(ORCH_DIR)" && ./gradlew --console=plain run -Dtestserver.root=$(MAKEFILE_DIR)
+	@cd "$(ORCH_DIR)" && ./gradlew --console=plain run
 
 orchestrate-test: check-java ## Run the orchestrator's property + integration tests (pure pipeline logic, no AWS creds)
-	@echo "==> Running orchestrator tests (test-server/orchestrator/)"
+	@echo "==> Running orchestrator tests (orchestrator/)"
 	@cd "$(ORCH_DIR)" && ./gradlew --console=plain test
 
 # ----------------------------------------------------------------------------

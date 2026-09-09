@@ -1,9 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.KnownBugGate;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -54,7 +49,7 @@ class EncryptionContextBehaviorTests {
         return LanguageServerRegistry.shared().targets();
     }
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -62,7 +57,7 @@ class EncryptionContextBehaviorTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(TargetPair pair) {
+    private static ESDKClientConfig configFor(EndpointPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -78,7 +73,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reservedEcKeyRejected {0}")
     @MethodSource("targets")
     void encryptRejectsReservedEncryptionContextKey(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put(RESERVED_KEY, "any-value");
         assertThrows(ESDKClientError.class,
@@ -93,7 +88,7 @@ class EncryptionContextBehaviorTests {
      */
     @ParameterizedTest(name = "reproducedEcMatchDecrypts {0}")
     @MethodSource("pairs")
-    void decryptSucceedsWithMatchingReproducedContext(TargetPair pair) {
+    void decryptSucceedsWithMatchingReproducedContext(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
@@ -109,7 +104,7 @@ class EncryptionContextBehaviorTests {
      */
     @ParameterizedTest(name = "reproducedEcMismatchRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsMismatchedReproducedContext(TargetPair pair) {
+    void decryptRejectsMismatchedReproducedContext(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("purpose", "test");
         Map<String, String> wrong = Map.of("purpose", "tampered");
@@ -126,7 +121,7 @@ class EncryptionContextBehaviorTests {
      */
     @ParameterizedTest(name = "highCodepointEcRoundTrips {0}")
     @MethodSource("pairs")
-    void encryptionContextWithHighCodepointsRoundTrips(TargetPair pair) {
+    void encryptionContextWithHighCodepointsRoundTrips(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of(
             "\u65e5\u672c\u8a9e", "value",          // CJK key
@@ -148,7 +143,7 @@ class EncryptionContextBehaviorTests {
      */
     @ParameterizedTest(name = "reservedIdentifierEcKeysRoundTrip {0}")
     @MethodSource("pairs")
-    void encryptionContextKeysCollidingWithReservedIdentifiersRoundTrip(TargetPair pair) {
+    void encryptionContextKeysCollidingWithReservedIdentifiersRoundTrip(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of(
             "__proto__", "a",
@@ -189,7 +184,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "reservedPrefixEcKeyRejected {0}")
     @MethodSource("targets")
     void encryptRejectsReservedPrefixEncryptionContextKey(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
         KnownBugGate.gate("encrypt-accepts-reserved-prefix-encryption-context-key", target.language(),
@@ -208,7 +203,7 @@ class EncryptionContextBehaviorTests {
     @ParameterizedTest(name = "nonReservedPrefixBoundaryAccepted {0}")
     @MethodSource("targets")
     void encryptAcceptsKeyThatDoesNotBeginWithReservedPrefix(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
+        ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> ec = Map.of("aws-crypto", "no-trailing-hyphen-is-not-reserved");
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, null, null);
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(target.endpoint(), config, ciphertext),

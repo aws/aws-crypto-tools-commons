@@ -1,6 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.FeatureDeclarations;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
@@ -42,11 +40,11 @@ enum ConformanceKeyring {
     }
 
     /** Raw-AES when both endpoints of {@code pair} support it, otherwise empty. */
-    static Optional<ConformanceKeyring> negotiate(TargetPair pair) {
+    static Optional<ConformanceKeyring> negotiate(EndpointPair pair) {
         return RAW_AES.supportedBy(pair) ? Optional.of(RAW_AES) : Optional.empty();
     }
 
-    private boolean supportedBy(TargetPair pair) {
+    private boolean supportedBy(EndpointPair pair) {
         FeatureDeclarations declarations = FeatureDeclarations.shared();
         for (String feature : features) {
             if (!declarations.isSupported(pair.encryptTarget().language(), feature)

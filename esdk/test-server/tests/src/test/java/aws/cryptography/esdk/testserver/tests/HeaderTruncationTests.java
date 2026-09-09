@@ -1,7 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,7 +32,7 @@ class HeaderTruncationTests {
     private static final ESDKCommitmentPolicy POLICY =
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -43,7 +40,7 @@ class HeaderTruncationTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(TargetPair pair) {
+    private static ESDKClientConfig configFor(EndpointPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -55,7 +52,7 @@ class HeaderTruncationTests {
     /** HDR-025: an empty (zero-byte) message is rejected. */
     @ParameterizedTest(name = "zeroByteRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsZeroByteMessage(TargetPair pair) {
+    void decryptRejectsZeroByteMessage(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, new byte[0]),
@@ -65,7 +62,7 @@ class HeaderTruncationTests {
     /** HDR-025: a single (version-only) byte is rejected. */
     @ParameterizedTest(name = "versionOnlyByteRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsVersionOnlyByte(TargetPair pair) {
+    void decryptRejectsVersionOnlyByte(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT);
         byte[] versionOnly = Arrays.copyOf(ciphertext, 1);
@@ -77,7 +74,7 @@ class HeaderTruncationTests {
     /** HDR-025: a message truncated in the middle of the header (before the body) is rejected. */
     @ParameterizedTest(name = "truncatedHeaderRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsTruncatedHeader(TargetPair pair) {
+    void decryptRejectsTruncatedHeader(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(), null, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

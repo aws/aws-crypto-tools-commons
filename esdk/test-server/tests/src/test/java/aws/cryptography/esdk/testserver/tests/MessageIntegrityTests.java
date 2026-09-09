@@ -1,8 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.KnownBugGate;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,7 +50,7 @@ class MessageIntegrityTests {
 
     static List<Arguments> cases() {
         List<Arguments> cases = new ArrayList<>();
-        for (TargetPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
             for (ESDKAlgorithmSuiteId suite : SUITES) {
                 cases.add(Arguments.of(pair, suite));
             }
@@ -69,7 +65,7 @@ class MessageIntegrityTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(TargetPair pair) {
+    private static ESDKClientConfig configFor(EndpointPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -81,7 +77,7 @@ class MessageIntegrityTests {
     /** TAMPER-002: dropping the final byte of a message makes decrypt fail. */
     @ParameterizedTest(name = "truncateByOneRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTruncatedMessage(TargetPair pair, ESDKAlgorithmSuiteId suite) {
+    void decryptRejectsTruncatedMessage(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);
@@ -100,7 +96,7 @@ class MessageIntegrityTests {
     /** DEC-006: appending trailing bytes after a valid message makes decrypt fail. */
     @ParameterizedTest(name = "trailingBytesRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTrailingBytes(TargetPair pair, ESDKAlgorithmSuiteId suite) {
+    void decryptRejectsTrailingBytes(EndpointPair pair, ESDKAlgorithmSuiteId suite) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             java.util.Map.of(), suite, null);

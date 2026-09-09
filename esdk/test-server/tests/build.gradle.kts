@@ -30,19 +30,6 @@ dependencies {
     // the Tests use.
     testImplementation("aws.cryptography.esdk.testserver:esdk-test-server-client-java")
 
-    // --- Shared TestServer test-support -------------------------------------
-    // Feature/known-bug gates, endpoint registry, generic TestServerClientCache.
-    // The ESDK-local EsdkTestServerClients / EsdkFeatureGate wrap it with the
-    // ESDK-specific client type and PaddingScheme enum.
-    testImplementation("aws.cryptography.testserver:commons-test-server-tests-support")
-
-    // --- Shared TestServer orchestrator (test-only) -------------------------
-    // Used exclusively by EsdkPaddingSchemeCatalogTest to reach the
-    // FeatureValidation.RAW_RSA_PADDING_SCHEMES catalog and pin it against
-    // ESDK's Smithy-model PaddingScheme enum; no runtime call site touches
-    // the orchestrator from this Tests module.
-    testImplementation("aws.cryptography.testserver:commons-test-server-orchestrator")
-
     // --- Client runtime: rpcv2Cbor protocol + JDK HTTP transport ------------
     // client-java exposes these as `implementation`, so declare them here for
     // compile access to the client builder, protocol, and transport types.
@@ -70,16 +57,11 @@ tasks.withType<Test>().configureEach {
         includeEngines("jqwik", "junit-jupiter")
     }
     // Surface which runtime endpoint configuration was used (helpful when the
-    // orchestrator later points the Tests at remote Language_Servers). Both
-    // namespaces are passed through: testserver.* is the shared runner-emitted
-    // boundary (targets/features/featureCatalog/rawRsaPaddingSchemes/
-    // referenceImplementation), and esdk.testserver.* carries the ESDK-only
-    // per-SDK properties (kms.*, hierarchical.*, defaultProducer,
-    // releasedVectors.*) the orchestrator does not touch.
+    // orchestrator later points the Tests at remote Language_Servers).
     systemProperties(
         System.getProperties()
             .stringPropertyNames()
-            .filter { it.startsWith("testserver.") || it.startsWith("esdk.testserver.") }
+            .filter { it.startsWith("esdk.testserver.") }
             .associateWith { System.getProperty(it) }
     )
     testLogging {

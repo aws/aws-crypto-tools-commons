@@ -1,7 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +29,7 @@ class DecryptResponseIntrospectionTests {
     private static final ESDKCommitmentPolicy POLICY =
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -40,7 +37,7 @@ class DecryptResponseIntrospectionTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(TargetPair pair) {
+    private static ESDKClientConfig configFor(EndpointPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -55,7 +52,7 @@ class DecryptResponseIntrospectionTests {
      */
     @ParameterizedTest(name = "decryptResponseExposesSuiteAndContext {0}")
     @MethodSource("pairs")
-    void decryptResponseExposesSuiteAndContext(TargetPair pair) {
+    void decryptResponseExposesSuiteAndContext(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("purpose", "introspection");
         ESDKAlgorithmSuiteId suite = ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
@@ -78,7 +75,7 @@ class DecryptResponseIntrospectionTests {
      */
     @ParameterizedTest(name = "decryptResponseExposesSignaturePublicKey {0}")
     @MethodSource("pairs")
-    void decryptResponseExposesSignaturePublicKey(TargetPair pair) {
+    void decryptResponseExposesSignaturePublicKey(EndpointPair pair) {
         ESDKClientConfig config = configFor(pair);
         Map<String, String> ec = Map.of("purpose", "signing");
         ESDKAlgorithmSuiteId suite =

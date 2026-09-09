@@ -1,8 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -59,7 +55,7 @@ class RawKeyringBehaviorTests {
         return LanguageServerRegistry.shared().targets();
     }
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -84,7 +80,7 @@ class RawKeyringBehaviorTests {
     @ParameterizedTest(name = "childrenOnlyMultiCannotEncrypt {0}")
     @MethodSource("targets")
     void childrenOnlyMultiKeyringCannotEncrypt(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, new TargetPair(target, target));
+        FeatureGate.require(FEATURES, new EndpointPair(target, target));
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(target.endpoint(), EsdkClientConfigs.rawAesChildrenOnlyMulti(), PLAINTEXT),
             "a multi-keyring with no generator must fail to encrypt (nothing can create a data key) ("
@@ -125,7 +121,7 @@ class RawKeyringBehaviorTests {
      */
     @ParameterizedTest(name = "nonAsciiProviderFieldsRoundTrip {0}")
     @MethodSource("pairs")
-    void nonAsciiKeyNamespaceAndNameRoundTrip(TargetPair pair) {
+    void nonAsciiKeyNamespaceAndNameRoundTrip(EndpointPair pair) {
         FeatureGate.require(Set.of("raw-aes"), pair);
         String namespace = "\u6a19\u6e96-namespace";        // 標準-namespace
         String keyName = "raw-aes-\u043a\u043b\u044e\u0447"; // raw-aes-ключ

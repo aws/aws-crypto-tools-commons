@@ -1,8 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,7 +48,7 @@ class RequiredEncryptionContextCmmTests {
 
     private static final Set<String> FEATURES = Set.of("required-encryption-context", "raw-aes");
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -65,7 +61,7 @@ class RequiredEncryptionContextCmmTests {
     }
 
     /** Encrypt with the required-EC CMM and the full context (required keys dropped from the header). */
-    private static byte[] encrypt(TargetPair pair) {
+    private static byte[] encrypt(EndpointPair pair) {
         FeatureGate.require(FEATURES, pair);
         return EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT, FULL_CONTEXT, null, null);
     }
@@ -73,7 +69,7 @@ class RequiredEncryptionContextCmmTests {
     /** CMM-007: reproducing the required context exactly on decrypt round-trips. */
     @ParameterizedTest(name = "reproducedRequiredEcDecrypts {0}")
     @MethodSource("pairs")
-    void decryptSucceedsWhenRequiredContextReproduced(TargetPair pair) {
+    void decryptSucceedsWhenRequiredContextReproduced(EndpointPair pair) {
         byte[] ciphertext = encrypt(pair);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, FULL_CONTEXT);
         assertArrayEquals(PLAINTEXT, recovered,
@@ -90,7 +86,7 @@ class RequiredEncryptionContextCmmTests {
      */
     @ParameterizedTest(name = "requiredKeysExcludedFromHeaderAad {0}")
     @MethodSource("pairs")
-    void requiredKeysAreExcludedFromTheSerializedHeader(TargetPair pair) {
+    void requiredKeysAreExcludedFromTheSerializedHeader(EndpointPair pair) {
         FeatureGate.require(Set.of("required-encryption-context", "raw-aes"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAesRequiredEc(List.of("purpose"));
         Map<String, String> context = Map.of("purpose", "test", "shared", "value");
@@ -178,7 +174,7 @@ class RequiredEncryptionContextCmmTests {
     @MethodSource("targets")
     void encryptRejectsReservedKeyAsRequiredEcKey(LanguageServerTarget target) {
         FeatureGate.require(Set.of("required-encryption-context", "raw-aes"),
-            new TargetPair(target, target));
+            new EndpointPair(target, target));
         ESDKClientConfig config = EsdkClientConfigs.rawAesRequiredEc(List.of("aws-crypto-public-key"));
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, null),

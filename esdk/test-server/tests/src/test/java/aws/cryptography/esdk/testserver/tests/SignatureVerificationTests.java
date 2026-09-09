@@ -1,8 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -93,7 +89,7 @@ class SignatureVerificationTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the
      * combination is a visible skip when they share none. Resolved before producing a message.
      */
-    private static ConformanceKeyring keyringFor(TargetPair combination) {
+    private static ConformanceKeyring keyringFor(EndpointPair combination) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(combination);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + combination);
@@ -111,7 +107,7 @@ class SignatureVerificationTests {
     void footerSignatureIndependentlyVerifies(LanguageServerTarget target, SigningLayout layout)
         throws Exception {
         ESDKClientConfig config =
-            keyringFor(new TargetPair(target, target)).config(layout.policy());
+            keyringFor(new EndpointPair(target, target)).config(layout.policy());
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             layout.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -149,7 +145,7 @@ class SignatureVerificationTests {
 
     static List<Arguments> pairCases() {
         List<Arguments> cases = new ArrayList<>();
-        for (TargetPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
             cases.add(Arguments.of(pair, P384));
             cases.add(Arguments.of(pair, P256));
         }
@@ -167,7 +163,7 @@ class SignatureVerificationTests {
      */
     @ParameterizedTest(name = "wrongKeySignatureRejected[{1}] {0}")
     @MethodSource("pairCases")
-    void decryptRejectsWellFormedSignatureByWrongKey(TargetPair pair, SigningLayout layout)
+    void decryptRejectsWellFormedSignatureByWrongKey(EndpointPair pair, SigningLayout layout)
         throws Exception {
         ESDKClientConfig config = keyringFor(pair).config(layout.policy());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
@@ -209,7 +205,7 @@ class SignatureVerificationTests {
     @MethodSource("cases")
     void emittedFooterSignatureIsCanonicalDer(LanguageServerTarget target, SigningLayout layout) {
         ESDKClientConfig config =
-            keyringFor(new TargetPair(target, target)).config(layout.policy());
+            keyringFor(new EndpointPair(target, target)).config(layout.policy());
         for (int i = 0; i < 8; i++) {
             byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT,
                 Map.of(), layout.suite(), null);

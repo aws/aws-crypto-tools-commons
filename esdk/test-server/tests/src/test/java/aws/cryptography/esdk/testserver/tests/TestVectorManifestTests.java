@@ -1,7 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
@@ -75,7 +72,7 @@ class TestVectorManifestTests {
         Map.entry("0478", ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY),
         Map.entry("0578", ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384));
 
-    static List<TargetPair> pairs() {
+    static List<EndpointPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -131,10 +128,10 @@ class TestVectorManifestTests {
             vectorPaddings.addAll(paddingsFor(scenario.get("encryptKeyDescription")));
             vectorPaddings.addAll(paddingsFor(scenario.get("decryptKeyDescription")));
 
-            for (TargetPair pair : pairs()) {
+            for (EndpointPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
                     FeatureGate.require(vectorFeatures, pair);
-                    EsdkFeatureGate.requireRawRsaPaddings(vectorPaddings, pair);
+                    FeatureGate.requireRawRsaPaddings(vectorPaddings, pair);
                     byte[] ciphertext = EsdkOps.encrypt(
                         pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
                     byte[] recovered =

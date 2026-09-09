@@ -1,9 +1,4 @@
 package aws.cryptography.esdk.testserver.tests;
-import aws.cryptography.testserver.tests.KnownBugGate;
-import aws.cryptography.testserver.tests.TargetPair;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.FeatureGate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -80,7 +75,7 @@ class HeaderStructureTests {
      * visible skip when it supports neither. Header structure is keyring-independent, so the target
      * runs once, under this keyring.
      */
-    private static ConformanceKeyring keyringFor(TargetPair pair) {
+    private static ConformanceKeyring keyringFor(EndpointPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -92,7 +87,7 @@ class HeaderStructureTests {
     @ParameterizedTest(name = "headerFields[{1}] {0}")
     @MethodSource("cases")
     void headerParsesToExpectedFields(LanguageServerTarget target, Expected expected) {
-        ESDKClientConfig config = keyringFor(new TargetPair(target, target)).config(expected.policy());
+        ESDKClientConfig config = keyringFor(new EndpointPair(target, target)).config(expected.policy());
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             expected.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
