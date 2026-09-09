@@ -1231,6 +1231,32 @@ structure StandardBeacon {
     /// whose library supports beacon partitions (the `beacon-partitions`
     /// feature); a server that declares that feature unsupported ignores it.
     numberOfPartitions: Integer
+
+    /// Optional beacon style (PartOnly / Shared / AsSet).
+    style: BeaconStyle
+}
+
+/// A standard beacon's style (exactly one member set). Models PartOnly (usable
+/// only within a compound beacon, never stored standalone), Shared (calculates
+/// its value as another named beacon so the two are comparable), and AsSet
+/// (beacons a Set attribute element-wise, stored as a Set).
+structure BeaconStyle {
+    partOnly: PartOnly
+    shared: Shared
+    asSet: AsSet
+}
+
+/// A beacon usable only as part of a compound beacon; never stored standalone.
+structure PartOnly {}
+
+/// A beacon over a Set attribute, stored as a Set of per-element beacon values.
+structure AsSet {}
+
+/// A beacon that calculates its value as the {@code other} beacon (same length),
+/// so the two beacons are directly comparable.
+structure Shared {
+    @required
+    other: String
 }
 
 list CompoundBeaconList {
