@@ -1335,10 +1335,39 @@ list VirtualPartList {
 }
 
 /// One part of a virtual field: the DynamoDB document path of a source
-/// attribute.
+/// attribute, with an optional ordered list of transforms applied to its value.
 structure VirtualPart {
     @required
     loc: String
+
+    trans: VirtualTransformList
+}
+
+list VirtualTransformList {
+    member: VirtualTransform
+}
+
+/// A virtual-part transformation (exactly one member set). Models the Upper,
+/// GetPrefix, and GetSuffix transforms; transforms treat the value as a string.
+structure VirtualTransform {
+    upper: Upper
+    prefix: GetPrefix
+    suffix: GetSuffix
+}
+
+/// Convert ASCII characters to upper case (no parameters).
+structure Upper {}
+
+/// Keep the first {@code length} characters (negative excludes from the end).
+structure GetPrefix {
+    @required
+    length: Integer
+}
+
+/// Keep the last {@code length} characters (negative excludes from the front).
+structure GetSuffix {
+    @required
+    length: Integer
 }
 
 map AttributeActionsOnEncrypt {

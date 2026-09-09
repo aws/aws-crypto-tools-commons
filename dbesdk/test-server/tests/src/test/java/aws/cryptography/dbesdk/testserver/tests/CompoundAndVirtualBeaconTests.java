@@ -4,6 +4,7 @@ import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.PK;
 import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,12 +27,18 @@ import aws.cryptography.dbesdk.testserver.client.model.GetItemOutputTransformInp
 import aws.cryptography.dbesdk.testserver.client.model.Keyring;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.PutItemInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.QueryInput;
+import aws.cryptography.dbesdk.testserver.client.model.QueryInputTransformInput;
+import aws.cryptography.dbesdk.testserver.client.model.ScanInput;
+import aws.cryptography.dbesdk.testserver.client.model.ScanInputTransformInput;
 import aws.cryptography.dbesdk.testserver.client.model.SearchConfig;
 import aws.cryptography.dbesdk.testserver.client.model.SignedPart;
 import aws.cryptography.dbesdk.testserver.client.model.SingleKeyStore;
 import aws.cryptography.dbesdk.testserver.client.model.StandardBeacon;
+import aws.cryptography.dbesdk.testserver.client.model.Upper;
 import aws.cryptography.dbesdk.testserver.client.model.VirtualField;
 import aws.cryptography.dbesdk.testserver.client.model.VirtualPart;
+import aws.cryptography.dbesdk.testserver.client.model.VirtualTransform;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -146,6 +153,144 @@ class CompoundAndVirtualBeaconTests {
 
         assertBeaconWrittenAndRoundTrips(
             pair, search, "aws_dbe_b_" + SIGNED_COMPOUND_NAME, signedPartActions());
+    }
+
+    @ParameterizedTest(name = "[beacon] ScanInputTransform rewrites a compound-beacon filter {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void scanInputTransformRewritesCompoundBeaconFilter(TargetPair pair) {
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        String clientId = createBeaconClient(client, compoundBeaconSearch(), beaconActions());
+
+        // Query on the assembled compound value "F-<first>.L-<last>" (the part
+        // prefixes joined by the split char) — grounded in the DBE compound-beacon
+        // example's "L-5678.U-011899988199" query value.
+        ScanInput transformed = client.scanInputTransform(ScanInputTransformInput.builder()
+            .clientId(clientId)
+            .sdkInput(ScanInput.builder()
+                .tableName(TABLE)
+                .filterExpression("#fl = :v")
+                .expressionAttributeNames(Map.of("#fl", COMPOUND_NAME))
+                .expressionAttributeValues(Map.of(":v",
+                    AttributeValue.builder().s("F-john.L-doe").build()))
+                .build())
+            .build()).getTransformedInput();
+
+        assertEquals("aws_dbe_b_" + COMPOUND_NAME,
+            transformed.getExpressionAttributeNames().get("#fl"),
+            "the compound-beacon attribute name must be rewritten to its beacon on " + pair);
+        assertNotEquals("F-john.L-doe",
+            transformed.getExpressionAttributeValues().get(":v").getS(),
+            "the compound value's encrypted parts must be beaconized on " + pair);
+    }
+
+    @ParameterizedTest(name = "[beacon] QueryInputTransform rewrites a compound-beacon filter {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void queryInputTransformRewritesCompoundBeaconFilter(TargetPair pair) {
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        String clientId = createBeaconClient(client, compoundBeaconSearch(), beaconActions());
+
+        QueryInput transformed = client.queryInputTransform(QueryInputTransformInput.builder()
+            .clientId(clientId)
+            .sdkInput(QueryInput.builder()
+                .tableName(TABLE)
+                .keyConditionExpression("#p = :p")
+                .filterExpression("#fl = :v")
+                .expressionAttributeNames(Map.of("#p", PK, "#fl", COMPOUND_NAME))
+                .expressionAttributeValues(Map.of(
+                    ":p", AttributeValue.builder().s("item-1").build(),
+                    ":v", AttributeValue.builder().s("F-john.L-doe").build()))
+                .build())
+            .build()).getTransformedInput();
+
+        assertEquals("aws_dbe_b_" + COMPOUND_NAME,
+            transformed.getExpressionAttributeNames().get("#fl"),
+            "the compound-beacon filter attribute must be rewritten to its beacon on " + pair);
+        assertEquals(PK, transformed.getExpressionAttributeNames().get("#p"),
+            "the non-beaconed partition key must be left unchanged on " + pair);
+        assertNotEquals("F-john.L-doe",
+            transformed.getExpressionAttributeValues().get(":v").getS(),
+            "the compound value's encrypted parts must be beaconized on " + pair);
+    }
+
+    @ParameterizedTest(name = "[beacon] Upper virtual-part transform changes the beacon value {0}")
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#pairs")
+    void upperVirtualPartTransformChangesTheBeaconValue(TargetPair pair) {
+        // A virtual field fullName = first + last. One client applies an Upper
+        // transform to the `first` part ("john" -> "JOHN"); the other applies
+        // none. Beacons are deterministic (same key + same input -> same beacon),
+        // so the two encrypts under the untransformed config must produce the SAME
+        // beacon (the control that makes the comparison value-based), and the
+        // Upper config must produce a DIFFERENT beacon — proving the transform is
+        // actually applied rather than silently ignored.
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        String plainId = createBeaconClient(client, virtualFieldSearch(false), beaconActions());
+        String upperId = createBeaconClient(client, virtualFieldSearch(true), beaconActions());
+        String beaconAttr = "aws_dbe_b_" + VIRTUAL_NAME;
+
+        AttributeValue plain1 = encryptAndGetBeacon(client, plainId, beaconAttr, pair);
+        AttributeValue plain2 = encryptAndGetBeacon(client, plainId, beaconAttr, pair);
+        AttributeValue upper = encryptAndGetBeacon(client, upperId, beaconAttr, pair);
+
+        assertEquals(plain1, plain2,
+            "an untransformed virtual-field beacon must be deterministic (control) on " + pair);
+        assertNotEquals(plain1, upper,
+            "the Upper transform must change the virtual-field beacon on " + pair);
+    }
+
+    /** Encrypt the beacon plaintext and return the written beacon attribute value. */
+    private static AttributeValue encryptAndGetBeacon(
+            DBESDKTestServerClient client, String clientId, String beaconAttr, TargetPair pair) {
+        Map<String, AttributeValue> encrypted = client.putItemInputTransform(
+            PutItemInputTransformInput.builder()
+                .clientId(clientId)
+                .sdkInput(PutItemInput.builder().tableName(TABLE).item(beaconPlaintext()).build())
+                .build()).getTransformedInput().getItem();
+        AttributeValue beacon = encrypted.get(beaconAttr);
+        assertNotNull(beacon, "beacon '" + beaconAttr + "' must be written on " + pair);
+        return beacon;
+    }
+
+    /**
+     * A SearchConfig with a standard beacon over a {@code fullName} virtual field
+     * (first + last). When {@code upperFirst} is set, an {@link Upper} transform
+     * is applied to the {@code first} part.
+     */
+    private static SearchConfig virtualFieldSearch(boolean upperFirst) {
+        VirtualPart.Builder firstPart = VirtualPart.builder().loc(FIRST);
+        if (upperFirst) {
+            firstPart.trans(List.of(VirtualTransform.builder().upper(Upper.builder().build()).build()));
+        }
+        return beaconSearch(BeaconVersion.builder()
+            .virtualFields(List.of(VirtualField.builder()
+                .name(VIRTUAL_NAME)
+                .parts(List.of(firstPart.build(), VirtualPart.builder().loc(LAST).build()))
+                .build()))
+            .standardBeacons(List.of(
+                StandardBeacon.builder().name(VIRTUAL_NAME).length(10).build())));
+    }
+
+    /**
+     * A SearchConfig whose beacon version carries the {@link #COMPOUND_NAME}
+     * compound beacon (two encrypted parts, {@code F-<first>.L-<last>}) — the
+     * same configuration proven by {@link #compoundBeaconWrittenAndItemRoundTrips}.
+     */
+    private static SearchConfig compoundBeaconSearch() {
+        return beaconSearch(BeaconVersion.builder()
+            .standardBeacons(List.of(
+                StandardBeacon.builder().name(FIRST).length(10).build(),
+                StandardBeacon.builder().name(LAST).length(10).build()))
+            .encryptedParts(List.of(
+                EncryptedPart.builder().name(FIRST).prefix("F-").build(),
+                EncryptedPart.builder().name(LAST).prefix("L-").build()))
+            .compoundBeacons(List.of(CompoundBeacon.builder()
+                .name(COMPOUND_NAME)
+                .split(".")
+                .constructors(List.of(Constructor.builder()
+                    .parts(List.of(
+                        ConstructorPart.builder().name(FIRST).required(true).build(),
+                        ConstructorPart.builder().name(LAST).required(true).build()))
+                    .build()))
+                .build())));
     }
 
     /**
