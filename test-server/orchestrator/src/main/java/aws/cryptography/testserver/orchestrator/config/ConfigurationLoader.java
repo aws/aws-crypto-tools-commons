@@ -75,8 +75,9 @@ public final class ConfigurationLoader {
         // known-bug injection lands; validating here fails a malformed ledger
         // fast, at load, before anything is cloned.
         Path bugPath = dir.resolve("bug-config.json");
+        List<String> bugLedgerIds = List.of();
         if (Files.isRegularFile(bugPath)) {
-            validateBugLedger(readObject("bug-config.json", read("bug-config.json", bugPath), bugPath), bugPath);
+            bugLedgerIds = validateBugLedger(readObject("bug-config.json", read("bug-config.json", bugPath), bugPath), bugPath);
         }
         List<ConfigurationEntry> entries = new ArrayList<>();
         JsonNode entriesNode = server.get("entries");
@@ -90,7 +91,8 @@ public final class ConfigurationLoader {
             stringList(feature.get("features")),
             entries,
             server.get("requiredKmsScenarios") == null
-                ? null : stringList(server.get("requiredKmsScenarios")));
+                ? null : stringList(server.get("requiredKmsScenarios")),
+            bugLedgerIds);
     }
 
     /** Parse (without validating) a Configuration_Set from a JSON string. */
@@ -154,8 +156,9 @@ public final class ConfigurationLoader {
         // both are in hand (with the known-bug injection); here we fail a
         // malformed list fast, at load.
         Path bugPath = dir.resolve("bug-config.json");
+        List<String> bugIds = List.of();
         if (Files.isRegularFile(bugPath)) {
-            validatePerServerBugIds(read("bug-config.json", bugPath), bugPath);
+            bugIds = validatePerServerBugIds(read("bug-config.json", bugPath), bugPath);
         }
         List<ConfigurationEntry> overrides = null;
         JsonNode overridesNode = server.get("configurationOverrides");
@@ -171,7 +174,8 @@ public final class ConfigurationLoader {
             stringList(feature.get("supportedFeatures")),
             stringList(feature.get("unsupportedFeatures")),
             stringList(feature.get("rawRsaPaddingSchemes")),
-            overrides);
+            overrides,
+            bugIds);
     }
 
     /** Parse (without validating) a commons-configuration file from a JSON string. */
@@ -281,8 +285,10 @@ public final class ConfigurationLoader {
      * and non-blank descriptions. Structural validation at load, before
      * anything is cloned; throws {@link ConfigurationLoadException} naming the
      * file on any violation.
+     *
+     * @return the ledger's bug ids, in ledger order.
      */
-    private static void validateBugLedger(JsonNode root, Path location) {
+    private static List<String> validateBugLedger(JsonNode root, Path location) {
         JsonNode bugs = root.get("bugs");
         if (bugs == null || !bugs.isArray()) {
             throw new ConfigurationLoadException(
@@ -310,14 +316,17 @@ public final class ConfigurationLoader {
                         + "' needs a non-blank 'description'", location);
             }
         }
+        return List.copyOf(new ArrayList<>(ids));
     }
 
     /**
      * Validate a per-server exhibited-bug list (design "Bug Configuration"): a
      * JSON array of non-blank, unique id strings. Throws
      * {@link ConfigurationLoadException} on any violation.
+     *
+     * @return the exhibited bug ids, in file order.
      */
-    private static void validatePerServerBugIds(String json, Path location) {
+    private static List<String> validatePerServerBugIds(String json, Path location) {
         JsonNode root;
         try {
             root = MAPPER.readTree(json);
@@ -343,6 +352,7 @@ public final class ConfigurationLoader {
                     location);
             }
         }
+        return List.copyOf(new ArrayList<>(ids));
     }
 
     private static Integer integer(JsonNode node, String field) {

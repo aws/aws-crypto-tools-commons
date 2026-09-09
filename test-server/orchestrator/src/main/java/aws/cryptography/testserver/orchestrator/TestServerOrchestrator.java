@@ -263,10 +263,12 @@ public final class TestServerOrchestrator {
 
     /**
      * One language's Feature_Declaration, wherever it was carried, with its
-     * optional raw-RSA padding capability ({@code null} = every scheme).
+     * optional raw-RSA padding capability ({@code null} = every scheme) and the
+     * bug ids it exhibits (empty = none / no bug ledger).
      */
     private record Declaration(
-            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes) {
+            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes,
+            List<String> bugIds) {
     }
 
     private PipelineOutcome executePipeline(
@@ -339,7 +341,7 @@ public final class TestServerOrchestrator {
                     own.product(), configurationSet.product()));
             declarations.put(context.ownLanguage(),
                 new Declaration(own.supportedFeatures(), own.unsupportedFeatures(),
-                    own.rawRsaPaddingSchemes()));
+                    own.rawRsaPaddingSchemes(), own.bugIds()));
         }
         for (ConfigurationEntry entry : effectiveEntries) {
             if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
@@ -352,7 +354,7 @@ public final class TestServerOrchestrator {
                     entry.rawRsaPaddingSchemes(), entry.supportedFeatures()));
             declarations.put(entry.language(),
                 new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures(),
-                    entry.rawRsaPaddingSchemes()));
+                    entry.rawRsaPaddingSchemes(), List.of()));
         }
         if (!onHand.valid()) {
             return PipelineOutcome.aborted(
@@ -457,7 +459,7 @@ public final class TestServerOrchestrator {
             }
             declarations.put(language,
                 new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures(),
-                    carried.rawRsaPaddingSchemes()));
+                    carried.rawRsaPaddingSchemes(), carried.bugIds()));
         }
 
         // ---- Stage 5: build + launch every server as a subprocess on its
@@ -577,6 +579,8 @@ public final class TestServerOrchestrator {
             ? List.of() : configurationSet.features();
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
         Map<String, List<String>> rawRsaPaddingSchemes = new LinkedHashMap<>();
+        Map<String, List<String>> knownBugs = new LinkedHashMap<>();
+        List<String> bugLedgerIds = configurationSet.bugLedgerIds();
         for (ConfigurationEntry entry : effectiveEntries) {
             Declaration declaration = declarations.get(entry.language());
             if (declaration == null) {
@@ -590,9 +594,24 @@ public final class TestServerOrchestrator {
             if (declaration.rawRsaPaddingSchemes() != null) {
                 rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
             }
+            // Each exhibited bug id must be defined in the commons bug ledger
+            // (design "Bug Configuration"): a server cannot declare a bug the
+            // ledger does not catalog.
+            List<String> exhibited = declaration.bugIds();
+            if (exhibited != null && !exhibited.isEmpty()) {
+                for (String id : exhibited) {
+                    if (!bugLedgerIds.contains(id)) {
+                        throw new IllegalStateException(
+                            "server '" + entry.language() + "' exhibits bug '" + id
+                                + "' which is not defined in the commons bug ledger "
+                                + bugLedgerIds);
+                    }
+                }
+                knownBugs.put(entry.language(), exhibited);
+            }
         }
         return new TestRunInput(
-            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation);
+            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation, knownBugs);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

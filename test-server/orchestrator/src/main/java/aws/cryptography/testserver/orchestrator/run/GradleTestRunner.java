@@ -68,6 +68,9 @@ public final class GradleTestRunner implements TestRunner {
     public static final String RAW_RSA_PADDING_SCHEMES_PROPERTY =
         "testserver.rawRsaPaddingSchemes";
 
+    /** Runtime-config key: comma-separated {@code lang:id[;id…]} exhibited-bug entries. */
+    public static final String KNOWN_BUGS_PROPERTY = "testserver.knownBugs";
+
     /** Runtime-config key: the reference implementation's language. */
     public static final String REFERENCE_IMPLEMENTATION_PROPERTY =
         "testserver.referenceImplementation";
@@ -170,6 +173,10 @@ public final class GradleTestRunner implements TestRunner {
         if (!input.rawRsaPaddingSchemes().isEmpty()) {
             command.add("-D" + RAW_RSA_PADDING_SCHEMES_PROPERTY + "="
                 + TestRunInput.formatRawRsaPaddingSchemes(input.rawRsaPaddingSchemes()));
+        }
+        if (!input.knownBugs().isEmpty()) {
+            command.add("-D" + KNOWN_BUGS_PROPERTY + "="
+                + TestRunInput.formatKnownBugs(input.knownBugs()));
         }
         command.add("-D" + REFERENCE_IMPLEMENTATION_PROPERTY + "="
             + input.referenceImplementation());

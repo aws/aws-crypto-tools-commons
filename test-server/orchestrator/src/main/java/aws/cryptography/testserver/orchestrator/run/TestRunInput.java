@@ -48,7 +48,8 @@ public record TestRunInput(
     Map<String, Map<String, Boolean>> features,
     List<String> featureCatalog,
     Map<String, List<String>> rawRsaPaddingSchemes,
-    String referenceImplementation
+    String referenceImplementation,
+    Map<String, List<String>> knownBugs
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -65,6 +66,28 @@ public record TestRunInput(
         if (referenceImplementation == null || referenceImplementation.isBlank()) {
             throw new IllegalArgumentException("referenceImplementation must be non-blank");
         }
+        Map<String, List<String>> copiedBugs = new LinkedHashMap<>();
+        if (knownBugs != null) {
+            knownBugs.forEach((language, ids) ->
+                copiedBugs.put(language, List.copyOf(ids)));
+        }
+        knownBugs = Collections.unmodifiableMap(copiedBugs);
+    }
+
+    /**
+     * Backward-compatible constructor for a run with no known-bug declarations
+     * (no server exhibits a catalogued bug, or the product has no bug ledger).
+     * Preserves the pre-bug-config 5-arg shape so existing call sites keep
+     * compiling.
+     */
+    public TestRunInput(
+            List<TestTarget> targets,
+            Map<String, Map<String, Boolean>> features,
+            List<String> featureCatalog,
+            Map<String, List<String>> rawRsaPaddingSchemes,
+            String referenceImplementation) {
+        this(targets, features, featureCatalog, rawRsaPaddingSchemes,
+            referenceImplementation, Map.of());
     }
 
     /**
@@ -109,6 +132,18 @@ public record TestRunInput(
      */
     public static String formatRawRsaPaddingSchemes(Map<String, List<String>> schemes) {
         return schemes.entrySet().stream()
+            .map(language -> language.getKey() + ":" + String.join(";", language.getValue()))
+            .collect(Collectors.joining(","));
+    }
+
+    /**
+     * Format the per-language exhibited-bug ids as the
+     * {@code testserver.knownBugs} value: {@code lang:id[;id…]} CSV, e.g.
+     * {@code java:some-bug;another-bug,rust:some-bug}. Only languages that
+     * exhibit at least one catalogued bug appear.
+     */
+    public static String formatKnownBugs(Map<String, List<String>> knownBugs) {
+        return knownBugs.entrySet().stream()
             .map(language -> language.getKey() + ":" + String.join(";", language.getValue()))
             .collect(Collectors.joining(","));
     }

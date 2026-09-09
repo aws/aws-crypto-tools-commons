@@ -72,6 +72,45 @@ public final class KnownBugGate {
                 + actingLanguage + " from the ledger " + KnownBugs.RESOURCE);
     }
 
+    /**
+     * Run {@code assertion} under expected-failure semantics for {@code bugId}
+     * when {@code actingLanguage} declares it in the injected
+     * {@link KnownBugDeclarations} registry ({@code testserver.knownBugs}) — the
+     * injection-based counterpart to {@link #gate(String, String, Executable)},
+     * for products whose bug ledger is per-server config rather than a classpath
+     * ledger. When the acting language does not declare the bug, every outcome
+     * propagates unchanged (the row keeps its full power to fail).
+     *
+     * @throws AssertionError if the declared bug did not reproduce (stale — the
+     *     server's {@code bug-config.json} entry must be removed), or
+     *     (propagated) if the assertion fails for a language that does not
+     *     declare the bug
+     * @throws TestAbortedException visible skip when the declared bug reproduces
+     */
+    public static void gateDeclared(String bugId, String actingLanguage, Executable assertion) {
+        gateDeclared(bugId, actingLanguage, assertion, KnownBugDeclarations.shared());
+    }
+
+    /** Injected-registry gate against an explicit registry; package-private for unit tests. */
+    static void gateDeclared(String bugId, String actingLanguage, Executable assertion,
+            KnownBugDeclarations declarations) {
+        if (!declarations.exhibits(actingLanguage, bugId)) {
+            run(assertion);
+            return;
+        }
+        try {
+            assertion.execute();
+        } catch (AssertionError predicted) {
+            throw new TestAbortedException(
+                "KNOWN BUG " + bugId + " — declared for " + actingLanguage, predicted);
+        } catch (Throwable other) {
+            throw sneakyThrow(other);
+        }
+        throw new AssertionError(
+            "declared known bug did not reproduce — remove '" + bugId + "' for "
+                + actingLanguage + " from its bug-config.json");
+    }
+
     /** Run the assertion with every outcome propagated unchanged. */
     private static void run(Executable assertion) {
         try {

@@ -23,6 +23,7 @@ public final class ConfigurationSet {
     private final List<String> features;
     private final List<ConfigurationEntry> entries;
     private final List<String> requiredKmsScenarios;
+    private final List<String> bugLedgerIds;
 
     /** {@link #ConfigurationSet(String, List, List, List)} with no KMS coverage-floor list configured. */
     public ConfigurationSet(String product, List<String> features, List<ConfigurationEntry> entries) {
@@ -51,6 +52,18 @@ public final class ConfigurationSet {
      */
     public ConfigurationSet(String product, List<String> features,
             List<ConfigurationEntry> entries, List<String> requiredKmsScenarios) {
+        this(product, features, entries, requiredKmsScenarios, null);
+    }
+
+    /**
+     * Full constructor including the commons bug ledger's ids (design "Bug
+     * Configuration"): the set of known-bug ids a server's exhibited-bug list
+     * may reference. {@code null} when absent (the consolidated
+     * configuration-set.json carries no ledger).
+     */
+    public ConfigurationSet(String product, List<String> features,
+            List<ConfigurationEntry> entries, List<String> requiredKmsScenarios,
+            List<String> bugLedgerIds) {
         this.product = product;
         // A null Feature_Catalog means "absent from the JSON"; duplicates are
         // preserved for the duplicate-name check.
@@ -58,6 +71,7 @@ public final class ConfigurationSet {
         this.entries = List.copyOf(entries);
         this.requiredKmsScenarios = requiredKmsScenarios == null
             ? null : List.copyOf(requiredKmsScenarios);
+        this.bugLedgerIds = bugLedgerIds == null ? List.of() : List.copyOf(bugLedgerIds);
     }
 
     /**
@@ -91,6 +105,15 @@ public final class ConfigurationSet {
 
     public List<ConfigurationEntry> entries() {
         return entries;
+    }
+
+    /**
+     * @return the commons bug ledger's ids — the known-bug ids a server's
+     *     exhibited-bug list may reference (design "Bug Configuration"); empty
+     *     when no ledger was configured.
+     */
+    public List<String> bugLedgerIds() {
+        return bugLedgerIds;
     }
 
     /** @return the entry for {@code language}, or {@code null} if absent. */
