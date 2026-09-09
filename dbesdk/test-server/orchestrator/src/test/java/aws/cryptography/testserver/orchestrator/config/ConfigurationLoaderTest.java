@@ -1,0 +1,268 @@
+package aws.cryptography.testserver.orchestrator.config;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Unit tests for {@link ConfigurationLoader}: strict parsing of the two
+ * configuration file kinds (the Configuration_Set and a Language_Repository's
+ * commons-configuration file), duplicate-key rejection
+ * ({@code STRICT_DUPLICATE_DETECTION}), and missing/unparseable-file errors that
+ * name the expected location.
+ */
+class ConfigurationLoaderTest {
+
+    // ------------------------------------------------------------------
+    // Configuration_Set parsing
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("parses the design-schema Configuration_Set: product, Feature_Catalog, entries")
+    void parsesDesignSchemaConfigurationSet() {
+        ConfigurationSet set = ConfigurationLoader.parseConfigurationSet("""
+            {
+              "product": "esdk",
+              "features": ["streaming", "MPL"],
+              "entries": [
+                {
+                  "language": "java",
+                  "majorVersion": 3,
+                  "port": 8091,
+                  "libraryRepository": {
+                    "name": "aws-crypto-tools-java",
+                    "url": "git@github.com:aws/aws-crypto-tools-java.git",
+                    "branch": "main",
+                    "path": "esdk"
+                  },
+                  "serverLocation": {
+                    "repository": "aws-crypto-tools-java",
+                    "url": "git@github.com:aws/aws-crypto-tools-java.git",
+                    "ref": "main",
+                    "path": "esdk/test-server/server"
+                  }
+                },
+                {
+                  "language": "python",
+                  "majorVersion": 4,
+                  "port": 8092,
+                  "supportedFeatures": ["streaming", "MPL"],
+                  "unsupportedFeatures": [],
+                  "libraryRepository": {
+                    "name": "aws-encryption-sdk-python",
+                    "url": "https://github.com/aws/aws-encryption-sdk-python",
+                    "branch": "master"
+                  },
+                  "serverLocation": {
+                    "repository": "aws-crypto-tools-commons",
+                    "url": "git@github.com:aws/aws-crypto-tools-commons.git",
+                    "ref": "main",
+                    "path": "esdk/test-server/servers/python"
+                  }
+                }
+              ]
+            }
+            """);
+
+        assertEquals("esdk", set.product());
+        assertEquals(List.of("streaming", "MPL"), set.features());
+        assertEquals(2, set.entries().size());
+
+        ConfigurationEntry java = set.forLanguage("java");
+        assertNotNull(java);
+        assertEquals(3, java.majorVersion());
+        assertEquals(8091, java.port());
+        assertEquals("aws-crypto-tools-java", java.libraryRepository().name());
+        assertEquals("esdk", java.libraryRepository().path());
+        assertEquals("esdk/test-server/server", java.serverLocation().path());
+        assertNull(java.supportedFeatures(), "java carries no Feature_Declaration in the set");
+        assertNull(java.unsupportedFeatures());
+        // Legacy accessors are derived from the libraryRepository object.
+        assertEquals("main", java.branch());
+        assertEquals("aws-crypto-tools-java", java.repository());
+
+        ConfigurationEntry python = set.forLanguage("python");
+        assertNotNull(python);
+        assertEquals(List.of("streaming", "MPL"), python.supportedFeatures());
+        assertEquals(List.of(), python.unsupportedFeatures());
+        assertTrue(python.hasFeatureDeclaration());
+        // An omitted libraryRepository.path defaults to "." (design "Data Models").
+        assertEquals(".", python.libraryRepository().path());
+        assertEquals("aws-crypto-tools-commons", python.serverLocation().repository());
+    }
+
+    @Test
+    @DisplayName("missing fields parse as null for validation to reject, not as parse errors")
+    void missingFieldsParseAsNull() {
+        ConfigurationSet set = ConfigurationLoader.parseConfigurationSet(
+            "{ \"entries\": [ { \"language\": \"java\" } ] }");
+
+        assertNull(set.product());
+        assertNull(set.features());
+        ConfigurationEntry entry = set.entries().get(0);
+        assertNull(entry.majorVersion());
+        assertNull(entry.port());
+        assertNull(entry.libraryRepository());
+        assertNull(entry.serverLocation());
+        assertNull(entry.supportedFeatures());
+        assertNull(entry.rawRsaPaddingSchemes());
+    }
+
+    // ------------------------------------------------------------------
+    // Commons-configuration parsing
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("parses the commons-configuration file: entry, product, declaration, overrides")
+    void parsesCommonsConfiguration() {
+        CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration("""
+            {
+              "commonsRepository": {
+                "name": "aws-crypto-tools-commons",
+                "url": "git@github.com:aws/aws-crypto-tools-commons.git",
+                "branch": "kessplas/esdk-test-server"
+              },
+              "product": "esdk",
+              "supportedFeatures": ["streaming", "MPL"],
+              "unsupportedFeatures": [],
+              "configurationOverrides": [
+                {
+                  "language": "python",
+                  "majorVersion": 4,
+                  "port": 8092,
+                  "libraryRepository": {
+                    "name": "aws-encryption-sdk-python",
+                    "url": "https://github.com/aws/aws-encryption-sdk-python",
+                    "branch": "some-feature-branch"
+                  },
+                  "serverLocation": {
+                    "repository": "aws-crypto-tools-commons",
+                    "url": "git@github.com:aws/aws-crypto-tools-commons.git",
+                    "ref": "some-feature-branch",
+                    "path": "esdk/test-server/servers/python"
+                  }
+                }
+              ]
+            }
+            """);
+
+        assertEquals("aws-crypto-tools-commons", config.commonsRepository().name());
+        assertEquals("kessplas/esdk-test-server", config.commonsRepository().branch());
+        assertEquals("esdk", config.product());
+        assertEquals(List.of("streaming", "MPL"), config.supportedFeatures());
+        assertEquals(List.of(), config.unsupportedFeatures());
+        assertNull(config.rawRsaPaddingSchemes());
+        assertEquals(1, config.configurationOverrides().size());
+        ConfigurationEntry override = config.configurationOverrides().get(0);
+        assertEquals("python", override.language());
+        assertEquals("some-feature-branch", override.serverLocation().ref());
+    }
+
+    @Test
+    @DisplayName("absent configurationOverrides defaults to an empty list")
+    void absentOverridesDefaultToEmpty() {
+        CommonsConfiguration config = ConfigurationLoader.parseCommonsConfiguration(
+            "{ \"product\": \"esdk\" }");
+        assertEquals(List.of(), config.configurationOverrides());
+        assertNull(config.commonsRepository());
+        assertNull(config.supportedFeatures());
+    }
+
+    // ------------------------------------------------------------------
+    // Strict duplicate detection (both file kinds)
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("rawRsaPaddingSchemes parses in both Feature_Declaration carriers")
+    void parsesRawRsaPaddingSchemes() {
+        CommonsConfiguration carried = ConfigurationLoader.parseCommonsConfiguration("""
+            {
+              "product": "esdk",
+              "supportedFeatures": ["raw-rsa"],
+              "unsupportedFeatures": [],
+              "rawRsaPaddingSchemes": ["PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"]
+            }
+            """);
+        assertEquals(List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"),
+            carried.rawRsaPaddingSchemes());
+
+        ConfigurationSet set = ConfigurationLoader.parseConfigurationSet("""
+            { "entries": [ { "language": "python",
+                             "rawRsaPaddingSchemes": ["PKCS1"] } ] }
+            """);
+        assertEquals(List.of("PKCS1"), set.entries().get(0).rawRsaPaddingSchemes());
+    }
+
+    @Test
+    @DisplayName("a duplicate JSON key in the Configuration_Set is an unparseable-file error")
+    void duplicateKeyInConfigurationSetIsRejected() {
+        ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
+            () -> ConfigurationLoader.parseConfigurationSet(
+                "{ \"product\": \"esdk\", \"product\": \"other\", \"entries\": [] }"));
+        assertTrue(e.getMessage().contains("unparseable"),
+            "duplicate keys must be reported as unparseable: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("a duplicate JSON key in the commons-configuration file is rejected, however nested")
+    void duplicateKeyInCommonsConfigurationIsRejected() {
+        assertThrows(ConfigurationLoadException.class,
+            () -> ConfigurationLoader.parseCommonsConfiguration("""
+                {
+                  "commonsRepository": { "name": "a", "name": "b" },
+                  "product": "esdk"
+                }
+                """));
+    }
+
+    // ------------------------------------------------------------------
+    // Missing / unparseable files name the expected location
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a missing Configuration_Set file names the expected location")
+    void missingConfigurationSetNamesExpectedLocation(@TempDir Path dir) {
+        Path expected = dir.resolve("config/configuration-set.json");
+        ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
+            () -> ConfigurationLoader.loadConfigurationSet(expected));
+        assertTrue(e.getMessage().contains(expected.toString()),
+            "the error must name the expected location: " + e.getMessage());
+        assertEquals(expected, e.expectedLocation());
+    }
+
+    @Test
+    @DisplayName("a missing commons-configuration file names the expected location (Req 4.9)")
+    void missingCommonsConfigurationNamesExpectedLocation(@TempDir Path dir) {
+        Path expected = dir.resolve("commons-configuration.json");
+        ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
+            () -> ConfigurationLoader.loadCommonsConfiguration(expected));
+        assertTrue(e.getMessage().contains(expected.toString()));
+    }
+
+    @Test
+    @DisplayName("malformed JSON names the expected location and the cause")
+    void malformedJsonNamesExpectedLocation(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("configuration-set.json");
+        Files.writeString(file, "{ not json");
+        ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
+            () -> ConfigurationLoader.loadConfigurationSet(file));
+        assertTrue(e.getMessage().contains(file.toString()));
+        assertTrue(e.getMessage().contains("unparseable"));
+    }
+
+    @Test
+    @DisplayName("a non-object top level is an unparseable-file error")
+    void nonObjectTopLevelIsRejected() {
+        assertThrows(ConfigurationLoadException.class,
+            () -> ConfigurationLoader.parseConfigurationSet("[1, 2, 3]"));
+    }
+}
