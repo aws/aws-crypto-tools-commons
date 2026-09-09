@@ -1373,6 +1373,13 @@ structure DBEClientConfig {
     /// omitted.
     algorithmSuiteId: DBEAlgorithmSuiteId
 
+    /// Optional plaintext-policy override on the item encryptor: whether the
+    /// encryptor writes/reads UNENCRYPTED items (used when migrating a plaintext
+    /// table to client-side encryption). Defaults, when omitted, to
+    /// FORBID_PLAINTEXT_WRITE_FORBID_PLAINTEXT_READ. Honored by the item
+    /// encryptor; mutually exclusive with a legacy override (not modeled here).
+    plaintextOverride: PlaintextOverride
+
     /// The keyring backing this client (mutually exclusive with `cmm`).
     keyring: Keyring
 
@@ -1764,6 +1771,20 @@ enum DBEAlgorithmSuiteId {
 
     /// Same as above, additionally signed with ECDSA-P384. The DBE default.
     ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384_SYMSIG_HMAC_SHA384
+}
+
+/// Plaintext policy for the item encryptor: whether it writes and/or reads
+/// UNENCRYPTED items, for migrating a plaintext table onto client-side
+/// encryption. The default (when no override is set) forbids both.
+enum PlaintextOverride {
+    /// Write items as plaintext (passthrough); allow reading plaintext items.
+    FORCE_PLAINTEXT_WRITE_ALLOW_PLAINTEXT_READ
+
+    /// Encrypt on write; allow reading either an encrypted or a plaintext item.
+    FORBID_PLAINTEXT_WRITE_ALLOW_PLAINTEXT_READ
+
+    /// Encrypt on write; reject reading a plaintext item (the strict default).
+    FORBID_PLAINTEXT_WRITE_FORBID_PLAINTEXT_READ
 }
 
 // ===========================================================================
