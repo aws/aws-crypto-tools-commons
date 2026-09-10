@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Loads the two configuration file kinds of the TestServer: the commons
@@ -64,10 +66,13 @@ public final class ConfigurationLoader {
         }
         List<BugLedgerEntry> ledger = new ArrayList<>();
         JsonNode bugsNode = bug.get("bugs");
-        if (bugsNode != null && bugsNode.isArray()) {
-            for (JsonNode n : bugsNode) {
+        if (bugsNode != null && bugsNode.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = bugsNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                JsonNode value = field.getValue();
                 ledger.add(new BugLedgerEntry(
-                    text(n, "id"), text(n, "description"), text(n, "ticketId")));
+                    field.getKey(), text(value, "description"), text(value, "ticketId")));
             }
         }
         return new ConfigurationSet(

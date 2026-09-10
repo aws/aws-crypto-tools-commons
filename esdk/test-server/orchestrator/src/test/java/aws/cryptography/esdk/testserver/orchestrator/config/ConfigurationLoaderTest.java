@@ -372,7 +372,7 @@ class ConfigurationLoaderTest {
             .findFirst().orElseThrow();
         assertTrue(bug.description() != null && !bug.description().isBlank(),
             "ledger entries carry a description");
-        assertEquals("", bug.ticketId(), "ticketId is blank until a ticket is filed");
+        assertNull(bug.ticketId(), "ticketId is null until a ticket is filed");
     }
 
     /**

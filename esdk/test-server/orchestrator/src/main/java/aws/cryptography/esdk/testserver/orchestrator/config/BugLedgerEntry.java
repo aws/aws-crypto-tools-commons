@@ -10,7 +10,7 @@ package aws.cryptography.esdk.testserver.orchestrator.config;
  *
  * @param id          the stable bug id, referenced by a server's bug-config.json
  * @param description a short human-readable description
- * @param ticketId    the tracking ticket id, or blank when none is filed yet
+ * @param ticketId    the tracking ticket id, or null when none is filed yet
  */
 public record BugLedgerEntry(String id, String description, String ticketId) {
 }

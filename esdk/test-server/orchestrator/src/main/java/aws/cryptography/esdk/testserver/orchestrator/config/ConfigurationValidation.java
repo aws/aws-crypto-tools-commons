@@ -170,7 +170,7 @@ public final class ConfigurationValidation {
     /**
      * Validate the commons bug ledger structurally: every entry has a non-blank
      * {@code id} and {@code description}, and ids are unique. The {@code ticketId}
-     * may be blank (a bug with no ticket filed yet). The ledger does not list
+     * may be null (a bug with no ticket filed yet). The ledger does not list
      * which languages exhibit a bug — that lives per-server — so nothing is
      * cross-checked against the languages here (a future reconciler prunes ledger
      * entries no language exhibits).
