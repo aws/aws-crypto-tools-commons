@@ -46,17 +46,21 @@ public final class ConfigurationLoader {
 
     /**
      * Load and parse (without validating) the Configuration_Set from a config
-     * directory holding {@code server-config.json} (product + entries) and
-     * {@code feature-config.json} (the Feature_Catalog), the two living side by
-     * side. Combined into one {@link ConfigurationSet}.
+     * directory holding {@code server-config.json} (product + entries),
+     * {@code feature-set.json} (the Feature_Catalog), and {@code bug-list.json}
+     * (the bug ledger), living side by side. The commons files carry names
+     * distinct from a Language_Server's {@code feature-config.json} /
+     * {@code bug-config.json} because they are the authoritative set/list the
+     * impl repos configure against, not per-server configuration. Combined into
+     * one {@link ConfigurationSet}.
      */
     public static ConfigurationSet loadConfigurationSet(Path configDir) {
         Path serverFile = configDir.resolve("server-config.json");
-        Path featureFile = configDir.resolve("feature-config.json");
-        Path bugFile = configDir.resolve("bug-config.json");
+        Path featureFile = configDir.resolve("feature-set.json");
+        Path bugFile = configDir.resolve("bug-list.json");
         JsonNode server = readObject("server-config", read("server-config", serverFile), serverFile);
-        JsonNode feature = readObject("feature-config", read("feature-config", featureFile), featureFile);
-        JsonNode bug = readObject("bug-config", read("bug-config", bugFile), bugFile);
+        JsonNode feature = readObject("feature-set", read("feature-set", featureFile), featureFile);
+        JsonNode bug = readObject("bug-list", read("bug-list", bugFile), bugFile);
         List<ConfigurationEntry> entries = new ArrayList<>();
         JsonNode entriesNode = server.get("entries");
         if (entriesNode != null && entriesNode.isArray()) {

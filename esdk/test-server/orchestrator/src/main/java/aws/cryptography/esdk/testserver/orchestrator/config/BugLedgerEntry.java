@@ -1,7 +1,7 @@
 package aws.cryptography.esdk.testserver.orchestrator.config;
 
 /**
- * One entry in the commons bug ledger ({@code config/bug-config.json}): the
+ * One entry in the commons bug ledger ({@code config/bug-list.json}): the
  * authoritative catalog of every known bug across the product's language
  * implementations. Unlike the Feature_Catalog, the ledger records only that a
  * bug exists — not which languages exhibit it (each Language_Server lists the

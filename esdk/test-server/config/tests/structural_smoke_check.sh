@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------
 # Asserts the shipped factoring of the ESDK TestServer as seen from the
 # Commons_Repository. This lives in config/tests/ because the Configuration_Set
-# (config/server-config.json + feature-config.json) is the primary subject, following the
+# (config/server-config.json + feature-set.json) is the primary subject, following the
 # model/tests/*.sh precedent of a tests/ subdir under the owning component
 # (esdk/test-server/tests/ is the Tests Gradle module, so it is NOT a home for
 # shell checks about the repo).
@@ -42,7 +42,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"    # aws-crypto-tools-commons/esdk/test-server
 REPO_ROOT="$(cd "$TS_DIR/../.." && pwd)"     # aws-crypto-tools-commons
 SERVER_CONFIG="$TS_DIR/config/server-config.json"
-FEATURE_CONFIG="$TS_DIR/config/feature-config.json"
+FEATURE_CONFIG="$TS_DIR/config/feature-set.json"
 PYTHON_FEATURE="$TS_DIR/servers/python/feature-config.json"
 MAKEFILE="$TS_DIR/Makefile"
 
@@ -155,7 +155,7 @@ else
     if [ -n "$catalog_errors" ]; then
         fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; } (Req 7.1, 7.3)"
     else
-        fail "server-config.json / feature-config.json is not parseable JSON (Req 7.1, 7.3)"
+        fail "server-config.json / feature-set.json is not parseable JSON (Req 7.1, 7.3)"
     fi
 fi
 
