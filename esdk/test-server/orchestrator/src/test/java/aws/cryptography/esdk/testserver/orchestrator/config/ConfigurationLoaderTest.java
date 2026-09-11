@@ -309,9 +309,9 @@ class ConfigurationLoaderTest {
         assertNotNull(java, "the shipped set must carry a java entry");
         assertEquals(3, java.majorVersion());
         assertEquals(8091, java.port());
-        // The Java server is hosted in aws-crypto-tools-java.
-        assertEquals("aws-crypto-tools-java", java.serverLocation().repository());
-        assertEquals("esdk/test-server/server", java.serverLocation().path());
+        // The Java server is hosted in aws-encryption-sdk-java.
+        assertEquals("aws-encryption-sdk-java", java.serverLocation().repository());
+        assertEquals("test-server/server", java.serverLocation().path());
 
         ConfigurationEntry python = set.forLanguage("python");
         assertNotNull(python, "the shipped set must carry a python entry");
