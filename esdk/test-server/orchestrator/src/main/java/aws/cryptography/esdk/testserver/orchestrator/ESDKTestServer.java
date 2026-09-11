@@ -194,11 +194,21 @@ public final class ESDKTestServer {
      * (Requirement 2.11).
      */
     public Result run(List<ConfigurationEntry> overrides) {
+        return run(overrides, Map.of());
+    }
+
+    /**
+     * As {@link #run(List)}, plus a dev-only local-overrides overlay mapping a
+     * language to a local working-tree root the resolver uses in place of a
+     * clone (empty in a normal run). Local development only — the overlay is
+     * gitignored and never ships in committed configuration.
+     */
+    public Result run(List<ConfigurationEntry> overrides, Map<String, Path> localRepositories) {
         List<LaunchedServer> launched = new ArrayList<>();
         List<String> cleanupFailureLanguages = new ArrayList<>();
         PipelineOutcome outcome;
         try {
-            outcome = executePipeline(overrides, launched);
+            outcome = executePipeline(overrides, launched, localRepositories);
         } finally {
             // 8. Teardown is total: stop every server launched during the run,
             // whatever the outcome (Requirement 2.6). A STILL_RUNNING close
@@ -250,7 +260,8 @@ public final class ESDKTestServer {
     }
 
     private PipelineOutcome executePipeline(
-            List<ConfigurationEntry> overrides, List<LaunchedServer> launched) {
+            List<ConfigurationEntry> overrides, List<LaunchedServer> launched,
+            Map<String, Path> localRepositories) {
         // ---- Stage 1: load + validate the Configuration_Set and the on-hand
         // Feature_Declarations, all before anything is cloned. ----
 
@@ -350,7 +361,8 @@ public final class ESDKTestServer {
         // ---- Stage 2: materialize the planned sources. Planning is pure
         // (design resolution-rules table); materialization performs the git
         // and filesystem I/O, capturing failures as data (Requirement 3.6). ----
-        List<ResolvedComponentPlan> plans = resolver.resolve(configurationSet, context, overrides);
+        List<ResolvedComponentPlan> plans =
+            resolver.resolve(configurationSet, context, overrides, localRepositories);
         MaterializedSources sources = materializer.materialize(plans);
 
         // ---- Stage 4 (emitted here so the record accompanies every

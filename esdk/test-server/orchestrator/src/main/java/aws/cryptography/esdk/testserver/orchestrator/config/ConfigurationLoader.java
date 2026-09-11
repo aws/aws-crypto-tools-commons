@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -84,6 +85,37 @@ public final class ConfigurationLoader {
             stringList(feature.get("features")),
             entries,
             ledger);
+    }
+
+    /**
+     * Load a dev-only local-overrides overlay:
+     * {@code {"repositories": {"<lang>": "<path>"}}} mapping a language to a
+     * local working-tree root the resolver uses in place of a clone (local
+     * development only — this file is gitignored and never ships in committed
+     * configuration). A relative path resolves against the overlay file's
+     * directory; blank/null values are skipped. Returns the languages in file
+     * order; an absent {@code repositories} object yields an empty map.
+     */
+    public static Map<String, Path> loadLocalRepositories(Path file) {
+        JsonNode root = readObject("local-overrides", read("local-overrides", file), file);
+        Map<String, Path> repositories = new LinkedHashMap<>();
+        JsonNode reposNode = root.get("repositories");
+        if (reposNode != null && reposNode.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = reposNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                JsonNode value = field.getValue();
+                if (value == null || value.isNull() || value.asText().isBlank()) {
+                    continue;
+                }
+                Path path = Path.of(value.asText());
+                if (!path.isAbsolute() && file.getParent() != null) {
+                    path = file.getParent().resolve(path);
+                }
+                repositories.put(field.getKey(), path.normalize());
+            }
+        }
+        return repositories;
     }
 
     /** Parse (without validating) a Configuration_Set from a JSON string. */

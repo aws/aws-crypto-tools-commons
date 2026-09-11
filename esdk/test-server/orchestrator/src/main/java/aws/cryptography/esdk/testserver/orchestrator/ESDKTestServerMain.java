@@ -22,6 +22,7 @@ import aws.cryptography.esdk.testserver.orchestrator.source.CommonsOrigin;
 import aws.cryptography.esdk.testserver.orchestrator.source.ResolutionReason;
 import aws.cryptography.esdk.testserver.orchestrator.source.RunContext;
 import aws.cryptography.esdk.testserver.orchestrator.source.SourceMaterializer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -223,7 +224,30 @@ public final class ESDKTestServerMain {
             System.out.println("    configurationOverrides: " + overrides.size());
         }
 
-        Result result = orchestrator.run(overrides);
+        // Dev-only local-overrides overlay (local development, gitignored): map a
+        // language to a local working-tree root the resolver uses instead of a
+        // clone. Default location config/local-overrides.json; point elsewhere
+        // with localOverrides=<path>. Absent → no overlay (normal run).
+        Path localOverridesFile = cli.containsKey("localOverrides")
+            ? Path.of(cli.get("localOverrides"))
+            : configPath.resolve("local-overrides.json");
+        Map<String, Path> localRepositories = Map.of();
+        if (Files.isRegularFile(localOverridesFile)) {
+            try {
+                localRepositories = ConfigurationLoader.loadLocalRepositories(localOverridesFile);
+            } catch (ConfigurationLoadException e) {
+                System.err.println("ESDKTestServer: " + e.getMessage());
+                System.exit(EXIT_USAGE);
+                return;
+            }
+            if (!localRepositories.isEmpty()) {
+                System.out.println("    localOverrides: " + localOverridesFile);
+                localRepositories.forEach((lang, root) ->
+                    System.out.println("      " + lang + " -> " + root + " (local working tree)"));
+            }
+        }
+
+        Result result = orchestrator.run(overrides, localRepositories);
 
         System.out.println();
         System.out.println("==> Result: " + (result.succeeded() ? "SUCCESS" : "FAILURE"));

@@ -4,6 +4,12 @@
 # jqwik's local failure-sample database (developer-local, not shared)
 **/.jqwik-database
 
+# Dev-only local-overrides overlay: maps a language to a local working-tree
+# root so `make orchestrate` uses local edits instead of a clone. Developer-
+# local — must never ship in committed configuration.
+/config/local-overrides.json
+**/local-overrides.json
+
 # Local-only reference material (e.g. the S3EC Python workflows kept for
 # hand-implemented non-Java language servers). Never committed; do not delete.
 /temp-s3ec-py-example/

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -373,6 +374,29 @@ class ConfigurationLoaderTest {
         assertTrue(bug.description() != null && !bug.description().isBlank(),
             "ledger entries carry a description");
         assertNull(bug.ticketId(), "ticketId is null until a ticket is filed");
+    }
+
+    @Test
+    @DisplayName("local-overrides overlay parses repositories, resolving relative paths against the file")
+    void localOverridesOverlayParses(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("local-overrides.json");
+        Files.writeString(file,
+            "{ \"repositories\": { \"rust\": \"/abs/rust\", \"java\": \"checkouts/java\" } }");
+
+        Map<String, Path> repos = ConfigurationLoader.loadLocalRepositories(file);
+
+        assertEquals(Path.of("/abs/rust"), repos.get("rust"),
+            "an absolute path is used as-is");
+        assertEquals(dir.resolve("checkouts/java").normalize(), repos.get("java"),
+            "a relative path resolves against the overlay file's directory");
+    }
+
+    @Test
+    @DisplayName("a local-overrides overlay with no repositories object yields an empty map")
+    void localOverridesOverlayEmptyWhenNoRepositories(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("local-overrides.json");
+        Files.writeString(file, "{ }");
+        assertTrue(ConfigurationLoader.loadLocalRepositories(file).isEmpty());
     }
 
     /**
