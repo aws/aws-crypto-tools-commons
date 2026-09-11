@@ -12,19 +12,19 @@
 #   * Requirements 1.1, 1.3: the Configuration_Set names the Java
 #     Language_Server in the aws-crypto-tools-java Language_Repository
 #     (serverLocation.repository "aws-crypto-tools-java", path
-#     "esdk/test-server/server") and the Python Language_Server in commons
-#     (serverLocation.repository "aws-crypto-tools-commons").
-#   * Requirement 1.8: commons contains zero copies of the Java
-#     Language_Server — no esdk/test-server/servers/java directory.
+#     "esdk/test-server/server") and the Python Language_Server in the
+#     aws-encryption-sdk-python Language_Repository
+#     (serverLocation.repository "aws-encryption-sdk-python", path
+#     "test-server").
+#   * Requirement 1.8: commons contains zero copies of a Language_Server —
+#     no esdk/test-server/servers/java or esdk/test-server/servers/python
+#     directory.
 #   * Requirement 10.1: exactly one Tests definition exists — exactly one
 #     MaterialsRoundTripTests.java in the repository, under
 #     esdk/test-server/tests/.
 #   * Requirements 7.1, 7.3: product is exactly "esdk" and the
 #     Feature_Catalog defines exactly the Features "streaming", "MPL", and
 #     "hierarchical".
-#   * Requirement 8.13: the Python Configuration_Entry carries the Python
-#     Feature_Declaration — supportedFeatures lists both streaming and MPL,
-#     unsupportedFeatures lists neither.
 #   * Requirement 2.7: the Makefile has no separate cross-language target
 #     (no test-cross-language) — `make orchestrate` is the single entry point.
 #
@@ -43,7 +43,6 @@ TS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"    # aws-crypto-tools-commons/esdk/tes
 REPO_ROOT="$(cd "$TS_DIR/../.." && pwd)"     # aws-crypto-tools-commons
 SERVER_CONFIG="$TS_DIR/config/server-config.json"
 FEATURE_CONFIG="$TS_DIR/config/feature-set.json"
-PYTHON_FEATURE="$TS_DIR/servers/python/feature-config.json"
 MAKEFILE="$TS_DIR/Makefile"
 
 failures=0
@@ -94,15 +93,18 @@ if not isinstance(python, dict):
     errors.append("no python Configuration_Entry")
 else:
     loc = python.get("serverLocation") or {}
-    if loc.get("repository") != "aws-crypto-tools-commons":
-        errors.append('python serverLocation.repository is %r, expected "aws-crypto-tools-commons"'
+    if loc.get("repository") != "aws-encryption-sdk-python":
+        errors.append('python serverLocation.repository is %r, expected "aws-encryption-sdk-python"'
                       % loc.get("repository"))
+    if loc.get("path") != "test-server":
+        errors.append('python serverLocation.path is %r, expected "test-server"'
+                      % loc.get("path"))
 
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in commons (Req 1.1, 1.3)"
+    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in aws-encryption-sdk-python at test-server (Req 1.1, 1.3)"
 else
     if [ -n "$location_errors" ]; then
         fail "Server_Location violation: ${location_errors//$'\n'/; } (Req 1.1, 1.3)"
@@ -118,6 +120,11 @@ if [ ! -e "$TS_DIR/servers/java" ]; then
     pass "no esdk/test-server/servers/java directory — commons holds zero Java server copies (Req 1.8)"
 else
     fail "esdk/test-server/servers/java exists — the Java Language_Server must live only in aws-crypto-tools-java (Req 1.8)"
+fi
+if [ ! -e "$TS_DIR/servers/python" ]; then
+    pass "no esdk/test-server/servers/python directory — commons holds zero Python server copies (Req 1.8)"
+else
+    fail "esdk/test-server/servers/python exists — the Python Language_Server must live only in aws-encryption-sdk-python (Req 1.8)"
 fi
 
 # ----------------------------------------------------------------------------
@@ -160,39 +167,7 @@ else
 fi
 
 # ----------------------------------------------------------------------------
-# Check 5: Python Feature_Declaration supports streaming + MPL (Req 8.13)
-# ----------------------------------------------------------------------------
-if declaration_errors=$(python3 - "$PYTHON_FEATURE" <<'PY'
-import json, sys
-python = json.load(open(sys.argv[1]))
-supported = python.get("supportedFeatures")
-unsupported = python.get("unsupportedFeatures")
-errors = []
-if not isinstance(supported, list):
-    errors.append("python supportedFeatures array is missing")
-if not isinstance(unsupported, list):
-    errors.append("python unsupportedFeatures array is missing")
-if not errors:
-    for feature in ("streaming", "MPL"):
-        if feature not in supported:
-            errors.append('"%s" is not in python supportedFeatures' % feature)
-        if feature in unsupported:
-            errors.append('"%s" appears in python unsupportedFeatures' % feature)
-print("\n".join(errors))
-sys.exit(1 if errors else 0)
-PY
-); then
-    pass "python supportedFeatures lists streaming and MPL; unsupportedFeatures lists neither (Req 8.13)"
-else
-    if [ -n "$declaration_errors" ]; then
-        fail "python Feature_Declaration violation: ${declaration_errors//$'\n'/; } (Req 8.13)"
-    else
-        fail "python feature-config.json is not parseable JSON (Req 8.13)"
-    fi
-fi
-
-# ----------------------------------------------------------------------------
-# Check 6: the Makefile has no separate cross-language target (Req 2.7)
+# Check 5: the Makefile has no separate cross-language target (Req 2.7)
 # ----------------------------------------------------------------------------
 if [ ! -f "$MAKEFILE" ]; then
     fail "Makefile missing: $MAKEFILE (Req 2.7)"

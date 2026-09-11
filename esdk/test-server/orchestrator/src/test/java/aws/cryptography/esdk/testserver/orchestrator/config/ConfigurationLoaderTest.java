@@ -317,14 +317,15 @@ class ConfigurationLoaderTest {
         assertNotNull(python, "the shipped set must carry a python entry");
         assertEquals(4, python.majorVersion());
         assertEquals(8092, python.port());
-        // Python's Feature_Declaration and bugs moved out of the entry into its
-        // own feature-config.json / bug-config.json under commons, so the entry
-        // carries no inline arrays now.
+        // Python's Feature_Declaration and bugs live in its own
+        // feature-config.json / bug-config.json in its repository, so the entry
+        // carries no inline arrays. The server now lives in the
+        // aws-encryption-sdk-python Language_Repository under test-server/.
         assertNull(python.supportedFeatures());
         assertNull(python.unsupportedFeatures());
-        assertEquals("esdk/test-server/servers/python", python.configPath());
-        assertEquals("aws-crypto-tools-commons", python.serverLocation().repository());
-        assertEquals("esdk/test-server/servers/python", python.serverLocation().path());
+        assertEquals("test-server", python.configPath());
+        assertEquals("aws-encryption-sdk-python", python.serverLocation().repository());
+        assertEquals("test-server", python.serverLocation().path());
 
         // Rust is a Language_Repository (aws-crypto-tools-rust): its
         // Feature_Declaration lives in its own repo, not inline here, so the entry

@@ -190,7 +190,7 @@ class SourceMaterializerTest {
         Path root = enclosingRepoRoot();
         var plan = new ResolvedComponentPlan(
             ComponentId.server("python"),
-            new SourcePlan.WorkingTree(root, "esdk/test-server/servers/python"),
+            new SourcePlan.WorkingTree(root, "esdk/test-server/config"),
             ResolutionReason.CONFIGURATION_ENTRY);
 
         MaterializedSources sources =
@@ -199,7 +199,7 @@ class SourceMaterializerTest {
         assertEquals(1, sources.outcomes().size());
         var success = assertInstanceOf(MaterializedSources.Success.class,
             sources.outcomes().get(0));
-        assertEquals(root.resolve("esdk/test-server/servers/python"), success.directory());
+        assertEquals(root.resolve("esdk/test-server/config"), success.directory());
         assertTrue(success.commit().matches("[0-9a-f]{40}"),
             "commit is the working tree's rev-parse HEAD: " + success.commit());
         assertNotNull(success.dirty(), "working-tree components carry the dirty flag");
@@ -252,7 +252,7 @@ class SourceMaterializerTest {
                 new SourcePlan.WorkingTree(root, "."),
                 ResolutionReason.WORKING_TREE),
             new ResolvedComponentPlan(ComponentId.server("python"),
-                new SourcePlan.WorkingTree(root, "esdk/test-server/servers/python"),
+                new SourcePlan.WorkingTree(root, "esdk/test-server/config"),
                 ResolutionReason.WORKING_TREE));
 
         MaterializedSources sources =
