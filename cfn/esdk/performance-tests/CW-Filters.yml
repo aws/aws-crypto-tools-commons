@@ -641,4 +641,195 @@ Resources:
         MetricNamespace: RustPerformanceBenchmarks
         MetricValue: $.result.p99_latency
         Unit: Milliseconds
-
+  NativeRustRawAesThroughput50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesThroughput50MBP50
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesThroughputP50Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustRawAesThroughput50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesThroughput50MBP95
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesThroughputP95Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustRawAesThroughput50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesThroughput50MBP99
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesThroughputP99Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustRawAesConcurrency50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesConcurrency50MBP50
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesConcurrentP50Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustRawAesConcurrency50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesConcurrency50MBP95
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesConcurrentP95Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustRawAesConcurrency50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesConcurrency50MBP99
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesConcurrentP99Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustRawAesMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesMemoryUsage50MB
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesPeakMemoryUsage
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  NativeRustRawAesMemoryEfficiency50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustRawAesMemoryEfficiency50MB
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesMemoryEfficiencyRatio
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  NativeRustCppRawAesThroughput50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesThroughput50MBP50
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesThroughputP50Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustCppRawAesThroughput50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesThroughput50MBP95
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesThroughputP95Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustCppRawAesThroughput50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesThroughput50MBP99
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesThroughputP99Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustCppRawAesConcurrency50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesConcurrency50MBP50
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesConcurrentP50Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustCppRawAesConcurrency50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesConcurrency50MBP95
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesConcurrentP95Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustCppRawAesConcurrency50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesConcurrency50MBP99
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesConcurrentP99Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustCppRawAesMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesMemoryUsage50MB
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesPeakMemoryUsage
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  NativeRustCppRawAesMemoryEfficiency50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppRawAesMemoryEfficiency50MB
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "raw-aes"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RawAesMemoryEfficiencyRatio
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
