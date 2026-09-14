@@ -1,0 +1,74 @@
+{
+  "_comment": [
+    "DB-ESDK TestServer commons server-config.json (design 'Server Configuration'):",
+    "product + one Configuration_Entry per language. The Feature_Catalog lives in",
+    "the sibling feature-set.json and the bug ledger in bug-list.json (the doc's",
+    "three-file layout) — the only supported configuration format. The shared",
+    "orchestrator's ConfigurationLoader loads this trio (server-config.json +",
+    "feature-set.json + bug-list.json) and fails if server-config.json is absent.",
+    "",
+    "The per-language SERVERS live in the DB-ESDK product repo",
+    "(aws-database-encryption-sdk-dynamodb) under test-server/<lang>-v<major>-server/;",
+    "the test cases + shared harness (model/tests/orchestrator/tests-support/client-java)",
+    "stay in commons. Each entry's serverLocation + libraryRepository therefore point",
+    "at the product repo, and configPath names the DIRECTORY holding the per-server trio",
+    "(server-config.json/feature-config.json/bug-config.json) co-located with the server."
+  ],
+  "product": "dbesdk",
+  "entries": [
+    {
+      "language": "java",
+      "majorVersion": 3,
+      "port": 8101,
+      "configPath": "test-server/java-v3-server",
+      "libraryRepository": {
+        "name": "aws-database-encryption-sdk-dynamodb",
+        "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "test-server/java-v3-server"
+      },
+      "serverLocation": {
+        "repository": "aws-database-encryption-sdk-dynamodb",
+        "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "test-server/java-v3-server"
+      }
+    },
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8102,
+      "configPath": "test-server/rust-v1-server",
+      "libraryRepository": {
+        "name": "aws-database-encryption-sdk-dynamodb",
+        "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "test-server/rust-v1-server"
+      },
+      "serverLocation": {
+        "repository": "aws-database-encryption-sdk-dynamodb",
+        "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "test-server/rust-v1-server"
+      }
+    },
+    {
+      "language": "net",
+      "majorVersion": 4,
+      "port": 8103,
+      "configPath": "test-server/net-v4-server",
+      "libraryRepository": {
+        "name": "aws-database-encryption-sdk-dynamodb",
+        "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
+        "branch": "huaye/dbesdk-test-server",
+        "path": "test-server/net-v4-server"
+      },
+      "serverLocation": {
+        "repository": "aws-database-encryption-sdk-dynamodb",
+        "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
+        "ref": "huaye/dbesdk-test-server",
+        "path": "test-server/net-v4-server"
+      }
+    }
+  ]
+}

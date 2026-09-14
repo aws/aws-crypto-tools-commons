@@ -1,0 +1,1035 @@
+package aws.cryptography.dbesdk.testserver.tests.wire;
+
+import aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers;
+import aws.cryptography.dbesdk.testserver.tests.DbeTestServerClients;
+
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.FOOT;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.HEAD;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.PK;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.PUBLIC;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.SECRET;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.TABLE;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.bytesOf;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.canonicalPlaintext;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.copy;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.encryptOnce;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.newKmsClient;
+import static aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers.standardActions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import aws.cryptography.dbesdk.testserver.client.client.DBESDKTestServerClient;
+import aws.cryptography.dbesdk.testserver.client.model.AttributeValue;
+import aws.cryptography.dbesdk.testserver.client.model.CryptoAction;
+import aws.cryptography.dbesdk.testserver.client.model.DBEAlgorithmSuiteId;
+import aws.cryptography.dbesdk.testserver.client.model.DBESDKClientError;
+import aws.cryptography.dbesdk.testserver.client.model.DecryptItemInput;
+import aws.cryptography.dbesdk.testserver.client.model.DecryptItemOutput;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.TargetPair;
+import java.nio.ByteBuffer;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+/**
+ * DB-ESDK cross-language tamper tests — 45 mutations, each run once per
+ * launched {@code (encryptTarget, decryptTarget)} pair. Each test method
+ * receives a pre-built {@link TestContext} (both endpoints' clients + the
+ * per-pair encrypted item), mutates the wire bytes, and asserts decrypt on
+ * the pair's decrypt target refuses the mutation with a
+ * {@link DBESDKClientError}.
+ *
+ * <p>Categories:
+ * <ul>
+ *   <li>Section 1 — Header field tamper (14 mutations)</li>
+ *   <li>Section 2 — Footer field tamper (6 mutations)</li>
+ *   <li>Section 3 — Attribute-level tamper (9 mutations)</li>
+ *   <li>Section 4 — Cross-record splice (5 mutations)</li>
+ *   <li>Section 5 — Truncation (8 mutations)</li>
+ *   <li>Section 6 — Schema promotion (3 decrypt-side schema mismatches)</li>
+ * </ul>
+ *
+ * <p>Test count = {@code 45 mutations × pairs²} — 405 tests today with three
+ * launched targets. Adding a language expands the matrix automatically.
+ *
+ * <p>All mutations use the AWS-KMS keyring pinned to the ESDK-shared symmetric
+ * key ({@link DbeTestHelpers#resolveKmsKeyArn()}), so both sides of a
+ * cross-language pair unwrap the same wire EDK. The pre-encrypted per-pair
+ * baseline is memoized in {@link #CONTEXTS}: a full run performs one
+ * CreateClient + one EncryptItem per pair — not per mutation.
+ *
+ * <p>The per-pair baseline builder also runs a round-trip check before any
+ * mutation-refused assertion: a broken decrypt path that refuses every input
+ * would silently pass every tamper assertion for the wrong reason, so we
+ * prove the untampered baseline decrypts successfully first. When the check
+ * fails, every tamper test for that pair reports the same clear
+ * "baseline round-trip failed on {@code <pair>}" cause.
+ */
+class ItemIntegrityRejectionTests {
+
+    // =====================================================================
+    // Header field tamper (14 mutations of aws_dbe_head).
+    // =====================================================================
+
+    /** Version byte set to an out-of-range value (0xFF). */
+    @ParameterizedTest(name = "1. Version byte → invalid value 0xFF {0}")
+    @MethodSource("testPairs")
+    void versionByteInvalid(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[0] = (byte) 0xFF;
+        //= specification/structured-encryption/header.md#format-version
+        //= type=test
+        //# The Version MUST be `0x01` or `0x02`.
+        assertDecryptFails(ctx, withHeader(ctx, header), "invalid version byte accepted");
+    }
+
+    /** Version byte flipped between the two legal values (0x01 ↔ 0x02). */
+    @ParameterizedTest(name = "2. Version byte → 0x01↔0x02 flipped between two legal values {0}")
+    @MethodSource("testPairs")
+    void versionByteFlippedLegal(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[0] = (byte) (header[0] == 0x01 ? 0x02 : 0x01);
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "flipped-legal version accepted");
+    }
+
+    /** Format flavor byte set to an unsupported value (0xFF). */
+    @ParameterizedTest(name = "3. Format flavor byte → invalid value 0xFF {0}")
+    @MethodSource("testPairs")
+    void flavorByteInvalid(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[1] = (byte) 0xFF;
+        //= specification/structured-encryption/header.md#format-flavor
+        //= type=test
+        //# The algorithm suite indicated by the flavor MUST be a
+        //# [DBE supported algorithm suite](../../submodules/MaterialProviders/aws-encryption-sdk-specification/framework/algorithm-suites.md#supported-algorithm-suites-enum).
+        assertDecryptFails(ctx, withHeader(ctx, header), "invalid flavor byte accepted");
+    }
+
+    /** Message ID byte flipped mid-field. */
+    @ParameterizedTest(name = "4. Message ID byte (mid-field) {0}")
+    @MethodSource("testPairs")
+    void messageIdMidFieldFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[16] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "message ID byte flip accepted");
+    }
+
+    /** Encrypt Legend Length byte (big-endian UInt16 after message ID). */
+    @ParameterizedTest(name = "5. Encrypt Legend Length (big-endian UInt16 after message ID) {0}")
+    @MethodSource("testPairs")
+    void encryptLegendLengthFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[34] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "encrypt legend length flip accepted");
+    }
+
+    /** First byte of the Encrypt Legend contents. */
+    @ParameterizedTest(name = "6. Encrypt Legend Bytes (first legend character) {0}")
+    @MethodSource("testPairs")
+    void encryptLegendByteFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[36] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "encrypt legend byte flip accepted");
+    }
+
+    /** First legend byte swapped to a different valid CryptoAction (SIGN_ONLY ↔ ENCRYPT_AND_SIGN). */
+    @ParameterizedTest(name = "7. Encrypt Legend byte swapped to a different valid CryptoAction {0}")
+    @MethodSource("testPairs")
+    void encryptLegendActionSwap(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[36] = (header[36] == (byte) 0x73) ? (byte) 0x65 : (byte) 0x73;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "swapped-valid legend action accepted");
+    }
+
+    /** Encryption Context count (2 bytes after the legend). */
+    @ParameterizedTest(name = "8. Encryption Context count (2 bytes after the legend) {0}")
+    @MethodSource("testPairs")
+    void encryptionContextCountFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        int legendLen = ((header[34] & 0xFF) << 8) | (header[35] & 0xFF);
+        int ecCountOffset = 36 + legendLen;
+        header[ecCountOffset] ^= (byte) 0x7F;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EC count flip accepted");
+    }
+
+    /** Byte inside the first Encryption Context entry's key content. */
+    @ParameterizedTest(name = "9. Encryption Context entry bytes (inside first EC pair) {0}")
+    @MethodSource("testPairs")
+    void encryptionContextEntryFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        int legendLen = ((header[34] & 0xFF) << 8) | (header[35] & 0xFF);
+        int ecCountOffset = 36 + legendLen;
+        int ecCount = ((header[ecCountOffset] & 0xFF) << 8) | (header[ecCountOffset + 1] & 0xFF);
+        if (ecCount == 0) {
+            fail("test #9 requires at least one Encryption Context entry, but the baseline has none. "
+                + "Configure the DbeTestHelpers schema to include a "
+                + "SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT attribute so this test exercises "
+                + "an actual EC entry.");
+        }
+        // First EC entry layout: [2-byte key length | key bytes | 2-byte value length | value bytes].
+        int keyLenOffset = ecCountOffset + 2;
+        int keyLen = ((header[keyLenOffset] & 0xFF) << 8) | (header[keyLenOffset + 1] & 0xFF);
+        if (keyLen < 1) {
+            fail("test #9 requires the first EC key to be non-empty, but keyLen = " + keyLen);
+        }
+        // Flip the first byte of the first EC key's content — a well-defined
+        // position inside real EC data, not the count metadata or a length prefix.
+        int firstKeyByteOffset = keyLenOffset + 2;
+        header[firstKeyByteOffset] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EC entry key byte flip accepted");
+    }
+
+    /** Encrypted Data Key count set to 0 — spec MUST-not condition. */
+    @ParameterizedTest(name = "10. Encrypted Data Key count {0}")
+    @MethodSource("testPairs")
+    void encryptedDataKeyCountZero(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[edkCountOffset(header)] = 0x00;
+        //= specification/structured-encryption/header.md#encrypted-data-key-count
+        //= type=test
+        //# This value MUST be greater than 0.
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK count = 0 accepted");
+    }
+
+    /** Byte inside the first Encrypted Data Key's Key Provider ID. */
+    @ParameterizedTest(name = "11. Encrypted Data Key — Key Provider ID byte {0}")
+    @MethodSource("testPairs")
+    void edkKeyProviderIdFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[firstEdkFieldOffsets(header)[0]] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK Key Provider ID flip accepted");
+    }
+
+    /** Byte inside the first Encrypted Data Key's Key Provider Information. */
+    @ParameterizedTest(name = "12. Encrypted Data Key — Key Provider Information byte {0}")
+    @MethodSource("testPairs")
+    void edkKeyProviderInfoFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[firstEdkFieldOffsets(header)[1]] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK Key Provider Information flip accepted");
+    }
+
+    /** Byte inside the first Encrypted Data Key ciphertext. */
+    @ParameterizedTest(name = "13. Encrypted Data Key — ciphertext byte {0}")
+    @MethodSource("testPairs")
+    void edkCiphertextFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[firstEdkFieldOffsets(header)[2]] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "EDK ciphertext flip accepted");
+    }
+
+    /** Byte in the header commitment (last 32 bytes). */
+    @ParameterizedTest(name = "14. Header Commitment (last 32 bytes of the header) {0}")
+    @MethodSource("testPairs")
+    void headerCommitmentFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        header[header.length - 1] ^= (byte) 0xFF;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, header), "header commitment flip accepted");
+    }
+
+    // =====================================================================
+    // Footer field tamper (6 mutations of aws_dbe_foot).
+    // =====================================================================
+
+    @ParameterizedTest(name = "1. Flip a byte inside a Recipient Tag {0}")
+    @MethodSource("testPairs")
+    void recipientTagByteFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] footer = footerBytes(ctx);
+        footer[10] ^= (byte) 0xFF;
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, withFooter(ctx, footer), "recipient tag flip accepted");
+    }
+
+    @ParameterizedTest(name = "2. Zero the entire Recipient Tag block {0}")
+    @MethodSource("testPairs")
+    void recipientTagZeroed(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] footer = footerBytes(ctx);
+        for (int i = 0; i < footer.length; i++) footer[i] = 0;
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, withFooter(ctx, footer), "zeroed recipient tag accepted");
+    }
+
+    @ParameterizedTest(name = "3. Truncate the last byte of the Recipient Tag {0}")
+    @MethodSource("testPairs")
+    void recipientTagSingleByteTruncated(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] footer = footerBytes(ctx);
+        byte[] trunc = new byte[footer.length - 1];
+        System.arraycopy(footer, 0, trunc, 0, trunc.length);
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, withFooter(ctx, trunc), "single-byte truncated tag accepted");
+    }
+
+    @ParameterizedTest(name = "4. Trailing byte on a non-signing (flavor 0x00) footer is rejected {0}")
+    @MethodSource("testPairs")
+    void spuriousSignatureOnNonSigningFooter(TargetPair pair) {
+        // Establish the premise the old test asserted only by its name: a NON-signing
+        // (SYMSIG) suite, whose header flavor is 0x00 and whose footer is Recipient
+        // Tags only. contextFor(...) uses the DEFAULT (ECDSA-signed) suite, so build
+        // dedicated non-signing clients here.
+        DBESDKTestServerClient enc = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        DBESDKTestServerClient dec = DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        DBEAlgorithmSuiteId nonSigning =
+            DBEAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_SYMSIG_HMAC_SHA384;
+        String encId = DbeTestHelpers.newKmsClientWithSuite(
+            enc, TABLE, PK, standardActions(), List.of(), nonSigning);
+        String decId = DbeTestHelpers.newKmsClientWithSuite(
+            dec, TABLE, PK, standardActions(), List.of(), nonSigning);
+        Map<String, AttributeValue> item = encryptOnce(enc, encId, canonicalPlaintext());
+        byte[] header = bytesOf(item.get(HEAD));
+        byte[] footer = bytesOf(item.get(FOOT));
+
+        //= specification/structured-encryption/footer.md#signature
+        //= type=test
+        //# The signature MUST be included in the footer if the flavor
+        //# in the [header](./header.md#format-flavor) is 0x01
+        //# and MUST NOT be included in the footer if the flavor
+        //# in the [header](./header.md#format-flavor) is 0x00.
+        assertEquals(0x00, header[1] & 0xFF,
+            "the SYMSIG (non-signing) suite must set header flavor 0x00 (" + pair + ")");
+        int edkCount = DbeTestHelpers.parseHeaderEdkCount(header);
+        assertEquals(1, edkCount, "single AWS-KMS keyring must produce exactly one EDK");
+        assertEquals(edkCount * 48, footer.length,
+            "a non-signing footer must be Recipient Tags only (48 bytes/EDK), no signature ("
+                + pair + ")");
+
+        // A trailing byte after the Recipient Tags is a spurious signature on a
+        // non-signing footer and MUST be rejected on decrypt.
+        byte[] extended = new byte[footer.length + 1];
+        System.arraycopy(footer, 0, extended, 0, footer.length);
+        extended[footer.length] = (byte) 0xAB;
+        Map<String, AttributeValue> tampered = copy(item);
+        tampered.put(FOOT, AttributeValue.builder().b(ByteBuffer.wrap(extended)).build());
+        assertDecryptFails(dec, decId, tampered, "trailing byte on a non-signing footer accepted");
+    }
+
+    /**
+     * Footer signature length is specification-conformant: under a signing
+     * (ECDSA-P384) suite the footer is Recipient Tags (48 bytes/EDK) plus a
+     * 96-byte signature (structured-encryption footer.md, Signature = "0 or 96").
+     *
+     * <p>KNOWN BUG: {@code Footer.dfy} sets {@code SignatureSize := 103}, so the
+     * implementation emits a 103-byte signature. The spec-conformant assertion
+     * therefore fails on every target that transpiles from that Dafny source. It
+     * is gated through the known-bug ledger keyed on the encrypt target (the
+     * footer producer): declared targets tolerate the mismatch as a visible skip;
+     * a target that stops exhibiting it (fixed to 96) fails loudly so the ledger
+     * entry can be removed. Non-declared targets must pass the spec assertion.
+     */
+    @ParameterizedTest(name = "signing footer signature length is spec-conformant (96 bytes) {0}")
+    @MethodSource("testPairs")
+    void signingFooterSignatureLengthMatchesSpec(TargetPair pair) {
+        // The DEFAULT suite is ECDSA-signed → header flavor 0x01, footer =
+        // Recipient Tags (48/EDK) + one ECDSA-P384 signature.
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        byte[] footer = footerBytes(ctx);
+        assertEquals(0x01, header[1] & 0xFF,
+            "the default ECDSA suite must set header flavor 0x01 (" + pair + ")");
+        int edkCount = DbeTestHelpers.parseHeaderEdkCount(header);
+        assertEquals(1, edkCount, "single AWS-KMS keyring must produce exactly one EDK");
+
+        // spec structured-encryption/footer.md#signature: Signature = "0 or 96".
+        // Impl Footer.dfy: SignatureSize := 103. Gated on the footer-producing
+        // (encrypt) target's language via the known-bug ledger.
+        KnownBugGate.gateDeclared(
+            "footer-ecdsa-signature-length-spec-96-implementation-103",
+            pair.encryptTarget().language(),
+            () -> assertEquals(edkCount * 48 + 96, footer.length,
+                "signing footer must be Recipient Tags (48/EDK) + a 96-byte ECDSA-P384 signature "
+                    + "per footer.md; got " + footer.length + " (" + pair + ")"));
+    }
+
+    @ParameterizedTest(name = "5. Empty footer (0 bytes) {0}")
+    @MethodSource("testPairs")
+    void emptyFooter(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        //= specification/structured-encryption/decrypt-path-structure.md#verify-signatures
+        //= type=test
+        //# The footer field value MUST be [verified](footer.md#footer-verification).
+        assertDecryptFails(ctx, withFooter(ctx, new byte[0]), "empty footer accepted");
+    }
+
+    @ParameterizedTest(name = "6. Extra trailing byte after the Recipient Tag {0}")
+    @MethodSource("testPairs")
+    void extraTrailingByte(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] footer = footerBytes(ctx);
+        byte[] extended = new byte[footer.length + 1];
+        System.arraycopy(footer, 0, extended, 0, footer.length);
+        extended[footer.length] = (byte) 0xAA;
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, withFooter(ctx, extended), "trailing byte accepted");
+    }
+
+    // =====================================================================
+    // Attribute-level tamper (9 mutations of per-attribute values).
+    // =====================================================================
+
+    @ParameterizedTest(name = "1. Flip a byte in the ciphertext of an encrypted attribute {0}")
+    @MethodSource("testPairs")
+    void ciphertextByteFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        byte[] bytes = bytesOf(item.get(SECRET));
+        bytes[5] ^= (byte) 0xFF;
+        item.put(SECRET, AttributeValue.builder().b(ByteBuffer.wrap(bytes)).build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "encrypted ciphertext byte flip accepted");
+    }
+
+    @ParameterizedTest(name = "2. Flip a byte in a sign-only plaintext attribute {0}")
+    @MethodSource("testPairs")
+    void signOnlyPlaintextFlip(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(PUBLIC, AttributeValue.builder().s(item.get(PUBLIC).getS() + "!").build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "sign-only plaintext mutation accepted");
+    }
+
+    @ParameterizedTest(name = "3. Delete a signed attribute {0}")
+    @MethodSource("testPairs")
+    void deleteSignedAttribute(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.remove(PUBLIC);
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "missing signed attribute accepted");
+    }
+
+    @ParameterizedTest(name = "4. Add an extra signed attribute not present at encrypt time {0}")
+    @MethodSource("testPairs")
+    void addExtraSignedAttribute(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put("intruder", AttributeValue.builder().s("added").build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "extra signed attribute accepted");
+    }
+
+    @ParameterizedTest(name = "5. Rename an attribute (move a value to a different key) {0}")
+    @MethodSource("testPairs")
+    void renameAttribute(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        AttributeValue value = item.remove(PUBLIC);
+        item.put("public_renamed", value);
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "renamed attribute accepted");
+    }
+
+    @ParameterizedTest(name = "6. Swap two sign-only attribute VALUES (keep both keys) {0}")
+    @MethodSource("testPairs")
+    void swapSignOnlyValues(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        String pk = item.get(PK).getS();
+        String pub = item.get(PUBLIC).getS();
+        item.put(PK, AttributeValue.builder().s(pub).build());
+        item.put(PUBLIC, AttributeValue.builder().s(pk).build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "swapped sign-only attribute values accepted");
+    }
+
+    @ParameterizedTest(name = "7. Change the 2-byte TypeID prefix on an encrypted attribute value {0}")
+    @MethodSource("testPairs")
+    void typeIdMutation(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        byte[] bytes = bytesOf(item.get(SECRET));
+        bytes[0] ^= (byte) 0xFF;
+        bytes[1] ^= (byte) 0xFF;
+        item.put(SECRET, AttributeValue.builder().b(ByteBuffer.wrap(bytes)).build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "TypeID mutation accepted");
+    }
+
+    @ParameterizedTest(name = "8. Change the partition key value (sign-only) {0}")
+    @MethodSource("testPairs")
+    void partitionKeyMutation(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(PK, AttributeValue.builder().s("intruder-pk").build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "partition key mutation accepted");
+    }
+
+    @ParameterizedTest(name = "9. Replace encrypted attribute with plaintext string {0}")
+    @MethodSource("testPairs")
+    void encryptedToPlaintextSwap(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(SECRET, AttributeValue.builder().s("hunter2").build());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "encrypted-to-plaintext swap accepted");
+    }
+
+    // =====================================================================
+    // Cross-record splice (5 mixings of head/foot/attrs).
+    // =====================================================================
+
+    @ParameterizedTest(name = "1. Splice: header from record1, attributes+footer from record2 {0}")
+    @MethodSource("testPairs")
+    void spliceHeaderFromRecord1(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> other = encryptOther(ctx);
+        Map<String, AttributeValue> item = copy(other);
+        item.put(HEAD, ctx.encryptedItem().get(HEAD));
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "cross-record header splice accepted");
+    }
+
+    @ParameterizedTest(name = "2. Splice: footer from record1, header+attributes from record2 {0}")
+    @MethodSource("testPairs")
+    void spliceFooterFromRecord1(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> other = encryptOther(ctx);
+        Map<String, AttributeValue> item = copy(other);
+        item.put(FOOT, ctx.encryptedItem().get(FOOT));
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "cross-record footer splice accepted");
+    }
+
+    @ParameterizedTest(name = "3. Splice: header+footer from record1, attributes from record2 {0}")
+    @MethodSource("testPairs")
+    void spliceHeadAndFootFromRecord1(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> other = encryptOther(ctx);
+        Map<String, AttributeValue> item = copy(other);
+        item.put(HEAD, ctx.encryptedItem().get(HEAD));
+        item.put(FOOT, ctx.encryptedItem().get(FOOT));
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "cross-record head+foot splice accepted");
+    }
+
+    @ParameterizedTest(name = "4. Splice: single encrypted attribute from record2 into record1 {0}")
+    @MethodSource("testPairs")
+    void spliceEncryptedAttributeFromRecord2(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> other = encryptOther(ctx);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(SECRET, other.get(SECRET));
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "cross-record encrypted attribute accepted");
+    }
+
+    @ParameterizedTest(name = "5. Splice: header/footer from a different logical table {0}")
+    @MethodSource("testPairs")
+    void spliceFromDifferentTable(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        // A separate encrypt-side client whose logical table differs by name
+        // only — same keyring, so its EDKs unwrap fine, but the canonical
+        // path prefix differs and the signature should reject.
+        String otherTableClient = newKmsClient(ctx.encryptClient(), "another-table", PK,
+            standardActions(), List.of());
+        Map<String, AttributeValue> encForOtherTable = encryptOnce(
+            ctx.encryptClient(), otherTableClient, canonicalPlaintext());
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(HEAD, encForOtherTable.get(HEAD));
+        item.put(FOOT, encForOtherTable.get(FOOT));
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx, item, "cross-table splice accepted");
+    }
+
+    // =====================================================================
+    // Truncation (8 head/foot truncations + additions).
+    // =====================================================================
+
+    @ParameterizedTest(name = "1. Header truncated mid-way (drop last 33 bytes = commitment + 1) {0}")
+    @MethodSource("testPairs")
+    void headerTruncatedMidCommitment(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        byte[] trunc = new byte[header.length - 33];
+        System.arraycopy(header, 0, trunc, 0, trunc.length);
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, trunc), "mid-header truncation accepted");
+    }
+
+    @ParameterizedTest(name = "2. Header truncated to the commitment boundary (last 32 bytes stripped) {0}")
+    @MethodSource("testPairs")
+    void headerTruncatedAtCommitmentBoundary(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        byte[] trunc = new byte[header.length - 32];
+        System.arraycopy(header, 0, trunc, 0, trunc.length);
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, trunc), "commitment-stripped header accepted");
+    }
+
+    @ParameterizedTest(name = "3. Header missing entirely (aws_dbe_head attribute removed) {0}")
+    @MethodSource("testPairs")
+    void headerAttributeRemoved(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.remove(HEAD);
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, item, "missing aws_dbe_head accepted");
+    }
+
+    @ParameterizedTest(name = "4. Header truncated to a single byte {0}")
+    @MethodSource("testPairs")
+    void headerTruncatedToSingleByte(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] trunc = new byte[] { headerBytes(ctx)[0] };
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, trunc), "1-byte header accepted");
+    }
+
+    @ParameterizedTest(name = "5. Header extended with 16 extra trailing bytes {0}")
+    @MethodSource("testPairs")
+    void headerExtendedWithTrailingBytes(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] header = headerBytes(ctx);
+        byte[] extended = new byte[header.length + 16];
+        System.arraycopy(header, 0, extended, 0, header.length);
+        for (int i = header.length; i < extended.length; i++) extended[i] = (byte) 0xCC;
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, withHeader(ctx, extended), "trailing-byte header accepted");
+    }
+
+    @ParameterizedTest(name = "6. Footer truncated to a single byte {0}")
+    @MethodSource("testPairs")
+    void footerTruncatedToSingleByte(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        byte[] footer = footerBytes(ctx);
+        byte[] trunc = new byte[] { footer[0] };
+        //= specification/structured-encryption/decrypt-path-structure.md#verify-signatures
+        //= type=test
+        //# The footer field value MUST be [verified](footer.md#footer-verification).
+        assertDecryptFails(ctx, withFooter(ctx, trunc), "1-byte footer accepted");
+    }
+
+    @ParameterizedTest(name = "7. Footer missing entirely (aws_dbe_foot attribute removed) {0}")
+    @MethodSource("testPairs")
+    void footerAttributeRemoved(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.remove(FOOT);
+        //= specification/structured-encryption/decrypt-path-structure.md#verify-signatures
+        //= type=test
+        //# A footer field MUST exist with the name `aws_dbe_foot`
+        assertDecryptFails(ctx, item, "missing aws_dbe_foot accepted");
+    }
+
+    @ParameterizedTest(name = "8. Both aws_dbe_head and aws_dbe_foot removed {0}")
+    @MethodSource("testPairs")
+    void bothHeadAndFootRemoved(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.remove(HEAD);
+        item.remove(FOOT);
+        //= specification/structured-encryption/decrypt-path-structure.md#parse-the-header
+        //= type=test
+        //# The header field value MUST be [verified](header.md#commitment-verification)
+        assertDecryptFails(ctx, item, "missing head+foot accepted");
+    }
+
+    // =====================================================================
+    // Schema promotion (3 decrypt-side schema mismatches).
+    // Instead of mutating bytes on the wire the tests build a second
+    // decrypt-side client with a different schema and decrypt the pair's
+    // baseline against it; the recipient-tag check must catch every mismatch.
+    // =====================================================================
+
+    @ParameterizedTest(name = "1. Decrypt schema marks a formerly-signed attribute as unsigned {0}")
+    @MethodSource("testPairs")
+    void signedToUnsignedPromotion(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        // Encrypt used PUBLIC as SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT (v2);
+        // decrypt now claims PUBLIC is unsigned via allowedUnsignedAttributes
+        // (v1 config, since no attribute uses the v2 action). Signature scope
+        // shift plus config version mismatch — either alone MUST fail decrypt.
+        Map<String, CryptoAction> reduced = new LinkedHashMap<>();
+        reduced.put(PK, CryptoAction.SIGN_ONLY);
+        reduced.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
+        String otherClientId = newKmsClient(
+            ctx.decryptClient(), TABLE, PK, reduced, List.of(PUBLIC));
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx.decryptClient(), otherClientId, ctx.encryptedItem(),
+            "signed→unsigned attribute promotion accepted");
+    }
+
+    @ParameterizedTest(name = "2. Decrypt uses a different partitionKeyName {0}")
+    @MethodSource("testPairs")
+    void differentPartitionKeyName(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        String otherClientId = newKmsClient(
+            ctx.decryptClient(), TABLE, PUBLIC, standardActions(), List.of());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx.decryptClient(), otherClientId, ctx.encryptedItem(),
+            "different partitionKeyName accepted");
+    }
+
+    @ParameterizedTest(name = "3. Decrypt uses a different logicalTableName {0}")
+    @MethodSource("testPairs")
+    void differentLogicalTableName(TargetPair pair) {
+        TestContext ctx = contextFor(pair);
+        String otherClientId = newKmsClient(
+            ctx.decryptClient(), "different-table-name", PK, standardActions(), List.of());
+        //= specification/structured-encryption/footer.md#recipient-tag-verification
+        //= type=test
+        //# Verification MUST fail unless at least one of the [Recipient Tags](#recipient-tags)
+        //# matches a calculated recipient tag using the provided symmetricSigningKey.
+        assertDecryptFails(ctx.decryptClient(), otherClientId, ctx.encryptedItem(),
+            "different logicalTableName accepted");
+    }
+
+    // =====================================================================
+    // TestContext — the per-pair pre-encrypted state each test method receives.
+    // =====================================================================
+
+    /**
+     * Per-pair pre-built state a tamper test receives:
+     * <ul>
+     *   <li>{@code pair} — the {@code (encrypt, decrypt)} target pair;
+     *       {@link #toString()} formats as e.g. {@code java-v3->rust-v1} for
+     *       parameterized test names.</li>
+     *   <li>{@code encryptClient / decryptClient} — the two HTTP clients
+     *       already cached in {@link DbeTestServerClients} per endpoint.</li>
+     *   <li>{@code encryptClientId / decryptClientId} — the two
+     *       server-assigned {@code clientId}s from the CreateClient calls
+     *       (both configured with the same schema and AWS-KMS keyring).</li>
+     *   <li>{@code encryptedItem} — the untampered baseline encrypted on
+     *       {@code encryptClient}. Every mutation reads bytes from here.</li>
+     * </ul>
+     */
+    record TestContext(
+        TargetPair pair,
+        DBESDKTestServerClient encryptClient,
+        DBESDKTestServerClient decryptClient,
+        String encryptClientId,
+        String decryptClientId,
+        Map<String, AttributeValue> encryptedItem
+    ) {
+        @Override
+        public String toString() {
+            return pair.toString();
+        }
+    }
+
+    // =====================================================================
+    // TargetPair provider (the @MethodSource every test above binds to) +
+    // per-pair TestContext cache. Each pair's baseline is built lazily on
+    // the first test that requests it via contextFor(pair), and shared by
+    // all 45 tests that see the same pair.
+    //
+    // The @MethodSource yields TargetPair (not TestContext) so any per-pair
+    // setup failure (unreachable server, CreateClient rejection, baseline
+    // round-trip failure) surfaces as a per-test failure visible in the
+    // JUnit XML — instead of throwing out of argument assembly and aborting
+    // the entire class's XML output (which the orchestrator sees as
+    // "zero tests executed").
+    // =====================================================================
+
+    private static final Map<TargetPair, TestContext> CONTEXTS = new ConcurrentHashMap<>();
+
+    static Stream<TargetPair> testPairs() {
+        return DbeTestHelpers.pairs().stream();
+    }
+
+    /**
+     * Resolve the pre-built {@link TestContext} for {@code pair}, building it
+     * on first request and caching the result. Called from every test
+     * method's body — not the {@code @MethodSource} — so a build failure
+     * surfaces as a per-test failure that Gradle writes to the JUnit XML,
+     * instead of aborting argument assembly for the whole class.
+     */
+    private static TestContext contextFor(TargetPair pair) {
+        return CONTEXTS.computeIfAbsent(pair, ItemIntegrityRejectionTests::buildContext);
+    }
+
+    private static TestContext buildContext(TargetPair pair) {
+        DBESDKTestServerClient encryptClient = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
+        DBESDKTestServerClient decryptClient = DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        // Same schema on both sides — a matched pair is the baseline. Tests
+        // that want a decrypt-side schema mismatch build their own client via
+        // DbeTestHelpers.newKmsClient(...).
+        Map<String, CryptoAction> actions = standardActions();
+        // Precondition for test #9 (EC entry tamper): the baseline schema MUST
+        // carry a non-empty header Encryption Context, which the DBE library
+        // emits only for SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT attributes.
+        // Assert it here so a schema edit that drops those actions fails at
+        // baseline construction instead of surfacing deep inside test #9.
+        assertTrue(DbeTestHelpers.hasContextAttribute(actions),
+            "baseline schema must include a SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT attribute "
+                + "so the header carries a non-empty Encryption Context (required by test #9)");
+        String encryptClientId = newKmsClient(encryptClient, TABLE, PK, actions, List.of());
+        String decryptClientId = newKmsClient(decryptClient, TABLE, PK, actions, List.of());
+        Map<String, AttributeValue> plaintext = canonicalPlaintext();
+        Map<String, AttributeValue> item = encryptOnce(encryptClient, encryptClientId, plaintext);
+        assertNotNull(item.get(HEAD),
+            "encrypted item from " + pair.encryptTarget().label() + " missing aws_dbe_head");
+        assertNotNull(item.get(FOOT),
+            "encrypted item from " + pair.encryptTarget().label() + " missing aws_dbe_foot");
+        // Prove the untampered baseline actually round-trips before any tamper
+        // test runs against this pair. Without this, a broken decrypt path
+        // that refuses every input would pass every mutation-refused assertion
+        // in the tamper suite (405 tests) for the wrong reason. Failing here
+        // once per pair fails the first tamper test that requests the pair's
+        // baseline with a clear "baseline round-trip failed" cause, and every
+        // subsequent tamper test for the same pair fails identically —
+        // instead of scattered errors deep inside each mutation.
+        verifyPairRoundTrip(pair, decryptClient, decryptClientId, item, plaintext);
+        return new TestContext(pair, encryptClient, decryptClient, encryptClientId, decryptClientId, item);
+    }
+
+    private static void verifyPairRoundTrip(TargetPair pair, DBESDKTestServerClient decryptClient,
+                                                String decryptClientId,
+                                                Map<String, AttributeValue> item,
+                                                Map<String, AttributeValue> plaintext) {
+        try {
+            DecryptItemOutput decrypted = decryptClient.decryptItem(
+                DecryptItemInput.builder()
+                    .clientId(decryptClientId)
+                    .encryptedItem(item)
+                    .build());
+            Map<String, AttributeValue> recovered = decrypted.getPlaintextItem();
+            assertNotNull(recovered,
+                "baseline decrypt on " + pair.decryptTarget().label() + " returned no plaintext");
+            for (Map.Entry<String, AttributeValue> entry : plaintext.entrySet()) {
+                AttributeValue actual = recovered.get(entry.getKey());
+                assertNotNull(actual,
+                    "baseline round-trip on " + pair + " lost attribute '" + entry.getKey() + "'");
+                assertTrue(entry.getValue().getS().equals(actual.getS()),
+                    "baseline round-trip on " + pair
+                        + " did not preserve attribute '" + entry.getKey()
+                        + "' (expected " + entry.getValue().getS()
+                        + ", got " + actual.getS() + ")");
+            }
+        } catch (RuntimeException e) {
+            fail("baseline round-trip failed on " + pair
+                + " — tamper tests for this pair would give misleading results. Root cause: " + e);
+        }
+    }
+
+    // =====================================================================
+    // Tamper-specific free helpers.
+    // =====================================================================
+
+    /** @return the raw bytes of the baseline's {@code aws_dbe_head} attribute. */
+    private static byte[] headerBytes(TestContext ctx) {
+        return bytesOf(ctx.encryptedItem().get(HEAD));
+    }
+
+    /** @return the raw bytes of the baseline's {@code aws_dbe_foot} attribute. */
+    private static byte[] footerBytes(TestContext ctx) {
+        return bytesOf(ctx.encryptedItem().get(FOOT));
+    }
+
+    /** @return a copy of the baseline item with its {@code aws_dbe_head} replaced by {@code header}. */
+    private static Map<String, AttributeValue> withHeader(TestContext ctx, byte[] header) {
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(HEAD, AttributeValue.builder().b(ByteBuffer.wrap(header)).build());
+        return item;
+    }
+
+    /** @return a copy of the baseline item with its {@code aws_dbe_foot} replaced by {@code footer}. */
+    private static Map<String, AttributeValue> withFooter(TestContext ctx, byte[] footer) {
+        Map<String, AttributeValue> item = copy(ctx.encryptedItem());
+        item.put(FOOT, AttributeValue.builder().b(ByteBuffer.wrap(footer)).build());
+        return item;
+    }
+
+    /**
+     * Decrypt {@code tampered} on the pair's decrypt client and assert the
+     * DBE library refuses it with a {@link DBESDKClientError}.
+     */
+    private static void assertDecryptFails(TestContext ctx, Map<String, AttributeValue> tampered, String message) {
+        assertDecryptFails(ctx.decryptClient(), ctx.decryptClientId(), tampered, message);
+    }
+
+    /**
+     * As {@link #assertDecryptFails(TestContext, Map, String)} but on a
+     * caller-supplied client/id — schema-promotion tests build their own
+     * decrypt-side client with a mismatched schema.
+     */
+    private static void assertDecryptFails(DBESDKTestServerClient client, String clientId,
+                                           Map<String, AttributeValue> encryptedItem, String message) {
+        DBESDKClientError error = assertThrows(
+            DBESDKClientError.class,
+            () -> client.decryptItem(DecryptItemInput.builder()
+                .clientId(clientId)
+                .encryptedItem(encryptedItem)
+                .build()),
+            message);
+        assertTrue(error.getMessage() == null || !error.getMessage().isEmpty(),
+            "DBE error surfaced but with an empty message");
+    }
+
+    /** Encrypt a second record on the baseline's encrypt-side client (used by the splice mutations). */
+    private static Map<String, AttributeValue> encryptOther(TestContext ctx) {
+        Map<String, AttributeValue> otherPlaintext = new LinkedHashMap<>();
+        otherPlaintext.put(PK, AttributeValue.builder().s("item-splice-2").build());
+        otherPlaintext.put(SECRET, AttributeValue.builder().s("other-secret").build());
+        otherPlaintext.put(PUBLIC, AttributeValue.builder().s("other-public").build());
+        return encryptOnce(ctx.encryptClient(), ctx.encryptClientId(), otherPlaintext);
+    }
+
+    /**
+     * Byte offset of the EDK count in the header:
+     * {@code 1 + 1 + 32 + 2 + legendLen + 2 + sum(EC entries)}.
+     */
+    private static int edkCountOffset(byte[] header) {
+        int legendLen = ((header[34] & 0xFF) << 8) | (header[35] & 0xFF);
+        int off = 36 + legendLen;
+        int ecCount = ((header[off] & 0xFF) << 8) | (header[off + 1] & 0xFF);
+        off += 2;
+        for (int i = 0; i < ecCount; i++) {
+            int keyLen = ((header[off] & 0xFF) << 8) | (header[off + 1] & 0xFF);
+            off += 2 + keyLen;
+            int valLen = ((header[off] & 0xFF) << 8) | (header[off + 1] & 0xFF);
+            off += 2 + valLen;
+        }
+        return off;
+    }
+
+    /**
+     * Content offsets of the three variable-length fields inside the FIRST
+     * Encrypted Data Key entry, returned as
+     * {@code {keyProviderId, keyProviderInformation, ciphertext}}. Entry layout
+     * per the DBE spec (header.md#encrypted-data-key-entries):
+     * {@code [2 provIdLen | provId | 2 provInfoLen | provInfo | 2 cipherLen | ciphertext]},
+     * and the EDK count is a single byte, so the first entry begins at
+     * {@code edkCountOffset + 1}.
+     */
+    private static int[] firstEdkFieldOffsets(byte[] header) {
+        int provIdLenOffset = edkCountOffset(header) + 1;
+        int provIdLen = ((header[provIdLenOffset] & 0xFF) << 8) | (header[provIdLenOffset + 1] & 0xFF);
+        int provIdOffset = provIdLenOffset + 2;
+        int provInfoLenOffset = provIdOffset + provIdLen;
+        int provInfoLen = ((header[provInfoLenOffset] & 0xFF) << 8) | (header[provInfoLenOffset + 1] & 0xFF);
+        int provInfoOffset = provInfoLenOffset + 2;
+        int cipherLenOffset = provInfoOffset + provInfoLen;
+        int cipherOffset = cipherLenOffset + 2;
+        return new int[] { provIdOffset, provInfoOffset, cipherOffset };
+    }
+}
