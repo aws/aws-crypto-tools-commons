@@ -1,5 +1,0 @@
-[
-  "decrypt-accepts-trailing-bytes-commit-key",
-  "decrypt-accepts-trailing-bytes-commit-key-ecdsa",
-  "encrypt-accepts-reserved-prefix-encryption-context-key"
-]

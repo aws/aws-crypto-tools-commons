@@ -20,7 +20,6 @@ each with its own wrapper, plus the commons-owned config:
 | `client-java/` | the generated Java Test_Client |
 | `tests/` | the single Java Tests suite |
 | `orchestrator/` | the Orchestrator core (resolves, builds, launches, runs, reports) |
-| `servers/python/` | the Python Language_Server (hand-implemented, no build step) |
 | `config/` | the commons Configuration_Set: `server-config.json`, `feature-set.json`, `bug-list.json` |
 
 The Java (and other language) servers are **not** hosted here — they live in
@@ -32,7 +31,7 @@ their Language_Repositories and are resolved by the orchestrator from
 - **JDK 21+** (smithy-java requires it). Either export `JAVA_HOME`, pass
   `make JAVA_HOME=/path/to/jdk21 <target>`, or rely on the Makefile's
   auto-detection. Verify with `make check-java`.
-- **git**, and **python3** (only for the Python server).
+- **git**, and **python3** (used by the structural smoke checks in `make validate`).
 - **AWS credentials** are required *only* for `make orchestrate` (the KMS
   keyring scenarios are part of it). The inner-loop targets below need none.
 
@@ -58,19 +57,6 @@ make orchestrate-test # the orchestrator's own property/integration tests
 `make orchestrate-test` is the one to run while working on the orchestrator
 itself — it exercises the resolution/materialization/validation pipeline as pure
 logic, with no git and no network.
-
-### The Python server by hand
-
-The Python server is standalone — no compile step, and it does not require the
-orchestrator:
-
-```
-make setup-python                       # clone the Python ESDK (once, idempotent), venv, install
-make run-python-server PYTHON_PORT=8091 # run it in the foreground (Ctrl-C to stop)
-```
-
-Then drive it directly with the Test_Client / Tests against
-`http://127.0.0.1:8091`.
 
 ## The full cross-language run
 
