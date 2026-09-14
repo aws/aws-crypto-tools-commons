@@ -10,9 +10,9 @@
 # shell checks about the repo).
 #
 #   * Requirements 1.1, 1.3: the Configuration_Set names the Java
-#     Language_Server in the aws-crypto-tools-java Language_Repository
-#     (serverLocation.repository "aws-crypto-tools-java", path
-#     "esdk/test-server/server") and the Python Language_Server in the
+#     Language_Server in the aws-encryption-sdk-java Language_Repository
+#     (serverLocation.repository "aws-encryption-sdk-java", path
+#     "test-server/server") and the Python Language_Server in the
 #     aws-encryption-sdk-python Language_Repository
 #     (serverLocation.repository "aws-encryption-sdk-python", path
 #     "test-server").
@@ -67,7 +67,7 @@ for f in "$SERVER_CONFIG" "$FEATURE_CONFIG"; do
 done
 
 # ----------------------------------------------------------------------------
-# Check 1: Server_Locations — Java server in aws-crypto-tools-java, Python
+# Check 1: Server_Locations — Java server in aws-encryption-sdk-java, Python
 # server in commons (Req 1.1, 1.3)
 # ----------------------------------------------------------------------------
 if location_errors=$(python3 - "$SERVER_CONFIG" <<'PY'
@@ -81,11 +81,11 @@ if not isinstance(java, dict):
     errors.append("no java Configuration_Entry")
 else:
     loc = java.get("serverLocation") or {}
-    if loc.get("repository") != "aws-crypto-tools-java":
-        errors.append('java serverLocation.repository is %r, expected "aws-crypto-tools-java"'
+    if loc.get("repository") != "aws-encryption-sdk-java":
+        errors.append('java serverLocation.repository is %r, expected "aws-encryption-sdk-java"'
                       % loc.get("repository"))
-    if loc.get("path") != "esdk/test-server/server":
-        errors.append('java serverLocation.path is %r, expected "esdk/test-server/server"'
+    if loc.get("path") != "test-server/server":
+        errors.append('java serverLocation.path is %r, expected "test-server/server"'
                       % loc.get("path"))
 
 python = entries.get("python")
@@ -104,7 +104,7 @@ print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in aws-encryption-sdk-python at test-server (Req 1.1, 1.3)"
+    pass "Java server located in aws-encryption-sdk-java at test-server/server; Python server in aws-encryption-sdk-python at test-server (Req 1.1, 1.3)"
 else
     if [ -n "$location_errors" ]; then
         fail "Server_Location violation: ${location_errors//$'\n'/; } (Req 1.1, 1.3)"

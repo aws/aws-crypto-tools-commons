@@ -5,18 +5,18 @@
       "language": "java",
       "majorVersion": 3,
       "port": 8091,
-      "configPath": "esdk/test-server",
+      "configPath": "test-server",
       "libraryRepository": {
-        "name": "aws-crypto-tools-java",
-        "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "branch": "kessplas/bug-config",
-        "path": "esdk"
+        "name": "aws-encryption-sdk-java",
+        "url": "https://github.com/aws/aws-encryption-sdk-java",
+        "branch": "kessplas/esdk-test-server",
+        "path": "."
       },
       "serverLocation": {
-        "repository": "aws-crypto-tools-java",
-        "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "ref": "kessplas/bug-config",
-        "path": "esdk/test-server/server"
+        "repository": "aws-encryption-sdk-java",
+        "url": "https://github.com/aws/aws-encryption-sdk-java",
+        "ref": "kessplas/esdk-test-server",
+        "path": "test-server/server"
       }
     },
     {
