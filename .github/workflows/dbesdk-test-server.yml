@@ -45,6 +45,26 @@ on:
       - ".github/workflows/dbesdk-test-server.yml"
   workflow_dispatch:
   workflow_call:
+    inputs:
+      commons_ref:
+        description: >-
+          aws-crypto-tools-commons ref (the harness + Configuration_Set: tests,
+          model, orchestrator, server-config) to check out. Empty on a native
+          commons run => the triggering commit. A cross-repo caller (the DB-ESDK
+          product repo) passes the commons ref that carries the test cases.
+        type: string
+        required: false
+        default: ""
+      dbe_ref:
+        description: >-
+          aws-database-encryption-sdk-dynamodb ref to resolve the language
+          SERVERS from. Empty on a native commons run => each server is cloned at
+          its server-config.json serverLocation.ref. A DB-ESDK-product caller
+          sets it to its own PR commit so the run tests THAT commit's servers via
+          a working-tree overlay instead of the configured branch.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -70,8 +90,30 @@ jobs:
       KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
 
     steps:
-      - name: Checkout (working tree = the Configuration_Set every target resolves from)
+      - name: Checkout aws-crypto-tools-commons (harness + Configuration_Set)
+        # Explicit repository so a cross-repo `workflow_call` (e.g. from the
+        # DB-ESDK product repo) still checks out the COMMONS working tree that
+        # holds the tests/model/orchestrator/server-config — not the caller's
+        # repo, which `actions/checkout` would default to. `commons_ref` is empty
+        # on a native commons run (=> the triggering commit) and set by a
+        # cross-repo caller to the commons ref carrying the test cases.
         uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons_ref || github.sha }}
+
+      - name: Checkout the DB-ESDK product repo at the requested server ref
+        # Only when a caller pins `dbe_ref` (a DB-ESDK-product-triggered run):
+        # check out that commit's SERVERS and feed them to `make orchestrate` as a
+        # working-tree overlay (see the orchestrate step), so the run tests exactly
+        # that commit rather than cloning server-config.json's serverLocation.ref.
+        # Omitted on a native commons run, which resolves the servers as before.
+        if: ${{ inputs.dbe_ref != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-database-encryption-sdk-dynamodb
+          ref: ${{ inputs.dbe_ref }}
+          path: .dbe-product-repo
 
       - name: Set up JDK 21 (Temurin) for the commons harness + Java server
         # smithy-java (client/tests/orchestrator) needs JDK 21+; the Java
@@ -185,7 +227,15 @@ jobs:
           # Nine concurrent server builds on a 2-core runner need a wide
           # readiness window (mirrors the ESDK workflow's 900s).
           DBESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate
+        # When a caller pinned dbe_ref, point the orchestrator's working-tree
+        # overlay at the product-repo checkout above so it tests THAT commit's
+        # servers; otherwise resolve them from server-config.json as before.
+        run: |
+          if [ -n "${{ inputs.dbe_ref }}" ]; then
+            make orchestrate DBESDK_DBE_REPO="${{ github.workspace }}/.dbe-product-repo"
+          else
+            make orchestrate
+          fi
 
       - name: Publish test results to the run summary
         # Renders the cross-language coverage matrix, failed-tests table,
