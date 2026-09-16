@@ -119,8 +119,8 @@ public final class DbeTestHelpers {
         }
         List<TargetPair> baseline = new ArrayList<>();
         for (TargetPair pair : all) {
-            if (supportsBaseline(declarations, pair.encryptTarget().language())
-                    && supportsBaseline(declarations, pair.decryptTarget().language())) {
+            if (supportsBaseline(declarations, pair.encryptTarget())
+                    && supportsBaseline(declarations, pair.decryptTarget())) {
                 baseline.add(pair);
             }
         }
@@ -163,9 +163,10 @@ public final class DbeTestHelpers {
      */
     private static final Set<String> BASELINE_FEATURES = Set.of("aws-kms", "raw-aes");
 
-    private static boolean supportsBaseline(FeatureDeclarations declarations, String language) {
+    private static boolean supportsBaseline(FeatureDeclarations declarations, LanguageServerTarget target) {
         for (String feature : BASELINE_FEATURES) {
-            if (!declarations.isSupported(language, feature)) {
+            if (!declarations.isSupported(
+                    target.language(), target.majorVersion(), target.repo(), feature)) {
                 return false;
             }
         }

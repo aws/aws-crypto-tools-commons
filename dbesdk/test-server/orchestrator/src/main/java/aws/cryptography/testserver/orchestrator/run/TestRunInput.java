@@ -103,12 +103,14 @@ public record TestRunInput(
 
     /**
      * Format flattened declarations as the {@code testserver.features}
-     * value: {@code lang:feat=bool[;feat=bool…]} CSV, e.g.
-     * {@code java:streaming=true;MPL=true,python:streaming=true;MPL=true}.
+     * value: {@code <language>:<major>:<repo>:<feature>=<bool>[;<feature>=<bool>…]}
+     * CSV, e.g.
+     * {@code java:3:aws-database-encryption-sdk-dynamodb:streaming=true;MPL=true}.
+     * The map key is the full {@code language:major:repo} source identity.
      */
     public static String formatFeatures(Map<String, Map<String, Boolean>> features) {
         return features.entrySet().stream()
-            .map(language -> language.getKey() + ":" + language.getValue().entrySet().stream()
+            .map(source -> source.getKey() + ":" + source.getValue().entrySet().stream()
                 .map(feature -> feature.getKey() + "=" + feature.getValue())
                 .collect(Collectors.joining(";")))
             .collect(Collectors.joining(","));
@@ -126,25 +128,27 @@ public record TestRunInput(
     /**
      * Format the declared raw-RSA padding capabilities as the
      * {@code testserver.rawRsaPaddingSchemes} value:
-     * {@code lang:SCHEME[;SCHEME…]} CSV, e.g.
-     * {@code c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1}. Only languages whose
+     * {@code <language>:<major>:<repo>:<SCHEME>[;<SCHEME>…]} CSV, e.g.
+     * {@code c:1:some-repo:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1}. The map key is
+     * the full {@code language:major:repo} source identity; only sources whose
      * declaration carries the capability appear.
      */
     public static String formatRawRsaPaddingSchemes(Map<String, List<String>> schemes) {
         return schemes.entrySet().stream()
-            .map(language -> language.getKey() + ":" + String.join(";", language.getValue()))
+            .map(source -> source.getKey() + ":" + String.join(";", source.getValue()))
             .collect(Collectors.joining(","));
     }
 
     /**
-     * Format the per-language exhibited-bug ids as the
-     * {@code testserver.knownBugs} value: {@code lang:id[;id…]} CSV, e.g.
-     * {@code java:some-bug;another-bug,rust:some-bug}. Only languages that
-     * exhibit at least one catalogued bug appear.
+     * Format the per-source exhibited-bug ids as the {@code testserver.knownBugs}
+     * value: {@code <language>:<major>:<repo>=<id>[;<id>…]} CSV, e.g.
+     * {@code java:3:aws-database-encryption-sdk-dynamodb=some-bug;another-bug}.
+     * The map key is the full {@code language:major:repo} source identity; only
+     * sources that exhibit at least one catalogued bug appear.
      */
     public static String formatKnownBugs(Map<String, List<String>> knownBugs) {
         return knownBugs.entrySet().stream()
-            .map(language -> language.getKey() + ":" + String.join(";", language.getValue()))
+            .map(e -> e.getKey() + "=" + String.join(";", e.getValue()))
             .collect(Collectors.joining(","));
     }
 

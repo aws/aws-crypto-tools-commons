@@ -577,7 +577,9 @@ public final class TestServerOrchestrator {
             ConfigurationEntry entry = entryByLanguage.get(server.language());
             int majorVersion = entry != null && entry.majorVersion() != null
                 ? entry.majorVersion() : 0;
-            targets.add(new TestTarget(server.language(), majorVersion, server.endpoint()));
+            String repo = entry != null && entry.repository() != null
+                ? entry.repository() : "unknown";
+            targets.add(new TestTarget(server.language(), majorVersion, repo, server.endpoint()));
         }
 
         List<String> catalog = commonsConfiguration.features() == null
@@ -591,13 +593,18 @@ public final class TestServerOrchestrator {
             if (declaration == null) {
                 continue;
             }
+            // Every per-source registry (features, raw-RSA paddings, known bugs)
+            // is keyed by the full (language, majorVersion, repo) source identity.
+            int major = entry.majorVersion() != null ? entry.majorVersion() : 0;
+            String repo = entry.repository() != null ? entry.repository() : "unknown";
+            String sourceKey = entry.language() + ":" + major + ":" + repo;
             Map<String, Boolean> flattened = TestRunInput.flattenDeclaration(
                 catalog, declaration.supported(), declaration.unsupported());
             if (!flattened.isEmpty()) {
-                features.put(entry.language(), flattened);
+                features.put(sourceKey, flattened);
             }
             if (declaration.rawRsaPaddingSchemes() != null) {
-                rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
+                rawRsaPaddingSchemes.put(sourceKey, declaration.rawRsaPaddingSchemes());
             }
             // Each exhibited bug id must be defined in the commons bug ledger
             // (design "Bug Configuration"): a server cannot declare a bug the
@@ -612,7 +619,7 @@ public final class TestServerOrchestrator {
                                 + bugLedgerIds);
                     }
                 }
-                knownBugs.put(entry.language(), exhibited);
+                knownBugs.put(sourceKey, exhibited);
             }
         }
         return new TestRunInput(

@@ -25,8 +25,8 @@ import org.opentest4j.TestAbortedException;
  *   <li>If any language in the combination declares any required Feature
  *       unsupported, the Test is skipped visibly via
  *       {@link TestAbortedException} with the message
- *       {@code feature-gated skip: feature=<f> unsupported by [<languages>]},
- *       naming each gating Feature and exactly the languages declaring it
+ *       {@code feature-gated skip: feature=<f> unsupported by [<targets>]},
+ *       naming each gating Feature and exactly the targets declaring it
  *       unsupported (Requirements 9.5, 9.6). No Language_Server operation has
  *       been invoked yet.</li>
  *   <li>A missing declaration — no registry configured, no declaration for a
@@ -76,16 +76,16 @@ public final class FeatureGate {
      * system properties — mirroring {@link FeatureDeclarations#parse}.
      */
     static void require(Set<String> features, TargetPair combination, FeatureDeclarations declarations) {
-        requireForLanguages(features, combinationLanguages(combination), declarations);
+        requireForTargets(features, combinationTargets(combination), declarations);
     }
 
     /** Single-target form against an explicit registry; package-private for unit tests. */
     static void require(Set<String> features, LanguageServerTarget target, FeatureDeclarations declarations) {
-        requireForLanguages(features, List.of(target.language()), declarations);
+        requireForTargets(features, List.of(target), declarations);
     }
 
-    private static void requireForLanguages(
-            Set<String> features, List<String> languages, FeatureDeclarations declarations) {
+    private static void requireForTargets(
+            Set<String> features, List<LanguageServerTarget> targets, FeatureDeclarations declarations) {
         // Deterministic ordering for messages, whatever Set implementation the
         // caller hands us.
         List<String> requiredFeatures = List.copyOf(new TreeSet<>(features));
@@ -109,9 +109,10 @@ public final class FeatureGate {
         Map<String, List<String>> unsupportedByFeature = new LinkedHashMap<>();
         for (String feature : requiredFeatures) {
             List<String> unsupporting = new ArrayList<>();
-            for (String language : languages) {
-                if (!declarations.isSupported(language, feature)) {
-                    unsupporting.add(language);
+            for (LanguageServerTarget target : targets) {
+                if (!declarations.isSupported(
+                        target.language(), target.majorVersion(), target.repo(), feature)) {
+                    unsupporting.add(target.label());
                 }
             }
             if (!unsupporting.isEmpty()) {
@@ -135,10 +136,10 @@ public final class FeatureGate {
      * empty registry never skips. Type safety of scheme names plays
      * the Feature_Catalog's role: there is no unknown-scheme case.
      *
-     * @throws TestAbortedException if any combination language declares any
+     * @throws TestAbortedException if any combination target declares any
      *     required scheme outside its supported subset, with the message
      *     {@code padding-gated skip: rawRsaPadding=<scheme> unsupported by
-     *     [<languages>]}, one clause per gating scheme
+     *     [<targets>]}, one clause per gating scheme
      */
     public static void requireRawRsaPaddings(
             Set<String> paddingSchemes, TargetPair combination) {
@@ -155,18 +156,18 @@ public final class FeatureGate {
     static void requireRawRsaPaddings(
             Set<String> paddingSchemes, TargetPair combination,
             FeatureDeclarations declarations) {
-        requirePaddingsForLanguages(paddingSchemes, combinationLanguages(combination), declarations);
+        requirePaddingsForTargets(paddingSchemes, combinationTargets(combination), declarations);
     }
 
     /** Single-target padding gate against an explicit registry; package-private for unit tests. */
     static void requireRawRsaPaddings(
             Set<String> paddingSchemes, LanguageServerTarget target,
             FeatureDeclarations declarations) {
-        requirePaddingsForLanguages(paddingSchemes, List.of(target.language()), declarations);
+        requirePaddingsForTargets(paddingSchemes, List.of(target), declarations);
     }
 
-    private static void requirePaddingsForLanguages(
-            Set<String> paddingSchemes, List<String> languages,
+    private static void requirePaddingsForTargets(
+            Set<String> paddingSchemes, List<LanguageServerTarget> targets,
             FeatureDeclarations declarations) {
         List<String> required = paddingSchemes.stream()
             .sorted(Comparator.naturalOrder())
@@ -175,9 +176,10 @@ public final class FeatureGate {
         Map<String, List<String>> unsupportedByScheme = new LinkedHashMap<>();
         for (String scheme : required) {
             List<String> unsupporting = new ArrayList<>();
-            for (String language : languages) {
-                if (!declarations.supportsRawRsaPadding(language, scheme)) {
-                    unsupporting.add(language);
+            for (LanguageServerTarget target : targets) {
+                if (!declarations.supportsRawRsaPadding(
+                        target.language(), target.majorVersion(), target.repo(), scheme)) {
+                    unsupporting.add(target.label());
                 }
             }
             if (!unsupporting.isEmpty()) {
@@ -201,16 +203,16 @@ public final class FeatureGate {
         }
     }
 
-    /** Distinct combination languages, encrypt target first. */
-    private static List<String> combinationLanguages(TargetPair combination) {
-        LinkedHashSet<String> languages = new LinkedHashSet<>();
-        languages.add(combination.encryptTarget().language());
-        languages.add(combination.decryptTarget().language());
-        return List.copyOf(languages);
+    /** Distinct combination targets, encrypt target first. */
+    private static List<LanguageServerTarget> combinationTargets(TargetPair combination) {
+        LinkedHashSet<LanguageServerTarget> targets = new LinkedHashSet<>();
+        targets.add(combination.encryptTarget());
+        targets.add(combination.decryptTarget());
+        return List.copyOf(targets);
     }
 
     /**
-     * {@code feature-gated skip: feature=<f> unsupported by [<languages>]},
+     * {@code feature-gated skip: feature=<f> unsupported by [<targets>]},
      * one clause per gating Feature.
      */
     private static String skipMessage(Map<String, List<String>> unsupportedByFeature) {

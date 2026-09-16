@@ -279,8 +279,8 @@ class OrchestratorErrorPathsIntegrationTest {
         // carriers' capabilities.
         assertTrue(runner.wasInvoked(), () -> "the Tests must run: " + result.summary());
         assertEquals(
-            Map.of("python", List.of("PKCS1"),
-                "c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
+            Map.of("python:1:aws-crypto-tools-python", List.of("PKCS1"),
+                "c:3:aws-crypto-tools-c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
             runner.lastInput().rawRsaPaddingSchemes(),
             "both carriers' capabilities must reach the Tests run; java must be absent");
     }

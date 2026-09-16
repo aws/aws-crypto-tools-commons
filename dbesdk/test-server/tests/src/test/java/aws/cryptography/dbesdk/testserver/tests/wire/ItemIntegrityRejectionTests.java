@@ -400,7 +400,7 @@ class ItemIntegrityRejectionTests {
         // (encrypt) target's language via the known-bug ledger.
         KnownBugGate.gateDeclared(
             "footer-ecdsa-signature-length-spec-96-implementation-103",
-            pair.encryptTarget().language(),
+            pair.encryptTarget(),
             () -> assertEquals(edkCount * 48 + 96, footer.length,
                 "signing footer must be Recipient Tags (48/EDK) + a 96-byte ECDSA-P384 signature "
                     + "per footer.md; got " + footer.length + " (" + pair + ")"));

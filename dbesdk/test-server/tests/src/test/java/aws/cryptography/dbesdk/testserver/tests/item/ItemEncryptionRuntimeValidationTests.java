@@ -118,7 +118,7 @@ class ItemEncryptionRuntimeValidationTests {
         item.put("value", DbeTestHelpers.deeplyNestedMap(32));
         KnownBugGate.gateDeclared(
             "java-deep-nesting-request-validation-overflow",
-            target.language(),
+            target,
             () -> {
                 DBESDKClientError error = assertThrows(DBESDKClientError.class,
                     () -> encryptOnce(client, clientId, item),

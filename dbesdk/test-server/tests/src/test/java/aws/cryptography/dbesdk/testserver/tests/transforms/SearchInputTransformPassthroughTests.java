@@ -123,7 +123,7 @@ class SearchInputTransformPassthroughTests {
         String overLimit = " ".repeat(4097);
         KnownBugGate.gateDeclared(
             "java-3-8-1-missing-expression-length-guard",
-            pair.encryptTarget().language(),
+            pair.encryptTarget(),
             () -> {
                 DBESDKClientError error = assertThrows(DBESDKClientError.class,
                     () -> client.queryInputTransform(QueryInputTransformInput.builder()
@@ -156,7 +156,7 @@ class SearchInputTransformPassthroughTests {
         String overLimit = " ".repeat(4097);
         KnownBugGate.gateDeclared(
             "java-3-8-1-missing-expression-length-guard",
-            pair.encryptTarget().language(),
+            pair.encryptTarget(),
             () -> {
                 DBESDKClientError error = assertThrows(DBESDKClientError.class,
                     () -> client.scanInputTransform(ScanInputTransformInput.builder()

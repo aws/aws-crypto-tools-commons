@@ -13,14 +13,21 @@ import java.util.Set;
  * <em>runtime configuration only</em> and shared across every test class —
  * mirroring {@link LanguageServerRegistry}.
  *
+ * <p>Feature support and raw-RSA padding capability are keyed by the full
+ * {@code (language, majorVersion, repo)} source identity — the same tuple the
+ * targets ({@link LanguageServerRegistry}) and known-bug
+ * ({@link KnownBugDeclarations}) registries use — because a capability may
+ * differ between two sources that share a language (a different major version,
+ * or the same library built from a different repository).
+ *
  * <p>Two runtime properties feed the registry (each read from the system
  * property first, then the environment variable):
  * <ol>
  *   <li><b>{@code testserver.features} / {@code TESTSERVER_FEATURES}</b> —
- *       a comma-separated list of per-language declarations, each of the form
- *       {@code <language>:<feature>=<bool>[;<feature>=<bool>…]} (e.g.
- *       {@code java:streaming=true;MPL=true,python:streaming=true;MPL=true}).
- *       The orchestrator derives this by flattening each language's
+ *       a comma-separated list of per-source declarations, each of the form
+ *       {@code <language>:<majorVersion>:<repo>:<feature>=<bool>[;<feature>=<bool>…]}
+ *       (e.g. {@code java:3:aws-database-encryption-sdk-dynamodb:streaming=true;MPL=true}).
+ *       The orchestrator derives this by flattening each source's
  *       Feature_Declaration: a Feature in {@code supportedFeatures} becomes
  *       {@code true}, one in {@code unsupportedFeatures} becomes {@code false}.</li>
  *   <li><b>{@code testserver.featureCatalog} /
@@ -29,13 +36,13 @@ import java.util.Set;
  *       (e.g. {@code raw-aes,aws-kms}).</li>
  * </ol>
  *
- * <p>A third, <em>optional</em> property carries the per-language raw-RSA
+ * <p>A third, <em>optional</em> property carries the per-source raw-RSA
  * padding capability: <b>{@code testserver.rawRsaPaddingSchemes} /
  * {@code TESTSERVER_RAW_RSA_PADDING_SCHEMES}</b> — a comma-separated list
- * of {@code <language>:<SCHEME>[;<SCHEME>…]} entries (e.g.
- * {@code c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1}), one per language whose
- * Feature_Declaration carries {@code rawRsaPaddingSchemes}. Unlike Feature
- * support, absence here is itself a declaration: a language absent from the
+ * of {@code <language>:<majorVersion>:<repo>:<SCHEME>[;<SCHEME>…]} entries (e.g.
+ * {@code c:1:some-repo:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1}), one per source
+ * whose Feature_Declaration carries {@code rawRsaPaddingSchemes}. Unlike Feature
+ * support, absence here is itself a declaration: a source absent from the
  * property (or the property absent entirely) declared no restriction, so it
  * supports every scheme names — that is the capability's
  * absent-means-all semantic transmitted from the configuration, not an
@@ -43,7 +50,7 @@ import java.util.Set;
  * anything else is a parse error.
  *
  * <p>Support is determined <em>solely</em> from the declarations: an absent
- * property, an absent language, or an absent {@code (language, Feature)} pair is
+ * property, an absent source, or an absent {@code (source, Feature)} pair is
  * a <b>configuration error</b> surfaced when queried ({@link IllegalStateException}
  * with an actionable message) — support is never assumed (Requirement 9.3).
  * Boolean values must be exactly {@code true} or {@code false}; anything else is
@@ -51,7 +58,10 @@ import java.util.Set;
  */
 public final class FeatureDeclarations {
 
-    /** Runtime-config key: comma-separated {@code lang:feat=bool[;feat=bool…]} entries. */
+    /**
+     * Runtime-config key: comma-separated
+     * {@code lang:major:repo:feat=bool[;feat=bool…]} entries.
+     */
     public static final String FEATURES_PROPERTY = "testserver.features";
     public static final String FEATURES_ENV = "TESTSERVER_FEATURES";
 
@@ -59,7 +69,7 @@ public final class FeatureDeclarations {
     public static final String CATALOG_PROPERTY = "testserver.featureCatalog";
     public static final String CATALOG_ENV = "TESTSERVER_FEATURE_CATALOG";
 
-    /** Runtime-config key: comma-separated {@code lang:SCHEME[;SCHEME…]} entries. */
+    /** Runtime-config key: comma-separated {@code lang:major:repo:SCHEME[;SCHEME…]} entries. */
     public static final String RAW_RSA_PADDING_SCHEMES_PROPERTY =
         "testserver.rawRsaPaddingSchemes";
     public static final String RAW_RSA_PADDING_SCHEMES_ENV =
@@ -70,13 +80,17 @@ public final class FeatureDeclarations {
     /** Catalog names in configuration order; {@code null} when unconfigured. */
     private final List<String> catalog;
 
-    /** language -> (feature -> supported); {@code null} when unconfigured. */
+    /**
+     * {@code language:major:repo} source key -> (feature -> supported);
+     * {@code null} when unconfigured.
+     */
     private final Map<String, Map<String, Boolean>> declarations;
 
     /**
-     * language -> declared raw-RSA padding schemes, only for languages that
-     * declared the capability; never {@code null} (absence means "no language
-     * declared a restriction", not "unconfigured").
+     * {@code language:major:repo} source key -> declared raw-RSA padding
+     * schemes, only for sources that declared the capability; never
+     * {@code null} (absence means "no source declared a restriction", not
+     * "unconfigured").
      */
     private final Map<String, Set<String>> rawRsaPaddingSchemes;
 
@@ -85,6 +99,11 @@ public final class FeatureDeclarations {
         this.catalog = catalog;
         this.declarations = declarations;
         this.rawRsaPaddingSchemes = rawRsaPaddingSchemes;
+    }
+
+    /** The composite source key {@code language:majorVersion:repo}. */
+    private static String key(String language, int majorVersion, String repo) {
+        return language + ":" + majorVersion + ":" + repo;
     }
 
     /**
@@ -133,25 +152,27 @@ public final class FeatureDeclarations {
     }
 
     /**
-     * @return whether {@code language} declares {@code feature} supported,
-     *     determined solely from the parsed Feature_Declarations.
+     * @return whether the {@code (language, majorVersion, repo)} source declares
+     *     {@code feature} supported, determined solely from the parsed
+     *     Feature_Declarations.
      * @throws IllegalStateException if no declarations were configured, the
-     *     language has no declaration, or the {@code (language, feature)} pair is
+     *     source has no declaration, or the {@code (source, feature)} pair is
      *     absent — a configuration error, never an assumption (Requirement 9.3).
      */
-    public boolean isSupported(String language, String feature) {
+    public boolean isSupported(String language, int majorVersion, String repo, String feature) {
         Map<String, Map<String, Boolean>> declared = requireDeclarations();
-        Map<String, Boolean> byFeature = declared.get(language);
+        String sourceKey = key(language, majorVersion, repo);
+        Map<String, Boolean> byFeature = declared.get(sourceKey);
         if (byFeature == null) {
             throw new IllegalStateException(
-                "configuration error: no Feature_Declaration for language '" + language
-                    + "' in " + FEATURES_PROPERTY + " (declared languages: " + declared.keySet()
+                "configuration error: no Feature_Declaration for source '" + sourceKey
+                    + "' in " + FEATURES_PROPERTY + " (declared sources: " + declared.keySet()
                     + "); Feature support is never assumed");
         }
         Boolean supported = byFeature.get(feature);
         if (supported == null) {
             throw new IllegalStateException(
-                "configuration error: language '" + language + "' declares no support value for Feature '"
+                "configuration error: source '" + sourceKey + "' declares no support value for Feature '"
                     + feature + "' in " + FEATURES_PROPERTY + " (declared Features: " + byFeature.keySet()
                     + "); Feature support is never assumed");
         }
@@ -159,7 +180,7 @@ public final class FeatureDeclarations {
     }
 
     /**
-     * @return whether per-language Feature_Declarations were configured for this
+     * @return whether per-source Feature_Declarations were configured for this
      *     run. False in an unconfigured run (e.g. an offline single-server smoke
      *     check with no {@value #FEATURES_PROPERTY}); callers that filter pairs by
      *     capability degrade to no filtering rather than fail.
@@ -169,15 +190,15 @@ public final class FeatureDeclarations {
     }
 
     /**
-     * @return whether {@code language} supports the raw-RSA padding
-     *     {@code scheme}. A language absent from the
+     * @return whether the {@code (language, majorVersion, repo)} source supports
+     *     the raw-RSA padding {@code scheme}. A source absent from the
      *     {@value #RAW_RSA_PADDING_SCHEMES_PROPERTY} property (or the property
      *     absent entirely) declared no restriction — its Feature_Declaration
      *     carries no {@code rawRsaPaddingSchemes} — so every scheme is
-     *     supported; a present language supports exactly its declared subset.
+     *     supported; a present source supports exactly its declared subset.
      */
-    public boolean supportsRawRsaPadding(String language, String scheme) {
-        Set<String> declared = rawRsaPaddingSchemes.get(language);
+    public boolean supportsRawRsaPadding(String language, int majorVersion, String repo, String scheme) {
+        Set<String> declared = rawRsaPaddingSchemes.get(key(language, majorVersion, repo));
         return declared == null || declared.contains(scheme);
     }
 
@@ -195,10 +216,11 @@ public final class FeatureDeclarations {
     }
 
     /**
-     * @return the languages carrying a Feature_Declaration, in configuration order.
+     * @return the {@code language:major:repo} source keys carrying a
+     *     Feature_Declaration, in configuration order.
      * @throws IllegalStateException if no declarations were configured.
      */
-    public Set<String> languages() {
+    public Set<String> sources() {
         return requireDeclarations().keySet();
     }
 
@@ -206,7 +228,7 @@ public final class FeatureDeclarations {
         if (declarations == null) {
             throw new IllegalStateException(
                 "configuration error: no Feature_Declarations configured; set -D" + FEATURES_PROPERTY
-                    + "=<lang:feat=bool[;feat=bool...]>,... (or " + FEATURES_ENV + ")");
+                    + "=<lang:major:repo:feat=bool[;feat=bool...]>,... (or " + FEATURES_ENV + ")");
         }
         return declarations;
     }
@@ -243,38 +265,48 @@ public final class FeatureDeclarations {
         return List.copyOf(new ArrayList<>(names));
     }
 
-    /** Parse {@code lang:feat=bool[;feat=bool…]} CSV entries, rejecting duplicates. */
+    /**
+     * Parse {@code lang:major:repo:feat=bool[;feat=bool…]} CSV entries, keyed by
+     * the {@code (language, majorVersion, repo)} source identity, rejecting
+     * duplicates. The feature list is split off with {@code split(":", 4)} — a
+     * feature declaration ({@code feat=bool}) contains no colon, so the fourth
+     * segment is the whole list.
+     */
     private static Map<String, Map<String, Boolean>> parseDeclarations(String raw) {
-        Map<String, Map<String, Boolean>> byLanguage = new LinkedHashMap<>();
+        Map<String, Map<String, Boolean>> bySource = new LinkedHashMap<>();
         for (String entry : raw.split(",")) {
             String trimmed = entry.trim();
             if (trimmed.isEmpty()) {
                 continue;
             }
-            int colon = trimmed.indexOf(':');
-            if (colon < 0) {
+            String[] parts = trimmed.split(":", 4);
+            if (parts.length != 4) {
                 throw new IllegalArgumentException(
-                    "malformed declaration entry (expected language:feature=bool[;feature=bool...]): "
-                        + trimmed);
+                    "malformed declaration entry (expected "
+                        + "language:major:repo:feature=bool[;feature=bool...]): " + trimmed);
             }
-            String language = trimmed.substring(0, colon).trim();
-            if (language.isEmpty()) {
-                throw new IllegalArgumentException("blank language in declaration entry: " + trimmed);
-            }
-            if (byLanguage.containsKey(language)) {
+            String language = parts[0].trim();
+            String repo = parts[2].trim();
+            if (language.isEmpty() || repo.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "duplicate language in " + FEATURES_PROPERTY + ": " + language);
+                    "blank language or repo in declaration entry: " + trimmed);
             }
-            byLanguage.put(language, parseLanguageDeclarations(language, trimmed.substring(colon + 1)));
+            int majorVersion = parseMajor(parts[1].trim(), trimmed);
+            String sourceKey = key(language, majorVersion, repo);
+            if (bySource.containsKey(sourceKey)) {
+                throw new IllegalArgumentException(
+                    "duplicate source in " + FEATURES_PROPERTY + ": " + sourceKey);
+            }
+            bySource.put(sourceKey, parseSourceDeclarations(sourceKey, parts[3]));
         }
-        if (byLanguage.isEmpty()) {
+        if (bySource.isEmpty()) {
             throw new IllegalArgumentException(
                 "no declarations parsed from " + FEATURES_PROPERTY + ": " + raw);
         }
-        return byLanguage;
+        return bySource;
     }
 
-    private static Map<String, Boolean> parseLanguageDeclarations(String language, String rawDeclarations) {
+    private static Map<String, Boolean> parseSourceDeclarations(String sourceKey, String rawDeclarations) {
         Map<String, Boolean> byFeature = new LinkedHashMap<>();
         for (String declaration : rawDeclarations.split(";")) {
             String trimmed = declaration.trim();
@@ -284,84 +316,98 @@ public final class FeatureDeclarations {
             int eq = trimmed.indexOf('=');
             if (eq < 0) {
                 throw new IllegalArgumentException(
-                    "malformed feature declaration for language '" + language
+                    "malformed feature declaration for source '" + sourceKey
                         + "' (expected feature=bool): " + trimmed);
             }
             String feature = trimmed.substring(0, eq).trim();
             if (feature.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "blank Feature name for language '" + language + "': " + trimmed);
+                    "blank Feature name for source '" + sourceKey + "': " + trimmed);
             }
             String value = trimmed.substring(eq + 1).trim();
             Boolean supported = switch (value) {
                 case "true" -> Boolean.TRUE;
                 case "false" -> Boolean.FALSE;
                 default -> throw new IllegalArgumentException(
-                    "feature support value must be exactly 'true' or 'false' for language '"
-                        + language + "', Feature '" + feature + "': " + value);
+                    "feature support value must be exactly 'true' or 'false' for source '"
+                        + sourceKey + "', Feature '" + feature + "': " + value);
             };
             if (byFeature.putIfAbsent(feature, supported) != null) {
                 throw new IllegalArgumentException(
-                    "duplicate Feature '" + feature + "' declared for language '" + language + "'");
+                    "duplicate Feature '" + feature + "' declared for source '" + sourceKey + "'");
             }
         }
         if (byFeature.isEmpty()) {
             throw new IllegalArgumentException(
-                "language '" + language + "' declares no features in " + FEATURES_PROPERTY);
+                "source '" + sourceKey + "' declares no features in " + FEATURES_PROPERTY);
         }
         return byFeature;
     }
 
     /**
-     * Parse {@code lang:SCHEME[;SCHEME…]} CSV entries, rejecting duplicate
-     * languages, duplicate schemes, and empty scheme lists. Scheme names are
-     * opaque strings here: each SDK's Tests validate them against its own
-     * modeled scheme enum in a per-SDK layer above this parser.
+     * Parse {@code lang:major:repo:SCHEME[;SCHEME…]} CSV entries, keyed by the
+     * {@code (language, majorVersion, repo)} source identity, rejecting duplicate
+     * sources, duplicate schemes, and empty scheme lists. Scheme names are opaque
+     * strings here: each SDK's Tests validate them against its own modeled scheme
+     * enum in a per-SDK layer above this parser.
      */
     private static Map<String, Set<String>> parseRawRsaPaddingSchemes(String raw) {
-        Map<String, Set<String>> byLanguage = new LinkedHashMap<>();
+        Map<String, Set<String>> bySource = new LinkedHashMap<>();
         for (String entry : raw.split(",")) {
             String trimmed = entry.trim();
             if (trimmed.isEmpty()) {
                 continue;
             }
-            int colon = trimmed.indexOf(':');
-            if (colon < 0) {
+            String[] parts = trimmed.split(":", 4);
+            if (parts.length != 4) {
                 throw new IllegalArgumentException(
-                    "malformed padding entry (expected language:SCHEME[;SCHEME...]): " + trimmed);
+                    "malformed padding entry (expected language:major:repo:SCHEME[;SCHEME...]): "
+                        + trimmed);
             }
-            String language = trimmed.substring(0, colon).trim();
-            if (language.isEmpty()) {
-                throw new IllegalArgumentException("blank language in padding entry: " + trimmed);
+            String language = parts[0].trim();
+            String repo = parts[2].trim();
+            if (language.isEmpty() || repo.isEmpty()) {
+                throw new IllegalArgumentException("blank language or repo in padding entry: " + trimmed);
             }
-            if (byLanguage.containsKey(language)) {
+            int majorVersion = parseMajor(parts[1].trim(), trimmed);
+            String sourceKey = key(language, majorVersion, repo);
+            if (bySource.containsKey(sourceKey)) {
                 throw new IllegalArgumentException(
-                    "duplicate language in " + RAW_RSA_PADDING_SCHEMES_PROPERTY + ": " + language);
+                    "duplicate source in " + RAW_RSA_PADDING_SCHEMES_PROPERTY + ": " + sourceKey);
             }
             Set<String> schemes = new LinkedHashSet<>();
-            for (String scheme : trimmed.substring(colon + 1).split(";")) {
+            for (String scheme : parts[3].split(";")) {
                 String name = scheme.trim();
                 if (name.isEmpty()) {
                     continue;
                 }
                 if (!schemes.add(name)) {
                     throw new IllegalArgumentException(
-                        "duplicate raw-RSA padding scheme '" + name + "' declared for language '"
-                            + language + "'");
+                        "duplicate raw-RSA padding scheme '" + name + "' declared for source '"
+                            + sourceKey + "'");
                 }
             }
             if (schemes.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "language '" + language + "' declares no padding schemes in "
+                    "source '" + sourceKey + "' declares no padding schemes in "
                         + RAW_RSA_PADDING_SCHEMES_PROPERTY);
             }
-            byLanguage.put(language, schemes);
+            bySource.put(sourceKey, schemes);
         }
-        if (byLanguage.isEmpty()) {
+        if (bySource.isEmpty()) {
             throw new IllegalArgumentException(
                 "no padding declarations parsed from " + RAW_RSA_PADDING_SCHEMES_PROPERTY
                     + ": " + raw);
         }
-        return byLanguage;
+        return bySource;
+    }
+
+    private static int parseMajor(String raw, String entry) {
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                "non-integer major version '" + raw + "' in entry: " + entry, e);
+        }
     }
 }

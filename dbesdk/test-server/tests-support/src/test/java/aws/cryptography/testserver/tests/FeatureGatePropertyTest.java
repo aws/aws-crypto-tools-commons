@@ -37,7 +37,7 @@ import org.opentest4j.TestAbortedException;
  * the gate permits execution; when at least one language lists at least one
  * associated Feature in its {@code unsupportedFeatures}, the gate aborts as
  * skipped before any Language_Server operation, with a message naming each
- * gating Feature and exactly the languages declaring it unsupported; when an
+ * gating Feature and exactly the targets declaring it unsupported; when an
  * associated Feature is not defined by the catalog, the gate raises a failure
  * (never a pass or a skip) naming the unknown Feature; and when a combination
  * language has no declaration available for an associated Feature, the gate
@@ -55,6 +55,11 @@ import org.opentest4j.TestAbortedException;
  * parse path the orchestrator-fed properties take.
  */
 class FeatureGatePropertyTest {
+
+    // Every generated target shares this (major, repo); only the language
+    // varies, so language <-> source identity is 1:1 in this property.
+    private static final int MAJOR = 1;
+    private static final String REPO = "aws-database-encryption-sdk-dynamodb";
 
     // Feature: test-server-factoring, Property 11: The FeatureGate decides solely from the declarations
     @Property(tries = 250)
@@ -114,6 +119,7 @@ class FeatureGatePropertyTest {
         for (String feature : sortedRequired) {
             List<String> unsupporting = combinationLanguages.stream()
                 .filter(language -> !scenario.declared().get(language).get(feature))
+                .map(FeatureGatePropertyTest::label)
                 .toList();
             if (!unsupporting.isEmpty()) {
                 unsupportedByFeature.put(feature, unsupporting);
@@ -133,9 +139,14 @@ class FeatureGatePropertyTest {
         assertDoesNotThrow(() -> FeatureGate.require(required, combination, declarations));
     }
 
+    /** The target label the gate names in its skip message: {@code <language>-v<major>}. */
+    private static String label(String language) {
+        return language + "-v" + MAJOR;
+    }
+
     /**
      * The specified skip message: {@code feature-gated skip: feature=<f>
-     * unsupported by [<languages>]}, one clause per gating Feature, joined by
+     * unsupported by [<targets>]}, one clause per gating Feature, joined by
      * {@code "; "}.
      */
     private static String expectedSkipMessage(Map<String, List<String>> unsupportedByFeature) {
@@ -169,13 +180,14 @@ class FeatureGatePropertyTest {
 
         /**
          * The declarations in the {@code testserver.features} format:
-         * {@code lang:feat=bool[;feat=bool…]} entries, comma-separated.
+         * {@code lang:major:repo:feat=bool[;feat=bool…]} entries, comma-separated.
          */
         String featuresRaw() {
             return declared.entrySet().stream()
-                .map(language -> language.getKey() + ":" + language.getValue().entrySet().stream()
-                    .map(feature -> feature.getKey() + "=" + feature.getValue())
-                    .collect(Collectors.joining(";")))
+                .map(source -> source.getKey() + ":" + MAJOR + ":" + REPO + ":"
+                    + source.getValue().entrySet().stream()
+                        .map(feature -> feature.getKey() + "=" + feature.getValue())
+                        .collect(Collectors.joining(";")))
                 .collect(Collectors.joining(","));
         }
 
@@ -193,7 +205,8 @@ class FeatureGatePropertyTest {
         private static LanguageServerTarget target(String language) {
             // No live server: the gate must decide before any Language_Server
             // operation, so an unroutable endpoint proves nothing is contacted.
-            return new LanguageServerTarget(language, 1, URI.create("http://127.0.0.1:0/" + language));
+            return new LanguageServerTarget(
+                language, MAJOR, REPO, URI.create("http://127.0.0.1:0/" + language));
         }
     }
 

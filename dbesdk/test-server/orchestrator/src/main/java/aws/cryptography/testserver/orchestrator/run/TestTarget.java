@@ -10,12 +10,13 @@ import java.net.URI;
  *
  * @param language     the logical language key, e.g. {@code "java"}
  * @param majorVersion the library major version, e.g. {@code 3}
+ * @param repo         the source repository name (from {@code libraryRepository.name})
  * @param endpoint     the launched Language_Server's base endpoint URL
  */
-public record TestTarget(String language, int majorVersion, URI endpoint) {
+public record TestTarget(String language, int majorVersion, String repo, URI endpoint) {
 
-    /** The {@code language:major=url} form of the targets property (design). */
+    /** The {@code language:major:repo=url} form of the targets property (design). */
     public String asPropertyEntry() {
-        return language + ":" + majorVersion + "=" + endpoint;
+        return language + ":" + majorVersion + ":" + repo + "=" + endpoint;
     }
 }

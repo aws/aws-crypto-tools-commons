@@ -23,21 +23,21 @@ class TestRunInputTest {
     @DisplayName("targets format is the normative lang:major=url CSV (Req 2.2)")
     void formatsTargets() {
         List<TestTarget> targets = List.of(
-            new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")),
-            new TestTarget("python", 4, URI.create("http://127.0.0.1:8092")));
+            new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091")),
+            new TestTarget("python", 4, "dbe", URI.create("http://127.0.0.1:8092")));
 
-        assertEquals("java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092",
+        assertEquals("java:3:dbe=http://127.0.0.1:8091,python:4:dbe=http://127.0.0.1:8092",
             TestRunInput.formatTargets(targets));
     }
 
     @Test
-    @DisplayName("features format is the normative lang:feat=bool[;feat=bool] CSV (Req 9.3)")
+    @DisplayName("features format is the normative lang:major:repo:feat=bool[;feat=bool] CSV (Req 9.3)")
     void formatsFeatures() {
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
-        features.put("java", declaration("streaming", true, "MPL", true));
-        features.put("python", declaration("streaming", true, "MPL", true));
+        features.put("java:3:dbe", declaration("streaming", true, "MPL", true));
+        features.put("python:3:dbe", declaration("streaming", true, "MPL", true));
 
-        assertEquals("java:streaming=true;MPL=true,python:streaming=true;MPL=true",
+        assertEquals("java:3:dbe:streaming=true;MPL=true,python:3:dbe:streaming=true;MPL=true",
             TestRunInput.formatFeatures(features));
     }
 
@@ -45,9 +45,9 @@ class TestRunInputTest {
     @DisplayName("an unsupported Feature is formatted as false")
     void formatsUnsupportedFeatureAsFalse() {
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
-        features.put("rust", declaration("streaming", false, "MPL", true));
+        features.put("rust:1:dbe", declaration("streaming", false, "MPL", true));
 
-        assertEquals("rust:streaming=false;MPL=true", TestRunInput.formatFeatures(features));
+        assertEquals("rust:1:dbe:streaming=false;MPL=true", TestRunInput.formatFeatures(features));
     }
 
     @Test
@@ -83,13 +83,13 @@ class TestRunInputTest {
     }
 
     @Test
-    @DisplayName("formats declared raw-RSA padding capabilities as lang:SCHEME[;SCHEME…] CSV")
+    @DisplayName("formats declared raw-RSA padding capabilities as lang:major:repo:SCHEME[;SCHEME…] CSV")
     void formatsRawRsaPaddingSchemes() {
         Map<String, List<String>> schemes = new LinkedHashMap<>();
-        schemes.put("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"));
-        schemes.put("python", List.of("OAEP_SHA512_MGF1"));
+        schemes.put("c:1:dbe", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1"));
+        schemes.put("python:1:dbe", List.of("OAEP_SHA512_MGF1"));
 
-        assertEquals("c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1,python:OAEP_SHA512_MGF1",
+        assertEquals("c:1:dbe:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1,python:1:dbe:OAEP_SHA512_MGF1",
             TestRunInput.formatRawRsaPaddingSchemes(schemes));
         assertEquals("", TestRunInput.formatRawRsaPaddingSchemes(Map.of()));
     }
@@ -98,20 +98,20 @@ class TestRunInputTest {
     @DisplayName("the record preserves target, language, and Feature ordering")
     void preservesOrdering() {
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
-        features.put("python", declaration("streaming", true, "MPL", true));
-        features.put("java", declaration("MPL", true, "streaming", true));
+        features.put("python:4:dbe", declaration("streaming", true, "MPL", true));
+        features.put("java:3:dbe", declaration("MPL", true, "streaming", true));
 
         TestRunInput input = new TestRunInput(
-            List.of(new TestTarget("python", 4, URI.create("http://127.0.0.1:8092")),
-                new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
+            List.of(new TestTarget("python", 4, "dbe", URI.create("http://127.0.0.1:8092")),
+                new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091"))),
             features,
             List.of("streaming", "MPL"),
             Map.of(),
             "java");
 
-        assertEquals("python:4=http://127.0.0.1:8092,java:3=http://127.0.0.1:8091",
+        assertEquals("python:4:dbe=http://127.0.0.1:8092,java:3:dbe=http://127.0.0.1:8091",
             TestRunInput.formatTargets(input.targets()));
-        assertEquals("python:streaming=true;MPL=true,java:MPL=true;streaming=true",
+        assertEquals("python:4:dbe:streaming=true;MPL=true,java:3:dbe:MPL=true;streaming=true",
             TestRunInput.formatFeatures(input.features()));
         assertFalse(input.featureCatalog().isEmpty());
     }
@@ -120,7 +120,7 @@ class TestRunInputTest {
     @DisplayName("the reference implementation is carried verbatim and must be non-blank")
     void carriesReferenceImplementation() {
         List<TestTarget> targets =
-            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")));
+            List.of(new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091")));
 
         assertEquals("python",
             new TestRunInput(targets, Map.of(), List.of(), Map.of(), "python")

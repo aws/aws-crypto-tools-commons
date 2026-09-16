@@ -244,7 +244,7 @@ class ItemEncryptionBoundaryBehaviorTests {
         String decId = newKmsClient(decryptClient, TABLE, PK, actions, List.of());
         KnownBugGate.gateDeclared(
             "java-deep-nesting-request-validation-overflow",
-            pair.encryptTarget().language(),
+            pair.encryptTarget(),
             () -> {
                 Map<String, AttributeValue> item = assertDoesNotThrow(
                     () -> encryptOnce(encryptClient, encId, plaintext),

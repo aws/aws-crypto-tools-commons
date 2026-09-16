@@ -29,25 +29,25 @@ class GradleTestRunnerTest {
     @DisplayName("command passes targets, features, featureCatalog, and referenceImplementation properties (Req 2.2, 9.3)")
     void commandCarriesAllThreeProperties() {
         TestRunInput input = new TestRunInput(
-            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")),
-                new TestTarget("python", 4, URI.create("http://127.0.0.1:8092"))),
+            List.of(new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091")),
+                new TestTarget("python", 4, "dbe", URI.create("http://127.0.0.1:8092"))),
             features(),
             List.of("streaming", "MPL"),
-            Map.of("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
+            Map.of("c:1:dbe", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
             "java");
 
         List<String> command = GradleTestRunner.command(Path.of("tests"), input, "");
 
         assertTrue(command.contains(
-                "-Dtestserver.targets=java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092"),
+                "-Dtestserver.targets=java:3:dbe=http://127.0.0.1:8091,python:4:dbe=http://127.0.0.1:8092"),
             "must pass the targets property: " + command);
         assertTrue(command.contains(
-                "-Dtestserver.features=java:streaming=true;MPL=true,python:streaming=true;MPL=true"),
+                "-Dtestserver.features=java:3:dbe:streaming=true;MPL=true,python:4:dbe:streaming=true;MPL=true"),
             "must pass the flattened features property: " + command);
         assertTrue(command.contains("-Dtestserver.featureCatalog=streaming,MPL"),
             "must pass the catalog verbatim: " + command);
         assertTrue(command.contains(
-                "-Dtestserver.rawRsaPaddingSchemes=c:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1"),
+                "-Dtestserver.rawRsaPaddingSchemes=c:1:dbe:PKCS1;OAEP_SHA1_MGF1;OAEP_SHA256_MGF1"),
             "must pass the declared padding capabilities: " + command);
         assertTrue(command.contains("-Dtestserver.referenceImplementation=java"),
             "must pass the reference implementation: " + command);
@@ -59,7 +59,7 @@ class GradleTestRunnerTest {
     @DisplayName("empty feature inputs omit the feature properties, never pass blanks")
     void commandOmitsEmptyFeatureProperties() {
         TestRunInput input = new TestRunInput(
-            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
+            List.of(new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091"))),
             Map.of(),
             List.of(),
             Map.of(),
@@ -148,8 +148,8 @@ class GradleTestRunnerTest {
         both.put("streaming", true);
         both.put("MPL", true);
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
-        features.put("java", both);
-        features.put("python", both);
+        features.put("java:3:dbe", both);
+        features.put("python:4:dbe", both);
         return features;
     }
 }

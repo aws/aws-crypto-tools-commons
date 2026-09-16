@@ -9,35 +9,43 @@ import java.util.Set;
  * The runtime known-bug registry the {@code Tests} consult when gating an
  * assertion a catalogued bug breaks, resolved once per JVM from the
  * {@code testserver.knownBugs} runtime property the orchestrator injects —
- * mirroring {@link FeatureDeclarations}, and the injection-based counterpart to
- * the classpath {@link KnownBugs} ledger.
+ * mirroring {@link FeatureDeclarations}.
  *
  * <p>The orchestrator flattens each server's {@code bug-config.json}
- * exhibited-bug list (validated against the commons bug ledger) into
- * {@code testserver.knownBugs} = {@code <language>:<id>[;<id>…]} CSV, e.g.
- * {@code java:some-bug;another-bug,rust:some-bug} (read from the system property
- * first, then the {@code TESTSERVER_KNOWN_BUGS} environment variable).
+ * exhibited-bug list (validated against the commons bug ledger), keyed by the
+ * full source identity {@code (language, majorVersion, repo)} so bugs from
+ * distinct code sources are never conflated — the same {@code language} and
+ * {@code majorVersion} could be built from different repositories. The value is
+ * {@code <language>:<majorVersion>:<repo>=<id>[;<id>…]} CSV, e.g.
+ * {@code java:3:aws-database-encryption-sdk-dynamodb=some-bug;another-bug} (read
+ * from the system property first, then the {@code TESTSERVER_KNOWN_BUGS}
+ * environment variable).
  *
  * <p>Unlike Feature support, absence here is <em>not</em> a configuration error:
- * a bug a language does not declare is simply not exhibited, so
- * {@link #exhibits(String, String)} returns {@code false} for an unconfigured
- * registry, an undeclared language, or an undeclared id — the assertion then
- * runs with its full power to fail. This is the normal case (no bug), which is
- * why it is never treated as missing configuration.
+ * a bug a target does not declare is simply not exhibited, so
+ * {@link #exhibits(String, int, String, String)} returns {@code false} for an
+ * unconfigured registry, an undeclared target, or an undeclared id — the
+ * assertion then runs with its full power to fail. This is the normal case (no
+ * bug), which is why it is never treated as missing configuration.
  */
 public final class KnownBugDeclarations {
 
-    /** Runtime-config key: comma-separated {@code lang:id[;id…]} entries. */
+    /** Runtime-config key: comma-separated {@code language:major:repo=id[;id…]} entries. */
     public static final String KNOWN_BUGS_PROPERTY = "testserver.knownBugs";
     public static final String KNOWN_BUGS_ENV = "TESTSERVER_KNOWN_BUGS";
 
     private static volatile KnownBugDeclarations instance;
 
-    /** language -> the bug ids that language declares it exhibits. */
-    private final Map<String, Set<String>> byLanguage;
+    /** (language:major:repo) -> the bug ids that source declares it exhibits. */
+    private final Map<String, Set<String>> byTarget;
 
-    private KnownBugDeclarations(Map<String, Set<String>> byLanguage) {
-        this.byLanguage = byLanguage;
+    private KnownBugDeclarations(Map<String, Set<String>> byTarget) {
+        this.byTarget = byTarget;
+    }
+
+    /** The canonical registry key for a target's source identity. */
+    private static String key(String language, int majorVersion, String repo) {
+        return language + ":" + majorVersion + ":" + repo;
     }
 
     /**
@@ -60,62 +68,74 @@ public final class KnownBugDeclarations {
     }
 
     /**
-     * Parse the {@code lang:id[;id…]} CSV into a registry. {@code null} or blank
-     * means "no known bug declared" — an empty registry. Public so per-SDK unit
-     * tests can exercise parsing without the JVM-wide singleton or system
-     * properties.
+     * Parse the {@code language:major:repo=id[;id…]} CSV into a registry.
+     * {@code null} or blank means "no known bug declared" — an empty registry.
+     * Public so per-SDK unit tests can exercise parsing without the JVM-wide
+     * singleton or system properties.
      */
     public static KnownBugDeclarations parse(String raw) {
-        Map<String, Set<String>> byLanguage = new LinkedHashMap<>();
+        Map<String, Set<String>> byTarget = new LinkedHashMap<>();
         if (raw == null || raw.isBlank()) {
-            return new KnownBugDeclarations(byLanguage);
+            return new KnownBugDeclarations(byTarget);
         }
         for (String entry : raw.split(",")) {
             String trimmed = entry.trim();
             if (trimmed.isEmpty()) {
                 continue;
             }
-            int colon = trimmed.indexOf(':');
-            if (colon < 0) {
+            int eq = trimmed.indexOf('=');
+            if (eq < 0) {
                 throw new IllegalArgumentException(
-                    "malformed known-bug entry (expected language:id[;id...]): " + trimmed);
+                    "malformed known-bug entry (expected language:major:repo=id[;id...]): "
+                        + trimmed);
             }
-            String language = trimmed.substring(0, colon).trim();
-            if (language.isEmpty()) {
-                throw new IllegalArgumentException("blank language in known-bug entry: " + trimmed);
-            }
-            if (byLanguage.containsKey(language)) {
+            String[] parts = trimmed.substring(0, eq).trim().split(":");
+            if (parts.length != 3 || parts[0].trim().isEmpty()
+                    || parts[1].trim().isEmpty() || parts[2].trim().isEmpty()) {
                 throw new IllegalArgumentException(
-                    "duplicate language in " + KNOWN_BUGS_PROPERTY + ": " + language);
+                    "malformed known-bug key (expected language:major:repo): "
+                        + trimmed.substring(0, eq).trim());
+            }
+            int majorVersion;
+            try {
+                majorVersion = Integer.parseInt(parts[1].trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                    "major version must be an integer in known-bug key: " + trimmed, e);
+            }
+            String canonicalKey = key(parts[0].trim(), majorVersion, parts[2].trim());
+            if (byTarget.containsKey(canonicalKey)) {
+                throw new IllegalArgumentException(
+                    "duplicate target in " + KNOWN_BUGS_PROPERTY + ": " + canonicalKey);
             }
             Set<String> ids = new LinkedHashSet<>();
-            for (String id : trimmed.substring(colon + 1).split(";")) {
+            for (String id : trimmed.substring(eq + 1).split(";")) {
                 String name = id.trim();
                 if (name.isEmpty()) {
                     continue;
                 }
                 if (!ids.add(name)) {
                     throw new IllegalArgumentException(
-                        "duplicate bug id '" + name + "' declared for language '" + language + "'");
+                        "duplicate bug id '" + name + "' declared for target '" + canonicalKey + "'");
                 }
             }
             if (ids.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "language '" + language + "' declares no bug ids in " + KNOWN_BUGS_PROPERTY);
+                    "target '" + canonicalKey + "' declares no bug ids in " + KNOWN_BUGS_PROPERTY);
             }
-            byLanguage.put(language, ids);
+            byTarget.put(canonicalKey, ids);
         }
-        return new KnownBugDeclarations(byLanguage);
+        return new KnownBugDeclarations(byTarget);
     }
 
     /**
-     * @return whether {@code language} declares it exhibits the bug {@code id}.
-     *     {@code false} when the registry is empty, the language is absent, or
-     *     the id is not among the language's declared ids — a bug not declared
-     *     is simply not exhibited.
+     * @return whether the source {@code (language, majorVersion, repo)} declares
+     *     it exhibits the bug {@code id}. {@code false} when the registry is
+     *     empty, the target is absent, or the id is not among that target's
+     *     declared ids — a bug not declared is simply not exhibited.
      */
-    public boolean exhibits(String language, String id) {
-        Set<String> ids = byLanguage.get(language);
+    public boolean exhibits(String language, int majorVersion, String repo, String id) {
+        Set<String> ids = byTarget.get(key(language, majorVersion, repo));
         return ids != null && ids.contains(id);
     }
 
