@@ -1,9 +1,13 @@
 # ESDK TestServer — local development
 
 This is the developer guide for building and running the ESDK TestServer on your
-machine. It covers the fast inner loop (no clones, no AWS credentials), the full
-cross-language run, and how to iterate on a single Language_Server with your
-local edits used live.
+machine. It has two parts, in the order you are most likely to need them:
+
+- **Library development** — run the Test suite against your local library
+  changes (including pointing the run at local checkouts), without touching the
+  TestServer framework itself.
+- **TestServer development** — build, validate, and test the framework itself
+  (the model, client, Tests, and orchestrator).
 
 For the design (Configuration organization, the resolution pipeline, the
 Server/Feature/Bug config files) see the design doc; this README is only about
@@ -33,32 +37,21 @@ their Language_Repositories and are resolved by the orchestrator from
   auto-detection. Verify with `make check-java`.
 - **git**, and **python3** (used by the structural smoke checks in `make validate`).
 - **AWS credentials** are required *only* for `make orchestrate` (the KMS
-  keyring scenarios are part of it). The inner-loop targets below need none.
+  keyring scenarios are part of it); the TestServer-development targets
+  (`make build`, `make validate`, `make orchestrate-test`, …) need none.
 
 > On NFS home directories, Gradle's file-watcher can throw
 > `java.io.IOException: Function not implemented`. If you hit it, disable the
 > watcher: `export GRADLE_OPTS=-Dorg.gradle.vfs.watch=false` (or pass
 > `--no-watch-fs` to a direct `./gradlew` invocation).
 
-## The fast inner loop (no clones, no credentials)
+## Library development
 
-Every one of these `cd`s into a single module and runs that module's own build —
-none of them clone a Language_Repository or need AWS credentials:
+You are changing an ESDK library (or its Language_Server) and want to run the
+Test suite against it — without modifying the TestServer framework. Everything
+in this part runs the actual Tests.
 
-```
-make build            # compile/codegen the client + Tests (skips tests)
-make build-client     # just the Java Test_Client
-make build-tests      # just the Tests suite
-make validate         # smithy validate + structural smoke checks
-make smoke            # model smoke checks + Tests round-trip smoke check
-make orchestrate-test # the orchestrator's own property/integration tests
-```
-
-`make orchestrate-test` is the one to run while working on the orchestrator
-itself — it exercises the resolution/materialization/validation pipeline as pure
-logic, with no git and no network.
-
-## The full cross-language run
+### The full cross-language run
 
 ```
 make orchestrate      # resolve + build + launch every configured server, run the full matrix
@@ -71,7 +64,7 @@ valid AWS credentials (e.g. run `creds`) and is heavyweight for a quick loop.
 Point it at a non-default KMS key set with the `ESDK_TESTSERVER_KMS_*` env vars
 (see the Makefile header).
 
-### It does not clone from scratch every time
+#### It does not clone from scratch every time
 
 Source materialization reuses work across runs:
 
@@ -88,7 +81,7 @@ So the scratch clones survive between runs (until `make clean` or a
 check does a per-run `git ls-remote`, so a fully offline run can only reuse
 working-tree sources — cloned languages need the network to verify the tip.
 
-## Iterating on a single Language_Server with live edits
+### Iterating on a single Language_Server with live edits
 
 To develop a server and have **your local, uncommitted edits used directly**
 (not a clone), run the orchestrator in **`language:<lang>`** mode from that
@@ -170,13 +163,36 @@ pin the ref** in that language's `server-config.json` (or a
 `configurationOverrides` entry) — clone-based, so it picks up pushed commits,
 not local working-tree edits.
 
-## Local overrides are dev-only
+#### Local overrides are dev-only
 
 The local-overrides overlay exists purely for local development. `local-overrides.json`
 is gitignored and must never be committed — CI never sees it, so committed
 configuration always resolves every non-own language from a clone. The overlay
 only turns a language's source into a working-tree plan; the component paths
 still come from that language's configuration entry.
+
+## TestServer development
+
+You are changing the framework itself — the model, the Test_Client, the Tests,
+or the orchestrator. These targets build and test the framework in place; none
+clone a Language_Repository or need AWS credentials.
+
+### The fast inner loop (no clones, no credentials)
+
+Every one of these `cd`s into a single module and runs that module's own build:
+
+```
+make build            # compile/codegen the client + Tests (skips tests)
+make build-client     # just the Java Test_Client
+make build-tests      # just the Tests suite
+make validate         # smithy validate + structural smoke checks
+make smoke            # model smoke checks + Tests round-trip smoke check
+make orchestrate-test # the orchestrator's own property/integration tests
+```
+
+`make orchestrate-test` is the one to run while working on the orchestrator
+itself — it exercises the resolution/materialization/validation pipeline as pure
+logic, with no git and no network.
 
 ## Cleaning up
 
