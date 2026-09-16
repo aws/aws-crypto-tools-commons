@@ -82,12 +82,14 @@ jobs:
       # the live step environment (the short-lived OIDC AWS_* credentials).
       GRADLE_OPTS: -Dorg.gradle.daemon=false
       # OIDC role to assume for the required KMS + keystore scenarios. Defaults
-      # to the shared ESDK TestServer CI role (its trust policy already trusts
-      # aws-crypto-tools-commons); that role's permissions are extended to cover
-      # the DB-ESDK item key, the beacon-keystore KMS key + branch-key DDB table,
-      # and the asymmetric RSA key. Override via the repo variable to target a
-      # different account/role.
-      KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
+      # to the dedicated DB-ESDK TestServer CI role, whose trust policy trusts
+      # aws-crypto-tools-commons and aws-database-encryption-sdk-dynamodb (so the
+      # product repo can trigger this reusable workflow), and whose permissions
+      # cover the DB-ESDK keyring set: the item key, the asymmetric RSA key, the
+      # beacon/hierarchical keystore KMS key + branch-key DDB table, and the
+      # dedicated symmetric + multi-region keys used by the keyring-interop tests.
+      # Override via the repo variable to target a different account/role.
+      KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/dbesdk-test-server-ci-kms-role' }}
 
     steps:
       - name: Checkout aws-crypto-tools-commons (harness + Configuration_Set)
