@@ -26,7 +26,7 @@ import aws.cryptography.dbesdk.testserver.client.model.Keyring;
 import aws.cryptography.dbesdk.testserver.client.model.LegacyOverride;
 import aws.cryptography.dbesdk.testserver.client.model.LegacyPolicy;
 import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.TargetPair;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -40,7 +40,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Cross-language pair tests for legacy-DDBEC interop — the modern DBE
+ * Legacy-DDBEC interop tests — the modern DBE
  * item encryptor reading (and, under a FORCE_LEGACY policy, writing) items in
  * the format of the legacy DynamoDB Encryption Client via a LegacyOverride.
  *
@@ -49,8 +49,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * bundles; the Rust and .NET libraries have no equivalent. This is modeled by
  * the {@code legacy-ddbec} Feature — declared <em>supported</em> only for the
  * Java Language_Server. Every test calls {@link FeatureGate#require} first, so
- * only the Java→Java pair runs and every pair involving Rust or .NET is visibly
- * skipped.
+ * each runs once per target and only the Java target runs — the Rust and .NET
+ * targets are visibly skipped.
  *
  * <p>Three bounded properties:
  * <ul>
@@ -115,11 +115,11 @@ class LegacyDdbecCompatibilityTests {
      * decrypt it — gated to Java (the only target with the adapter).
      */
     @ParameterizedTest(name = "[legacy] modern client reads an independently produced Java legacy vector {0}")
-    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#allPairs")
-    void modernClientReadsIndependentJavaLegacyVector(TargetPair pair) {
-        FeatureGate.require(Set.of("legacy-ddbec"), pair);
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#targets")
+    void modernClientReadsIndependentJavaLegacyVector(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("legacy-ddbec"), target);
         Map<String, AttributeValue> legacyVector = loadLegacyVector();
-        DBESDKTestServerClient decryptClient = DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        DBESDKTestServerClient decryptClient = DbeTestServerClients.forEndpoint(target.endpoint());
         String decryptId = decryptClient.createClient(CreateClientInput.builder()
             .config(legacyConfig(LegacyPolicy.FORBID_LEGACY_ENCRYPT_ALLOW_LEGACY_DECRYPT)).build())
             .getClientId();
@@ -170,16 +170,15 @@ class LegacyDdbecCompatibilityTests {
     }
 
     @ParameterizedTest(name = "[legacy] force-legacy round-trip {0}")
-    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#allPairs")
-    void forceLegacyEncryptRoundTrips(TargetPair pair) {
-        FeatureGate.require(Set.of("legacy-ddbec"), pair);
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#targets")
+    void forceLegacyEncryptRoundTrips(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("legacy-ddbec"), target);
         DBEClientConfig config = legacyConfig(LegacyPolicy.FORCE_LEGACY_ENCRYPT_ALLOW_LEGACY_DECRYPT);
-        DBESDKTestServerClient encryptClient = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
-        DBESDKTestServerClient decryptClient = DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
 
-        String encryptId = encryptClient.createClient(
+        String encryptId = client.createClient(
             CreateClientInput.builder().config(config).build()).getClientId();
-        Map<String, AttributeValue> encrypted = encryptClient.encryptItem(
+        Map<String, AttributeValue> encrypted = client.encryptItem(
             EncryptItemInput.builder().clientId(encryptId).plaintextItem(canonicalPlaintext()).build())
             .getEncryptedItem();
 
@@ -188,9 +187,9 @@ class LegacyDdbecCompatibilityTests {
         assertFalse(encrypted.containsKey(MODERN_HEADER),
             "force-legacy item must not carry the modern aws_dbe_head");
 
-        String decryptId = decryptClient.createClient(
+        String decryptId = client.createClient(
             CreateClientInput.builder().config(config).build()).getClientId();
-        Map<String, AttributeValue> recovered = decryptClient.decryptItem(
+        Map<String, AttributeValue> recovered = client.decryptItem(
             DecryptItemInput.builder().clientId(decryptId).encryptedItem(encrypted).build())
             .getPlaintextItem();
 
@@ -200,48 +199,46 @@ class LegacyDdbecCompatibilityTests {
     }
 
     @ParameterizedTest(name = "[legacy] forbid-legacy-decrypt rejects a legacy item {0}")
-    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#allPairs")
-    void forbidLegacyDecryptRejectsLegacyItem(TargetPair pair) {
-        FeatureGate.require(Set.of("legacy-ddbec"), pair);
-        DBESDKTestServerClient encryptClient = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
-        DBESDKTestServerClient decryptClient = DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#targets")
+    void forbidLegacyDecryptRejectsLegacyItem(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("legacy-ddbec"), target);
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
 
-        String encryptId = encryptClient.createClient(CreateClientInput.builder()
+        String encryptId = client.createClient(CreateClientInput.builder()
             .config(legacyConfig(LegacyPolicy.FORCE_LEGACY_ENCRYPT_ALLOW_LEGACY_DECRYPT)).build())
             .getClientId();
-        Map<String, AttributeValue> legacyItem = encryptClient.encryptItem(
+        Map<String, AttributeValue> legacyItem = client.encryptItem(
             EncryptItemInput.builder().clientId(encryptId).plaintextItem(canonicalPlaintext()).build())
             .getEncryptedItem();
 
-        String decryptId = decryptClient.createClient(CreateClientInput.builder()
+        String decryptId = client.createClient(CreateClientInput.builder()
             .config(legacyConfig(LegacyPolicy.FORBID_LEGACY_ENCRYPT_FORBID_LEGACY_DECRYPT)).build())
             .getClientId();
-        assertThrows(DBESDKClientError.class, () -> decryptClient.decryptItem(
+        assertThrows(DBESDKClientError.class, () -> client.decryptItem(
             DecryptItemInput.builder().clientId(decryptId).encryptedItem(legacyItem).build()),
             "a forbid-legacy-decrypt client must reject a legacy-format item");
     }
 
     @ParameterizedTest(name = "[legacy] migration client (forbid-encrypt/allow-decrypt) reads a legacy item {0}")
-    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#allPairs")
-    void forbidLegacyEncryptAllowLegacyDecryptReadsLegacyItem(TargetPair pair) {
-        FeatureGate.require(Set.of("legacy-ddbec"), pair);
-        DBESDKTestServerClient encryptClient = DbeTestServerClients.forEndpoint(pair.encryptEndpoint());
-        DBESDKTestServerClient decryptClient = DbeTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @MethodSource("aws.cryptography.dbesdk.testserver.tests.DbeTestHelpers#targets")
+    void forbidLegacyEncryptAllowLegacyDecryptReadsLegacyItem(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("legacy-ddbec"), target);
+        DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
 
-        // A legacy-format item, produced by a FORCE_LEGACY client on the Java
-        // server (legacy is Java-only, so the encrypt endpoint is the Java server).
-        String encryptId = encryptClient.createClient(CreateClientInput.builder()
+        // A legacy-format item, produced by a FORCE_LEGACY client (legacy is
+        // Java-only, so this target is the Java server).
+        String encryptId = client.createClient(CreateClientInput.builder()
             .config(legacyConfig(LegacyPolicy.FORCE_LEGACY_ENCRYPT_ALLOW_LEGACY_DECRYPT)).build())
             .getClientId();
-        Map<String, AttributeValue> legacyItem = encryptClient.encryptItem(
+        Map<String, AttributeValue> legacyItem = client.encryptItem(
             EncryptItemInput.builder().clientId(encryptId).plaintextItem(canonicalPlaintext()).build())
             .getEncryptedItem();
 
         // The migration policy — write modern, still read legacy — decrypts it.
-        String decryptId = decryptClient.createClient(CreateClientInput.builder()
+        String decryptId = client.createClient(CreateClientInput.builder()
             .config(legacyConfig(LegacyPolicy.FORBID_LEGACY_ENCRYPT_ALLOW_LEGACY_DECRYPT)).build())
             .getClientId();
-        Map<String, AttributeValue> recovered = decryptClient.decryptItem(
+        Map<String, AttributeValue> recovered = client.decryptItem(
             DecryptItemInput.builder().clientId(decryptId).encryptedItem(legacyItem).build())
             .getPlaintextItem();
 
