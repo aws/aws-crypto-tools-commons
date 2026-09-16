@@ -35,10 +35,16 @@ their Language_Repositories and are resolved by the orchestrator from
 - **JDK 21+** (smithy-java requires it). Either export `JAVA_HOME`, pass
   `make JAVA_HOME=/path/to/jdk21 <target>`, or rely on the Makefile's
   auto-detection. Verify with `make check-java`.
+- **Smithy CLI** (`smithy` on `PATH`) — required by `make validate`, which runs
+  `smithy validate` on the model.
 - **git**, and **python3** (used by the structural smoke checks in `make validate`).
 - **AWS credentials** are required *only* for `make orchestrate` (the KMS
   keyring scenarios are part of it); the TestServer-development targets
   (`make build`, `make validate`, `make orchestrate-test`, …) need none.
+- **Per-language build toolchains** — only for a full `make orchestrate`, which
+  builds every configured Language_Server: Maven (Java), Cargo (Rust), Go,
+  .NET, Node, CMake, and a Python 3 venv. Install what you need (e.g. via `mise`
+  or `toolbox`); the TestServer-development targets require none of them.
 
 > On NFS home directories, Gradle's file-watcher can throw
 > `java.io.IOException: Function not implemented`. If you hit it, disable the
