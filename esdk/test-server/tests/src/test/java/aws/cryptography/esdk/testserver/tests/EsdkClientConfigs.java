@@ -172,6 +172,20 @@ public final class EsdkClientConfigs {
     }
 
     /**
+     * @return a Raw-AES / Default-CMM config over the multi-keyring's generator keyring alone,
+     *     with the encrypted-data-key count capped at {@code maxEncryptedDataKeys}. Decrypts a
+     *     {@link #rawAesMulti()} message without multi-keyring support, so the cap is
+     *     exercisable on targets that support only single raw-AES keyrings.
+     */
+    public static ESDKClientConfig rawAesWithMaxEdks(long maxEncryptedDataKeys) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .maxEncryptedDataKeys(maxEncryptedDataKeys)
+            .cmm(defaultCmm(rawAesKeyring()))
+            .build();
+    }
+
+    /**
      * @return a Default-CMM config over a multi-keyring of Raw-RSA generator + Raw-AES child,
      *     so an encrypted message carries an RSA EDK first and an AES EDK second.
      */

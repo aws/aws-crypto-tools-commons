@@ -26,7 +26,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  * <ul>
  *   <li><b>CMM-007</b> — round-trips when the required keys are reproduced exactly on decrypt
- *       ({@code spec/framework/required-encryption-context-cmm.md#decrypt-materials}).</li>
+ *       ({@code spec/framework/required-encryption-context-cmm.md#decrypt-materials}). Also
+ *       proven with the plain Default CMM on the decrypt leg (Dafny
+ *       TestRemoveOnEncryptRemoveAndSupplyOnDecryptHappyCase), decrypt-side.</li>
  *   <li><b>CMM-008</b> — decrypt fails when the required keys are not correctly reproduced: none
  *       supplied, the required key missing, or a required key given a wrong value
  *       ({@code spec/framework/required-encryption-context-cmm.md#decrypt-materials}).</li>
@@ -74,6 +76,28 @@ class RequiredEncryptionContextCmmTests {
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, FULL_CONTEXT);
         assertArrayEquals(PLAINTEXT, recovered,
             "decrypt with the required keys reproduced exactly must recover the plaintext (" + pair + ")");
+    }
+
+    /**
+     * Dafny parity (TestRemoveOnEncryptRemoveAndSupplyOnDecryptHappyCase): a message encrypted
+     * with the required-EC CMM decrypts under the plain Default CMM when the dropped context is
+     * reproduced — the decryptor needs no required-EC CMM of its own. Decrypt-side with per-side
+     * gating: the required-EC-capable reference produces; every raw-AES-capable target decrypts.
+     */
+    @ParameterizedTest(name = "defaultCmmDecryptsWithReproducedContext {0}")
+    @MethodSource("decryptSide")
+    void decryptSucceedsWithDefaultCmmWhenRequiredContextReproduced(ReferencePair pair) {
+        FeatureGate.require(FEATURES,
+            new EndpointPair(pair.encryptTarget(), pair.encryptTarget()));
+        FeatureGate.require(Set.of("raw-aes"),
+            new EndpointPair(pair.decryptTarget(), pair.decryptTarget()));
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT,
+            FULL_CONTEXT, null, null);
+        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(),
+            ciphertext, FULL_CONTEXT);
+        assertArrayEquals(PLAINTEXT, recovered,
+            "decrypt with the Default CMM and the dropped context reproduced must recover the "
+                + "plaintext (" + pair + ")");
     }
 
     /**
