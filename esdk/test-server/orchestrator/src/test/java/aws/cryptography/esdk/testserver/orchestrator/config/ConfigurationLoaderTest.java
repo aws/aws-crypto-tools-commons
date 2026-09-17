@@ -303,7 +303,8 @@ class ConfigurationLoaderTest {
             "aws-kms", "aws-kms-multi", "aws-kms-discovery",
             "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery",
             "aws-kms-rsa", "aws-kms-ecdh",
-            "required-encryption-context", "caching"), set.features());
+            "required-encryption-context",
+            "default-cmm-reproduced-encryption-context", "caching"), set.features());
 
         ConfigurationEntry java = set.forLanguage("java");
         assertNotNull(java, "the shipped set must carry a java entry");
