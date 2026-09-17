@@ -81,16 +81,14 @@ class RequiredEncryptionContextCmmTests {
     /**
      * Dafny parity (TestRemoveOnEncryptRemoveAndSupplyOnDecryptHappyCase): a message encrypted
      * with the required-EC CMM decrypts under the plain Default CMM when the dropped context is
-     * reproduced — the decryptor needs no required-EC CMM of its own. Decrypt-side with per-side
-     * gating: the required-EC-capable reference produces; every raw-AES-capable target decrypts.
+     * reproduced — the decryptor needs no required-EC CMM of its own, though supplying the
+     * reproduced context on decrypt is itself the required-encryption-context capability, so
+     * both legs gate on it.
      */
     @ParameterizedTest(name = "defaultCmmDecryptsWithReproducedContext {0}")
     @MethodSource("decryptSide")
     void decryptSucceedsWithDefaultCmmWhenRequiredContextReproduced(ReferencePair pair) {
-        FeatureGate.require(FEATURES,
-            new EndpointPair(pair.encryptTarget(), pair.encryptTarget()));
-        FeatureGate.require(Set.of("raw-aes"),
-            new EndpointPair(pair.decryptTarget(), pair.decryptTarget()));
+        FeatureGate.require(FEATURES, pair.asEndpointPair());
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT,
             FULL_CONTEXT, null, null);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(),
