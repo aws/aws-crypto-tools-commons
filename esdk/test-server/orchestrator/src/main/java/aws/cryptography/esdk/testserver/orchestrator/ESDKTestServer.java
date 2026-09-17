@@ -64,7 +64,7 @@ import java.util.concurrent.Future;
  *   <li>Complete Feature validation for declarations obtained by
  *       materialization — a language whose effective entry carries no inline
  *       declaration reads it from
- *       {@code <server root>/esdk/test-server/commons-configuration.json}
+ *       {@code <server root>/esdk/test-server/feature-config.json}
  *       (e.g. Java's in a Commons_Run), including the product match
  *       (Requirements 8.4, 8.10, 8.11).</li>
  *   <li>Produce + emit the Resolution_Record — stdout block and
@@ -97,20 +97,34 @@ public final class ESDKTestServer {
      * Configuration_Entry whose Language_Repository places the file elsewhere
      * overrides this via {@code commonsConfigurationPath}.
      */
-    static final String COMMONS_CONFIGURATION_RELATIVE_PATH =
-        "esdk/test-server/commons-configuration.json";
+    /**
+     * The DEFAULT repository-root-relative config directory holding a
+     * Language_Server's {@code server-config.json}, {@code feature-config.json},
+     * and {@code bug-config.json} (design "Configuration files"). An entry whose
+     * Language_Repository places them elsewhere overrides this via
+     * {@code configPath}.
+     */
+    static final String DEFAULT_CONFIG_DIRECTORY = "esdk/test-server";
 
     /**
-     * The repository-root-relative path to {@code entry}'s commons-configuration
-     * file: the entry's {@code commonsConfigurationPath} when set, otherwise
-     * {@link #COMMONS_CONFIGURATION_RELATIVE_PATH}. Lets a Language_Repository
-     * whose layout differs from the default (e.g. the Rust server, whose sources
-     * live under {@code esdk-test-server/}) carry its declaration alongside them.
+     * The repository-root-relative config directory for {@code entry}: its
+     * {@code configPath} when set, otherwise {@link #DEFAULT_CONFIG_DIRECTORY}.
+     * The server's three config files live side by side in this directory.
      */
-    static String commonsConfigurationRelativePath(ConfigurationEntry entry) {
-        String configured = entry == null ? null : entry.commonsConfigurationPath();
+    static String configDirectory(ConfigurationEntry entry) {
+        String configured = entry == null ? null : entry.configPath();
         return configured == null || configured.isBlank()
-            ? COMMONS_CONFIGURATION_RELATIVE_PATH : configured;
+            ? DEFAULT_CONFIG_DIRECTORY : configured;
+    }
+
+    /**
+     * The bug ids {@code entry} declares, from {@code <configDir>/bug-config.json}
+     * under {@code root}. Empty when the file is absent (a server with zero bugs
+     * need not ship one).
+     */
+    private static List<String> loadBugs(Path root, ConfigurationEntry entry) {
+        return ConfigurationLoader.loadBugConfiguration(
+            root.resolve(configDirectory(entry)).resolve("bug-config.json"));
     }
 
     /**
@@ -180,11 +194,21 @@ public final class ESDKTestServer {
      * (Requirement 2.11).
      */
     public Result run(List<ConfigurationEntry> overrides) {
+        return run(overrides, Map.of());
+    }
+
+    /**
+     * As {@link #run(List)}, plus a dev-only local-overrides overlay mapping a
+     * language to a local working-tree root the resolver uses in place of a
+     * clone (empty in a normal run). Local development only — the overlay is
+     * gitignored and never ships in committed configuration.
+     */
+    public Result run(List<ConfigurationEntry> overrides, Map<String, Path> localRepositories) {
         List<LaunchedServer> launched = new ArrayList<>();
         List<String> cleanupFailureLanguages = new ArrayList<>();
         PipelineOutcome outcome;
         try {
-            outcome = executePipeline(overrides, launched);
+            outcome = executePipeline(overrides, launched, localRepositories);
         } finally {
             // 8. Teardown is total: stop every server launched during the run,
             // whatever the outcome (Requirement 2.6). A STILL_RUNNING close
@@ -231,11 +255,13 @@ public final class ESDKTestServer {
      * optional raw-RSA padding capability ({@code null} = every scheme).
      */
     private record Declaration(
-            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes) {
+            List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes,
+            List<String> knownBugs) {
     }
 
     private PipelineOutcome executePipeline(
-            List<ConfigurationEntry> overrides, List<LaunchedServer> launched) {
+            List<ConfigurationEntry> overrides, List<LaunchedServer> launched,
+            Map<String, Path> localRepositories) {
         // ---- Stage 1: load + validate the Configuration_Set and the on-hand
         // Feature_Declarations, all before anything is cloned. ----
 
@@ -281,9 +307,9 @@ public final class ESDKTestServer {
         Map<String, Declaration> declarations = new LinkedHashMap<>();
         FeatureValidation.Result onHand = FeatureValidation.Result.ok();
         if (context.kind() == RunContext.Kind.LANGUAGE) {
+            ConfigurationEntry ownEntry = configurationSet.forLanguage(context.ownLanguage());
             Path expected = context.languageRepoRoot()
-                .resolve(commonsConfigurationRelativePath(
-                    configurationSet.forLanguage(context.ownLanguage())));
+                .resolve(configDirectory(ownEntry));
             CommonsConfiguration own;
             try {
                 own = ConfigurationLoader.loadCommonsConfiguration(expected);
@@ -293,16 +319,25 @@ public final class ESDKTestServer {
                 return PipelineOutcome.aborted(FeatureValidation.carryingFileError(
                     context.ownLanguage(), expected.toString(), e.getMessage()).message());
             }
+            List<String> ownBugs;
+            try {
+                ownBugs = loadBugs(context.languageRepoRoot(), ownEntry);
+            } catch (ConfigurationLoadException e) {
+                return PipelineOutcome.aborted(
+                    "could not read the bug-configuration for language '"
+                        + context.ownLanguage() + "': " + e.getMessage());
+            }
             onHand = onHand
                 .and(FeatureValidation.validateDeclaration(catalog, context.ownLanguage(),
                     own.supportedFeatures(), own.unsupportedFeatures()))
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(context.ownLanguage(),
                     own.rawRsaPaddingSchemes(), own.supportedFeatures()))
+                .and(FeatureValidation.validateKnownBugs(context.ownLanguage(), ownBugs))
                 .and(FeatureValidation.validateProductMatch(context.invokingRepositoryName(),
                     own.product(), configurationSet.product()));
             declarations.put(context.ownLanguage(),
                 new Declaration(own.supportedFeatures(), own.unsupportedFeatures(),
-                    own.rawRsaPaddingSchemes()));
+                    own.rawRsaPaddingSchemes(), ownBugs));
         }
         for (ConfigurationEntry entry : effectiveEntries) {
             if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
@@ -312,10 +347,11 @@ public final class ESDKTestServer {
                 .and(FeatureValidation.validateDeclaration(catalog,
                     entry.language(), entry.supportedFeatures(), entry.unsupportedFeatures()))
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(entry.language(),
-                    entry.rawRsaPaddingSchemes(), entry.supportedFeatures()));
+                    entry.rawRsaPaddingSchemes(), entry.supportedFeatures()))
+                .and(FeatureValidation.validateKnownBugs(entry.language(), entry.knownBugs()));
             declarations.put(entry.language(),
                 new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures(),
-                    entry.rawRsaPaddingSchemes()));
+                    entry.rawRsaPaddingSchemes(), entry.knownBugs()));
         }
         if (!onHand.valid()) {
             return PipelineOutcome.aborted(
@@ -325,7 +361,8 @@ public final class ESDKTestServer {
         // ---- Stage 2: materialize the planned sources. Planning is pure
         // (design resolution-rules table); materialization performs the git
         // and filesystem I/O, capturing failures as data (Requirement 3.6). ----
-        List<ResolvedComponentPlan> plans = resolver.resolve(configurationSet, context, overrides);
+        List<ResolvedComponentPlan> plans =
+            resolver.resolve(configurationSet, context, overrides, localRepositories);
         MaterializedSources sources = materializer.materialize(plans);
 
         // ---- Stage 4 (emitted here so the record accompanies every
@@ -395,13 +432,21 @@ public final class ESDKTestServer {
                 return PipelineOutcome.aborted("no materialized server component for language '"
                     + language + "' to locate its Feature_Declaration");
             }
-            Path expected = server.get().root().resolve(commonsConfigurationRelativePath(entry));
+            Path expected = server.get().root().resolve(configDirectory(entry));
             CommonsConfiguration carried;
             try {
                 carried = ConfigurationLoader.loadCommonsConfiguration(expected);
             } catch (ConfigurationLoadException e) {
                 return PipelineOutcome.aborted(FeatureValidation.carryingFileError(
                     language, expected.toString(), e.getMessage()).message());
+            }
+            List<String> carriedBugs;
+            try {
+                carriedBugs = loadBugs(server.get().root(), entry);
+            } catch (ConfigurationLoadException e) {
+                return PipelineOutcome.aborted(
+                    "could not read the bug-configuration for language '"
+                        + language + "': " + e.getMessage());
             }
             String languageRepository = entry.serverLocation() != null
                 && entry.serverLocation().repository() != null
@@ -411,6 +456,7 @@ public final class ESDKTestServer {
                     carried.supportedFeatures(), carried.unsupportedFeatures())
                 .and(FeatureValidation.validateRawRsaPaddingSchemes(language,
                     carried.rawRsaPaddingSchemes(), carried.supportedFeatures()))
+                .and(FeatureValidation.validateKnownBugs(language, carriedBugs))
                 .and(FeatureValidation.validateProductMatch(languageRepository,
                     carried.product(), configurationSet.product()));
             if (!crossRepo.valid()) {
@@ -419,7 +465,7 @@ public final class ESDKTestServer {
             }
             declarations.put(language,
                 new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures(),
-                    carried.rawRsaPaddingSchemes()));
+                    carried.rawRsaPaddingSchemes(), carriedBugs));
         }
 
         // ---- Stage 5: build + launch every server as a subprocess on its
@@ -532,7 +578,10 @@ public final class ESDKTestServer {
             ConfigurationEntry entry = entryByLanguage.get(server.language());
             int majorVersion = entry != null && entry.majorVersion() != null
                 ? entry.majorVersion() : 0;
-            targets.add(new TestTarget(server.language(), majorVersion, server.endpoint()));
+            String repository = entry != null && entry.libraryRepository() != null
+                && entry.libraryRepository().name() != null
+                ? entry.libraryRepository().name() : server.language();
+            targets.add(new TestTarget(server.language(), majorVersion, repository, server.endpoint()));
         }
 
         List<String> catalog = configurationSet.features() == null
@@ -553,8 +602,26 @@ public final class ESDKTestServer {
                 rawRsaPaddingSchemes.put(entry.language(), declaration.rawRsaPaddingSchemes());
             }
         }
+        // Each launched Target that declares known bugs contributes a
+        // `<lang>:<major>:<repo>=<id>[;<id>…]` entry naming the bugs it exhibits;
+        // the Tests gate exactly those rows for that Target. A Target that
+        // declares no bug contributes nothing, so a run whose servers are all
+        // clean sends none.
+        List<String> bugEntries = new ArrayList<>();
+        for (TestTarget target : targets) {
+            Declaration declaration = declarations.get(target.language());
+            if (declaration == null || declaration.knownBugs() == null
+                    || declaration.knownBugs().isEmpty()) {
+                continue;
+            }
+            bugEntries.add(target.language() + ":" + target.majorVersion() + ":"
+                + target.repository() + "=" + String.join(";", declaration.knownBugs()));
+        }
+        String knownBugs = String.join(",", bugEntries);
+
         return new TestRunInput(
-            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation);
+            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation,
+            knownBugs);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

@@ -1,93 +1,88 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link KnownBugs} ledger parsing: the committed resource loads, a valid
- * document resolves by id, and every malformed shape is rejected with a
- * message naming the problem.
+ * {@link KnownBugs} parsing of the injected per-server property: a target's set
+ * of exhibited bug ids resolves by the full {@code (language, majorVersion,
+ * repository)} identity, an absent target exhibits nothing, and a malformed
+ * entry — a non-triple key, a non-integer major, a duplicate target, or a
+ * duplicate id — is rejected (the orchestrator generates this from validated
+ * configuration).
  */
 class KnownBugsTest {
 
-    @Test
-    void committedLedgerResourceLoadsAndValidates() {
-        // Guards known-bugs.json itself: a malformed or invalid committed
-        // ledger fails here, not mid-matrix.
-        KnownBugs.shared();
+    private static KnownBugs.Target target(String language, int majorVersion, String repository) {
+        return new KnownBugs.Target(language, majorVersion, repository);
     }
 
     @Test
-    void lookupResolvesDeclaredEntriesById() {
-        KnownBugs ledger = KnownBugs.parse("""
-            [
-              {"id": "a", "description": "op does the wrong thing", "languages": ["java", "python"]},
-              {"id": "b", "description": "other wrong thing", "languages": ["c"]}
-            ]
-            """);
-        assertEquals(List.of("java", "python"), ledger.lookup("a").orElseThrow().languages());
-        assertTrue(ledger.lookup("b").orElseThrow().exhibitedBy("c"));
-        assertTrue(ledger.lookup("missing").isEmpty());
-        assertEquals(List.of("a", "b"), List.copyOf(ledger.ids()));
+    void parsesPerServerSets() {
+        KnownBugs bugs = KnownBugs.parse(
+            "java:3:aws-crypto-tools-java=a;b,c:2:aws-encryption-sdk-c=x");
+        assertTrue(bugs.exhibits(target("java", 3, "aws-crypto-tools-java"), "a"));
+        assertTrue(bugs.exhibits(target("java", 3, "aws-crypto-tools-java"), "b"));
+        assertTrue(bugs.exhibits(target("c", 2, "aws-encryption-sdk-c"), "x"));
+        assertFalse(bugs.exhibits(target("java", 3, "aws-crypto-tools-java"), "x"),
+            "a target exhibits only its own declared ids");
+        assertEquals(Set.of("a", "b"),
+            bugs.bugsFor(target("java", 3, "aws-crypto-tools-java")));
     }
 
     @Test
-    void nonArrayRootIsRejected() {
+    void blankOrAbsentIsNoBugs() {
+        assertTrue(KnownBugs.parse(null).bugsFor(target("java", 3, "r")).isEmpty());
+        assertTrue(KnownBugs.parse("   ").bugsFor(target("java", 3, "r")).isEmpty());
+    }
+
+    @Test
+    void absentTargetExhibitsNothing() {
+        KnownBugs bugs = KnownBugs.parse("java:3:aws-crypto-tools-java=a");
+        assertFalse(bugs.exhibits(target("python", 4, "aws-encryption-sdk-python"), "a"));
+        assertTrue(bugs.bugsFor(target("python", 4, "aws-encryption-sdk-python")).isEmpty());
+    }
+
+    @Test
+    void identityIsTheFullTriple() {
+        KnownBugs bugs = KnownBugs.parse("java:3:aws-crypto-tools-java=a");
+        assertFalse(bugs.exhibits(target("java", 4, "aws-crypto-tools-java"), "a"),
+            "a different major version is a distinct target");
+        assertFalse(bugs.exhibits(target("java", 3, "aws-encryption-sdk"), "a"),
+            "a different repository is a distinct target");
+    }
+
+    @Test
+    void nonTripleKeyIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse("{\"bugs\": []}"));
-        assertTrue(e.getMessage().contains("must be a JSON array"), e.getMessage());
+            () -> KnownBugs.parse("java:3=a"));
+        assertTrue(e.getMessage().contains("language:major:repository"), e.getMessage());
     }
 
     @Test
-    void missingIdIsRejected() {
+    void nonIntegerMajorIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse("[{\"description\": \"d\", \"languages\": [\"java\"]}]"));
-        assertTrue(e.getMessage().contains("'id'"), e.getMessage());
+            () -> KnownBugs.parse("java:x:aws-crypto-tools-java=a"));
+        assertTrue(e.getMessage().contains("not an integer"), e.getMessage());
     }
 
     @Test
-    void blankDescriptionIsRejected() {
+    void duplicateTargetIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse("[{\"id\": \"a\", \"description\": \" \", \"languages\": [\"java\"]}]"));
-        assertTrue(e.getMessage().contains("'description'"), e.getMessage());
+            () -> KnownBugs.parse(
+                "java:3:aws-crypto-tools-java=a,java:3:aws-crypto-tools-java=b"));
+        assertTrue(e.getMessage().contains("duplicate target"), e.getMessage());
     }
 
     @Test
-    void emptyLanguagesIsRejected() {
+    void duplicateIdWithinTargetIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse("[{\"id\": \"a\", \"description\": \"d\", \"languages\": []}]"));
-        assertTrue(e.getMessage().contains("non-empty 'languages'"), e.getMessage());
-    }
-
-    @Test
-    void duplicateBugIdIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse("""
-                [
-                  {"id": "a", "description": "d", "languages": ["java"]},
-                  {"id": "a", "description": "d2", "languages": ["python"]}
-                ]
-                """));
+            () -> KnownBugs.parse("java:3:aws-crypto-tools-java=a;a"));
         assertTrue(e.getMessage().contains("duplicate bug id"), e.getMessage());
-    }
-
-    @Test
-    void duplicateLanguageIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(
-                "[{\"id\": \"a\", \"description\": \"d\", \"languages\": [\"java\", \"java\"]}]"));
-        assertTrue(e.getMessage().contains("twice"), e.getMessage());
-    }
-
-    @Test
-    void unknownEntryFieldIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> KnownBugs.parse(
-                "[{\"id\": \"a\", \"description\": \"d\", \"languages\": [\"java\"], \"suites\": []}]"));
-        assertTrue(e.getMessage().contains("unknown field 'suites'"), e.getMessage());
     }
 }

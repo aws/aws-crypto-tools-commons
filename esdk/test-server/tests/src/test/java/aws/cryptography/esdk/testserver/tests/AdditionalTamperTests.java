@@ -160,7 +160,7 @@ class AdditionalTamperTests {
         tampered[message.footerOffset + 1] = (byte) inflatedLength;
 
         KnownBugGate.gate("decrypt-accepts-signature-trailing-garbage",
-            pair.decryptTarget().language(),
+            pair.decryptTarget(),
             () -> assertRejected(pair, config, tampered,
                 "a footer whose signature field is the valid signature plus trailing garbage"));
     }

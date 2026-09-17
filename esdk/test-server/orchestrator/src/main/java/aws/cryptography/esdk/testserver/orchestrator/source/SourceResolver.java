@@ -4,6 +4,7 @@ import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationSet;
 import aws.cryptography.esdk.testserver.orchestrator.config.RepositoryCoordinates;
 import aws.cryptography.esdk.testserver.orchestrator.config.ServerLocation;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,6 +68,31 @@ public final class SourceResolver {
      */
     public List<ResolvedComponentPlan> resolve(
             ConfigurationSet set, RunContext context, List<ConfigurationEntry> overrides) {
+        return resolve(set, context, overrides, Map.of());
+    }
+
+    /**
+     * Plan every component of the run, honoring a dev-only local-overrides
+     * overlay.
+     *
+     * @param set                the commons-stored Configuration_Set resolved for the run
+     * @param context            the execution context
+     * @param overrides          the invoking Language_Repository's
+     *                           Configuration_Overrides (empty for a Commons_Run),
+     *                           each a complete replacement entry (Requirement 4.6)
+     * @param localRepositories  a dev-only overlay mapping a language to a local
+     *                           working-tree root; that language's library and
+     *                           server are planned as {@link SourcePlan.WorkingTree}
+     *                           at the root plus the effective entry's paths rather
+     *                           than cloned. Ignored for the own language of a
+     *                           Language_Repository_Run (already a working tree).
+     *                           Empty in a normal (CI) run.
+     * @return one plan per (language × {library, server}) in entry order, with
+     *     the {@code commons} component first on Language_Repository_Runs
+     */
+    public List<ResolvedComponentPlan> resolve(
+            ConfigurationSet set, RunContext context, List<ConfigurationEntry> overrides,
+            Map<String, Path> localRepositories) {
         Map<String, ConfigurationEntry> overrideByLanguage = new LinkedHashMap<>();
         for (ConfigurationEntry override : overrides) {
             overrideByLanguage.put(override.language(), override);
@@ -95,50 +121,67 @@ public final class SourceResolver {
             // has one — ConfigurationValidation rejects it (Req 4.7).
             ConfigurationEntry override = ownLanguage ? null : overrideByLanguage.get(language);
             ConfigurationEntry effective = override != null ? override : stored;
+
+            // A dev-only local override wins over a clone (but never over the
+            // own language, which is already a working tree). It replaces only
+            // the source location; the component paths still come from the
+            // effective entry.
+            Path localRoot = ownLanguage ? null : localRepositories.get(language);
+
             ResolutionReason reason = ownLanguage
                 ? ResolutionReason.WORKING_TREE
-                : override != null
-                    ? ResolutionReason.CONFIGURATION_OVERRIDE
-                    : ResolutionReason.CONFIGURATION_ENTRY;
+                : localRoot != null
+                    ? ResolutionReason.LOCAL_OVERRIDE
+                    : override != null
+                        ? ResolutionReason.CONFIGURATION_OVERRIDE
+                        : ResolutionReason.CONFIGURATION_ENTRY;
 
-            plans.add(libraryPlan(language, effective, context, ownLanguage, reason));
-            plans.add(serverPlan(language, effective, context, ownLanguage, reason));
+            plans.add(libraryPlan(language, effective, context, ownLanguage, localRoot, reason));
+            plans.add(serverPlan(language, effective, context, ownLanguage, localRoot, reason));
         }
         return List.copyOf(plans);
     }
 
     /**
      * The library component: the own language's working tree in a
-     * Language_Repository_Run (Requirement 4.2), otherwise a clone of the
-     * run-effective library repository coordinates (Requirements 4.1, 4.3, 4.6).
+     * Language_Repository_Run (Requirement 4.2), a dev-only local working tree
+     * when {@code localRoot} is set, otherwise a clone of the run-effective
+     * library repository coordinates (Requirements 4.1, 4.3, 4.6).
      */
     private static ResolvedComponentPlan libraryPlan(
             String language, ConfigurationEntry effective, RunContext context,
-            boolean ownLanguage, ResolutionReason reason) {
+            boolean ownLanguage, Path localRoot, ResolutionReason reason) {
         RepositoryCoordinates library = effective.libraryRepository();
         String path = pathOrDefault(library == null ? null : library.path());
-        SourcePlan plan = ownLanguage
-            ? new SourcePlan.WorkingTree(context.languageRepoRoot(), path)
-            : new SourcePlan.Clone(library.url(), library.branch(), path);
+        SourcePlan plan;
+        if (ownLanguage) {
+            plan = new SourcePlan.WorkingTree(context.languageRepoRoot(), path);
+        } else if (localRoot != null) {
+            plan = new SourcePlan.WorkingTree(localRoot, path);
+        } else {
+            plan = new SourcePlan.Clone(library.url(), library.branch(), path);
+        }
         return new ResolvedComponentPlan(ComponentId.library(language), plan, reason);
     }
 
     /**
      * The server component, from the run-effective Server_Location as the sole
      * source (Requirements 1.5, 3.5): the own language's working tree
-     * (Requirement 4.2, ref ignored); a working-tree plan when the
-     * Server_Location names the invoking repository (Requirement 3.4); a clone
-     * at exactly {@code (url, ref)} with the location's path otherwise
-     * (Requirement 3.3).
+     * (Requirement 4.2, ref ignored); a dev-only local working tree when
+     * {@code localRoot} is set; a working-tree plan when the Server_Location
+     * names the invoking repository (Requirement 3.4); a clone at exactly
+     * {@code (url, ref)} with the location's path otherwise (Requirement 3.3).
      */
     private static ResolvedComponentPlan serverPlan(
             String language, ConfigurationEntry effective, RunContext context,
-            boolean ownLanguage, ResolutionReason reason) {
+            boolean ownLanguage, Path localRoot, ResolutionReason reason) {
         ServerLocation location = effective.serverLocation();
         String path = pathOrDefault(location == null ? null : location.path());
         SourcePlan plan;
         if (ownLanguage) {
             plan = new SourcePlan.WorkingTree(context.languageRepoRoot(), path);
+        } else if (localRoot != null) {
+            plan = new SourcePlan.WorkingTree(localRoot, path);
         } else if (location.repository().equals(context.invokingRepositoryName())) {
             plan = new SourcePlan.WorkingTree(context.invokingWorkingTreeRoot(), path);
         } else {

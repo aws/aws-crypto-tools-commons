@@ -162,7 +162,7 @@ class EncryptionContextBehaviorTests {
             return;
         }
         KnownBugGate.gate("encrypt-mishandles-proto-encryption-context-key",
-            pair.encryptTarget().language(), () -> {
+            pair.encryptTarget(), () -> {
                 byte[] recovered = assertDoesNotThrow(
                     () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec),
                     "decrypt of a message carrying reserved-identifier EC keys (" + pair + ")");
@@ -187,7 +187,7 @@ class EncryptionContextBehaviorTests {
         ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
-        KnownBugGate.gate("encrypt-accepts-reserved-prefix-encryption-context-key", target.language(),
+        KnownBugGate.gate("encrypt-accepts-reserved-prefix-encryption-context-key", target,
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
                 "encrypt with an 'aws-crypto-' prefixed encryption-context key must be rejected as an "

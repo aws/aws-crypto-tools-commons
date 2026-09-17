@@ -67,6 +67,7 @@ public final class ConfigurationValidation {
         List<String> errors = new ArrayList<>();
 
         validateCatalog(set, errors);
+        validateBugLedger(set.bugLedger(), errors);
 
         for (ConfigurationEntry entry : set.entries()) {
             validateEntry("entry", entry, errors);
@@ -158,6 +159,38 @@ public final class ConfigurationValidation {
             if (count.getValue() > 1) {
                 errors.add("Feature_Catalog: duplicate Feature name '"
                     + count.getKey() + "'");
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Bug ledger (commons catalog)
+    // ------------------------------------------------------------------
+
+    /**
+     * Validate the commons bug ledger structurally: every entry has a non-blank
+     * {@code id} and {@code description}, and ids are unique. The {@code ticketId}
+     * may be null (a bug with no ticket filed yet). The ledger does not list
+     * which languages exhibit a bug — that lives per-server — so nothing is
+     * cross-checked against the languages here (a future reconciler prunes ledger
+     * entries no language exhibits).
+     */
+    private static void validateBugLedger(List<BugLedgerEntry> ledger, List<String> errors) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (BugLedgerEntry bug : ledger) {
+            if (bug.id() == null || bug.id().isBlank()) {
+                errors.add("bug ledger: an entry is missing a non-blank id");
+                continue;
+            }
+            if (bug.description() == null || bug.description().isBlank()) {
+                errors.add("bug ledger: bug '" + bug.id()
+                    + "' is missing a non-blank description");
+            }
+            counts.merge(bug.id(), 1, Integer::sum);
+        }
+        for (Map.Entry<String, Integer> count : counts.entrySet()) {
+            if (count.getValue() > 1) {
+                errors.add("bug ledger: duplicate bug id '" + count.getKey() + "'");
             }
         }
     }

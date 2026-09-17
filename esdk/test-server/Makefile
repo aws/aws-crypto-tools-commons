@@ -6,14 +6,13 @@
 #
 #   model/         the single Smithy model (validated with the smithy CLI)
 #   client-java/   the generated Java Test_Client   (root: esdk-test-server-client-java)
-#   servers/python/ the Python Language_Server      (hand-implemented, no build)
 #   tests/         the single Java Tests suite       (root: esdk-test-server-tests)
 #   orchestrator/  the Orchestrator core            (root: esdk-test-server-orchestrator)
 #
 # The Java Language_Server is NOT hosted here: it lives in the
 # aws-crypto-tools-java Language_Repository at esdk/test-server/server
 # (Requirement 1.2), and the orchestrated run resolves it from the java
-# entry's Server_Location in config/configuration-set.json (Requirement 1.5).
+# entry's Server_Location in config/server-config.json (Requirement 1.5).
 #
 # THE SINGLE ORCHESTRATED ENTRY POINT
 # -----------------------------------
@@ -33,7 +32,6 @@
 #   make build                 # fast compile/codegen check of all modules
 #   make orchestrate           # the complete cross-language Commons_Run
 #   make orchestrate-test      # the orchestrator's own property/integration tests
-#   make setup-python          # prepare the Python server env (clone/venv/install)
 #   make JAVA_HOME=/path/to/jdk21 orchestrate   # force a specific JDK
 #
 # NOTE: written to work with the GNU Make 3.81 that ships with macOS, which
@@ -86,25 +84,6 @@ CREATE_OIDC_PROVIDER ?= false
 TMP_DIR    := $(MAKEFILE_DIR)/.make-tmp
 
 # ----------------------------------------------------------------------------
-# Python Language_Server environment (setup-python / run-python-server).
-# ----------------------------------------------------------------------------
-# The Python Language_Server is hand-implemented and delegates to the real AWS
-# Encryption SDK for Python, installed from a clone of its repository. Python
-# needs no compile step, so `setup-python` just clones + creates a venv +
-# installs the ESDK editable from the relative path. NOTE: the orchestrated run
-# (`make orchestrate`) sets up its own isolated Python environment via the
-# PythonLaunchPlan, so `setup-python` / `run-python-server` are standalone
-# developer conveniences for exercising the Python server by hand.
-PYTHON3        ?= python3
-PY_SERVER_DIR  := $(MAKEFILE_DIR)/servers/python
-PY_ESDK_REPO   ?= https://github.com/aws/aws-encryption-sdk-python
-PY_ESDK_DIR    := $(PY_SERVER_DIR)/.deps/aws-encryption-sdk-python
-PY_VENV        := $(PY_SERVER_DIR)/.venv
-PY_PYTHON      := $(PY_VENV)/bin/python
-# Port for the standalone `run-python-server` convenience target.
-PYTHON_PORT    ?= 8091
-
-# ----------------------------------------------------------------------------
 # JDK resolution
 # ----------------------------------------------------------------------------
 # smithy-java 1.4.0 requires JDK 21+. The shell default here is often Corretto
@@ -131,7 +110,7 @@ endif
 
 .PHONY: help check-java validate smoke build build-client build-tests \
         orchestrate orchestrate-test \
-        deploy-kms-cdk setup-python run-python-server clean
+        deploy-kms-cdk clean
 
 # ----------------------------------------------------------------------------
 help: ## Show this help
@@ -247,36 +226,6 @@ deploy-kms-cdk: ## Deploy the KMS_Test_Resources CDK stack (needs AWS creds via 
 	@cd "$(CDK_DIR)" && npm install && \
 		AWS_REGION="$(ESDK_TESTSERVER_KMS_REGION)" npx cdk deploy --require-approval never \
 			-c createOidcProvider=$(CREATE_OIDC_PROVIDER)
-
-# ----------------------------------------------------------------------------
-# Python Language_Server standalone conveniences. `setup-python` prepares the
-# Python server's environment (clone the ESDK, create the venv, install); it is
-# Python, so there is no compile step. These are for exercising the Python
-# server by hand — the orchestrated run sets up its own isolated environment.
-# ----------------------------------------------------------------------------
-setup-python: ## Clone the Python ESDK, create the venv, and install the Python server deps
-	@echo "==> Preparing the Python Language_Server environment"
-	@if [ ! -d "$(PY_ESDK_DIR)/.git" ]; then \
-		echo "==> Cloning $(PY_ESDK_REPO) -> $(PY_ESDK_DIR)"; \
-		git clone --depth 1 "$(PY_ESDK_REPO)" "$(PY_ESDK_DIR)"; \
-	else \
-		echo "==> Python ESDK already cloned at $(PY_ESDK_DIR)"; \
-	fi
-	@if [ ! -x "$(PY_PYTHON)" ]; then \
-		echo "==> Creating venv at $(PY_VENV)"; \
-		"$(PYTHON3)" -m venv "$(PY_VENV)"; \
-	fi
-	@echo "==> Installing the Python ESDK (editable) + MPL + the server package"
-	@"$(PY_VENV)/bin/pip" install --quiet --upgrade pip
-	@"$(PY_VENV)/bin/pip" install --quiet \
-		-e "$(PY_ESDK_DIR)" \
-		'aws-cryptographic-material-providers>=1.7.4,<=1.11.2' \
-		-e "$(PY_SERVER_DIR)"
-	@echo "==> Python server environment ready ($(PY_PYTHON))"
-
-run-python-server: ## Start the Python server in the FOREGROUND on PYTHON_PORT (needs setup-python first)
-	@echo "==> Starting Python Language_Server on port $(PYTHON_PORT) (foreground; Ctrl-C to stop)"
-	@cd "$(PY_SERVER_DIR)" && "$(PY_PYTHON)" -m esdk_test_server "$(PYTHON_PORT)"
 
 # ----------------------------------------------------------------------------
 clean: ## gradle clean in every module + remove Makefile temp files

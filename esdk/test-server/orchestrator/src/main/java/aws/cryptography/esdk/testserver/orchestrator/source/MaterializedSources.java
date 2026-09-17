@@ -85,7 +85,7 @@ public final class MaterializedSources {
          * falling back to {@link #directory()} when the path cannot be
          * stripped. Lets the pipeline locate repository-level files — e.g. a
          * Language_Repository's
-         * {@code esdk/test-server/commons-configuration.json} carrying its
+         * {@code esdk/test-server/server-config.json} carrying its
          * Feature_Declaration — from a materialized server component
          * (Requirement 8.4).
          */

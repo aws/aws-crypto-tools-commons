@@ -110,7 +110,7 @@ class MessageIntegrityTests {
         String bugId = ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY.equals(suite)
             ? "decrypt-accepts-trailing-bytes-commit-key"
             : "decrypt-accepts-trailing-bytes-commit-key-ecdsa";
-        KnownBugGate.gate(bugId, pair.decryptTarget().language(),
+        KnownBugGate.gate(bugId, pair.decryptTarget(),
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, withTrailer),
                 "decrypt of a valid message with 4 trailing bytes appended must be rejected as an "

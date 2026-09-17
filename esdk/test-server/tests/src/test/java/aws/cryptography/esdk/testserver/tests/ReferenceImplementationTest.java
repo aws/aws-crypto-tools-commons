@@ -19,7 +19,9 @@ import org.junit.jupiter.api.Test;
 class ReferenceImplementationTest {
 
     private static final LanguageServerRegistry REGISTRY = LanguageServerRegistry.parse(
-        "java:3=http://127.0.0.1:1,python:4=http://127.0.0.1:2,c:2=http://127.0.0.1:3");
+        "java:3:aws-crypto-tools-java=http://127.0.0.1:1,"
+            + "python:4:aws-encryption-sdk-python=http://127.0.0.1:2,"
+            + "c:2:aws-encryption-sdk-c=http://127.0.0.1:3");
 
     private static final String CATALOG = "raw-aes,raw-rsa";
 
@@ -92,7 +94,7 @@ class ReferenceImplementationTest {
     @Test
     @DisplayName("a reference language with no configured target is substituted (single-language runs)")
     void substitutesWhenReferenceHasNoTarget() {
-        LanguageServerRegistry cOnly = LanguageServerRegistry.parse("c:2=http://127.0.0.1:3");
+        LanguageServerRegistry cOnly = LanguageServerRegistry.parse("c:2:aws-encryption-sdk-c=http://127.0.0.1:3");
         FeatureDeclarations declarations = declarations("c:raw-aes=true;raw-rsa=true", null);
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
@@ -122,7 +124,9 @@ class ReferenceImplementationTest {
     @DisplayName("the reference language's first configured target is picked when it ships multiple majors")
     void picksTheFirstTargetOfTheReferenceLanguage() {
         LanguageServerRegistry twoMajors = LanguageServerRegistry.parse(
-            "java:3=http://127.0.0.1:1,java:4=http://127.0.0.1:2,python:4=http://127.0.0.1:3");
+            "java:3:aws-crypto-tools-java=http://127.0.0.1:1,"
+                + "java:4:aws-crypto-tools-java=http://127.0.0.1:2,"
+                + "python:4:aws-encryption-sdk-python=http://127.0.0.1:3");
         FeatureDeclarations declarations = declarations(
             "java:raw-aes=true;raw-rsa=true,python:raw-aes=true;raw-rsa=true", null);
 

@@ -152,7 +152,7 @@ class EncryptionContextFormatTests {
     void emptyEncryptionContextValueSerializesAndRoundTrips(LanguageServerTarget target) {
         ESDKClientConfig config = configFor(new EndpointPair(target, target));
         Map<String, String> ec = Map.of("empty-value-key", "");
-        KnownBugGate.gate("encrypt-rejects-empty-encryption-context-value", target.language(), () -> {
+        KnownBugGate.gate("encrypt-rejects-empty-encryption-context-value", target, () -> {
             byte[] ciphertext = assertDoesNotThrow(
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, SUITE, null),
                 target + ": encrypt with an empty encryption-context value must be accepted");

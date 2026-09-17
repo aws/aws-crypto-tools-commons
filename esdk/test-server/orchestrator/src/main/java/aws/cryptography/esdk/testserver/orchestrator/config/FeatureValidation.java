@@ -110,6 +110,28 @@ public final class FeatureValidation {
     }
 
     /**
+     * Validate one Language_Server's {@code bug-config.json} list
+     * structurally (the known-bug analogue of {@link #validateDeclaration}): no
+     * blank ids and no duplicates. There is no central catalogue of bug ids, so
+     * membership is not checked — the list is authoritative for that server; a
+     * gate on an id no server declares simply asserts live everywhere.
+     *
+     * @param language  the language whose bug list this is; named in every error
+     * @param knownBugs the parsed bug ids, or {@code null} when the server ships
+     *                  no bug-configuration file (declares no bug)
+     * @return a {@link Result} with one error per structural violation
+     */
+    public static Result validateKnownBugs(String language, List<String> knownBugs) {
+        if (knownBugs == null) {
+            return Result.ok();
+        }
+        List<String> errors = new ArrayList<>();
+        addBlankErrors(errors, language, "bug-configuration", knownBugs);
+        addDuplicateErrors(errors, language, "known bug", "bug-configuration", knownBugs);
+        return Result.of(errors);
+    }
+
+    /**
      * Validate one participating language's Feature_Declaration against the
      * Feature_Catalog (Requirements 8.5–8.9).
      *
@@ -322,6 +344,17 @@ public final class FeatureValidation {
                 errors.add("language " + language + ": unknown Feature " + quote(name)
                     + " in " + arrayName
                     + ": the Feature_Catalog does not define it");
+            }
+        }
+    }
+
+    /** Name each null or blank entry in {@code array} (position-based, since it has no name). */
+    private static void addBlankErrors(
+            List<String> errors, String language, String arrayName, List<String> array) {
+        for (int i = 0; i < array.size(); i++) {
+            String value = array.get(i);
+            if (value == null || value.isBlank()) {
+                errors.add("language " + language + ": " + arrayName + " has a blank entry at index " + i);
             }
         }
     }

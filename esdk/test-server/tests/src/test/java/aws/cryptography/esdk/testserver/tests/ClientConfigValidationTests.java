@@ -76,7 +76,7 @@ class ClientConfigValidationTests {
     @MethodSource("targets")
     void createClientRejectsZeroMaxEncryptedDataKeys(LanguageServerTarget target) {
         FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        KnownBugGate.gate("create-client-accepts-zero-max-encrypted-data-keys", target.language(),
+        KnownBugGate.gate("create-client-accepts-zero-max-encrypted-data-keys", target,
             () -> assertCreateRejected(target,
                 config(rawAes(new byte[32], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), 0L),
                 "a maxEncryptedDataKeys of 0"));
@@ -87,7 +87,7 @@ class ClientConfigValidationTests {
     @MethodSource("targets")
     void createClientRejectsMismatchedAesWrappingKeyLength(LanguageServerTarget target) {
         FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        KnownBugGate.gate("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", target.language(),
+        KnownBugGate.gate("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", target,
             () -> assertCreateRejected(target,
                 config(rawAes(new byte[16], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), null),
                 "a 16-byte wrapping key for a 256-bit AES wrapping suite"));
@@ -177,8 +177,8 @@ class ClientConfigValidationTests {
                 .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
                 .build())
             .build();
-        KnownBugGate.gate("create-client-accepts-reserved-aws-kms-namespace", target.language(),
-            () -> KnownBugGate.gate("raw-aes-reserved-namespace-rejected-as-esdk-error", target.language(),
+        KnownBugGate.gate("create-client-accepts-reserved-aws-kms-namespace", target,
+            () -> KnownBugGate.gate("raw-aes-reserved-namespace-rejected-as-esdk-error", target,
                 () -> assertCreateRejected(target, config(keyring, null),
                     "a Raw-AES keyring in the reserved 'aws-kms' key namespace")));
     }

@@ -304,13 +304,13 @@ class FeatureValidationTest {
         @DisplayName("the error names the language and the expected location")
         void namesLanguageAndLocation() {
             FeatureValidation.Result r = FeatureValidation.carryingFileError(
-                "java", "aws-crypto-tools-java/esdk/test-server/commons-configuration.json",
+                "java", "aws-crypto-tools-java/esdk/test-server/feature-config.json",
                 "file not found");
             assertFalse(r.valid());
             assertEquals(1, r.errors().size());
             assertTrue(r.errors().get(0).contains("java"));
             assertTrue(r.errors().get(0).contains(
-                "aws-crypto-tools-java/esdk/test-server/commons-configuration.json"));
+                "aws-crypto-tools-java/esdk/test-server/feature-config.json"));
             assertTrue(r.errors().get(0).contains("file not found"));
         }
 
@@ -318,10 +318,10 @@ class FeatureValidationTest {
         @DisplayName("a null cause is omitted from the message")
         void nullCauseOmitted() {
             FeatureValidation.Result r = FeatureValidation.carryingFileError(
-                "python", "config/configuration-set.json", null);
+                "python", "config/server-config.json", null);
             assertFalse(r.valid());
             assertTrue(r.errors().get(0).contains("python"));
-            assertTrue(r.errors().get(0).contains("config/configuration-set.json"));
+            assertTrue(r.errors().get(0).contains("config/server-config.json"));
         }
     }
 
@@ -348,6 +348,43 @@ class FeatureValidationTest {
             assertEquals(2, combined.errors().size());
             assertEquals(declaration.errors().get(0), combined.errors().get(0));
             assertEquals(product.errors().get(0), combined.errors().get(1));
+        }
+    }
+
+    @Nested
+    @DisplayName("bug-configuration list structural validation")
+    class KnownBugsFixList {
+
+        @Test
+        @DisplayName("a null list is valid (the server ships no bug-configuration file)")
+        void nullListIsValid() {
+            assertTrue(FeatureValidation.validateKnownBugs("rust", null).valid());
+        }
+
+        @Test
+        @DisplayName("distinct bug ids are valid")
+        void distinctIdsAreValid() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugs(
+                "rust", List.of("bug-a", "bug-b"));
+            assertTrue(r.valid(), r.message());
+        }
+
+        @Test
+        @DisplayName("an in-array duplicate id is rejected")
+        void duplicateIdIsRejected() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugs(
+                "rust", List.of("bug-a", "bug-a"));
+            assertFalse(r.valid());
+            assertTrue(r.message().contains("2 times"), r.message());
+        }
+
+        @Test
+        @DisplayName("a blank id is rejected")
+        void blankIdIsRejected() {
+            FeatureValidation.Result r = FeatureValidation.validateKnownBugs(
+                "rust", List.of(" "));
+            assertFalse(r.valid());
+            assertTrue(r.message().contains("blank"), r.message());
         }
     }
 }

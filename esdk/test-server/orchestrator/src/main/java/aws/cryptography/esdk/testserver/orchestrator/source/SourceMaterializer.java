@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p><b>One level deep by construction</b> (Requirement 3.7): this class only
  * clones, checks paths, and queries commits. It never reads a materialized
- * repository's {@code commons-configuration.json} or Configuration_Overrides —
+ * repository's {@code server-config.json} or Configuration_Overrides —
  * no configuration parsing exists on this code path, so a repository obtained
  * for a Server_Location cannot trigger further context-dependent resolution.
  */

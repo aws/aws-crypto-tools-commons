@@ -11,24 +11,24 @@ import java.util.List;
 
 /**
  * The Python {@code Language_Server} launch plan (task 6.3, Requirements 1.3,
- * 2.1). Reproduces the Makefile's {@code setup-python} + {@code
- * run-python-server} flow from the run's <em>resolved</em> sources instead of
- * the Makefile's own {@code .deps} clone:
+ * 2.1). Builds and launches the Python server entirely from the run's
+ * <em>resolved</em> sources:
  *
  * <ol>
  *   <li><b>Resolve.</b> The Python library directory (the materialized
  *       {@code aws-encryption-sdk-python} clone) and the Python server
- *       directory (the resolved commons {@code servers/python}) come from the
+ *       directory (the resolved {@code test-server} in
+ *       {@code aws-encryption-sdk-python}) come from the
  *       {@link MaterializedSources}; a missing component is a {@code RESOLVE}
  *       launch failure (Requirement 2.5).</li>
- *   <li><b>Environment ({@code setup-python}).</b> Create a venv in this
- *       plan's work directory (skipped when its python already exists, like
- *       the Makefile), upgrade pip, then a single editable install of the
- *       resolved library, the Material Providers Library (same version range
- *       as the Makefile), cbor2 (the wire-protocol codec the server package
- *       declares), and the server package. Any failing step is a {@code BUILD}
- *       launch failure naming the step and carrying the tool output.</li>
- *   <li><b>Launch ({@code run-python-server}).</b> {@code <venv python> -m
+ *   <li><b>Environment.</b> Create a venv in this
+ *       plan's work directory (skipped when its python already exists),
+ *       upgrade pip, then a single editable install of the resolved library,
+ *       the Material Providers Library (the pinned version range), cbor2 (the
+ *       wire-protocol codec the server package declares), and the server
+ *       package. Any failing step is a {@code BUILD} launch failure naming the
+ *       step and carrying the tool output.</li>
+ *   <li><b>Launch.</b> {@code <venv python> -m
  *       esdk_test_server <port>} from the server directory, via the shared
  *       {@link SubprocessLauncher} (port probe, TCP readiness, process-tree
  *       teardown).</li>
@@ -177,7 +177,7 @@ public final class PythonLaunchPlan implements Launcher {
             "-e", serverDir.toString());
     }
 
-    /** {@code <venv python> -m esdk_test_server <port>} (the Makefile's run-python-server). */
+    /** {@code <venv python> -m esdk_test_server <port>}. */
     static List<String> serverCommand(Path venvDir, int port) {
         return List.of(venvPython(venvDir).toString(), "-m", SERVER_MODULE, String.valueOf(port));
     }

@@ -104,10 +104,10 @@ class TargetPlumbingPropertyTest {
 
     // ------------------------------------------------------------- formatting
 
-    /** The normative {@code esdk.testserver.targets} format: {@code lang:major=url} CSV. */
+    /** The normative {@code esdk.testserver.targets} format: {@code lang:major:repo=url} CSV. */
     private static String formatTargets(List<LanguageServerTarget> targets) {
         return targets.stream()
-            .map(t -> t.language() + ":" + t.majorVersion() + "=" + t.endpoint())
+            .map(t -> t.language() + ":" + t.majorVersion() + ":" + t.repository() + "=" + t.endpoint())
             .collect(Collectors.joining(","));
     }
 
@@ -177,7 +177,8 @@ class TargetPlumbingPropertyTest {
         int port = 8000;
         for (Tuple.Tuple2<String, Integer> key : byLabel.values()) {
             targets.add(new LanguageServerTarget(
-                key.get1(), key.get2(), URI.create("http://127.0.0.1:" + port++)));
+                key.get1(), key.get2(), "repo-" + key.get1(),
+                URI.create("http://127.0.0.1:" + port++)));
         }
         return targets;
     }

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -177,6 +178,22 @@ class ConfigurationLoaderTest {
         assertNull(config.supportedFeatures());
     }
 
+    @Test
+    @DisplayName("parses an entry's configPath (the server's config directory)")
+    void parsesEntryConfigPath() {
+        ConfigurationSet set = ConfigurationLoader.parseConfigurationSet("""
+            {
+              "product": "esdk",
+              "features": ["raw-aes"],
+              "entries": [
+                { "language": "rust", "majorVersion": 1, "port": 8093,
+                  "configPath": "esdk-test-server" }
+              ]
+            }
+            """);
+        assertEquals("esdk-test-server", set.entries().get(0).configPath());
+    }
+
     // ------------------------------------------------------------------
     // Strict duplicate detection (both file kinds)
     // ------------------------------------------------------------------
@@ -231,9 +248,10 @@ class ConfigurationLoaderTest {
     @Test
     @DisplayName("a missing Configuration_Set file names the expected location")
     void missingConfigurationSetNamesExpectedLocation(@TempDir Path dir) {
-        Path expected = dir.resolve("config/configuration-set.json");
+        Path configDir = dir.resolve("config");
+        Path expected = configDir.resolve("server-config.json");
         ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
-            () -> ConfigurationLoader.loadConfigurationSet(expected));
+            () -> ConfigurationLoader.loadConfigurationSet(configDir));
         assertTrue(e.getMessage().contains(expected.toString()),
             "the error must name the expected location: " + e.getMessage());
         assertEquals(expected, e.expectedLocation());
@@ -242,19 +260,19 @@ class ConfigurationLoaderTest {
     @Test
     @DisplayName("a missing commons-configuration file names the expected location (Req 4.9)")
     void missingCommonsConfigurationNamesExpectedLocation(@TempDir Path dir) {
-        Path expected = dir.resolve("commons-configuration.json");
+        Path expected = dir.resolve("server-config.json");
         ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
-            () -> ConfigurationLoader.loadCommonsConfiguration(expected));
+            () -> ConfigurationLoader.loadCommonsConfiguration(dir));
         assertTrue(e.getMessage().contains(expected.toString()));
     }
 
     @Test
     @DisplayName("malformed JSON names the expected location and the cause")
     void malformedJsonNamesExpectedLocation(@TempDir Path dir) throws Exception {
-        Path file = dir.resolve("configuration-set.json");
+        Path file = dir.resolve("server-config.json");
         Files.writeString(file, "{ not json");
         ConfigurationLoadException e = assertThrows(ConfigurationLoadException.class,
-            () -> ConfigurationLoader.loadConfigurationSet(file));
+            () -> ConfigurationLoader.loadConfigurationSet(dir));
         assertTrue(e.getMessage().contains(file.toString()));
         assertTrue(e.getMessage().contains("unparseable"));
     }
@@ -271,11 +289,11 @@ class ConfigurationLoaderTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the shipped config/configuration-set.json parses to the design schema (Req 1.3, 7.1, 7.3, 8.13)")
+    @DisplayName("the shipped config/ parses to the design schema (Req 1.3, 7.1, 7.3, 8.13)")
     void shippedConfigurationSetParses() {
         // The TestServer-level home: esdk/test-server/config/, a sibling of the
         // orchestrator module (the Gradle test working directory).
-        Path shipped = Path.of("..", "config", "configuration-set.json").toAbsolutePath().normalize();
+        Path shipped = Path.of("..", "config").toAbsolutePath().normalize();
         ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(shipped);
 
         assertEquals("esdk", set.product());
@@ -291,23 +309,23 @@ class ConfigurationLoaderTest {
         assertNotNull(java, "the shipped set must carry a java entry");
         assertEquals(3, java.majorVersion());
         assertEquals(8091, java.port());
-        // The Java server is hosted in aws-crypto-tools-java.
-        assertEquals("aws-crypto-tools-java", java.serverLocation().repository());
-        assertEquals("esdk/test-server/server", java.serverLocation().path());
+        // The Java server is hosted in aws-encryption-sdk-java.
+        assertEquals("aws-encryption-sdk-java", java.serverLocation().repository());
+        assertEquals("test-server/server", java.serverLocation().path());
 
         ConfigurationEntry python = set.forLanguage("python");
         assertNotNull(python, "the shipped set must carry a python entry");
         assertEquals(4, python.majorVersion());
         assertEquals(8092, python.port());
-        assertEquals(List.of(
-            "streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "multi",
-            "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk",
-            "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa",
-            "required-encryption-context"), python.supportedFeatures());
-        assertEquals(List.of("raw-ecdh", "aws-kms-ecdh", "caching"),
-            python.unsupportedFeatures());
-        assertEquals("aws-crypto-tools-commons", python.serverLocation().repository());
-        assertEquals("esdk/test-server/servers/python", python.serverLocation().path());
+        // Python's Feature_Declaration and bugs live in its own
+        // feature-config.json / bug-config.json in its repository, so the entry
+        // carries no inline arrays. The server now lives in the
+        // aws-encryption-sdk-python Language_Repository under test-server/.
+        assertNull(python.supportedFeatures());
+        assertNull(python.unsupportedFeatures());
+        assertEquals("test-server", python.configPath());
+        assertEquals("aws-encryption-sdk-python", python.serverLocation().repository());
+        assertEquals("test-server", python.serverLocation().path());
 
         // Rust is a Language_Repository (aws-crypto-tools-rust): its
         // Feature_Declaration lives in its own repo, not inline here, so the entry
@@ -319,40 +337,76 @@ class ConfigurationLoaderTest {
         assertEquals(8093, rust.port());
         assertEquals("aws-crypto-tools-rust", rust.serverLocation().repository());
         assertEquals("esdk-test-server", rust.serverLocation().path());
-        assertEquals("esdk-test-server/commons-configuration.json", rust.commonsConfigurationPath());
+        assertEquals("esdk-test-server", rust.configPath());
         assertNull(rust.supportedFeatures());
         assertNull(rust.unsupportedFeatures());
 
         // The remaining entries follow the same Language_Repository pattern:
-        // no inline arrays, a commonsConfigurationPath next to the server.
+        // no inline arrays, a configPath directory next to the server.
         assertLanguageRepositoryEntry(set, "rust-cpp", 1, 8094,
-            "aws-crypto-tools-rust", "esdk-cpp-test-server",
-            "esdk-cpp-test-server/commons-configuration.json");
+            "aws-crypto-tools-rust-cpp", "esdk-cpp-test-server",
+            "esdk-cpp-test-server");
         assertLanguageRepositoryEntry(set, "javascript", 5, 8095,
             "aws-encryption-sdk-javascript", "test-server",
-            "test-server/commons-configuration.json");
+            "test-server");
         assertLanguageRepositoryEntry(set, "c", 2, 8096,
             "aws-encryption-sdk-c", "test-server",
-            "test-server/commons-configuration.json");
+            "test-server");
         assertLanguageRepositoryEntry(set, "net", 5, 8097,
             "aws-encryption-sdk", "esdk-test-servers/net",
-            "esdk-test-servers/net/commons-configuration.json");
+            "esdk-test-servers/net");
         assertLanguageRepositoryEntry(set, "rust-dafny", 1, 8098,
             "aws-encryption-sdk", "esdk-test-servers/rust",
-            "esdk-test-servers/rust/commons-configuration.json");
+            "esdk-test-servers/rust");
         assertLanguageRepositoryEntry(set, "go", 1, 8099,
             "aws-encryption-sdk", "esdk-test-servers/go",
-            "esdk-test-servers/go/commons-configuration.json");
+            "esdk-test-servers/go");
+    }
+
+    @Test
+    @DisplayName("the shipped bug ledger loads as a catalog of {id, description, ticketId}")
+    void shippedBugLedgerLoads() {
+        Path shipped = Path.of("..", "config").toAbsolutePath().normalize();
+        ConfigurationSet set = ConfigurationLoader.loadConfigurationSet(shipped);
+        assertTrue(!set.bugLedger().isEmpty(), "the shipped bug ledger must be populated");
+        BugLedgerEntry bug = set.bugLedger().stream()
+            .filter(b -> "encrypt-non-positive-frame-length-generic-error".equals(b.id()))
+            .findFirst().orElseThrow();
+        assertTrue(bug.description() != null && !bug.description().isBlank(),
+            "ledger entries carry a description");
+        assertNull(bug.ticketId(), "ticketId is null until a ticket is filed");
+    }
+
+    @Test
+    @DisplayName("local-overrides overlay parses repositories, resolving relative paths against the file")
+    void localOverridesOverlayParses(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("local-overrides.json");
+        Files.writeString(file,
+            "{ \"repositories\": { \"rust\": \"/abs/rust\", \"java\": \"checkouts/java\" } }");
+
+        Map<String, Path> repos = ConfigurationLoader.loadLocalRepositories(file);
+
+        assertEquals(Path.of("/abs/rust"), repos.get("rust"),
+            "an absolute path is used as-is");
+        assertEquals(dir.resolve("checkouts/java").normalize(), repos.get("java"),
+            "a relative path resolves against the overlay file's directory");
+    }
+
+    @Test
+    @DisplayName("a local-overrides overlay with no repositories object yields an empty map")
+    void localOverridesOverlayEmptyWhenNoRepositories(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("local-overrides.json");
+        Files.writeString(file, "{ }");
+        assertTrue(ConfigurationLoader.loadLocalRepositories(file).isEmpty());
     }
 
     /**
      * Assert one shipped Language_Repository-pattern entry: its coordinates,
-     * its external declaration location, and that no inline Feature_Declaration
-     * is carried.
+     * its config directory, and that no inline Feature_Declaration is carried.
      */
     private static void assertLanguageRepositoryEntry(ConfigurationSet set, String language,
             int majorVersion, int port, String serverRepository, String serverPath,
-            String commonsConfigurationPath) {
+            String configPath) {
         ConfigurationEntry entry = set.forLanguage(language);
         assertNotNull(entry, "the shipped set must carry a " + language + " entry");
         assertEquals(majorVersion, entry.majorVersion(), language + " majorVersion");
@@ -361,8 +415,7 @@ class ConfigurationLoaderTest {
             language + " serverLocation.repository");
         assertEquals(serverPath, entry.serverLocation().path(),
             language + " serverLocation.path");
-        assertEquals(commonsConfigurationPath, entry.commonsConfigurationPath(),
-            language + " commonsConfigurationPath");
+        assertEquals(configPath, entry.configPath(), language + " configPath");
         assertNull(entry.supportedFeatures(), language + " carries no inline supportedFeatures");
         assertNull(entry.unsupportedFeatures(), language + " carries no inline unsupportedFeatures");
     }

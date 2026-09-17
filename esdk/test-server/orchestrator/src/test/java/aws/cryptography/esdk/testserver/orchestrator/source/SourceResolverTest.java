@@ -188,4 +188,73 @@ class SourceResolverTest {
         assertEquals("override-branch", overridden.branch());
         assertEquals(ResolutionReason.INVOCATION_OVERRIDE, overridden.reason());
     }
+
+    @Test
+    @DisplayName("local override: a non-own language is planned from its local working tree (dev overlay)")
+    void localOverridePlansWorkingTreeForAnotherLanguage() {
+        RunContext context = RunContext.commonsRun(COMMONS_ROOT, COMMONS);
+        Path javaLocal = Path.of("/work/local-java");
+        Map<ComponentId, ResolvedComponentPlan> plan = byComponent(new SourceResolver()
+            .resolve(set(), context, List.of(), Map.of("java", javaLocal)));
+
+        ResolvedComponentPlan lib = plan.get(ComponentId.library("java"));
+        assertEquals(ResolutionReason.LOCAL_OVERRIDE, lib.reason());
+        SourcePlan.WorkingTree libTree = assertInstanceOf(SourcePlan.WorkingTree.class, lib.plan());
+        assertEquals(javaLocal, libTree.root());
+        assertEquals("esdk", libTree.path());
+
+        ResolvedComponentPlan srv = plan.get(ComponentId.server("java"));
+        assertEquals(ResolutionReason.LOCAL_OVERRIDE, srv.reason());
+        SourcePlan.WorkingTree srvTree = assertInstanceOf(SourcePlan.WorkingTree.class, srv.plan());
+        assertEquals(javaLocal, srvTree.root());
+        assertEquals("esdk/test-server/server", srvTree.path());
+
+        // A language absent from the overlay is unaffected: python still clones its library.
+        assertInstanceOf(SourcePlan.Clone.class, plan.get(ComponentId.library("python")).plan());
+    }
+
+    @Test
+    @DisplayName("local override never applies to the own language (already a working tree)")
+    void localOverrideIgnoredForOwnLanguage() {
+        CommonsOrigin origin = new CommonsOrigin(
+            "git@github.com:aws/aws-crypto-tools-commons.git", "main",
+            ResolutionReason.CONFIGURATION_ENTRY);
+        RunContext context = RunContext.languageRun(
+            "java", JAVA_ROOT, COMMONS_ROOT, JAVA_REPO, origin);
+
+        Map<ComponentId, ResolvedComponentPlan> plan = byComponent(new SourceResolver()
+            .resolve(set(), context, List.of(), Map.of("java", Path.of("/work/elsewhere"))));
+
+        ResolvedComponentPlan srv = plan.get(ComponentId.server("java"));
+        assertEquals(ResolutionReason.WORKING_TREE, srv.reason());
+        SourcePlan.WorkingTree tree = assertInstanceOf(SourcePlan.WorkingTree.class, srv.plan());
+        assertEquals(JAVA_ROOT, tree.root(),
+            "own language uses languageRepoRoot, not the overlay path");
+    }
+
+    @Test
+    @DisplayName("local override wins over a Configuration_Override (dev intent beats a pinned clone)")
+    void localOverrideWinsOverConfigurationOverride() {
+        CommonsOrigin origin = new CommonsOrigin(
+            "git@github.com:aws/aws-crypto-tools-commons.git", "main",
+            ResolutionReason.CONFIGURATION_ENTRY);
+        RunContext context = RunContext.languageRun(
+            "java", JAVA_ROOT, COMMONS_ROOT, JAVA_REPO, origin);
+        ConfigurationEntry pythonOverride = new ConfigurationEntry("python", 4, 8092,
+            new RepositoryCoordinates("aws-encryption-sdk-python",
+                "https://github.com/fork/aws-encryption-sdk-python", "pinned-branch", "."),
+            new ServerLocation(COMMONS,
+                "git@github.com:aws/aws-crypto-tools-commons.git", "pinned-branch",
+                "esdk/test-server/servers/python"),
+            null, null);
+        Path pyLocal = Path.of("/work/local-python");
+
+        Map<ComponentId, ResolvedComponentPlan> plan = byComponent(new SourceResolver()
+            .resolve(set(), context, List.of(pythonOverride), Map.of("python", pyLocal)));
+
+        ResolvedComponentPlan srv = plan.get(ComponentId.server("python"));
+        assertEquals(ResolutionReason.LOCAL_OVERRIDE, srv.reason());
+        SourcePlan.WorkingTree tree = assertInstanceOf(SourcePlan.WorkingTree.class, srv.plan());
+        assertEquals(pyLocal, tree.root());
+    }
 }

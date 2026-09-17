@@ -22,6 +22,7 @@ import aws.cryptography.esdk.testserver.orchestrator.source.CommonsOrigin;
 import aws.cryptography.esdk.testserver.orchestrator.source.ResolutionReason;
 import aws.cryptography.esdk.testserver.orchestrator.source.RunContext;
 import aws.cryptography.esdk.testserver.orchestrator.source.SourceMaterializer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +80,7 @@ import java.util.Map;
  *       directory, which is the orchestrator module when launched via
  *       Gradle).</li>
  *   <li>{@code -Desdk.testserver.config=<path>} — the Configuration_Set JSON
- *       (default {@code config/configuration-set.json} under the TestServer
+ *       (default {@code config/ directory} under the TestServer
  *       root — the Configuration_Set's TestServer-level home).</li>
  * </ul>
  *
@@ -114,7 +115,7 @@ public final class ESDKTestServerMain {
             workingDir.getParent() != null ? workingDir.getParent().toString() : workingDir.toString()));
         Path configPath = Path.of(System.getProperty(
             "esdk.testserver.config",
-            testServerRoot.resolve("config/configuration-set.json").toString()));
+            testServerRoot.resolve("config").toString()));
         Path testsModuleDir = testServerRoot.resolve("tests");
 
         // The commons checkout the run reads shared components from: the working
@@ -223,7 +224,30 @@ public final class ESDKTestServerMain {
             System.out.println("    configurationOverrides: " + overrides.size());
         }
 
-        Result result = orchestrator.run(overrides);
+        // Dev-only local-overrides overlay (local development, gitignored): map a
+        // language to a local working-tree root the resolver uses instead of a
+        // clone. Default location config/local-overrides.json; point elsewhere
+        // with localOverrides=<path>. Absent → no overlay (normal run).
+        Path localOverridesFile = cli.containsKey("localOverrides")
+            ? Path.of(cli.get("localOverrides"))
+            : configPath.resolve("local-overrides.json");
+        Map<String, Path> localRepositories = Map.of();
+        if (Files.isRegularFile(localOverridesFile)) {
+            try {
+                localRepositories = ConfigurationLoader.loadLocalRepositories(localOverridesFile);
+            } catch (ConfigurationLoadException e) {
+                System.err.println("ESDKTestServer: " + e.getMessage());
+                System.exit(EXIT_USAGE);
+                return;
+            }
+            if (!localRepositories.isEmpty()) {
+                System.out.println("    localOverrides: " + localOverridesFile);
+                localRepositories.forEach((lang, root) ->
+                    System.out.println("      " + lang + " -> " + root + " (local working tree)"));
+            }
+        }
+
+        Result result = orchestrator.run(overrides, localRepositories);
 
         System.out.println();
         System.out.println("==> Result: " + (result.succeeded() ? "SUCCESS" : "FAILURE"));
@@ -297,13 +321,13 @@ public final class ESDKTestServerMain {
     private static List<ConfigurationEntry> loadOverrides(
             Path languageRepoRoot, ConfigurationEntry ownEntry) {
         Path expected = languageRepoRoot.resolve(
-            ESDKTestServer.commonsConfigurationRelativePath(ownEntry));
+            ESDKTestServer.configDirectory(ownEntry));
         try {
             CommonsConfiguration own = ConfigurationLoader.loadCommonsConfiguration(expected);
             return own.configurationOverrides();
         } catch (ConfigurationLoadException e) {
             throw new IllegalArgumentException(
-                "could not read the commons-configuration file at " + expected
+                "could not read the server config at " + expected
                     + ": " + e.getMessage());
         }
     }

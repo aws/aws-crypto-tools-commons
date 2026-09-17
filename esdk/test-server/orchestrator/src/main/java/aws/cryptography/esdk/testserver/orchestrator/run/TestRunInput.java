@@ -48,7 +48,8 @@ public record TestRunInput(
     Map<String, Map<String, Boolean>> features,
     List<String> featureCatalog,
     Map<String, List<String>> rawRsaPaddingSchemes,
-    String referenceImplementation
+    String referenceImplementation,
+    String knownBugs
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -65,12 +66,30 @@ public record TestRunInput(
         if (referenceImplementation == null || referenceImplementation.isBlank()) {
             throw new IllegalArgumentException("referenceImplementation must be non-blank");
         }
+        // Empty means "no server declared a known bug"; the Tests then gate
+        // nothing and every assertion runs live.
+        knownBugs = knownBugs == null ? "" : knownBugs;
+    }
+
+    /**
+     * Convenience constructor for a run where no server declared a known bug —
+     * every assertion runs live. Preserves the pre-known-bug
+     * {@code (…, referenceImplementation)} shape so existing call sites keep
+     * compiling.
+     */
+    public TestRunInput(
+            List<TestTarget> targets,
+            Map<String, Map<String, Boolean>> features,
+            List<String> featureCatalog,
+            Map<String, List<String>> rawRsaPaddingSchemes,
+            String referenceImplementation) {
+        this(targets, features, featureCatalog, rawRsaPaddingSchemes, referenceImplementation, "");
     }
 
     /**
      * Format targets as the {@code esdk.testserver.targets} value:
-     * {@code lang:major=url} CSV, e.g.
-     * {@code java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092}.
+     * {@code lang:major:repository=url} CSV, e.g.
+     * {@code java:3:aws-crypto-tools-java=http://127.0.0.1:8091}.
      */
     public static String formatTargets(List<TestTarget> targets) {
         return targets.stream()

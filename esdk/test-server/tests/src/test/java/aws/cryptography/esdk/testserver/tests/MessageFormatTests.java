@@ -165,7 +165,7 @@ class MessageFormatTests {
             target + ": the header frame length must equal the input frame length (512)");
 
         byte[] dflt = encrypt(target, "default frame length".getBytes(StandardCharsets.UTF_8), null);
-        KnownBugGate.gate("default-frame-length-262144", target.language(),
+        KnownBugGate.gate("default-frame-length-262144", target,
             () -> assertEquals(4096L, EsdkMessage.parse(dflt).frameLength,
                 target + ": with no input frame length the header must record the 4096 default"));
     }

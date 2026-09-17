@@ -4,29 +4,27 @@
 # ----------------------------------------------------------------------------
 # Asserts the shipped factoring of the ESDK TestServer as seen from the
 # Commons_Repository. This lives in config/tests/ because the Configuration_Set
-# (config/configuration-set.json) is the primary subject, following the
+# (config/server-config.json + feature-set.json) is the primary subject, following the
 # model/tests/*.sh precedent of a tests/ subdir under the owning component
 # (esdk/test-server/tests/ is the Tests Gradle module, so it is NOT a home for
 # shell checks about the repo).
 #
-#   * Requirements 1.1, 1.3: the Configuration_Set names the Java
-#     Language_Server in the aws-crypto-tools-java Language_Repository
-#     (serverLocation.repository "aws-crypto-tools-java", path
-#     "esdk/test-server/server") and the Python Language_Server in commons
-#     (serverLocation.repository "aws-crypto-tools-commons").
-#   * Requirement 1.8: commons contains zero copies of the Java
-#     Language_Server — no esdk/test-server/servers/java directory.
-#   * Requirement 10.1: exactly one Tests definition exists — exactly one
+#   * the Configuration_Set names the Java Language_Server in the
+#     aws-encryption-sdk-java repository (serverLocation.repository
+#     "aws-encryption-sdk-java", path "test-server/server") and the Python
+#     Language_Server in the aws-encryption-sdk-python repository
+#     (serverLocation.repository "aws-encryption-sdk-python", path
+#     "test-server");
+#   * commons contains zero copies of a Language_Server — no
+#     esdk/test-server/servers/java or esdk/test-server/servers/python
+#     directory;
+#   * exactly one Tests definition exists — exactly one
 #     MaterialsRoundTripTests.java in the repository, under
-#     esdk/test-server/tests/.
-#   * Requirements 7.1, 7.3: product is exactly "esdk" and the
-#     Feature_Catalog defines exactly the Features "streaming", "MPL", and
-#     "hierarchical".
-#   * Requirement 8.13: the Python Configuration_Entry carries the Python
-#     Feature_Declaration — supportedFeatures lists both streaming and MPL,
-#     unsupportedFeatures lists neither.
-#   * Requirement 2.7: the Makefile has no separate cross-language target
-#     (no test-cross-language) — `make orchestrate` is the single entry point.
+#     esdk/test-server/tests/;
+#   * product is exactly "esdk" and the Feature_Catalog defines the expected
+#     per-keyring/per-CMM Features;
+#   * the Makefile has no separate cross-language target (no
+#     test-cross-language) — `make orchestrate` is the single entry point.
 #
 # Hermetic: no network, no JDK, no AWS — pure filesystem + python3 JSON
 # assertions. Repository-wide scans exclude .git/, Gradle build/.gradle
@@ -41,7 +39,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"    # aws-crypto-tools-commons/esdk/test-server
 REPO_ROOT="$(cd "$TS_DIR/../.." && pwd)"     # aws-crypto-tools-commons
-CONFIG="$TS_DIR/config/configuration-set.json"
+SERVER_CONFIG="$TS_DIR/config/server-config.json"
+FEATURE_CONFIG="$TS_DIR/config/feature-set.json"
 MAKEFILE="$TS_DIR/Makefile"
 
 failures=0
@@ -57,17 +56,19 @@ repo_find() {
     -o "$@" -print 2>/dev/null
 }
 
-if [ ! -f "$CONFIG" ]; then
-    fail "Configuration_Set missing: $CONFIG"
-    echo "Aborting remaining checks." >&2
-    exit 1
-fi
+for f in "$SERVER_CONFIG" "$FEATURE_CONFIG"; do
+    if [ ! -f "$f" ]; then
+        fail "config file missing: $f"
+        echo "Aborting remaining checks." >&2
+        exit 1
+    fi
+done
 
 # ----------------------------------------------------------------------------
-# Check 1: Server_Locations — Java server in aws-crypto-tools-java, Python
-# server in commons (Req 1.1, 1.3)
+# Check 1: Server_Locations — Java server in aws-encryption-sdk-java, Python
+# server in commons
 # ----------------------------------------------------------------------------
-if location_errors=$(python3 - "$CONFIG" <<'PY'
+if location_errors=$(python3 - "$SERVER_CONFIG" <<'PY'
 import json, sys
 cfg = json.load(open(sys.argv[1]))
 entries = {e.get("language"): e for e in cfg.get("entries", [])}
@@ -78,11 +79,11 @@ if not isinstance(java, dict):
     errors.append("no java Configuration_Entry")
 else:
     loc = java.get("serverLocation") or {}
-    if loc.get("repository") != "aws-crypto-tools-java":
-        errors.append('java serverLocation.repository is %r, expected "aws-crypto-tools-java"'
+    if loc.get("repository") != "aws-encryption-sdk-java":
+        errors.append('java serverLocation.repository is %r, expected "aws-encryption-sdk-java"'
                       % loc.get("repository"))
-    if loc.get("path") != "esdk/test-server/server":
-        errors.append('java serverLocation.path is %r, expected "esdk/test-server/server"'
+    if loc.get("path") != "test-server/server":
+        errors.append('java serverLocation.path is %r, expected "test-server/server"'
                       % loc.get("path"))
 
 python = entries.get("python")
@@ -90,113 +91,88 @@ if not isinstance(python, dict):
     errors.append("no python Configuration_Entry")
 else:
     loc = python.get("serverLocation") or {}
-    if loc.get("repository") != "aws-crypto-tools-commons":
-        errors.append('python serverLocation.repository is %r, expected "aws-crypto-tools-commons"'
+    if loc.get("repository") != "aws-encryption-sdk-python":
+        errors.append('python serverLocation.repository is %r, expected "aws-encryption-sdk-python"'
                       % loc.get("repository"))
+    if loc.get("path") != "test-server":
+        errors.append('python serverLocation.path is %r, expected "test-server"'
+                      % loc.get("path"))
 
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass "Java server located in aws-crypto-tools-java at esdk/test-server/server; Python server in commons (Req 1.1, 1.3)"
+    pass "Java server located in aws-encryption-sdk-java at test-server/server; Python server in aws-encryption-sdk-python at test-server"
 else
     if [ -n "$location_errors" ]; then
-        fail "Server_Location violation: ${location_errors//$'\n'/; } (Req 1.1, 1.3)"
+        fail "Server_Location violation: ${location_errors//$'\n'/; }"
     else
-        fail "configuration-set.json is not parseable JSON (Req 1.1, 1.3)"
+        fail "server-config.json is not parseable JSON"
     fi
 fi
 
 # ----------------------------------------------------------------------------
-# Check 2: no commons copy of the Java Language_Server (Req 1.8)
+# Check 2: no commons copy of the Java Language_Server
 # ----------------------------------------------------------------------------
 if [ ! -e "$TS_DIR/servers/java" ]; then
-    pass "no esdk/test-server/servers/java directory — commons holds zero Java server copies (Req 1.8)"
+    pass "no esdk/test-server/servers/java directory — commons holds zero Java server copies"
 else
-    fail "esdk/test-server/servers/java exists — the Java Language_Server must live only in aws-crypto-tools-java (Req 1.8)"
+    fail "esdk/test-server/servers/java exists — the Java Language_Server must live only in aws-crypto-tools-java"
+fi
+if [ ! -e "$TS_DIR/servers/python" ]; then
+    pass "no esdk/test-server/servers/python directory — commons holds zero Python server copies"
+else
+    fail "esdk/test-server/servers/python exists — the Python Language_Server must live only in aws-encryption-sdk-python"
 fi
 
 # ----------------------------------------------------------------------------
-# Check 3: exactly one Tests definition, under esdk/test-server/tests/ (Req 10.1)
+# Check 3: exactly one Tests definition, under esdk/test-server/tests/
 # ----------------------------------------------------------------------------
 tests_copies="$(repo_find -type f -name 'MaterialsRoundTripTests.java')"
 tests_count="$(printf '%s' "$tests_copies" | grep -c . || true)"
 expected_tests="$TS_DIR/tests/src/test/java/aws/cryptography/esdk/testserver/tests/MaterialsRoundTripTests.java"
 if [ "$tests_count" = "1" ] && [ "$tests_copies" = "$expected_tests" ]; then
-    pass "exactly one Tests definition, under esdk/test-server/tests/ (Req 10.1)"
+    pass "exactly one Tests definition, under esdk/test-server/tests/"
 else
-    fail "expected exactly 1 MaterialsRoundTripTests.java at $expected_tests, found $tests_count: ${tests_copies//$'\n'/, } (Req 10.1)"
+    fail "expected exactly 1 MaterialsRoundTripTests.java at $expected_tests, found $tests_count: ${tests_copies//$'\n'/, }"
 fi
 
 # ----------------------------------------------------------------------------
 # Check 4: product is "esdk" and the Feature_Catalog is exactly
-# ["streaming", "MPL"] (Req 7.1, 7.3)
+# ["streaming", "MPL"]
 # ----------------------------------------------------------------------------
-if catalog_errors=$(python3 - "$CONFIG" <<'PY'
+if catalog_errors=$(python3 - "$SERVER_CONFIG" "$FEATURE_CONFIG" <<'PY'
 import json, sys
-cfg = json.load(open(sys.argv[1]))
+server = json.load(open(sys.argv[1]))
+feature = json.load(open(sys.argv[2]))
 errors = []
-if cfg.get("product") != "esdk":
-    errors.append('product is %r, expected exactly "esdk"' % cfg.get("product"))
-features = cfg.get("features")
+if server.get("product") != "esdk":
+    errors.append('product is %r, expected exactly "esdk"' % server.get("product"))
+features = feature.get("features")
 if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "raw-ecdh", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "aws-kms-ecdh", "required-encryption-context", "caching"]):
     errors.append('Feature_Catalog is %r, expected exactly the per-keyring/per-CMM Feature_Catalog' % features)
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
 PY
 ); then
-    pass 'product is "esdk" and the Feature_Catalog defines the per-keyring/per-CMM Features (Req 7.1, 7.3)'
+    pass 'product is "esdk" and the Feature_Catalog defines the per-keyring/per-CMM Features'
 else
     if [ -n "$catalog_errors" ]; then
-        fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; } (Req 7.1, 7.3)"
+        fail "product/Feature_Catalog violation: ${catalog_errors//$'\n'/; }"
     else
-        fail "configuration-set.json is not parseable JSON (Req 7.1, 7.3)"
+        fail "server-config.json / feature-set.json is not parseable JSON"
     fi
 fi
 
 # ----------------------------------------------------------------------------
-# Check 5: Python Feature_Declaration supports streaming + MPL (Req 8.13)
-# ----------------------------------------------------------------------------
-if declaration_errors=$(python3 - "$CONFIG" <<'PY'
-import json, sys
-cfg = json.load(open(sys.argv[1]))
-entries = {e.get("language"): e for e in cfg.get("entries", [])}
-python = entries.get("python") or {}
-supported = python.get("supportedFeatures")
-unsupported = python.get("unsupportedFeatures")
-errors = []
-if not isinstance(supported, list):
-    errors.append("python supportedFeatures array is missing")
-if not isinstance(unsupported, list):
-    errors.append("python unsupportedFeatures array is missing")
-if not errors:
-    for feature in ("streaming", "MPL"):
-        if feature not in supported:
-            errors.append('"%s" is not in python supportedFeatures' % feature)
-        if feature in unsupported:
-            errors.append('"%s" appears in python unsupportedFeatures' % feature)
-print("\n".join(errors))
-sys.exit(1 if errors else 0)
-PY
-); then
-    pass "python supportedFeatures lists streaming and MPL; unsupportedFeatures lists neither (Req 8.13)"
-else
-    if [ -n "$declaration_errors" ]; then
-        fail "python Feature_Declaration violation: ${declaration_errors//$'\n'/; } (Req 8.13)"
-    else
-        fail "configuration-set.json is not parseable JSON (Req 8.13)"
-    fi
-fi
-
-# ----------------------------------------------------------------------------
-# Check 6: the Makefile has no separate cross-language target (Req 2.7)
+# Check 5: the Makefile has no separate cross-language target
 # ----------------------------------------------------------------------------
 if [ ! -f "$MAKEFILE" ]; then
-    fail "Makefile missing: $MAKEFILE (Req 2.7)"
+    fail "Makefile missing: $MAKEFILE"
 elif grep -qE '^test-cross-language\s*:' "$MAKEFILE"; then
-    fail "Makefile defines a test-cross-language target — 'make orchestrate' must be the single cross-language entry point (Req 2.7)"
+    fail "Makefile defines a test-cross-language target — 'make orchestrate' must be the single cross-language entry point"
 else
-    pass "Makefile has no test-cross-language target — 'make orchestrate' is the single entry point (Req 2.7)"
+    pass "Makefile has no test-cross-language target — 'make orchestrate' is the single entry point"
 fi
 
 # --- Summary -----------------------------------------------------------------

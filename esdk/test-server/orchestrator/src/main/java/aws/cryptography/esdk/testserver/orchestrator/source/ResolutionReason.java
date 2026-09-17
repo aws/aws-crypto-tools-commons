@@ -16,6 +16,9 @@ package aws.cryptography.esdk.testserver.orchestrator.source;
  *   <li>{@link #INVOCATION_OVERRIDE} — an explicit invocation-time commons
  *       branch override trumped the Commons_Configuration_Entry
  *       (Requirement 4.8).</li>
+ *   <li>{@link #LOCAL_OVERRIDE} — a dev-only local-overrides overlay pointed a
+ *       language at a local working tree instead of a clone (local development
+ *       only; the overlay never ships in committed configuration).</li>
  * </ul>
  */
 public enum ResolutionReason {
@@ -23,7 +26,8 @@ public enum ResolutionReason {
     CONFIGURATION_ENTRY("configuration-entry"),
     CONFIGURATION_OVERRIDE("configuration-override"),
     WORKING_TREE("working-tree"),
-    INVOCATION_OVERRIDE("invocation-override");
+    INVOCATION_OVERRIDE("invocation-override"),
+    LOCAL_OVERRIDE("local-override");
 
     private final String label;
 

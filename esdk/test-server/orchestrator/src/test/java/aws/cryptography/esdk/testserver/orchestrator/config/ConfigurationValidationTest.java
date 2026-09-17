@@ -68,6 +68,36 @@ class ConfigurationValidationTest {
     }
 
     @Test
+    @DisplayName("a bug ledger with a duplicate id or a blank description is rejected")
+    void bugLedgerStructuralErrorsAreRejected() {
+        ConfigurationSet dupId = new ConfigurationSet("esdk", List.of("streaming", "MPL"),
+            List.of(entry("java", 8091)),
+            List.of(new BugLedgerEntry("bug-a", "desc", ""),
+                new BugLedgerEntry("bug-a", "other", "")));
+        ConfigurationSetValidation v1 = ConfigurationValidation.validate(dupId);
+        assertFalse(v1.valid());
+        assertTrue(v1.message().contains("duplicate bug id 'bug-a'"), v1.message());
+
+        ConfigurationSet blankDesc = new ConfigurationSet("esdk", List.of("streaming", "MPL"),
+            List.of(entry("java", 8091)),
+            List.of(new BugLedgerEntry("bug-b", " ", "")));
+        ConfigurationSetValidation v2 = ConfigurationValidation.validate(blankDesc);
+        assertFalse(v2.valid());
+        assertTrue(v2.message().contains("bug-b") && v2.message().contains("description"),
+            v2.message());
+    }
+
+    @Test
+    @DisplayName("a well-formed bug ledger validates; a blank ticketId is allowed")
+    void bugLedgerWellFormedIsAccepted() {
+        ConfigurationSet ok = new ConfigurationSet("esdk", List.of("streaming", "MPL"),
+            List.of(entry("java", 8091)),
+            List.of(new BugLedgerEntry("bug-a", "a real bug", "")));
+        assertTrue(ConfigurationValidation.validate(ok).valid(),
+            "a blank ticketId must be accepted");
+    }
+
+    @Test
     @DisplayName("missing serverLocation elements are each named with the language (Req 3.8)")
     void missingServerLocationElementsAreNamed() {
         ConfigurationEntry noLocation = new ConfigurationEntry("java", 3, 8091,

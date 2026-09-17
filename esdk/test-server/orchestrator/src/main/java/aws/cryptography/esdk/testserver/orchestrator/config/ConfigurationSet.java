@@ -22,13 +22,22 @@ public final class ConfigurationSet {
     private final String product;
     private final List<String> features;
     private final List<ConfigurationEntry> entries;
+    private final List<BugLedgerEntry> bugLedger;
 
-    public ConfigurationSet(String product, List<String> features, List<ConfigurationEntry> entries) {
+    public ConfigurationSet(String product, List<String> features,
+            List<ConfigurationEntry> entries, List<BugLedgerEntry> bugLedger) {
         this.product = product;
         // A null Feature_Catalog means "absent from the JSON"; duplicates are
         // preserved for the duplicate-name check.
         this.features = features == null ? null : List.copyOf(features);
         this.entries = List.copyOf(entries);
+        this.bugLedger = bugLedger == null ? List.of() : List.copyOf(bugLedger);
+    }
+
+    /** Convenience: no bug ledger (empty). */
+    public ConfigurationSet(String product, List<String> features,
+            List<ConfigurationEntry> entries) {
+        this(product, features, entries, List.of());
     }
 
     /**
@@ -37,7 +46,7 @@ public final class ConfigurationSet {
      * until the resolution rework migrates them.
      */
     public ConfigurationSet(List<ConfigurationEntry> entries) {
-        this(null, null, entries);
+        this(null, null, entries, List.of());
     }
 
     /** @return the product identifier (e.g. {@code "esdk"}), or null if absent. */
@@ -48,6 +57,11 @@ public final class ConfigurationSet {
     /** @return the Feature_Catalog (the {@code features} list), or null if absent. */
     public List<String> features() {
         return features;
+    }
+
+    /** @return the commons bug ledger (catalog of all known bugs); never null, may be empty. */
+    public List<BugLedgerEntry> bugLedger() {
+        return bugLedger;
     }
 
     public List<ConfigurationEntry> entries() {

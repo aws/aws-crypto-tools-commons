@@ -56,7 +56,7 @@ class PlaintextLengthBoundTests {
         FeatureGate.require(Set.of("streaming"), samePair(target));
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         long bound = PLAINTEXT.length - 1;
-        KnownBugGate.gate("encrypt-stream-ignores-plaintext-length-bound", target.language(),
+        KnownBugGate.gate("encrypt-stream-ignores-plaintext-length-bound", target,
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encryptStream(target.endpoint(), config, PLAINTEXT, bound),
                 "streamed encrypt of a plaintext longer than the plaintext-length bound must be rejected "

@@ -63,7 +63,7 @@
 # PRIVATE JAVA-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
 # clones aws-crypto-tools-java per the Java Configuration_Entry's
 # Server_Location (`git clone git@github.com:aws/aws-crypto-tools-java.git`,
-# the SSH URL from config/configuration-set.json). aws-crypto-tools-java is a
+# the SSH URL from config/server-config.json). aws-crypto-tools-java is a
 # PRIVATE repo, and in GitHub Actions the default GITHUB_TOKEN / checkout
 # token only grants access to THIS repo — so that cross-repo clone fails
 # without extra auth. The "Configure git auth" step below rewrites the SSH URL
@@ -360,7 +360,7 @@ jobs:
         id: pins
         run: |
           set -euo pipefail
-          config=esdk/test-server/config/configuration-set.json
+          config=esdk/test-server/config/server-config.json
           pin() {
             local name="$1" language="$2" url ref tip
             url=$(jq -r --arg l "$language" \
@@ -501,12 +501,12 @@ jobs:
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
         # Language_Server + live Java library) and aws-crypto-tools-rust (the
         # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/configuration-set.json).
+        # Configuration_Entries' Server_Locations (config/server-config.json).
         # GitHub Actions' default token only reaches THIS repo, so that
         # cross-repo private clone needs its own credential. We supply a
         # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
         # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/configuration-set.json or the Makefile changes. The public
+        # config/server-config.json or the Makefile changes. The public
         # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
         #
         # SECURITY NOTES:
@@ -536,7 +536,7 @@ jobs:
             echo "'repo' scope)." >&2
             exit 1
           fi
-          # Rewrite the SSH URL used in config/configuration-set.json to
+          # Rewrite the SSH URL used in config/server-config.json to
           # authenticated HTTPS so `git clone git@github.com:aws/...`
           # transparently becomes an authenticated HTTPS clone.
           git config --global \

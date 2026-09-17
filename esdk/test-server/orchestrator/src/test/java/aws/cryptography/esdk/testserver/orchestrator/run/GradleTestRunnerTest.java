@@ -29,8 +29,10 @@ class GradleTestRunnerTest {
     @DisplayName("command passes targets, features, featureCatalog, and referenceImplementation properties (Req 2.2, 9.3)")
     void commandCarriesAllThreeProperties() {
         TestRunInput input = new TestRunInput(
-            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091")),
-                new TestTarget("python", 4, URI.create("http://127.0.0.1:8092"))),
+            List.of(new TestTarget("java", 3, "aws-crypto-tools-java",
+                    URI.create("http://127.0.0.1:8091")),
+                new TestTarget("python", 4, "aws-encryption-sdk-python",
+                    URI.create("http://127.0.0.1:8092"))),
             features(),
             List.of("streaming", "MPL"),
             Map.of("c", List.of("PKCS1", "OAEP_SHA1_MGF1", "OAEP_SHA256_MGF1")),
@@ -39,7 +41,8 @@ class GradleTestRunnerTest {
         List<String> command = GradleTestRunner.command(Path.of("tests"), input);
 
         assertTrue(command.contains(
-                "-Desdk.testserver.targets=java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092"),
+                "-Desdk.testserver.targets=java:3:aws-crypto-tools-java=http://127.0.0.1:8091,"
+                    + "python:4:aws-encryption-sdk-python=http://127.0.0.1:8092"),
             "must pass the targets property: " + command);
         assertTrue(command.contains(
                 "-Desdk.testserver.features=java:streaming=true;MPL=true,python:streaming=true;MPL=true"),
@@ -59,7 +62,8 @@ class GradleTestRunnerTest {
     @DisplayName("empty feature inputs omit the feature properties, never pass blanks")
     void commandOmitsEmptyFeatureProperties() {
         TestRunInput input = new TestRunInput(
-            List.of(new TestTarget("java", 3, URI.create("http://127.0.0.1:8091"))),
+            List.of(new TestTarget("java", 3, "aws-crypto-tools-java",
+                URI.create("http://127.0.0.1:8091"))),
             Map.of(),
             List.of(),
             Map.of(),
@@ -73,6 +77,29 @@ class GradleTestRunnerTest {
         assertTrue(command.stream()
                 .noneMatch(a -> a.startsWith("-Desdk.testserver.rawRsaPaddingSchemes")),
             "no padding property when no language declares one: " + command);
+        assertTrue(command.stream()
+                .noneMatch(a -> a.startsWith("-Desdk.testserver.knownBugs")),
+            "no known-bugs property when no server declared a bug: " + command);
+    }
+
+    @Test
+    @DisplayName("resolved known bugs are passed as the knownBugs property")
+    void commandCarriesKnownBugsWhenPresent() {
+        TestRunInput input = new TestRunInput(
+            List.of(new TestTarget("rust", 1, "aws-crypto-tools-rust",
+                URI.create("http://127.0.0.1:8093"))),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            "rust",
+            "rust:1:aws-crypto-tools-rust=encrypt-non-positive-frame-length-generic-error");
+
+        List<String> command = GradleTestRunner.command(Path.of("tests"), input);
+
+        assertTrue(command.contains(
+                "-Desdk.testserver.knownBugs="
+                    + "rust:1:aws-crypto-tools-rust=encrypt-non-positive-frame-length-generic-error"),
+            "must pass the resolved known bugs: " + command);
     }
 
     // ---- JUnit XML parsing ----------------------------------------------

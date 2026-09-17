@@ -152,7 +152,7 @@ class HeaderFieldTamperTests {
         // Flip the low byte of the second frame's sequence number so it is no longer (previous + 1).
         int seqLowByte = message.frames.get(1).sequenceNumberOffset() + 3;
         tampered[seqLowByte] ^= (byte) 0x01;
-        KnownBugGate.gate("decrypt-accepts-out-of-order-frame-sequence", pair.decryptTarget().language(),
+        KnownBugGate.gate("decrypt-accepts-out-of-order-frame-sequence", pair.decryptTarget(),
             () -> assertRejected(pair, config, tampered,
                 "a message with an out-of-order frame sequence number"));
     }
