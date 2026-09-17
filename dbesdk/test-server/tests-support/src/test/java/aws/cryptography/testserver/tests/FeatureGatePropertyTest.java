@@ -26,10 +26,7 @@ import net.jqwik.api.statistics.Statistics;
 import org.opentest4j.TestAbortedException;
 
 /**
- * Property-based Test for the {@link FeatureGate} (Task 7.5).
- *
- * <p>Feature: test-server-factoring, Property 11: The FeatureGate decides solely
- * from the declarations
+ * Property-based Test for the {@link FeatureGate}.
  *
  * <p>For any generated Feature_Catalog, per-language Feature_Declarations,
  * associated Feature set, and target combination: when every language in the
@@ -42,8 +39,6 @@ import org.opentest4j.TestAbortedException;
  * (never a pass or a skip) naming the unknown Feature; and when a combination
  * language has no declaration available for an associated Feature, the gate
  * raises a configuration failure rather than assuming support.
- *
- * <p><b>Validates: Requirements 9.3, 9.4, 9.5, 9.6, 9.11</b>
  *
  * <p>Harness plumbing, not fanned across the target matrix: the gate is a pure
  * decision over the declarations, so this test injects a
@@ -61,7 +56,6 @@ class FeatureGatePropertyTest {
     private static final int MAJOR = 1;
     private static final String REPO = "aws-database-encryption-sdk-dynamodb";
 
-    // Feature: test-server-factoring, Property 11: The FeatureGate decides solely from the declarations
     @Property(tries = 250)
     void featureGateDecidesSolelyFromTheDeclarations(@ForAll("scenarios") Scenario scenario) {
         FeatureDeclarations declarations =
@@ -74,12 +68,12 @@ class FeatureGatePropertyTest {
         List<String> sortedRequired = List.copyOf(new TreeSet<>(required));
         List<String> combinationLanguages = scenario.combinationLanguages();
 
-        // Expected outcome, derived from the declarations alone (Requirement 9.3),
+        // Expected outcome, derived from the declarations alone,
         // in the gate's specified decision order.
 
         // (1) A Feature the catalog does not define is a test FAILURE naming the
         //     unknown Feature — never a pass or a skip — checked before any
-        //     declaration lookup (Requirement 9.11).
+        //     declaration lookup.
         Optional<String> firstUnknown = sortedRequired.stream()
             .filter(feature -> !scenario.catalog().contains(feature))
             .findFirst();
@@ -95,7 +89,7 @@ class FeatureGatePropertyTest {
 
         // (2) Any combination language without a declared support value for any
         //     required Feature is a configuration failure — support is never
-        //     assumed (Requirement 9.3).
+        //     assumed.
         boolean missingDeclaration = sortedRequired.stream().anyMatch(feature ->
             combinationLanguages.stream().anyMatch(language -> {
                 Map<String, Boolean> byFeature = scenario.declared().get(language);
@@ -114,7 +108,7 @@ class FeatureGatePropertyTest {
         // (3) Any language declaring any required Feature unsupported gates the
         //     combination: a visible skip whose message names each gating Feature
         //     (sorted order) and exactly the unsupporting languages, encrypt
-        //     target first (Requirements 9.5, 9.6).
+        //     target first.
         Map<String, List<String>> unsupportedByFeature = new LinkedHashMap<>();
         for (String feature : sortedRequired) {
             List<String> unsupporting = combinationLanguages.stream()
@@ -134,7 +128,7 @@ class FeatureGatePropertyTest {
         }
 
         // (4) Every combination language declares every required Feature
-        //     supported: the gate permits execution (Requirement 9.4).
+        //     supported: the gate permits execution.
         Statistics.collect("pass-through");
         assertDoesNotThrow(() -> FeatureGate.require(required, combination, declarations));
     }

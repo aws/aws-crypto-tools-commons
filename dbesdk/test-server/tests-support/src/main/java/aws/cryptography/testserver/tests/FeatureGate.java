@@ -13,31 +13,31 @@ import org.opentest4j.TestAbortedException;
 /**
  * The Feature gate a Feature-associated Test invokes <em>first in its test
  * body</em>, before any Language_Server operation, to associate the execution
- * with one or more Features from the Feature_Catalog (Requirement 9.1).
+ * with one or more Features from the Feature_Catalog.
  *
  * <p>Decisions are made solely from the {@link FeatureDeclarations} runtime
- * registry (Requirement 9.3), in this order:
+ * registry, in this order:
  * <ol>
  *   <li>Every required Feature must be defined by the Feature_Catalog. An
  *       unknown Feature is a <b>test failure</b> ({@link AssertionError} naming
- *       the Test and the unknown Feature) — never a pass or a skip
- *       (Requirement 9.11). This check runs first.</li>
+ *       the Test and the unknown Feature) — never a pass or a skip.
+ *       This check runs first.</li>
  *   <li>If any language in the combination declares any required Feature
  *       unsupported, the Test is skipped visibly via
  *       {@link TestAbortedException} with the message
  *       {@code feature-gated skip: feature=<f> unsupported by [<targets>]},
  *       naming each gating Feature and exactly the targets declaring it
- *       unsupported (Requirements 9.5, 9.6). No Language_Server operation has
+ *       unsupported. No Language_Server operation has
  *       been invoked yet.</li>
  *   <li>A missing declaration — no registry configured, no declaration for a
  *       combination language, or no value for a (language, Feature) pair — is
  *       a <b>configuration failure</b> ({@link IllegalStateException} from the
- *       registry): support is never assumed (Requirement 9.3).</li>
+ *       registry): support is never assumed.</li>
  * </ol>
  *
  * <p>When every combination language declares every required Feature supported,
- * the gate returns normally and the Test executes (Requirement 9.4). Tests with
- * no Feature association simply never call the gate (Requirement 9.7).
+ * the gate returns normally and the Test executes. Tests with
+ * no Feature association simply never call the gate.
  */
 public final class FeatureGate {
 
@@ -50,11 +50,11 @@ public final class FeatureGate {
      * Language_Server operation.
      *
      * @throws AssertionError if any Feature is not defined by the
-     *     Feature_Catalog (Requirement 9.11)
+     *     Feature_Catalog
      * @throws TestAbortedException if any combination language declares any
-     *     required Feature unsupported (Requirements 9.5, 9.6)
+     *     required Feature unsupported
      * @throws IllegalStateException if a required declaration is missing — a
-     *     configuration error, never assumed support (Requirement 9.3)
+     *     configuration error, never assumed support
      */
     public static void require(Set<String> features, TargetPair combination) {
         require(features, combination, FeatureDeclarations.shared());
@@ -91,7 +91,7 @@ public final class FeatureGate {
         List<String> requiredFeatures = List.copyOf(new TreeSet<>(features));
 
         // 1. Unknown Feature vs the catalog is a test FAILURE, checked before
-        //    any declaration lookup (Requirement 9.11). An unconfigured catalog
+        //    any declaration lookup. An unconfigured catalog
         //    surfaces here as the registry's configuration error.
         List<String> catalog = declarations.catalog();
         for (String feature : requiredFeatures) {
@@ -99,13 +99,13 @@ public final class FeatureGate {
                 throw new AssertionError(
                     "Test " + callingTest() + " is associated with unknown Feature '" + feature
                         + "': the Feature_Catalog defines " + catalog
-                        + " (Requirement 9.11 — never recorded as passed or skipped)");
+                        + " (never recorded as passed or skipped)");
             }
         }
 
         // 2. Collect, per gating Feature, exactly the languages declaring it
         //    unsupported. A missing declaration propagates as the registry's
-        //    configuration error (Requirement 9.3).
+        //    configuration error.
         Map<String, List<String>> unsupportedByFeature = new LinkedHashMap<>();
         for (String feature : requiredFeatures) {
             List<String> unsupporting = new ArrayList<>();
@@ -121,7 +121,7 @@ public final class FeatureGate {
         }
 
         // 3. Any gating Feature ⇒ visible skip before any Language_Server
-        //    operation (Requirements 9.5, 9.6).
+        //    operation.
         if (!unsupportedByFeature.isEmpty()) {
             throw new TestAbortedException(skipMessage(unsupportedByFeature));
         }

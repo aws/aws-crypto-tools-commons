@@ -38,10 +38,9 @@ import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
 
-// Feature: test-server-factoring, Property 7: Every entry launches once, and Tests start only after all are reachable
 
 /**
- * Property 7 (design "Correctness Properties"): for any generated valid
+ * For any generated valid
  * {@code commons configuration}, the orchestrated pipeline
  * <ul>
  *   <li>invokes the launcher exactly once per {@code Configuration_Entry},

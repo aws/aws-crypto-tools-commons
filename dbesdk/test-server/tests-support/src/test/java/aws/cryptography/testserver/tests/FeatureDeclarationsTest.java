@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link FeatureDeclarations} parsing, lookup, and the
- * configuration-error paths of Requirement 9.3: an absent registry, absent
+ * configuration-error paths: an absent registry, absent
  * source, or absent (source, Feature) pair is a configuration error when
  * queried — Feature support is never assumed. Support is keyed by the full
  * {@code (language, majorVersion, repo)} source identity.
@@ -32,7 +32,7 @@ class FeatureDeclarationsTest {
     // ------------------------------------------------------------------ parsing
 
     @Test
-    @DisplayName("parses the design's example formats and looks up support per (language, major, repo, Feature)")
+    @DisplayName("parses the example formats and looks up support per (language, major, repo, Feature)")
     void parsesDeclarationsAndCatalog() {
         FeatureDeclarations declarations = FeatureDeclarations.parse(FEATURES, CATALOG);
 

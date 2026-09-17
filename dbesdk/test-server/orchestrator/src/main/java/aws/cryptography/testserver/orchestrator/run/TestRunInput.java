@@ -8,13 +8,12 @@ import java.util.stream.Collectors;
 
 /**
  * The complete runtime input a {@link TestRunner} hands to the single
- * {@code Tests} suite (design "Runtime properties handed to the Tests"):
+ * {@code Tests} suite:
  *
  * <ul>
- *   <li>the launched {@link TestTarget}s → {@code testserver.targets}
- *       (Requirement 2.2),</li>
+ *   <li>the launched {@link TestTarget}s → {@code testserver.targets},</li>
  *   <li>each language's Feature_Declaration flattened to booleans →
- *       {@code testserver.features} (Requirement 9.3; a Feature in
+ *       {@code testserver.features} (a Feature in
  *       {@code supportedFeatures} becomes {@code true}, one in
  *       {@code unsupportedFeatures} becomes {@code false}),</li>
  *   <li>the commons configuration's Feature_Catalog verbatim →
@@ -155,8 +154,8 @@ public record TestRunInput(
     /**
      * Flatten one language's Feature_Declaration to booleans, in catalog order:
      * a Feature in {@code supportedFeatures} becomes {@code true}, one in
-     * {@code unsupportedFeatures} becomes {@code false}. Requirement 8
-     * validation has already established that every catalog Feature appears in
+     * {@code unsupportedFeatures} becomes {@code false}. Validation has
+     * already established that every catalog Feature appears in
      * exactly one array, so the result covers the whole catalog for a validated
      * declaration. {@code null} arrays are treated as absent (empty).
      */

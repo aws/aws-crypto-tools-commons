@@ -9,7 +9,7 @@ import java.util.Set;
 
 /**
  * The runtime Feature_Declaration registry the {@code Tests} consult when gating
- * Feature-associated Tests (Requirement 9.3), resolved once per JVM from
+ * Feature-associated Tests, resolved once per JVM from
  * <em>runtime configuration only</em> and shared across every test class —
  * mirroring {@link LanguageServerRegistry}.
  *
@@ -52,7 +52,7 @@ import java.util.Set;
  * <p>Support is determined <em>solely</em> from the declarations: an absent
  * property, an absent source, or an absent {@code (source, Feature)} pair is
  * a <b>configuration error</b> surfaced when queried ({@link IllegalStateException}
- * with an actionable message) — support is never assumed (Requirement 9.3).
+ * with an actionable message) — support is never assumed.
  * Boolean values must be exactly {@code true} or {@code false}; anything else is
  * a parse error, never coerced.
  */
@@ -157,7 +157,7 @@ public final class FeatureDeclarations {
      *     Feature_Declarations.
      * @throws IllegalStateException if no declarations were configured, the
      *     source has no declaration, or the {@code (source, feature)} pair is
-     *     absent — a configuration error, never an assumption (Requirement 9.3).
+     *     absent — a configuration error, never an assumption.
      */
     public boolean isSupported(String language, int majorVersion, String repo, String feature) {
         Map<String, Map<String, Boolean>> declared = requireDeclarations();

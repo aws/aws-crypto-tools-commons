@@ -16,14 +16,14 @@ import java.util.Objects;
  * configured, but the identity is always the full tuple so adding another major
  * version later is purely additional configuration.
  *
- * <p>The endpoint is supplied by runtime configuration (Requirement 7.3): the
+ * <p>The endpoint is supplied by runtime configuration: the
  * orchestrator launches each Language_Server on its configured port and hands the
  * Tests the resulting {@code (language, majorVersion, repo, endpoint)} set via
  * {@code testserver.targets}. {@code repo} is the source repository name
  * (the {@code libraryRepository.name} from {@code server-config.json}), carried
  * so the identity fully distinguishes bug (code) sources — the same
  * {@code (language, majorVersion)} could be built from different repositories.
- * There is no in-process fallback — the Tests are endpoint-only (Requirement 10.2).
+ * There is no in-process fallback — the Tests are endpoint-only.
  */
 public record LanguageServerTarget(String language, int majorVersion, String repo, URI endpoint) {
 

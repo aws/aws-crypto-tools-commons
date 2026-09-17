@@ -28,8 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Integration tests for the orchestrator's fail-closed error paths (design
- * "Error Handling"). Each aborts before running any {@code Tests}, records no
+ * Integration tests for the orchestrator's fail-closed error paths. Each
+ * aborts before running any {@code Tests}, records no
  * partial results, and returns a fail-open failure that identifies the cause.
  * Uses {@link FakeLauncher}/{@link StubTestRunner} so the paths are
  * deterministic without cloning repos or launching servers.

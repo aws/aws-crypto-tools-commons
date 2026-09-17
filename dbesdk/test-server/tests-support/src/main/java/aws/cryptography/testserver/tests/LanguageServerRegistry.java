@@ -12,7 +12,7 @@ import java.util.Optional;
  * resolved once from <em>runtime configuration only</em> and shared across every
  * test class as a process-wide singleton.
  *
- * <p>The Tests are <strong>endpoint-only</strong> (Requirement 10.2): each Target
+ * <p>The Tests are <strong>endpoint-only</strong>: each Target
  * is located exclusively through the endpoint supplied at run time via
  * <b>{@code testserver.targets}</b> (system property) or
  * <b>{@code TESTSERVER_TARGETS}</b> (environment variable) — a
@@ -65,8 +65,8 @@ public final class LanguageServerRegistry {
 
     private static LanguageServerRegistry resolve() {
         String configured = configuredTargets().orElseThrow(() -> new IllegalStateException(
-            "No Language_Server targets configured. The Tests are endpoint-only "
-                + "(Requirement 10.2): supply the targets via the -D" + TARGETS_PROPERTY
+            "No Language_Server targets configured. The Tests are endpoint-only: "
+                + "supply the targets via the -D" + TARGETS_PROPERTY
                 + " system property or the " + TARGETS_ENV + " environment variable as a "
                 + "comma-separated list of <language>:<majorVersion>:<repo>=<endpointUrl> entries, "
                 + "e.g. -D" + TARGETS_PROPERTY
@@ -81,7 +81,7 @@ public final class LanguageServerRegistry {
      * touching the process-wide singleton, system properties, or the
      * environment. Public because per-SDK unit tests, which live in a
      * different package than this class, exercise the parser directly (e.g.
-     * the Property 12 jqwik test round-trips format→parse and drives the
+     * a jqwik test round-trips format→parse and drives the
      * pairwise matrix through it).
      */
     public static LanguageServerRegistry parse(String raw) {

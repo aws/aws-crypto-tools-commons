@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.opentest4j.TestAbortedException;
 
 /**
- * Unit tests for the {@link FeatureGate} decision logic (Requirements 9.3,
- * 9.4, 9.5, 9.6, 9.11), exercising the package-private injected-registry
+ * Unit tests for the {@link FeatureGate} decision logic, exercising the
+ * package-private injected-registry
  * variant so no system properties, singleton state, or Language_Server are
  * involved. (The jqwik property test over the gate is a separate task.)
  *
