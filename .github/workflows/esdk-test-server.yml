@@ -1,0 +1,752 @@
+# ============================================================================
+# ESDK TestServer CI (aws-crypto-tools-commons — the Commons_Repository)
+# ----------------------------------------------------------------------------
+# LOCATION MATTERS: this file lives FLAT, directly under `.github/workflows/`.
+# GitHub Actions only discovers workflow files that sit directly in
+# `.github/workflows/` — a nested file such as `.github/workflows/esdk/...`
+# would NEVER be triggered. Because this repo (aws-crypto-tools-commons) hosts
+# tooling for multiple products, we namespace per product with a filename
+# prefix instead of a subdirectory: `esdk-` marks this as the ESDK TestServer
+# workflow. Future products get e.g. `s3ec-test-server.yml`, and so on.
+#
+# WHAT THIS DOES — a Commons_Run (Requirements 5.3, 6.1, 6.3, 6.4, 6.5, 6.6,
+# 6.8 of the test-server-factoring spec):
+#   1. `make validate` — smithy validate + the model/structural smoke checks
+#      (cheap, hermetic gates before the orchestrated run).
+#   2. `make orchestrate` — THE single orchestrated entry point (Requirements
+#      2.7, 6.1): one invocation resolves every language from the
+#      Configuration_Set stored in THIS working tree (a Commons_Run,
+#      Requirement 4.1) — including cloning the Java Language_Server from
+#      aws-crypto-tools-java at the ref/path in the Java Configuration_Entry's
+#      Server_Location (Requirement 6.1) and aws-encryption-sdk-python for the
+#      Python library — builds + installs the live libraries itself
+#      (JavaLaunchPlan / PythonLaunchPlan), launches every configured
+#      Language_Server as a subprocess on its configured port, runs the single
+#      Tests suite over the full pairwise cross-language matrix, and reports
+#      one fail-open result.
+#
+# The trigger paths (`esdk/test-server/**` + this file) cover every
+# commons-hosted ESDK TestServer component of Requirement 6.3: the
+# Smithy_Model (model/), the Test_Client (client-java/), the Tests (tests/),
+# the Orchestrator (orchestrator/), the Configuration_Set incl. its
+# Feature_Catalog and the Python Feature_Declaration (config/), the Python
+# Language_Server (servers/python/), and the KMS infrastructure (cdk/).
+#
+# Step-failure short-circuiting supplies Requirement 6.4: a failed step (in
+# particular a failed orchestrated run — the orchestrator exits non-zero on
+# any failed result, and the Makefile propagates it) fails the job and no
+# subsequent build/setup/test steps execute. The report upload runs under
+# `if: always()` because it is diagnostics, not a subsequent test step.
+#
+# NOTE the deliberately SHORT step list: the orchestrated run performs the
+# library builds and the Python env setup itself, so there is no separate
+# "build all modules" or "make setup-python" step here — JavaLaunchPlan
+# stamps + `mvn install`s the live ESDK Java library from the clone, and
+# PythonLaunchPlan clones the Python ESDK and prepares its own isolated venv.
+# The old Makefile-driven `test-cross-language` path is retired; `make
+# orchestrate` IS the cross-language run.
+#
+# JDK SPLIT: the commons harness (smithy-java client/server + orchestrator +
+# Tests) needs JDK 21+; the live ESDK Java build targets Java 8 and builds on
+# a JDK 17-class toolchain. Both are set up below. The JDK 21 setup runs LAST
+# so it owns the default JAVA_HOME, which the commons Makefile honors as-is
+# (`JAVA_HOME ?=` — its own macOS-oriented probing is bypassed in CI). NOTE on
+# the ESDK build JDK: the orchestrator's JavaLaunchPlan resolves the Maven JDK
+# as explicit-config → macOS java_home → ambient environment; no explicit
+# config is wired through the CLI and the macOS tool does not exist on
+# ubuntu, so the live ESDK `mvn install` inside the orchestrated run executes
+# under the inherited JAVA_HOME (21). The ESDK build compiles its Java 8
+# target via --release on modern JDKs; JDK 17 is still provisioned here for
+# the test-vectors stub install (its `jar` tool) and as the documented
+# 17-class toolchain should explicit wiring be added later.
+#
+# PRIVATE JAVA-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
+# clones aws-crypto-tools-java per the Java Configuration_Entry's
+# Server_Location (`git clone git@github.com:aws/aws-crypto-tools-java.git`,
+# the SSH URL from config/server-config.json). aws-crypto-tools-java is a
+# PRIVATE repo, and in GitHub Actions the default GITHUB_TOKEN / checkout
+# token only grants access to THIS repo — so that cross-repo clone fails
+# without extra auth. The "Configure git auth" step below rewrites the SSH URL
+# to authenticated HTTPS for the duration of the job via git insteadOf, using
+# the LANGUAGE_REPO_PAT secret with READ-ONLY scope (Requirement 6.6): a
+# fine-grained PAT with `Contents: Read` on aws-crypto-tools-java, or a
+# classic PAT with `repo`. This is the mirror image of the Java repo
+# workflow's COMMONS_REPO_PAT pattern. (aws-encryption-sdk-python is PUBLIC
+# and cloned via its HTTPS URL, so it needs no auth and is untouched by the
+# SSH-URL rewrite.)
+#
+# AWS/KMS (ONLINE, REQUIRED): the KMS_Scenarios are REQUIRED and call real AWS
+# KMS, so the orchestrated run cannot pass without usable credentials
+# (Requirement 6.5). This workflow:
+#   * declares permissions: { id-token: write } for the GitHub OIDC exchange;
+#   * assumes KMS_CI_ROLE_ARN via configure-aws-credentials (defaults to the
+#     shared role from the CDK EsdkTestServerKmsStack — no repo variable
+#     needed; its trust policy trusts both ESDK repositories);
+#   * VERIFIES the credentials with `aws sts get-caller-identity` and fails
+#     the workflow BEFORE the orchestrated run when they are unobtainable
+#     (for example a fork PR with no id-token) — Requirement 6.8;
+#   * keeps GRADLE_OPTS=-Dorg.gradle.daemon=false for the whole job so no
+#     Gradle daemon captures a stale, credential-free environment: every
+#     Gradle invocation — and every server/Tests JVM the orchestrator forks —
+#     inherits the live step environment with the short-lived AWS_* creds.
+#
+# REPO VARIABLES ARE OPTIONAL. By default this workflow targets the shared
+# KMS_Test_Resources: the OIDC role defaults to the CDK stack's `roleArn` and
+# the key ARNs default in KmsRuntimeConfig. To target a DIFFERENT account/role
+# or key set, override under Settings → Secrets and variables → Actions →
+# Variables (all non-secret ARNs):
+#   * vars.ESDK_TEST_SERVER_KMS_ROLE_ARN           — OIDC IAM role ARN to assume.
+#   * vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN  — symmetric KMS key ARN.
+#   * vars.ESDK_TEST_SERVER_KMS_MRK_ARN            — multi-region KMS key ARN.
+#   * vars.ESDK_TEST_SERVER_KMS_MRK2_ARN           — second multi-region KMS key ARN
+#                                                    (AwsKmsMrkMultiKeyring child).
+#   * vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN        — asymmetric RSA KMS key ARN.
+#   * vars.ESDK_TEST_SERVER_KMS_REGION             — AWS region (optional; us-west-2).
+#
+# RESOLUTION_RECORD (Requirement 5.3): the orchestrator emits the
+# Resolution_Record to stdout before the first Test and before the result —
+# pass or fail — so this workflow's log always contains it. The JSON copy of
+# a Commons_Run is written against THIS working tree's test-server root at
+#   esdk/test-server/orchestrator/build/resolution-record.json
+# and is uploaded as an artifact with `if: always()`.
+# ============================================================================
+
+name: ESDK TestServer
+
+on:
+  pull_request:
+    paths:
+      - "esdk/test-server/**"
+      - ".github/workflows/esdk-test-server.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "esdk/test-server/**"
+      - ".github/workflows/esdk-test-server.yml"
+  # Manual trigger from the Actions tab.
+  workflow_dispatch:
+  # Allow an aggregate/parent CI workflow to reuse this one.
+  workflow_call:
+
+permissions:
+  contents: read
+  # Required for the GitHub OIDC token exchange used by the
+  # configure-aws-credentials step below (Requirement 6.5).
+  id-token: write
+
+jobs:
+  esdk-test-server:
+    # JVM + python3 + git; ubuntu is sufficient.
+    runs-on: ubuntu-latest
+
+    env:
+      # Default AWS region for the whole job so every step (and every JVM the
+      # orchestrator forks) has a region. Overridable via the KMS region
+      # variable; the server also defaults to us-west-2 as a final fallback.
+      AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      # Disable the Gradle daemon for the whole job. A daemon captures its
+      # environment at start and reuses it across builds, so short-lived OIDC
+      # AWS_* credentials configured by an earlier step would NOT reach the
+      # daemon-forked server/Tests JVMs. Daemon-less, every Gradle invocation
+      # (and every JVM it forks) uses the live step environment, which has
+      # the credentials.
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+      # The OIDC role to assume for the required KMS_Scenarios. DEFAULTS to the
+      # role the CDK EsdkTestServerKmsStack created for the shared
+      # KMS_Test_Resources (its `roleArn` CfnOutput), so CI runs against the
+      # shared keys with NO repo variables configured. Override with the repo
+      # variable ESDK_TEST_SERVER_KMS_ROLE_ARN to target a different
+      # account/role. This is an IAM role ARN, not a secret.
+      KMS_CI_ROLE_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
+      # sccache as the Rust compiler cache (see the "Set up sccache" step). It
+      # content-hashes compiler inputs, so restored artifacts stay valid across the
+      # orchestrated run's fresh mid-run clone (unlike caching target/, which
+      # corrupted the build). RustLaunchPlan's cargo build inherits these, so its
+      # rustc invocations hit the cache.
+      RUSTC_WRAPPER: sccache
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      # Keep the sccache server alive for the whole job so the end-of-job
+      # stats step reports the orchestrated run's real hit/miss counts (the
+      # default 600s idle timeout kills the server long before that step).
+      SCCACHE_IDLE_TIMEOUT: "0"
+
+    steps:
+      - name: Checkout (working tree = the Configuration_Set every language resolves from)
+        # A Commons_Run resolves EVERY language from the Configuration_Entry
+        # values stored in this working tree (Requirement 4.1): the Java
+        # server/library clone from aws-crypto-tools-java, the Python library
+        # clone from aws-encryption-sdk-python, and the commons-hosted Python
+        # server + Tests + orchestrator from the tree itself.
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin) for the ESDK toolchain
+        # First setup-java: exposes JAVA_HOME_17_X64 — used by the
+        # test-vectors stub install below, and the documented 17-class
+        # toolchain for the live ESDK build (see the JDK SPLIT note at the
+        # top of this file).
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up JDK 21 (Temurin) for the commons harness
+        # Second setup-java runs last, so it also sets the default JAVA_HOME
+        # to 21; smithy-java requires JDK 21+. The commons Makefile honors a
+        # caller-set JAVA_HOME (`JAVA_HOME ?=`), so setup-java's export is
+        # picked up as-is — no explicit make variable needed.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Python 3.11
+        # The orchestrated run's PythonLaunchPlan prepares its own isolated
+        # venv (clone + install), but it needs a python3 on PATH to create it
+        # with. (No `make setup-python` here — that target is a standalone
+        # developer convenience; the orchestrator does its own env setup.)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js 22 (for the JavaScript Language_Server build)
+        # The orchestrated run's NodeLaunchPlan runs the repository-root
+        # `npm ci` + `npm run build-node` in the aws-encryption-sdk-javascript
+        # clone; the root install runs its lerna postinstall, which needs
+        # structuredClone (Node.js 17+). 22 mirrors that repo's own
+        # test-server workflow.
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Go (for the Go Language_Server and the Rust servers' aws-lc-sys native builds)
+        # The orchestrated run's GoLaunchPlan builds the Go Language_Server
+        # from the aws-encryption-sdk clone, and the Rust launch plans'
+        # cargo builds compile aws-lc-sys native code with Go on hosted
+        # runners.
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Set up the Rust toolchain (for the Rust Language_Server build)
+        # RustLaunchPlan runs `cargo build --release` in the materialized Rust
+        # server crate. Select a stable toolchain via the runner's preinstalled
+        # rustup (no third-party action, matching the smithy-install rationale).
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+
+      - name: Set up sccache (Rust compiler cache)
+        # sccache caches individual rustc compilations keyed by a hash of the inputs
+        # (sources, flags, compiler) — mtime-independent, so the orchestrated run's
+        # fresh clone of aws-crypto-tools-rust still hits the cache on warm runs
+        # (caching the compiled target/ instead corrupted the build). Installed from
+        # the pinned release binary, same rationale as the Smithy CLI (a
+        # deterministic download, no third-party action).
+        run: |
+          set -euo pipefail
+          SCCACHE_VERSION="v0.8.2"
+          base="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
+          url="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${base}.tar.gz"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/sccache.tar.gz"
+          tar -xzf "$tmp/sccache.tar.gz" -C "$tmp"
+          sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
+          sccache --version
+
+      - name: Restore the Rust cargo downloads + sccache compiler cache
+        # Cache the cargo registry/git downloads AND the sccache compiler cache —
+        # NOT the compiled target dir. The orchestrated run clones aws-crypto-tools-rust
+        # mid-run, giving the sources fresh mtimes, so a restored target/ yields an
+        # incorrect cargo incremental build (observed: the Rust hierarchical keyring
+        # then failed on non-committing suites). Downloads are content-checksummed and
+        # sccache is content-hashed, so both reuse safely across runs while only the
+        # final link step runs fresh. A distinct key prefix (cargo- not rust-) avoids
+        # restoring the earlier target-containing caches.
+        #
+        # Explicit restore/save split: the orchestrate step exits non-zero on any
+        # failed Test (fail-open Result), and actions/cache's implicit post step
+        # only saves on job SUCCESS — so the combined action never saved anything
+        # here. The matching save step at the end of the job runs `if: always()`.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-esdk-test-server-
+
+      - name: Set up .NET (for the .NET Language_Server build)
+        # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
+        # library and server inside the aws-encryption-sdk clone. 6.0 + 8.0
+        # mirror that repo's own test-server workflow (the library's TFMs; the
+        # server targets net8.0).
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - name: Install Dafny 4.9.0 (for the .NET library transpile)
+        # The .NET library carries no committed generated code, so
+        # DotnetLaunchPlan runs `make setup_net && make transpile_net` in the
+        # clone, which needs dafny on PATH. Installed as a global dotnet tool
+        # pinned to the version the aws-encryption-sdk repo's
+        # project.properties declares (a deterministic download, no
+        # third-party action, matching the smithy-install rationale).
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dafny --version 4.9.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          export PATH="$HOME/.dotnet/tools:$PATH"
+          dafny --version
+
+      - name: Build aws-c-common (for the C Language_Server build)
+        # The orchestrated run's CLaunchPlan cmake-configures the
+        # aws-encryption-sdk-c clone, whose CMake requires an aws-c-common
+        # install; ubuntu runners ship none. Build it from source into the
+        # workspace and export CMAKE_PREFIX_PATH, which CLaunchPlan passes
+        # through to the configure — the same approach as that repo's own
+        # test-server workflow.
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/awslabs/aws-c-common "$RUNNER_TEMP/aws-c-common"
+          cmake -S "$RUNNER_TEMP/aws-c-common" -B "$RUNNER_TEMP/aws-c-common-build" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/.aws-c-common-install" \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
+          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
+
+      - name: Restore Gradle + Maven caches
+        # Gradle: the client-java/tests/orchestrator builds under
+        # esdk/test-server plus the Java server build the orchestrated run
+        # executes inside its clone. Maven: the live ESDK `mvn install`
+        # JavaLaunchPlan runs during the orchestrated run. Key on the three
+        # gradle modules' build scripts + wrapper descriptors, path-depth
+        # pinned (single `*` does not cross `/`) so gradle files inside the
+        # materialized clones under orchestrator/build/sources/ never enter
+        # the hash — the save-time key must equal the restore-time key.
+        # Saved by the end-of-job save step (`if: always()` — see the cargo
+        # restore note).
+        id: gradle-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.m2/repository
+          key: >-
+            ${{ runner.os }}-gradle-${{ hashFiles(
+              'esdk/test-server/*/build.gradle.kts',
+              'esdk/test-server/*/settings.gradle.kts',
+              'esdk/test-server/*/gradle.properties',
+              'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Resolve language-repo commit pins (cache keys)
+        # The materialized-sources caches below are keyed on the resolved tip
+        # commit of each language branch the Configuration_Set pins, so a push
+        # to one language repo invalidates only that repo's cache. Coordinates
+        # come from the Configuration_Set itself (jq), tips from git ls-remote.
+        # An unresolvable tip degrades to a per-run unique pin: that cache
+        # simply misses and the run builds cold, exactly as before caching.
+        id: pins
+        run: |
+          set -euo pipefail
+          config=esdk/test-server/config/server-config.json
+          pin() {
+            local name="$1" language="$2" url ref tip
+            url=$(jq -r --arg l "$language" \
+              '.entries[] | select(.language==$l) | .serverLocation.url' "$config")
+            ref=$(jq -r --arg l "$language" \
+              '.entries[] | select(.language==$l) | .serverLocation.ref' "$config")
+            tip=$(git ls-remote "$url" "refs/heads/$ref" | cut -f1)
+            if [ -z "$tip" ]; then
+              echo "::warning::could not resolve $url @ $ref — the $name sources cache misses this run"
+              tip="unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            fi
+            echo "$name=$tip" >> "$GITHUB_OUTPUT"
+            echo "$name: $url @ $ref -> $tip"
+          }
+          pin esdk net
+          pin javascript javascript
+          pin c c
+
+      - name: Restore the materialized aws-encryption-sdk clone (net transpile + go)
+        # The orchestrator reuses a materialized clone whose HEAD equals the
+        # live branch tip (SourceMaterializer), and DotnetLaunchPlan's stamp
+        # skips the submodule init + Dafny transpile + dotnet build when the
+        # stamped commit matches — the single longest build in the run. The
+        # rust-dafny cargo target dir is excluded: sccache covers those
+        # compiles and target dirs are multi-GB. No restore-keys: a clone at
+        # any other commit is wiped by the materializer, so a stale restore
+        # is pure download cost.
+        id: sources-esdk
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*
+            !esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
+          key: ${{ runner.os }}-sources-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
+
+      - name: Restore the materialized aws-encryption-sdk-javascript clone
+        # NodeLaunchPlan's stamp skips the root npm ci + lerna build-node +
+        # server tsc on a reused clone of the same commit; node_modules and
+        # the built workspace packages ride in the clone. Keyed on the branch
+        # tip + the Node major this workflow provisions.
+        id: sources-javascript
+        uses: actions/cache/restore@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-javascript@*
+          key: ${{ runner.os }}-sources-javascript-${{ steps.pins.outputs.javascript }}-node22
+
+      - name: Restore the materialized aws-encryption-sdk-c clone
+        # The clone carries the cmake build tree (test-server/.build); on a
+        # reused clone the cmake re-run finds everything up to date (tar
+        # preserves the source-older-than-objects mtime order).
+        id: sources-c
+        uses: actions/cache/restore@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-c@*
+          key: ${{ runner.os }}-sources-c-${{ steps.pins.outputs.c }}
+
+      - name: Restore the NuGet package cache
+        # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
+        # pays off when the esdk pin moves and the transpile runs cold.
+        id: nuget-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-esdk-test-server-
+
+      - name: Restore the Go module + build caches
+        # GoLaunchPlan's go build (modules + compiled packages) and the
+        # aws-lc-sys native builds' Go tooling.
+        id: go-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
+          restore-keys: |
+            ${{ runner.os }}-go-esdk-test-server-
+
+      - name: Restore the npm download cache
+        # Pays off when the javascript pin moves and npm ci runs cold.
+        id: npm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
+          restore-keys: |
+            ${{ runner.os }}-npm-esdk-test-server-
+
+      - name: Install Smithy CLI
+        # `make validate` runs `smithy validate` on the model before the pure
+        # bash smoke checks. The Smithy CLI is NOT preinstalled on ubuntu-latest,
+        # so we install it from the official Smithy release using the installer
+        # bundled in the release archive. We pin the version (1.58.0) to match
+        # the model's smithy-protocol-traits:1.58.0 dependency for deterministic
+        # builds. This is preferred over skipping `smithy validate` because it
+        # keeps full model-validation coverage in CI; the install is a single
+        # deterministic download + bundled `install` script (no third-party
+        # action, no supply-chain surface beyond the official Smithy release).
+        run: |
+          set -euo pipefail
+          SMITHY_VERSION="1.58.0"
+          url="https://github.com/smithy-lang/smithy/releases/download/${SMITHY_VERSION}/smithy-cli-linux-x86_64.zip"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/smithy-cli.zip"
+          unzip -q "$tmp/smithy-cli.zip" -d "$tmp"
+          sudo "$tmp/smithy-cli-linux-x86_64/install"
+          smithy --version
+
+      - name: Install stub for the unpublished test-vectors artifact
+        # The orchestrated run's JavaLaunchPlan runs `mvn install` (tests
+        # skipped) on the aws-crypto-tools-java clone, whose esdk/pom.xml
+        # declares a TEST-scope, optional dependency
+        # `software.amazon.cryptography:TestAwsCryptographicMaterialProviders`
+        # that is NOT published to Maven Central (it is produced from the
+        # MaterialProviders submodule's Dafny build). Maven resolves
+        # test-scope deps for the whole lifecycle even when tests are
+        # skipped, so we install a tiny stub JAR to satisfy resolution —
+        # exactly as the aws-crypto-tools-java workflow does for its own
+        # Language_Repository_Run. This only affects the ESDK's own (skipped)
+        # test suite; the LIVE main jar the orchestrator installs is the real
+        # build.
+        run: |
+          set -euo pipefail
+          MP_VERSION="1.7.0"
+          tmp="$(mktemp -d)"
+          echo "placeholder for unpublished test-vectors artifact" > "$tmp/README.txt"
+          "$JAVA_HOME_17_X64/bin/jar" cf "$tmp/stub.jar" -C "$tmp" README.txt
+          mvn -q -e org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file \
+            -Dfile="$tmp/stub.jar" \
+            -DgroupId=software.amazon.cryptography \
+            -DartifactId=TestAwsCryptographicMaterialProviders \
+            -Dversion="$MP_VERSION" \
+            -Dpackaging=jar
+
+      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
+        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
+        # Language_Server + live Java library) and aws-crypto-tools-rust (the
+        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
+        # Configuration_Entries' Server_Locations (config/server-config.json).
+        # GitHub Actions' default token only reaches THIS repo, so that
+        # cross-repo private clone needs its own credential. We supply a
+        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
+        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
+        # config/server-config.json or the Makefile changes. The public
+        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
+        #
+        # SECURITY NOTES:
+        #   - The PAT is passed only via the step `env:` below (never inlined
+        #     in the script), and GitHub automatically masks the secret value
+        #     in logs. We do NOT use `set -x`, so the configured URL is not
+        #     echoed.
+        #   - The token is written only to the ephemeral runner's global git
+        #     config (~/.gitconfig), which is discarded when the job ends.
+        #   - This rewrite is CI-ONLY. Local development is unaffected and
+        #     keeps using the SSH URL as-is.
+        #   - Required token scope: READ access to the contents of
+        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
+        #     with `Contents: Read` on each repo, or a classic PAT with the
+        #     `repo` scope).
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
+            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
+            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
+            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
+            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
+            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
+            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
+            echo "'repo' scope)." >&2
+            exit 1
+          fi
+          # Rewrite the SSH URL used in config/server-config.json to
+          # authenticated HTTPS so `git clone git@github.com:aws/...`
+          # transparently becomes an authenticated HTTPS clone.
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Configure AWS credentials via OIDC
+        # Assumes the KMS OIDC role (KMS_CI_ROLE_ARN; its trust policy trusts
+        # aws-crypto-tools-commons) and exports short-lived AWS_* credentials
+        # + AWS_REGION for the orchestrated run (Requirement 6.5). With the
+        # daemon-less GRADLE_OPTS above, every server/Tests JVM the
+        # orchestrator forks inherits them.
+        #
+        # continue-on-error: a failure here (e.g. a fork PR with no id-token)
+        # does NOT abruptly end the job with a generic action error; the next
+        # step verifies the credentials and fails with an actionable message,
+        # gating the orchestrated run (Requirement 6.8).
+        id: aws-credentials
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.KMS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+
+      - name: Verify AWS credentials are active (gates the orchestrated run)
+        # The KMS_Scenarios are REQUIRED and call real AWS KMS, so the run
+        # cannot pass without usable credentials. Confirm they resolve and,
+        # if not, fail the workflow HERE — before the orchestrated run
+        # (Requirement 6.8) — with an actionable message rather than a deep
+        # "Unable to load credentials" error from inside a server later.
+        # Prints the assumed role ARN / account (not secrets).
+        run: |
+          if ! aws sts get-caller-identity; then
+            echo "::error::No usable AWS credentials for the required KMS_Scenarios." >&2
+            echo "The ESDK TestServer KMS scenarios are required and call real AWS KMS, so this" >&2
+            echo "run needs GitHub OIDC credentials for the role:" >&2
+            echo "    ${KMS_CI_ROLE_ARN}" >&2
+            echo "That role is assumable by workflows in the ESDK repositories. Runs without OIDC" >&2
+            echo "access to it (for example a pull request from a fork) cannot exercise the KMS" >&2
+            echo "scenarios and therefore cannot pass. To target a different account/role, set the" >&2
+            echo "ESDK_TEST_SERVER_KMS_ROLE_ARN repository variable (Settings -> Secrets and" >&2
+            echo "variables -> Actions -> Variables)." >&2
+            exit 1
+          fi
+
+      - name: Validate model (smithy validate + model smoke checks)
+        working-directory: esdk/test-server
+        run: make validate
+
+      - name: Fetch released decrypt test-vector corpora
+        # One download of the awslabs/aws-encryption-sdk-test-vectors
+        # awses-decrypt corpora, extracted under $RUNNER_TEMP; every
+        # Language_Server then replays them (ReleasedVectorDecryptTests). The
+        # default offline (raw-keyring) positive vectors need no KMS. A corpus
+        # that fails to fetch is skipped, not fatal — the harness runs whatever
+        # is present and skips when none is.
+        shell: bash
+        run: |
+          DIR="$RUNNER_TEMP/released-vectors"
+          mkdir -p "$DIR"
+          base="https://github.com/awslabs/aws-encryption-sdk-test-vectors/raw/master/vectors/awses-decrypt"
+          for corpus in python-1.3.5 python-1.3.7 python-1.3.8 python-2.0.0 python-2.2.0 python-2.3.0; do
+            if curl -fsSL --retry 3 -o "$DIR/$corpus.zip" "$base/$corpus.zip"; then
+              mkdir -p "$DIR/$corpus"
+              unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus" && rm -f "$DIR/$corpus.zip"
+            else
+              echo "::warning::could not fetch $corpus decrypt vectors; skipping that corpus"
+            fi
+          done
+          echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
+
+      - name: Orchestrated Commons_Run (make orchestrate)
+        # THE single orchestrated entry point (Requirements 2.7, 6.1): one
+        # invocation resolves every language from THIS working tree's
+        # Configuration_Set — the Java Language_Server + live library cloned
+        # from aws-crypto-tools-java at its Server_Location ref/path, the
+        # Python library cloned from aws-encryption-sdk-python, the Python
+        # server from this tree — builds + launches every configured
+        # Language_Server as a subprocess, runs the Tests over the full
+        # pairwise cross-language matrix, and reports one fail-open result.
+        # The orchestrator emits the Resolution_Record to stdout — visible in
+        # this step's log, pass or fail (Requirement 5.3) — and exits
+        # non-zero on any failed result, which fails this step and
+        # short-circuits the job (Requirement 6.4).
+        #
+        # The ESDK_TESTSERVER_KMS_* environment variables carry the
+        # KMS_Test_Resources coordinates to the nested Tests JVM the
+        # orchestrator launches (read by KmsRuntimeConfig). They resolve to
+        # EMPTY when the repo variables are unset, in which case
+        # KmsRuntimeConfig falls back to the shared default key ARNs. Env
+        # vars are used rather than -D system properties because the Tests
+        # run in a nested JVM that inherits the parent ENVIRONMENT only.
+        working-directory: esdk/test-server
+        env:
+          # Readiness window for each Language_Server launch (SubprocessLauncher).
+          # The Java plan builds inside this window (gradlew runServer), and with
+          # nine servers building concurrently on a 2-core hosted runner the
+          # default 180s starves it out — 900s absorbs the contention.
+          ESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
+          ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
+          ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
+          ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
+          ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+          ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
+        run: make orchestrate
+
+      - name: Rust compiler cache stats (sccache)
+        # Surfaces the compiler cache hit/miss counts for the orchestrated run's
+        # Rust build — the insight the captured build output otherwise hides. Runs
+        # whether the build passed or failed; never fails the job.
+        if: always()
+        run: sccache --show-stats || true
+
+      - name: Upload test reports + Resolution_Record
+        # `if: always()`: diagnostics upload, not a subsequent test step —
+        # the artifacts (including resolution-record.json, Requirement 5.3)
+        # are preserved whether the run passed or failed. A Commons_Run
+        # executes against THIS working tree, so the orchestrator writes the
+        # Resolution_Record JSON and the per-server launch logs under
+        # orchestrator/build/, and the Tests suite's JUnit reports under
+        # tests/build/. The launch dir is the launch plans' scratch space
+        # (Python venv, build cruft — tens of MB), so only the per-server
+        # *.log files are uploaded, not the directory wholesale.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: esdk-test-server-reports
+          path: |
+            esdk/test-server/orchestrator/build/resolution-record.json
+            esdk/test-server/orchestrator/build/launch/*/*.log
+            esdk/test-server/tests/build/reports/tests
+            esdk/test-server/tests/build/test-results
+          if-no-files-found: ignore
+
+      # ------------------------------------------------------------------
+      # Cache saves. Every save runs `if: always()` because the orchestrate
+      # step exits non-zero on any failed Test (the fail-open Result), and a
+      # cache that only saves on job success would never save here. Saves
+      # whose exact key was already restored are skipped.
+      # ------------------------------------------------------------------
+
+      - name: Save the Rust cargo downloads + sccache compiler cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save Gradle + Maven caches
+        if: always() && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.m2/repository
+          key: >-
+            ${{ runner.os }}-gradle-${{ hashFiles(
+              'esdk/test-server/*/build.gradle.kts',
+              'esdk/test-server/*/settings.gradle.kts',
+              'esdk/test-server/*/gradle.properties',
+              'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+
+      - name: Save the materialized aws-encryption-sdk clone
+        if: always() && steps.sources-esdk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*
+            !esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
+          key: ${{ runner.os }}-sources-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
+
+      - name: Save the materialized aws-encryption-sdk-javascript clone
+        if: always() && steps.sources-javascript.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-javascript@*
+          key: ${{ runner.os }}-sources-javascript-${{ steps.pins.outputs.javascript }}-node22
+
+      - name: Save the materialized aws-encryption-sdk-c clone
+        if: always() && steps.sources-c.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-c@*
+          key: ${{ runner.os }}-sources-c-${{ steps.pins.outputs.c }}
+
+      - name: Save the NuGet package cache
+        if: always() && steps.nuget-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
+
+      - name: Save the Go module + build caches
+        if: always() && steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
+
+      - name: Save the npm download cache
+        if: always() && steps.npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
