@@ -1,0 +1,28 @@
+{
+  "name": "esdk-test-server-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK app provisioning the ESDK TestServer KMS_Test_Resources (symmetric, MRK, asymmetric RSA keys) and the GitHub OIDC CI role.",
+  "bin": {
+    "esdk-test-server": "bin/esdk-test-server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.12",
+    "@types/node": "20.14.9",
+    "aws-cdk": "2.1117.0",
+    "jest": "29.7.0",
+    "ts-jest": "29.1.5",
+    "ts-node": "10.9.2",
+    "typescript": "5.5.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.150.0",
+    "constructs": "10.3.0"
+  }
+}
