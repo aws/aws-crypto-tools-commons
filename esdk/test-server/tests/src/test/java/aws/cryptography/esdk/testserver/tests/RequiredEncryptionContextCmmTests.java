@@ -30,7 +30,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       proven with the plain Default CMM on the decrypt leg (Dafny
  *       TestRemoveOnEncryptRemoveAndSupplyOnDecryptHappyCase), decrypt-side.</li>
  *   <li><b>CMM-008</b> — decrypt fails when the required keys are not correctly reproduced: none
- *       supplied, the required key missing, or a required key given a wrong value
+ *       supplied, the required key missing, a required key given a wrong value, or an extra pair
+ *       reproduced that the message was not encrypted with
  *       ({@code spec/framework/required-encryption-context-cmm.md#decrypt-materials}).</li>
  *   <li><b>EC-011</b> — a Required-EC CMM configured with the reserved {@code aws-crypto-public-key}
  *       as a required key is rejected on encrypt (a per-server property)
@@ -183,6 +184,22 @@ class RequiredEncryptionContextCmmTests {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, wrong),
             "decrypt reproducing a required key with a wrong value must fail (" + pair + ")");
+    }
+
+    /**
+     * CMM-008: decrypt reproducing the required keys correctly plus a pair the message was not
+     * encrypted with fails — the extra reproduced-only pair joins the decryption materials, so
+     * the keyring unwraps under a context the wrapping never bound.
+     */
+    @ParameterizedTest(name = "supersetReproducedEcRejected {0}")
+    @MethodSource("decryptSide")
+    void decryptFailsWhenExtraKeyReproduced(ReferencePair pair) {
+        byte[] ciphertext = encrypt(pair.asEndpointPair());
+        Map<String, String> superset =
+            Map.of("purpose", "test", "tenant", "acme", "extra", "not-on-the-message");
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, superset),
+            "decrypt reproducing a pair the message was not encrypted with must fail (" + pair + ")");
     }
 
     static List<LanguageServerTarget> targets() {
