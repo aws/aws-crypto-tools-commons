@@ -188,17 +188,25 @@ class RequiredEncryptionContextCmmTests {
 
     /**
      * CMM-008: decrypt reproducing the required keys correctly plus a pair the message was not
-     * encrypted with fails — the extra reproduced-only pair joins the decryption materials, so
-     * the keyring unwraps under a context the wrapping never bound.
+     * encrypted with fails — the Default CMM appends the reproduced-only pair to the decryption
+     * materials, so the unwrap sees a context the wrapping never bound. The decryptor needs no
+     * required-EC CMM of its own, so the decrypt leg runs with the plain Default CMM under the
+     * same per-side gating as {@code defaultCmmDecryptsWithReproducedContext}.
      */
     @ParameterizedTest(name = "supersetReproducedEcRejected {0}")
     @MethodSource("decryptSide")
     void decryptFailsWhenExtraKeyReproduced(ReferencePair pair) {
-        byte[] ciphertext = encrypt(pair.asEndpointPair());
+        FeatureGate.require(FEATURES,
+            new EndpointPair(pair.encryptTarget(), pair.encryptTarget()));
+        FeatureGate.require(Set.of("raw-aes", "default-cmm-reproduced-encryption-context"),
+            new EndpointPair(pair.decryptTarget(), pair.decryptTarget()));
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT,
+            FULL_CONTEXT, null, null);
         Map<String, String> superset =
             Map.of("purpose", "test", "tenant", "acme", "extra", "not-on-the-message");
         assertThrows(ESDKClientError.class,
-            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, superset),
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(),
+                ciphertext, superset),
             "decrypt reproducing a pair the message was not encrypted with must fail (" + pair + ")");
     }
 
