@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "DB-ESDK TestServer commons feature-config.json (design 'Feature Configuration'):",
+    "the authoritative Feature_Catalog. Each language's commons server declares the",
+    "supported/unsupported half of every feature here in its own feature-config.json;",
+    "the union must equal this catalog. A feature is a named capability whose support",
+    "may differ by target implementation or generation; it is not a test category, and",
+    "universal baseline behavior is not gated. Only capabilities that (a) vary across a",
+    "current target or (b) are a genuine independent unit a future native server may not",
+    "yet implement are listed here, and each has at least one gated test."
+  ],
+  "product": "dbesdk",
+  "features": [
+    "raw-aes",
+    "raw-rsa",
+    "aws-kms",
+    "aws-kms-mrk",
+    "aws-kms-rsa",
+    "aws-kms-hierarchical",
+    "required-encryption-context-cmm",
+    "ddb-transforms",
+    "searchable-encryption",
+    "beacon-partitions",
+    "structured-encryption",
+    "plaintext-override",
+    "legacy-ddbec"
+  ]
+}
