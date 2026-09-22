@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "Primitives TestServer commons server-config.json (design 'Server Configuration'):",
+    "product + one Configuration_Entry per language. The Feature_Catalog lives in the",
+    "sibling feature-set.json and the bug ledger in bug-list.json (the doc's",
+    "three-file layout) — the only supported configuration format. The shared",
+    "orchestrator (test-server-common/orchestrator/) loads this trio and resolves",
+    "each entry's server from its Server_Location.",
+    "",
+    "The Rust Language_Server lives in aws-crypto-tools-rust under prim-test-server/;",
+    "configPath names the DIRECTORY holding its per-server trio",
+    "(server-config.json/feature-config.json/bug-config.json) co-located with the server."
+  ],
+  "product": "primitives",
+  "entries": [
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8094,
+      "configPath": "prim-test-server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "aws-crypto-rust/primitives-test-server",
+        "path": "prim"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "aws-crypto-rust/primitives-test-server",
+        "path": "prim-test-server"
+      }
+    }
+  ]
+}

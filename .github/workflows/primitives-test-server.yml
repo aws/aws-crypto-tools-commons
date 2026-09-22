@@ -1,21 +1,62 @@
-# Primitives TestServer CI (aws-crypto-tools-commons)
+# Primitives TestServer CI for aws-crypto-tools-commons. Runs `make orchestrate`:
+# it builds and launches each language server (rust-v1), runs the test suite
+# over every server combination — each server against every other and against
+# itself — and fails the build if any test fails. The aws-crypto-tools-rust
+# repo can also call this workflow and pass its own commit, so a change there
+# is tested against this suite.
 #
-# A Commons_Run: validates the model, builds the client + tests, then runs
-# the full orchestrated pipeline (build + launch Rust Language_Server + run
-# the Java test suite against it).
+# The job sets up JDK 21 and Rust (plus Go, which the rust server needs to
+# build its aws-lc-sys native dependency). The tests are offline — no AWS
+# credentials are needed.
+#
+# PRIVATE RUST-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
+# clones aws-crypto-tools-rust per the Rust Configuration_Entry's
+# Server_Location (`git clone git@github.com:aws/aws-crypto-tools-rust.git`,
+# the SSH URL from config/server-config.json). aws-crypto-tools-rust is a
+# PRIVATE repo, and in GitHub Actions the default GITHUB_TOKEN / checkout
+# token only grants access to THIS repo — so that cross-repo clone fails
+# without extra auth. The "Configure git auth" step below rewrites the SSH URL
+# to authenticated HTTPS for the duration of the job via git insteadOf, using
+# the LANGUAGE_REPO_PAT secret with READ-ONLY scope.
+
 name: Primitives TestServer
 
 on:
   pull_request:
     paths:
       - "primitives/test-server/**"
+      - "test-server-common/**"
       - ".github/workflows/primitives-test-server.yml"
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "primitives/test-server/**"
+      - "test-server-common/**"
       - ".github/workflows/primitives-test-server.yml"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commons_ref:
+        description: >-
+          The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
+          — the tests, model, orchestrator, and config. Leave empty to use the
+          commit that triggered the run (the checkout falls back to github.sha).
+          The aws-crypto-tools-rust repo, when it calls this workflow, sets this
+          to the commons ref holding the tests it wants to run.
+        type: string
+        required: false
+        default: ""
+      rust_ref:
+        description: >-
+          The aws-crypto-tools-rust ref whose language server to test. Leave
+          empty to clone the server at the ref pinned in
+          config/server-config.json. The aws-crypto-tools-rust repo, when it
+          calls this workflow, sets this to its own commit, and the server is
+          taken straight from that checkout instead of being cloned.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -23,99 +64,167 @@ permissions:
 jobs:
   primitives-test-server:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: primitives/test-server
 
     env:
+      # No daemon, so each server/Tests JVM the orchestrator forks inherits the
+      # live step environment.
       GRADLE_OPTS: -Dorg.gradle.daemon=false
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout aws-crypto-tools-commons (tests, model, orchestrator)
+        # Name the repository explicitly: when aws-crypto-tools-rust calls this
+        # workflow, checkout would default to that repo, but the tests, model,
+        # and orchestrator live here in commons. commons_ref is empty on a
+        # direct commons run (falls back to the triggering commit) or set by
+        # the caller.
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons_ref || github.sha }}
 
-      - name: Set up JDK 21 (smithy-java 1.4.0 requires 21+)
-        uses: actions/setup-java@v4
+      - name: Checkout aws-crypto-tools-rust at the requested server ref
+        # Only when rust_ref is set: check out that commit's server so make
+        # orchestrate (below) tests it directly instead of cloning it.
+        if: ${{ inputs.rust_ref != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-rust
+          ref: ${{ inputs.rust_ref }}
+          path: .rust-product-repo
+          token: ${{ secrets.LANGUAGE_REPO_PAT }}
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Go (aws-lc-sys native builds need Go)
-        uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-
-      - name: Set up Rust toolchain
+      - name: Set up the Rust toolchain
         run: |
           set -euo pipefail
           rustup toolchain install stable --profile minimal
           rustup default stable
           cargo --version
 
-      - name: Authenticate private repo clones
+      - name: Set up Go
+        # Only used to build the rust server's aws-lc-sys native code.
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          # This isn't a Go project (Go only builds aws-lc-sys above), so there's no
+          # go.sum; skip setup-go's cache to avoid its "file not found" warning.
+          cache: false
+
+      - name: Restore Gradle + cargo caches
+        uses: actions/cache/restore@v4
+        id: caches
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: >-
+            ${{ runner.os }}-primitives-test-server-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'primitives/test-server/*/build.gradle.kts',
+              'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-primitives-test-server-
+
+      - name: Install Smithy CLI
+        # Needed by `make validate`; pinned official release.
+        run: |
+          set -euo pipefail
+          SMITHY_VERSION="1.58.0"
+          url="https://github.com/smithy-lang/smithy/releases/download/${SMITHY_VERSION}/smithy-cli-linux-x86_64.zip"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/smithy-cli.zip"
+          unzip -q "$tmp/smithy-cli.zip" -d "$tmp"
+          sudo "$tmp/smithy-cli-linux-x86_64/install"
+          smithy --version
+
+      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
+        # The PAT is passed only via the step `env:` below (never inlined in
+        # the script), and GitHub automatically masks the secret value in logs.
+        # The token is written only to the ephemeral runner's global git config
+        # (~/.gitconfig), which is discarded when the job ends. This rewrite is
+        # CI-ONLY: local development is unaffected and keeps using the SSH URL
+        # as-is. Required token scope: READ access to the contents of
+        # aws-crypto-tools-rust (a fine-grained PAT with `Contents: Read`, or a
+        # classic PAT with the `repo` scope).
         env:
           LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
         run: |
           set -euo pipefail
           if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "::warning::LANGUAGE_REPO_PAT secret not set — orchestrate step will fail to clone private repos"
+            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
+            echo "The private aws-crypto-tools-rust clone the orchestrated run performs" >&2
+            echo "(the Rust Configuration_Entry's Server_Location) WILL FAIL without it." >&2
+            echo "Add a repository/org secret named LANGUAGE_REPO_PAT with read access to" >&2
+            echo "the contents of aws-crypto-tools-rust (a fine-grained PAT with" >&2
+            echo "'Contents: Read', or a classic PAT with the 'repo' scope)." >&2
+            exit 1
+          fi
+          # Rewrite the SSH URL used in config/server-config.json to
+          # authenticated HTTPS so `git clone git@github.com:aws/...`
+          # transparently becomes an authenticated HTTPS clone.
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Validate model (smithy validate)
+        working-directory: primitives/test-server
+        run: make validate
+
+      - name: Run the test suite (make orchestrate)
+        working-directory: primitives/test-server
+        env:
+          # Wide readiness window for the cargo release build on a 2-core runner.
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        # With rust_ref set, point orchestrate at the checked-out server above so it
+        # tests that commit; otherwise it clones it per config/server-config.json.
+        run: |
+          if [ -n "${{ inputs.rust_ref }}" ]; then
+            make orchestrate PRIMITIVES_RUST_REPO="${{ github.workspace }}/.rust-product-repo"
           else
-            git config --global url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf "https://github.com/"
-            git config --global url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf "git@github.com:"
+            make orchestrate
           fi
 
-      - name: Cache Rust build artifacts (sccache)
-        uses: actions/cache@v4
+      - name: Publish test results to the run summary
+        if: always()
+        run: |
+          python3 test-server-common/tools/ci_summary.py \
+            primitives/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test reports + Resolution_Record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: primitives-test-server-reports
+          path: |
+            test-server-common/orchestrator/build/resolution-record.json
+            test-server-common/orchestrator/build/launch/*/*.log
+            primitives/test-server/build/launch/*/*.log
+            primitives/test-server/tests/build/reports/tests
+            primitives/test-server/tests/build/test-results
+          if-no-files-found: ignore
+
+      - name: Save Gradle + cargo caches
+        if: always() && steps.caches.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
         with:
           path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-primitives-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-primitives-
-
-      - name: Validate Smithy model
-        run: |
-          cd model
-          # smithy validate requires the smithy CLI; use Gradle-based validation
-          cd ../client-java
-          # Generate Gradle wrapper if missing
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.10
-          fi
-          ./gradlew smithyBuild --info || echo "::warning::smithy validate requires Gradle wrapper setup"
-
-      - name: Build client-java (codegen)
-        run: |
-          cd client-java
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
-          ./gradlew build
-
-      - name: Build tests
-        run: |
-          cd tests
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
-          ./gradlew build
-
-      - name: Build orchestrator
-        run: |
-          cd orchestrator
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.10; fi
-          ./gradlew build
-
-      - name: Orchestrate (clone Rust server from configured branch, build, launch, test)
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
-        run: |
-          set -euo pipefail
-          # Clone the Rust repo here (where git config is in scope) rather
-          # than letting the JVM orchestrator do it (subprocess may not see ~/.gitconfig)
-          CLONE_DIR="/tmp/primitives-testserver-clones/rust"
-          rm -rf "$CLONE_DIR"
-          git clone --depth 1 --single-branch \
-            --branch aws-crypto-rust/primitives-test-server \
-            "https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/aws/aws-crypto-tools-rust.git" \
-            "$CLONE_DIR"
-          # Run orchestrator in language mode with the pre-cloned working tree
-          cd orchestrator
-          ./gradlew --console=plain run \
-            --args="context=language:rust languageRepoRoot=$CLONE_DIR"
+          key: >-
+            ${{ runner.os }}-primitives-test-server-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'primitives/test-server/*/build.gradle.kts',
+              'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}

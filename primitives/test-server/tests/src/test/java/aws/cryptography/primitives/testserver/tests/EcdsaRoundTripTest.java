@@ -8,72 +8,77 @@ import aws.cryptography.primitives.testserver.client.model.EcdsaSignInput;
 import aws.cryptography.primitives.testserver.client.model.EcdsaSignOutput;
 import aws.cryptography.primitives.testserver.client.model.EcdsaVerifyInput;
 import aws.cryptography.primitives.testserver.client.model.EcdsaVerifyOutput;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.TestFactory;
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Set;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ECDSA round-trip: generate on server A, sign on A, verify on server B.
+ * ECDSA round-trip: generate + sign on the encrypt target, verify on the
+ * decrypt target.
  */
 public class EcdsaRoundTripTest {
 
     private static final byte[] MESSAGE = "ECDSA cross-language test message".getBytes();
 
-    @TestFactory
-    Stream<DynamicTest> ecdsaP384RoundTrip() {
-        List<LanguageServerRegistry.EndpointPair> pairs = LanguageServerRegistry.instance().pairs();
-        Assumptions.assumeFalse(pairs.isEmpty(), "No targets configured");
+    static List<TargetPair> pairs() {
+        return LanguageServerRegistry.shared().pairs();
+    }
 
-        return pairs.stream().map(pair -> DynamicTest.dynamicTest(
-            "ECDSA-P384: sign@" + pair.server1().language()
-                + " → verify@" + pair.server2().language(),
-            () -> {
-                PrimitivesTestServerClient signer = TestServerClients.forEndpoint(pair.server1().endpoint());
-                PrimitivesTestServerClient verifier = TestServerClients.forEndpoint(pair.server2().endpoint());
+    @ParameterizedTest(name = "[ecdsa-p384] round-trip {0}")
+    @MethodSource("pairs")
+    void ecdsaP384RoundTrip(TargetPair pair) {
+        FeatureGate.require(Set.of("ecdsa"), pair);
+        PrimitivesTestServerClient signer =
+            PrimitivesTestServerClients.forEndpoint(pair.encryptEndpoint());
+        PrimitivesTestServerClient verifier =
+            PrimitivesTestServerClients.forEndpoint(pair.decryptEndpoint());
 
-                // Generate key pair on signer
-                EcdsaGenerateKeyPairOutput keyPair = signer.ecdsaGenerateKeyPair(
-                    EcdsaGenerateKeyPairInput.builder()
-                        .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                        .build());
+        EcdsaGenerateKeyPairOutput keyPair = PrimitivesTestServerClients.withRetry(() ->
+            signer.ecdsaGenerateKeyPair(EcdsaGenerateKeyPairInput.builder()
+                .algorithm(EcdsaAlgorithm.ECDSA_P384)
+                .build()));
 
-                assertNotNull(keyPair.getSigningKey());
-                assertNotNull(keyPair.getVerificationKey());
-                assertEquals(49, keyPair.getVerificationKey().remaining()); // compressed P-384
+        assertNotNull(keyPair.getSigningKey());
+        assertNotNull(keyPair.getVerificationKey());
+        assertEquals(49, keyPair.getVerificationKey().remaining()); // compressed P-384
 
-                // Sign
-                EcdsaSignOutput signOut = signer.ecdsaSign(EcdsaSignInput.builder()
-                    .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                    .signingKey(keyPair.getSigningKey())
-                    .message(ByteBuffer.wrap(MESSAGE))
-                    .build());
+        EcdsaSignOutput signOut = PrimitivesTestServerClients.withRetry(() ->
+            signer.ecdsaSign(EcdsaSignInput.builder()
+                .algorithm(EcdsaAlgorithm.ECDSA_P384)
+                .signingKey(keyPair.getSigningKey())
+                .message(ByteBuffer.wrap(MESSAGE))
+                .build()));
 
-                assertNotNull(signOut.getSignature());
+        assertNotNull(signOut.getSignature());
 
-                // Verify on (possibly different) server
-                EcdsaVerifyOutput verifyOut = verifier.ecdsaVerify(EcdsaVerifyInput.builder()
-                    .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                    .verificationKey(keyPair.getVerificationKey())
-                    .message(ByteBuffer.wrap(MESSAGE))
-                    .signature(signOut.getSignature())
-                    .build());
+        EcdsaVerifyOutput verifyOut = PrimitivesTestServerClients.withRetry(() ->
+            verifier.ecdsaVerify(EcdsaVerifyInput.builder()
+                .algorithm(EcdsaAlgorithm.ECDSA_P384)
+                .verificationKey(keyPair.getVerificationKey())
+                .message(ByteBuffer.wrap(MESSAGE))
+                .signature(signOut.getSignature())
+                .build()));
 
-                assertTrue(verifyOut.isValid(), "signature must verify");
+        assertTrue(verifyOut.isValid(), "signature must verify");
 
-                // Negative: wrong message
-                EcdsaVerifyOutput badVerify = verifier.ecdsaVerify(EcdsaVerifyInput.builder()
-                    .algorithm(EcdsaAlgorithm.ECDSA_P384)
-                    .verificationKey(keyPair.getVerificationKey())
-                    .message(ByteBuffer.wrap("wrong".getBytes()))
-                    .signature(signOut.getSignature())
-                    .build());
+        EcdsaVerifyOutput badVerify = PrimitivesTestServerClients.withRetry(() ->
+            verifier.ecdsaVerify(EcdsaVerifyInput.builder()
+                .algorithm(EcdsaAlgorithm.ECDSA_P384)
+                .verificationKey(keyPair.getVerificationKey())
+                .message(ByteBuffer.wrap("wrong".getBytes()))
+                .signature(signOut.getSignature())
+                .build()));
 
-                assertFalse(badVerify.isValid(), "wrong message must not verify");
-            }));
+        assertFalse(badVerify.isValid(), "wrong message must not verify");
     }
 }

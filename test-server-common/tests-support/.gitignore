@@ -1,0 +1,7 @@
+# Gradle
+.gradle/
+build/
+
+# Smithy build output
+smithyprojections/
+bin/
