@@ -330,22 +330,22 @@ class ConfigurationLoaderTest {
         // Rust is a Language_Repository (aws-crypto-tools-rust): its
         // Feature_Declaration lives in its own repo, not inline here, so the entry
         // carries no supported/unsupported arrays and points at its declaration
-        // location, alongside its server sources under esdk-test-server/.
+        // location, alongside its server sources under esdk/test-server/.
         ConfigurationEntry rust = set.forLanguage("rust");
         assertNotNull(rust, "the shipped set must carry a rust entry");
         assertEquals(1, rust.majorVersion());
         assertEquals(8093, rust.port());
         assertEquals("aws-crypto-tools-rust", rust.serverLocation().repository());
-        assertEquals("esdk-test-server", rust.serverLocation().path());
-        assertEquals("esdk-test-server", rust.configPath());
+        assertEquals("esdk/test-server", rust.serverLocation().path());
+        assertEquals("esdk/test-server", rust.configPath());
         assertNull(rust.supportedFeatures());
         assertNull(rust.unsupportedFeatures());
 
         // The remaining entries follow the same Language_Repository pattern:
         // no inline arrays, a configPath directory next to the server.
         assertLanguageRepositoryEntry(set, "rust-cpp", 1, 8094,
-            "aws-crypto-tools-rust-cpp", "esdk-cpp-test-server",
-            "esdk-cpp-test-server");
+            "aws-crypto-tools-rust-cpp", "esdk/shims/aws-esdk-cpp/test-server",
+            "esdk/shims/aws-esdk-cpp/test-server");
         assertLanguageRepositoryEntry(set, "javascript", 5, 8095,
             "aws-encryption-sdk-javascript", "test-server",
             "test-server");
