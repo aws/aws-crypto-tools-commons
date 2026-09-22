@@ -18,6 +18,9 @@ import java.util.Map;
  * <p>Both the per-configuration {@code MaterialsRoundTripTests#blobRoundTrip}
  * (one named execution per scenario) and the property-based Test (Property 1)
  * drive this single body, so there is exactly one definition of the round trip.
+ *
+ * <p>Each RPC goes through {@link TestServerClients#withRetry} so a transient
+ * transport failure is retried on the test side rather than failing the run.
  */
 public final class BlobRoundTrip {
 
@@ -34,25 +37,25 @@ public final class BlobRoundTrip {
 
         // CreateClient on each endpoint; each returns a ClientId referencing a
         // configured, offline Raw-AES ESDK client (Requirement 3.1).
-        String encryptClientId = encryptClient.createClient(
-            CreateClientInput.builder().config(EsdkClientConfigs.rawAes()).build()).getClientId();
-        String decryptClientId = decryptClient.createClient(
-            CreateClientInput.builder().config(EsdkClientConfigs.rawAes()).build()).getClientId();
+        String encryptClientId = TestServerClients.withRetry(() -> encryptClient.createClient(
+            CreateClientInput.builder().config(EsdkClientConfigs.rawAes()).build())).getClientId();
+        String decryptClientId = TestServerClients.withRetry(() -> decryptClient.createClient(
+            CreateClientInput.builder().config(EsdkClientConfigs.rawAes()).build())).getClientId();
 
         // Encrypt against one endpoint (Blob_Variant, Requirement 4.2).
-        ByteBuffer ciphertext = encryptClient.encrypt(
-            EncryptInput.builder()
-                .clientId(encryptClientId)
-                .plaintext(ByteBuffer.wrap(plaintext))
-                .build())
+        EncryptInput encryptRequest = EncryptInput.builder()
+            .clientId(encryptClientId)
+            .plaintext(ByteBuffer.wrap(plaintext))
+            .build();
+        ByteBuffer ciphertext = TestServerClients.withRetry(() -> encryptClient.encrypt(encryptRequest))
             .getCiphertext();
 
         // Decrypt against the other endpoint (Blob_Variant, Requirement 4.3).
-        ByteBuffer recovered = decryptClient.decrypt(
-            DecryptInput.builder()
-                .clientId(decryptClientId)
-                .ciphertext(ciphertext)
-                .build())
+        DecryptInput decryptRequest = DecryptInput.builder()
+            .clientId(decryptClientId)
+            .ciphertext(ciphertext)
+            .build();
+        ByteBuffer recovered = TestServerClients.withRetry(() -> decryptClient.decrypt(decryptRequest))
             .getPlaintext();
 
         return toArray(recovered);
@@ -78,10 +81,10 @@ public final class BlobRoundTrip {
         ESDKTestServerClient encryptClient = TestServerClients.forEndpoint(pair.encryptEndpoint());
         ESDKTestServerClient decryptClient = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
-        String encryptClientId = encryptClient.createClient(
-            CreateClientInput.builder().config(scenario.config()).build()).getClientId();
-        String decryptClientId = decryptClient.createClient(
-            CreateClientInput.builder().config(scenario.decryptConfigOrDefault()).build())
+        String encryptClientId = TestServerClients.withRetry(() -> encryptClient.createClient(
+            CreateClientInput.builder().config(scenario.config()).build())).getClientId();
+        String decryptClientId = TestServerClients.withRetry(() -> decryptClient.createClient(
+            CreateClientInput.builder().config(scenario.decryptConfigOrDefault()).build()))
             .getClientId();
 
         EncryptInput.Builder encryptInput = EncryptInput.builder()
@@ -93,7 +96,9 @@ public final class BlobRoundTrip {
         if (scenario.algorithmSuiteId() != null) {
             encryptInput.algorithmSuiteId(scenario.algorithmSuiteId());
         }
-        ByteBuffer ciphertext = encryptClient.encrypt(encryptInput.build()).getCiphertext();
+        EncryptInput encryptRequest = encryptInput.build();
+        ByteBuffer ciphertext = TestServerClients.withRetry(() -> encryptClient.encrypt(encryptRequest))
+            .getCiphertext();
 
         DecryptInput.Builder decryptInput = DecryptInput.builder()
             .clientId(decryptClientId)
@@ -101,7 +106,9 @@ public final class BlobRoundTrip {
         if (!encryptionContext.isEmpty()) {
             decryptInput.encryptionContext(encryptionContext);
         }
-        ByteBuffer recovered = decryptClient.decrypt(decryptInput.build()).getPlaintext();
+        DecryptInput decryptRequest = decryptInput.build();
+        ByteBuffer recovered = TestServerClients.withRetry(() -> decryptClient.decrypt(decryptRequest))
+            .getPlaintext();
 
         return toArray(recovered);
     }

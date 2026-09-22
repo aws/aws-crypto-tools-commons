@@ -42,6 +42,9 @@ import org.junit.jupiter.api.Test;
  * <p>These assert the client receives the correct <em>modeled</em> type (not a
  * bare {@code CallException}/HTTP error, Requirements 6.1-6.4) and that the two
  * shapes are distinct. Fully offline: Raw-AES configs, no AWS/KMS/network.
+ * Each RPC goes through {@link TestServerClients#withRetry}, which retries only
+ * a transport-level failure; the modeled errors asserted here propagate on the
+ * first attempt.
  */
 class ModeledErrorTransmissionTest {
 
@@ -56,27 +59,27 @@ class ModeledErrorTransmissionTest {
         ESDKTestServerClient decryptClient = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
         // Encrypt with one Raw-AES key.
-        String encryptClientId = encryptClient.createClient(
-            CreateClientInput.builder().config(EsdkClientConfigs.rawAes()).build()).getClientId();
-        ByteBuffer ciphertext = encryptClient.encrypt(
-            EncryptInput.builder()
-                .clientId(encryptClientId)
-                .plaintext(ByteBuffer.wrap(PLAINTEXT))
-                .build())
+        String encryptClientId = TestServerClients.withRetry(() -> encryptClient.createClient(
+            CreateClientInput.builder().config(EsdkClientConfigs.rawAes()).build())).getClientId();
+        EncryptInput encryptRequest = EncryptInput.builder()
+            .clientId(encryptClientId)
+            .plaintext(ByteBuffer.wrap(PLAINTEXT))
+            .build();
+        ByteBuffer ciphertext = TestServerClients.withRetry(() -> encryptClient.encrypt(encryptRequest))
             .getCiphertext();
 
         // Decrypt with a DIFFERENT (incompatible) Raw-AES key: the ESDK cannot
         // unwrap the data key, so the failure originates inside the ESDK_Client
         // and must forward as an ESDKClientError (Requirements 4.11, 5.6).
-        String decryptClientId = decryptClient.createClient(
-            CreateClientInput.builder().config(EsdkClientConfigs.rawAesIncompatibleKey()).build())
+        String decryptClientId = TestServerClients.withRetry(() -> decryptClient.createClient(
+            CreateClientInput.builder().config(EsdkClientConfigs.rawAesIncompatibleKey()).build()))
             .getClientId();
 
         ESDKClientError error = assertThrows(ESDKClientError.class, () ->
-            decryptClient.decrypt(DecryptInput.builder()
+            TestServerClients.withRetry(() -> decryptClient.decrypt(DecryptInput.builder()
                 .clientId(decryptClientId)
                 .ciphertext(ciphertext)
-                .build()));
+                .build())));
 
         // assertThrows already proves the wire error deserialized to the EXACT
         // modeled type ESDKClientError (distinct from GenericServerError), not a
@@ -96,10 +99,10 @@ class ModeledErrorTransmissionTest {
         // the guard rejects it with a GenericServerError before any ESDK call
         // (Requirements 3.9, 5.5), performing no operation.
         GenericServerError error = assertThrows(GenericServerError.class, () ->
-            client.decrypt(DecryptInput.builder()
+            TestServerClients.withRetry(() -> client.decrypt(DecryptInput.builder()
                 .clientId("00000000-0000-0000-0000-000000000000")
                 .ciphertext(ByteBuffer.wrap(new byte[] {1, 2, 3, 4}))
-                .build()));
+                .build())));
 
         assertNotNull(error.getMessage());
         assertFalse(error.getMessage().isEmpty(),
@@ -113,10 +116,10 @@ class ModeledErrorTransmissionTest {
         ESDKTestServerClient client = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
         GenericServerError error = assertThrows(GenericServerError.class, () ->
-            client.decrypt(DecryptInput.builder()
+            TestServerClients.withRetry(() -> client.decrypt(DecryptInput.builder()
                 .clientId("")
                 .ciphertext(ByteBuffer.wrap(new byte[] {1, 2, 3, 4}))
-                .build()));
+                .build())));
 
         assertNotNull(error.getMessage());
         assertFalse(error.getMessage().isEmpty(),
