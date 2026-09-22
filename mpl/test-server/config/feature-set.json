@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "MPL TestServer commons feature-set.json (design 'Feature Configuration'):",
+    "the authoritative Feature_Catalog. Each language's server declares the",
+    "supported/unsupported half of every feature here in its own feature-config.json;",
+    "the union must equal this catalog. Each feature names one keyring, CMM, or",
+    "cache capability a Language_Server may implement."
+  ],
+  "product": "mpl",
+  "features": [
+    "raw-aes",
+    "default-cmm",
+    "hierarchical",
+    "caching-cmm",
+    "required-encryption-context-cmm",
+    "raw-rsa",
+    "aws-kms",
+    "multi-keyring",
+    "storm-tracking-cmc"
+  ]
+}

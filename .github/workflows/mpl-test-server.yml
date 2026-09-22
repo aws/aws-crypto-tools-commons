@@ -1,22 +1,62 @@
-# MPL TestServer CI (aws-crypto-tools-commons)
+# MPL TestServer CI for aws-crypto-tools-commons. Runs `make orchestrate`:
+# it builds and launches each language server (rust-v1), runs the test suite
+# over every server combination — each server against every other and against
+# itself — and fails the build if any test fails. The aws-crypto-tools-rust
+# repo can also call this workflow and pass its own commit, so a change there
+# is tested against this suite.
 #
-# A Commons_Run: validate the model, build the Test_Client + Tests +
-# Orchestrator, then run the single orchestrated pipeline, which clones the
-# Rust Language_Server at the ref in its Configuration_Entry, builds it,
-# launches it, and runs the Tests over the target matrix.
+# The job sets up JDK 21 and Rust (plus Go, which the rust server needs to
+# build its aws-lc-sys native dependency). The tests are offline — no AWS
+# credentials are needed.
+#
+# PRIVATE RUST-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
+# clones aws-crypto-tools-rust per the Rust Configuration_Entry's
+# Server_Location (`git clone git@github.com:aws/aws-crypto-tools-rust.git`,
+# the SSH URL from config/server-config.json). aws-crypto-tools-rust is a
+# PRIVATE repo, and in GitHub Actions the default GITHUB_TOKEN / checkout
+# token only grants access to THIS repo — so that cross-repo clone fails
+# without extra auth. The "Configure git auth" step below rewrites the SSH URL
+# to authenticated HTTPS for the duration of the job via git insteadOf, using
+# the LANGUAGE_REPO_PAT secret with READ-ONLY scope.
+
 name: MPL TestServer
 
 on:
   pull_request:
     paths:
       - "mpl/test-server/**"
+      - "test-server-common/**"
       - ".github/workflows/mpl-test-server.yml"
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "mpl/test-server/**"
+      - "test-server-common/**"
       - ".github/workflows/mpl-test-server.yml"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commons_ref:
+        description: >-
+          The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
+          — the tests, model, orchestrator, and config. Leave empty to use the
+          commit that triggered the run (the checkout falls back to github.sha).
+          The aws-crypto-tools-rust repo, when it calls this workflow, sets this
+          to the commons ref holding the tests it wants to run.
+        type: string
+        required: false
+        default: ""
+      rust_ref:
+        description: >-
+          The aws-crypto-tools-rust ref whose language server to test. Leave
+          empty to clone the server at the ref pinned in
+          config/server-config.json. The aws-crypto-tools-rust repo, when it
+          calls this workflow, sets this to its own commit, and the server is
+          taken straight from that checkout instead of being cloned.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -24,185 +64,167 @@ permissions:
 jobs:
   mpl-test-server:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mpl/test-server
 
     env:
-      # No Gradle daemon: a daemon captures its environment at start and reuses
-      # it, so any per-step environment the orchestrator's forked JVMs need
-      # would go stale.
+      # No daemon, so each server/Tests JVM the orchestrator forks inherits the
+      # live step environment.
       GRADLE_OPTS: -Dorg.gradle.daemon=false
-      # sccache rather than caching target/: the orchestrated run clones the
-      # Rust repo fresh each run, giving every source a new mtime, so a
-      # restored target/ produces an incorrect incremental build. sccache keys
-      # on a hash of the compiler inputs, so it survives the fresh clone.
-      RUSTC_WRAPPER: sccache
-      SCCACHE_DIR: ${{ github.workspace }}/.sccache
-      SCCACHE_IDLE_TIMEOUT: "0"
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout aws-crypto-tools-commons (tests, model, orchestrator)
+        # Name the repository explicitly: when aws-crypto-tools-rust calls this
+        # workflow, checkout would default to that repo, but the tests, model,
+        # and orchestrator live here in commons. commons_ref is empty on a
+        # direct commons run (falls back to the triggering commit) or set by
+        # the caller.
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons_ref || github.sha }}
 
-      - name: Set up JDK 21 (smithy-java 1.4.0 requires 21+)
-        uses: actions/setup-java@v4
+      - name: Checkout aws-crypto-tools-rust at the requested server ref
+        # Only when rust_ref is set: check out that commit's server so make
+        # orchestrate (below) tests it directly instead of cloning it.
+        if: ${{ inputs.rust_ref != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-rust
+          ref: ${{ inputs.rust_ref }}
+          path: .rust-product-repo
+          token: ${{ secrets.LANGUAGE_REPO_PAT }}
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Go (aws-lc-sys native builds need Go)
-        uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-
-      - name: Set up Rust toolchain
+      - name: Set up the Rust toolchain
         run: |
           set -euo pipefail
           rustup toolchain install stable --profile minimal
           rustup default stable
           cargo --version
 
-      - name: Set up sccache (Rust compiler cache)
-        run: |
-          set -euo pipefail
-          SCCACHE_VERSION="v0.8.2"
-          base="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
-          url="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${base}.tar.gz"
-          tmp="$(mktemp -d)"
-          curl -sSL "$url" -o "$tmp/sccache.tar.gz"
-          tar -xzf "$tmp/sccache.tar.gz" -C "$tmp"
-          sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
-          sccache --version
-
-      - name: Resolve the Rust Language_Server coordinates from the Configuration_Set
-        # Single source of truth: the url and ref the orchestrate step clones
-        # come from config/configuration-set.json, not from a literal in this
-        # file, so the workflow and the Configuration_Set cannot drift.
-        id: rust
-        run: |
-          set -euo pipefail
-          config=config/configuration-set.json
-          url=$(jq -r '.entries[] | select(.language=="rust") | .serverLocation.url' "$config")
-          ref=$(jq -r '.entries[] | select(.language=="rust") | .serverLocation.ref' "$config")
-          if [ -z "$url" ] || [ "$url" = "null" ] || [ -z "$ref" ] || [ "$ref" = "null" ]; then
-            echo "::error::could not read the rust serverLocation url/ref from $config" >&2
-            exit 1
-          fi
-          {
-            echo "url=$url"
-            echo "ref=$ref"
-          } >> "$GITHUB_OUTPUT"
-          echo "rust Language_Server: $url @ $ref"
-
-      - name: Restore the cargo downloads + sccache compiler cache
-        # Explicit restore/save split rather than actions/cache: the orchestrate
-        # step exits non-zero on a failed Test, and the combined action's
-        # implicit post step only saves on job SUCCESS — so it never saved
-        # anything here. The matching save step runs `if: always()`.
-        id: cargo-cache
-        uses: actions/cache/restore@v4
+      - name: Set up Go
+        # Only used to build the rust server's aws-lc-sys native code.
+        uses: actions/setup-go@v5
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-mpl-test-server-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-mpl-test-server-
+          go-version: "stable"
+          # This isn't a Go project (Go only builds aws-lc-sys above), so there's no
+          # go.sum; skip setup-go's cache to avoid its "file not found" warning.
+          cache: false
 
-      - name: Restore the Gradle cache
-        id: gradle-cache
+      - name: Restore Gradle + cargo caches
         uses: actions/cache/restore@v4
+        id: caches
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.cargo/registry
+            ~/.cargo/git
           key: >-
-            ${{ runner.os }}-gradle-mpl-test-server-${{ hashFiles(
+            ${{ runner.os }}-mpl-test-server-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
-              'mpl/test-server/*/settings.gradle.kts',
-              'mpl/test-server/*/gradle.properties',
               'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-mpl-test-server-
+            ${{ runner.os }}-mpl-test-server-
 
-      - name: Build client-java (codegen)
-        run: cd client-java && ./gradlew build
+      - name: Install Smithy CLI
+        # Needed by `make validate`; pinned official release.
+        run: |
+          set -euo pipefail
+          SMITHY_VERSION="1.58.0"
+          url="https://github.com/smithy-lang/smithy/releases/download/${SMITHY_VERSION}/smithy-cli-linux-x86_64.zip"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/smithy-cli.zip"
+          unzip -q "$tmp/smithy-cli.zip" -d "$tmp"
+          sudo "$tmp/smithy-cli-linux-x86_64/install"
+          smithy --version
 
-      - name: Build tests
-        run: cd tests && ./gradlew build
-
-      - name: Build orchestrator
-        run: cd orchestrator && ./gradlew build
-
-      - name: Orchestrate (clone the Rust MPL server, build, launch, test)
+      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
+        # The PAT is passed only via the step `env:` below (never inlined in
+        # the script), and GitHub automatically masks the secret value in logs.
+        # The token is written only to the ephemeral runner's global git config
+        # (~/.gitconfig), which is discarded when the job ends. This rewrite is
+        # CI-ONLY: local development is unaffected and keeps using the SSH URL
+        # as-is. Required token scope: READ access to the contents of
+        # aws-crypto-tools-rust (a fine-grained PAT with `Contents: Read`, or a
+        # classic PAT with the `repo` scope).
         env:
           LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
-          RUST_SERVER_URL: ${{ steps.rust.outputs.url }}
-          RUST_SERVER_REF: ${{ steps.rust.outputs.ref }}
         run: |
           set -euo pipefail
           if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "::error::the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "aws-crypto-tools-rust is private and the default Actions token only" >&2
-            echo "reaches this repo, so the Rust Language_Server clone cannot succeed." >&2
+            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
+            echo "The private aws-crypto-tools-rust clone the orchestrated run performs" >&2
+            echo "(the Rust Configuration_Entry's Server_Location) WILL FAIL without it." >&2
             echo "Add a repository/org secret named LANGUAGE_REPO_PAT with read access to" >&2
-            echo "its contents (a fine-grained PAT with 'Contents: Read', or a classic PAT" >&2
-            echo "with the 'repo' scope)." >&2
+            echo "the contents of aws-crypto-tools-rust (a fine-grained PAT with" >&2
+            echo "'Contents: Read', or a classic PAT with the 'repo' scope)." >&2
             exit 1
           fi
-          # Rewrite the configured URL to an authenticated HTTPS clone. The PAT
-          # is never inlined in the command, so it is not echoed and does not
-          # land in the clone's .git/config as a remote URL.
-          auth_url="${RUST_SERVER_URL/https:\/\/github.com\//https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/}"
-          CLONE_DIR="/tmp/mpl-testserver-clones/rust"
-          rm -rf "$CLONE_DIR"
-          git clone --depth 1 --single-branch \
-            --branch "$RUST_SERVER_REF" "$auth_url" "$CLONE_DIR"
-          git -C "$CLONE_DIR" remote set-url origin "$RUST_SERVER_URL"
-          cd orchestrator
-          ./gradlew --console=plain run \
-            --args="context=language:rust languageRepoRoot=$CLONE_DIR"
+          # Rewrite the SSH URL used in config/server-config.json to
+          # authenticated HTTPS so `git clone git@github.com:aws/...`
+          # transparently becomes an authenticated HTTPS clone.
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
 
-      - name: Rust compiler cache stats (sccache)
+      - name: Validate model (smithy validate)
+        working-directory: mpl/test-server
+        run: make validate
+
+      - name: Run the test suite (make orchestrate)
+        working-directory: mpl/test-server
+        env:
+          # Wide readiness window for the cargo release build on a 2-core runner.
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        # With rust_ref set, point orchestrate at the checked-out server above so it
+        # tests that commit; otherwise it clones it per config/server-config.json.
+        run: |
+          if [ -n "${{ inputs.rust_ref }}" ]; then
+            make orchestrate MPL_RUST_REPO="${{ github.workspace }}/.rust-product-repo"
+          else
+            make orchestrate
+          fi
+
+      - name: Publish test results to the run summary
         if: always()
-        run: sccache --show-stats || true
+        run: |
+          python3 test-server-common/tools/ci_summary.py \
+            mpl/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload the server log + test reports
+      - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mpl-test-server-reports
           path: |
-            /tmp/mpl-testserver-clones/rust/mpl-test-server/.server.log
+            test-server-common/orchestrator/build/resolution-record.json
+            test-server-common/orchestrator/build/launch/*/*.log
+            mpl/test-server/build/launch/*/*.log
             mpl/test-server/tests/build/reports/tests
             mpl/test-server/tests/build/test-results
           if-no-files-found: ignore
 
-      # Cache saves run `if: always()` because the orchestrate step exits
-      # non-zero on a failed Test; a save gated on job success would never run.
-      - name: Save the cargo downloads + sccache compiler cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-mpl-test-server-${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Save the Gradle cache
-        if: always() && steps.gradle-cache.outputs.cache-hit != 'true'
+      - name: Save Gradle + cargo caches
+        if: always() && steps.caches.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.cargo/registry
+            ~/.cargo/git
           key: >-
-            ${{ runner.os }}-gradle-mpl-test-server-${{ hashFiles(
+            ${{ runner.os }}-mpl-test-server-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
-              'mpl/test-server/*/settings.gradle.kts',
-              'mpl/test-server/*/gradle.properties',
               'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
