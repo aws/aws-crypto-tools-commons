@@ -560,6 +560,7 @@ jobs:
         with:
           role-to-assume: ${{ env.KMS_CI_ROLE_ARN }}
           aws-region: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+          role-duration-seconds: 7200
 
       - name: Verify AWS credentials are active (gates the orchestrated run)
         # The KMS_Scenarios are REQUIRED and call real AWS KMS, so the run

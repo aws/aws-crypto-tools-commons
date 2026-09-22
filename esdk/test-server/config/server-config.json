@@ -15,7 +15,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "test-server/server"
       }
     },
@@ -33,7 +33,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "test-server"
       }
     },
@@ -51,7 +51,7 @@
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "esdk-test-server"
       }
     },
@@ -69,7 +69,7 @@
       "serverLocation": {
         "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "kessplas/bug-config-cpp",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec-cpp",
         "path": "esdk-cpp-test-server"
       }
     },
@@ -87,7 +87,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "test-server"
       }
     },
@@ -105,7 +105,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-c",
         "url": "https://github.com/aws/aws-encryption-sdk-c",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "test-server"
       }
     },
@@ -123,7 +123,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "esdk-test-servers/net"
       }
     },
@@ -141,7 +141,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "esdk-test-servers/rust"
       }
     },
@@ -159,7 +159,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
         "path": "esdk-test-servers/go"
       }
     }
