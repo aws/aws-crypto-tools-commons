@@ -1,34 +1,19 @@
-# ============================================================================
-# DB-ESDK TestServer CI (aws-crypto-tools-commons — the Commons_Repository)
-# ----------------------------------------------------------------------------
-# Product-namespaced sibling of esdk-test-server.yml (GitHub Actions only
-# discovers workflows directly under .github/workflows/, so products are
-# namespaced by filename prefix, not subdirectory). This runs the DB-ESDK
-# TestServer as a Commons_Run: one `make orchestrate` resolves every target
-# from the Configuration_Set in this working tree, clones + builds each
-# Language_Server, launches them, runs the single Tests suite over the
-# cross-language matrix, and reports one fail-open result.
+# DB-ESDK TestServer CI for aws-crypto-tools-commons. Runs `make orchestrate`:
+# it builds and launches each language server (java-v3, rust-v1, net-v4), runs
+# the test suite over every server combination — each server against every other
+# and against itself, plus the single-server tests — and fails the build if any
+# test fails. The aws-database-encryption-sdk-dynamodb repo can also call this
+# workflow and pass its own commit, so a change there is tested against this suite.
 #
-# DB-ESDK vs ESDK differences (why this is shorter):
-#   * Three targets — java-v3, rust-v1, net-v4 — so JDK 21 (commons harness +
-#     Java server), a Rust toolchain (+ Go/cmake for the aws-lc-sys native
-#     build the Rust server pulls in), and the .NET 8 SDK. No python/node/c.
-#   * The servers consume the PUBLISHED DB-ESDK libraries (Maven jar, the
-#     aws-db-esdk crate, the NuGet package) — there is no Dafny transpile step.
-#   * The servers live in the PUBLIC aws-database-encryption-sdk-dynamodb repo
-#     (server-config.json Server_Locations), so the cross-repo clone needs no
-#     PAT — the SSH URL is rewritten to plain (unauthenticated) HTTPS.
+# The job sets up JDK 21, Rust (plus Go, which the rust server needs to build its
+# aws-lc-sys native dependency) and .NET 8. The servers use the published DB-ESDK
+# libraries, so there is no Dafny build step.
 #
-# AWS/KMS (ONLINE, REQUIRED): DB-ESDK scenarios call real AWS KMS and, for the
-# searchable-encryption tests, a branch-key DynamoDB keystore. The assumed
-# OIDC role therefore needs, in the target account/region:
-#   * kms:Encrypt/Decrypt/GenerateDataKey* on the item-encryption KMS key,
-#   * kms:Decrypt/GenerateDataKeyWithoutPlaintext on the beacon keystore KMS key,
-#   * dynamodb:GetItem/Query/BatchGetItem on the branch-key store table,
-#   * kms:GetPublicKey + Encrypt/Decrypt on the asymmetric RSA key (aws-kms-rsa).
-# Override the role and (optional) resource ARNs with the repo variables below;
-# the run fails fast (before orchestrate) if credentials are unusable.
-# ============================================================================
+# The tests call real AWS KMS and a DynamoDB keystore, so the job needs live AWS
+# credentials: it assumes an IAM role through GitHub OIDC (OpenID Connect) and
+# fails early, with a clear message, if that role can't be assumed. The role needs
+# KMS access to the item, RSA, beacon-keystore and keyring-interop keys and read
+# access to the branch-key DynamoDB table.
 
 name: DB-ESDK TestServer
 
@@ -48,27 +33,28 @@ on:
     inputs:
       commons_ref:
         description: >-
-          aws-crypto-tools-commons ref (the harness + Configuration_Set: tests,
-          model, orchestrator, server-config) to check out. Empty on a native
-          commons run => the triggering commit. A cross-repo caller (the DB-ESDK
-          product repo) passes the commons ref that carries the test cases.
+          The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
+          — the tests, model, orchestrator, and config. Leave empty to use the
+          commit that triggered the run (the checkout falls back to github.sha).
+          The aws-database-encryption-sdk-dynamodb repo, when it calls this
+          workflow, sets this to the commons ref holding the tests it wants to run.
         type: string
         required: false
         default: ""
       dbe_ref:
         description: >-
-          aws-database-encryption-sdk-dynamodb ref to resolve the language
-          SERVERS from. Empty on a native commons run => each server is cloned at
-          its server-config.json serverLocation.ref. A DB-ESDK-product caller
-          sets it to its own PR commit so the run tests THAT commit's servers via
-          a working-tree overlay instead of the configured branch.
+          The aws-database-encryption-sdk-dynamodb ref whose language servers to
+          test. Leave empty to clone each server at the ref pinned in
+          config/server-config.json. The aws-database-encryption-sdk-dynamodb
+          repo, when it calls this workflow, sets this to its own commit, and the
+          servers are taken straight from that checkout instead of being cloned.
         type: string
         required: false
         default: ""
 
 permissions:
   contents: read
-  # For the GitHub OIDC token exchange in configure-aws-credentials.
+  # For the KMS OIDC token exchange.
   id-token: write
 
 jobs:
@@ -78,38 +64,27 @@ jobs:
     env:
       AWS_REGION: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       AWS_DEFAULT_REGION: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
-      # Daemon-less so every server/Tests JVM the orchestrator forks inherits
-      # the live step environment (the short-lived OIDC AWS_* credentials).
+      # No daemon, so each server/Tests JVM the orchestrator forks inherits the
+      # short-lived OIDC credentials from this step's environment.
       GRADLE_OPTS: -Dorg.gradle.daemon=false
-      # OIDC role to assume for the required KMS + keystore scenarios. Defaults
-      # to the dedicated DB-ESDK TestServer CI role, whose trust policy trusts
-      # aws-crypto-tools-commons and aws-database-encryption-sdk-dynamodb (so the
-      # product repo can trigger this reusable workflow), and whose permissions
-      # cover the DB-ESDK keyring set: the item key, the asymmetric RSA key, the
-      # beacon/hierarchical keystore KMS key + branch-key DDB table, and the
-      # dedicated symmetric + multi-region keys used by the keyring-interop tests.
-      # Override via the repo variable to target a different account/role.
+      # IAM role the tests assume for their AWS calls; its trust policy trusts both
+      # this repo and aws-database-encryption-sdk-dynamodb. Override with the repo variable.
       KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/dbesdk-test-server-ci-kms-role' }}
 
     steps:
-      - name: Checkout aws-crypto-tools-commons (harness + Configuration_Set)
-        # Explicit repository so a cross-repo `workflow_call` (e.g. from the
-        # DB-ESDK product repo) still checks out the COMMONS working tree that
-        # holds the tests/model/orchestrator/server-config — not the caller's
-        # repo, which `actions/checkout` would default to. `commons_ref` is empty
-        # on a native commons run (=> the triggering commit) and set by a
-        # cross-repo caller to the commons ref carrying the test cases.
+      - name: Checkout aws-crypto-tools-commons (tests, model, orchestrator)
+        # Name the repository explicitly: when aws-database-encryption-sdk-dynamodb
+        # calls this workflow, checkout would default to that repo, but the tests,
+        # model, and orchestrator live here in commons. commons_ref is empty on a
+        # direct commons run (falls back to the triggering commit) or set by the caller.
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ inputs.commons_ref || github.sha }}
 
-      - name: Checkout the DB-ESDK product repo at the requested server ref
-        # Only when a caller pins `dbe_ref` (a DB-ESDK-product-triggered run):
-        # check out that commit's SERVERS and feed them to `make orchestrate` as a
-        # working-tree overlay (see the orchestrate step), so the run tests exactly
-        # that commit rather than cloning server-config.json's serverLocation.ref.
-        # Omitted on a native commons run, which resolves the servers as before.
+      - name: Checkout aws-database-encryption-sdk-dynamodb at the requested server ref
+        # Only when dbe_ref is set: check out that commit's servers so make
+        # orchestrate (below) tests them directly instead of cloning them.
         if: ${{ inputs.dbe_ref != '' }}
         uses: actions/checkout@v4
         with:
@@ -117,33 +92,29 @@ jobs:
           ref: ${{ inputs.dbe_ref }}
           path: .dbe-product-repo
 
-      - name: Set up JDK 21 (Temurin) for the commons harness + Java server
-        # smithy-java (client/tests/orchestrator) needs JDK 21+; the Java
-        # Language_Server build consumes the published DB-ESDK jar. The commons
-        # Makefile honors a caller-set JAVA_HOME (`JAVA_HOME ?=`).
+      - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up the Rust toolchain (for the rust-v1 Language_Server)
+      - name: Set up the Rust toolchain
         run: |
           set -euo pipefail
           rustup toolchain install stable --profile minimal
           rustup default stable
           cargo --version
 
-      - name: Set up Go (for the Rust server's aws-lc-sys native build)
+      - name: Set up Go
+        # Only used to build the rust server's aws-lc-sys native code.
         uses: actions/setup-go@v5
         with:
           go-version: "stable"
-          # This is not a Go project (Go is only the native toolchain for the
-          # rust server's aws-lc-sys build), so there is no go.sum to key a
-          # module cache on — disable setup-go's cache to avoid a spurious
-          # "Dependencies file is not found" restore warning.
+          # This isn't a Go project (Go only builds aws-lc-sys above), so there's no
+          # go.sum; skip setup-go's cache to avoid its "file not found" warning.
           cache: false
 
-      - name: Set up .NET 8 (for the net-v4 Language_Server)
+      - name: Set up .NET 8
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
@@ -160,6 +131,8 @@ jobs:
             ~/.nuget/packages
           key: >-
             ${{ runner.os }}-dbesdk-test-server-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'dbesdk/test-server/*/build.gradle.kts',
               'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
@@ -167,8 +140,7 @@ jobs:
             ${{ runner.os }}-dbesdk-test-server-
 
       - name: Install Smithy CLI
-        # `make validate` runs `smithy validate` on the model. Deterministic
-        # download of the official release, version-pinned; no third-party action.
+        # Needed by `make validate`; pinned official release.
         run: |
           set -euo pipefail
           SMITHY_VERSION="1.58.0"
@@ -180,19 +152,18 @@ jobs:
           smithy --version
 
       - name: Rewrite the DBE repo SSH URL to public HTTPS
-        # The Server_Locations clone aws-database-encryption-sdk-dynamodb via
-        # its SSH URL. That repo is PUBLIC, so no PAT is needed — rewrite SSH to
-        # plain HTTPS for the job so `git clone git@github.com:aws/...` works
-        # without SSH keys on the runner. CI-only; local dev keeps using SSH.
+        # When servers are cloned (dbe_ref unset), config/server-config.json gives
+        # their source as SSH URLs. CI runners have no SSH keys, so rewrite SSH to
+        # public HTTPS for the job. Not needed locally, where SSH keys are present.
         run: |
           set -euo pipefail
           git config --global \
             url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Configure AWS credentials via OIDC
-        # continue-on-error so the next step fails with an actionable message
-        # (rather than a generic action error) when no role is configured / a
-        # fork PR has no id-token.
+        # Don't fail here; the next step reports a clear reason. The common case is a
+        # pull request from a fork, which GitHub denies an OIDC token, so no
+        # credentials can be obtained.
         id: aws-credentials
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
@@ -201,16 +172,15 @@ jobs:
           aws-region: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
 
       - name: Verify AWS credentials are active (gates the orchestrated run)
-        # DB-ESDK scenarios call real KMS + a branch-key DDB keystore, so the
-        # run cannot pass without usable credentials. Fail HERE, before
-        # orchestrate, with an actionable message.
+        # The tests make real AWS calls, so stop here with a clear message if the
+        # credentials didn't resolve, rather than failing deep inside orchestrate.
         run: |
           if ! aws sts get-caller-identity; then
-            echo "::error::No usable AWS credentials for the required DB-ESDK KMS scenarios." >&2
+            echo "::error::No usable AWS credentials ; the DB-ESDK tests make real AWS calls." >&2
             echo "This run needs GitHub OIDC access to the role ${KMS_CI_ROLE_ARN}, whose trust" >&2
             echo "policy must trust aws-crypto-tools-commons and whose permissions must reach the" >&2
             echo "DB-ESDK KMS keys + branch-key DynamoDB keystore. A fork PR with no id-token" >&2
-            echo "cannot exercise the required KMS scenarios and therefore cannot pass." >&2
+            echo "cannot obtain credentials, and so cannot pass." >&2
             exit 1
           fi
 
@@ -218,20 +188,13 @@ jobs:
         working-directory: dbesdk/test-server
         run: make validate
 
-      - name: Orchestrated Commons_Run (make orchestrate)
-        # One invocation resolves every target from this working tree's
-        # Configuration_Set, clones + builds each Language_Server from the
-        # DB-ESDK product repo at its Server_Location, launches them, runs the
-        # Tests over the cross-language matrix, and exits non-zero on any failed
-        # result (which fails this step and short-circuits the job).
+      - name: Run the test suite (make orchestrate)
         working-directory: dbesdk/test-server
         env:
-          # Nine concurrent server builds on a 2-core runner need a wide
-          # readiness window (mirrors the ESDK workflow's 900s).
+          # Wide readiness window for the concurrent server builds on a 2-core runner.
           DBESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        # When a caller pinned dbe_ref, point the orchestrator's working-tree
-        # overlay at the product-repo checkout above so it tests THAT commit's
-        # servers; otherwise resolve them from server-config.json as before.
+        # With dbe_ref set, point orchestrate at the checked-out servers above so it
+        # tests that commit; otherwise it clones them per config/server-config.json.
         run: |
           if [ -n "${{ inputs.dbe_ref }}" ]; then
             make orchestrate DBESDK_DBE_REPO="${{ github.workspace }}/.dbe-product-repo"
@@ -240,14 +203,9 @@ jobs:
           fi
 
       - name: Publish test results to the run summary
-        # Renders the cross-language coverage matrix, failed-tests table,
-        # skipped-by-reason table (with languages), and known-bugs table on the
-        # Actions run's Summary page (visible on the website, no artifact
-        # download) directly from the JUnit XML the Tests suite writes.
-        # python3 is preinstalled on ubuntu-latest.
         if: always()
         run: |
-          python3 dbesdk/test-server/tools/ci_summary.py \
+          python3 test-server-common/tools/ci_summary.py \
             dbesdk/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test reports + Resolution_Record
@@ -256,8 +214,8 @@ jobs:
         with:
           name: dbesdk-test-server-reports
           path: |
-            dbesdk/test-server/orchestrator/build/resolution-record.json
-            dbesdk/test-server/orchestrator/build/launch/*/*.log
+            test-server-common/orchestrator/build/resolution-record.json
+            test-server-common/orchestrator/build/launch/*/*.log
             dbesdk/test-server/tests/build/reports/tests
             dbesdk/test-server/tests/build/test-results
           if-no-files-found: ignore
@@ -274,6 +232,8 @@ jobs:
             ~/.nuget/packages
           key: >-
             ${{ runner.os }}-dbesdk-test-server-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'dbesdk/test-server/*/build.gradle.kts',
               'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
