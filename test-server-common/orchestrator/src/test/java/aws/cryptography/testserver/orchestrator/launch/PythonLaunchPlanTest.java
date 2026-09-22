@@ -1,14 +1,14 @@
-package aws.cryptography.esdk.testserver.orchestrator.launch;
+package aws.cryptography.testserver.orchestrator.launch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
-import aws.cryptography.esdk.testserver.orchestrator.source.ComponentId;
-import aws.cryptography.esdk.testserver.orchestrator.source.MaterializedSources;
-import aws.cryptography.esdk.testserver.orchestrator.source.ResolutionReason;
-import aws.cryptography.esdk.testserver.orchestrator.source.SourcePlan;
+import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
+import aws.cryptography.testserver.orchestrator.source.ComponentId;
+import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
+import aws.cryptography.testserver.orchestrator.source.ResolutionReason;
+import aws.cryptography.testserver.orchestrator.source.SourcePlan;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;

@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -50,7 +54,7 @@ class BitFlipCorpusTests {
     /** Number of distinct bit positions sampled per message (not the exhaustive corpus). */
     private static final int SAMPLES = 12;
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -58,7 +62,7 @@ class BitFlipCorpusTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -73,7 +77,7 @@ class BitFlipCorpusTests {
      */
     @ParameterizedTest(name = "singleBitFlipRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsAnySingleBitFlip(EndpointPair pair) {
+    void decryptRejectsAnySingleBitFlip(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(), SUITE,
             FRAME_LENGTH);

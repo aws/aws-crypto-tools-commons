@@ -1,5 +1,8 @@
 package aws.cryptography.esdk.testserver.tests.meta;
 
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -10,9 +13,7 @@ import aws.cryptography.esdk.testserver.client.model.DecryptInput;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.EncryptInput;
 import aws.cryptography.esdk.testserver.client.model.GenericServerError;
-import aws.cryptography.esdk.testserver.tests.EndpointPair;
 import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs;
-import aws.cryptography.esdk.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.esdk.testserver.tests.TestServerClients;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +52,7 @@ class ModeledErrorTransmissionTest {
     @Test
     @DisplayName("Decrypt with incompatible key material surfaces as ESDKClientError over the wire")
     void wrongKeyMaterialSurfacesAsEsdkClientError() {
-        EndpointPair pair = LanguageServerRegistry.shared().selfPair();
+        TargetPair pair = LanguageServerRegistry.shared().selfPair();
         ESDKTestServerClient encryptClient = TestServerClients.forEndpoint(pair.encryptEndpoint());
         ESDKTestServerClient decryptClient = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
@@ -89,7 +90,7 @@ class ModeledErrorTransmissionTest {
     @Test
     @DisplayName("Decrypt with an unknown ClientId surfaces as GenericServerError over the wire")
     void unknownClientIdSurfacesAsGenericServerError() {
-        EndpointPair pair = LanguageServerRegistry.shared().selfPair();
+        TargetPair pair = LanguageServerRegistry.shared().selfPair();
         ESDKTestServerClient client = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
         // No CreateClient call: this ClientId is not present in the registry, so
@@ -109,7 +110,7 @@ class ModeledErrorTransmissionTest {
     @Test
     @DisplayName("Decrypt with an empty ClientId surfaces as GenericServerError over the wire")
     void emptyClientIdSurfacesAsGenericServerError() {
-        EndpointPair pair = LanguageServerRegistry.shared().selfPair();
+        TargetPair pair = LanguageServerRegistry.shared().selfPair();
         ESDKTestServerClient client = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
         GenericServerError error = assertThrows(GenericServerError.class, () ->

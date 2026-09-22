@@ -1,5 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+
 import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,8 +22,8 @@ import java.util.Set;
  * (round trips, vectors) stays on {@link LanguageServerRegistry#pairs()}.
  *
  * <p>The reference language comes from
- * <b>{@code esdk.testserver.referenceImplementation}</b> (system property) or
- * <b>{@code ESDK_TESTSERVER_REFERENCE_IMPLEMENTATION}</b> (environment
+ * <b>{@code testserver.referenceImplementation}</b> (system property) or
+ * <b>{@code TESTSERVER_REFERENCE_IMPLEMENTATION}</b> (environment
  * variable), defaulting to {@code java}; the orchestrator passes its validated
  * {@code referenceImplementation} argument through the property.
  *
@@ -35,8 +40,8 @@ import java.util.Set;
 public final class ReferenceImplementation {
 
     /** Runtime-config key: the reference implementation's language. */
-    public static final String REFERENCE_PROPERTY = "esdk.testserver.referenceImplementation";
-    public static final String REFERENCE_ENV = "ESDK_TESTSERVER_REFERENCE_IMPLEMENTATION";
+    public static final String REFERENCE_PROPERTY = "testserver.referenceImplementation";
+    public static final String REFERENCE_ENV = "TESTSERVER_REFERENCE_IMPLEMENTATION";
 
     /** The default reference language, mirroring the orchestrator's default. */
     static final String DEFAULT_REFERENCE_LANGUAGE = "java";
@@ -102,23 +107,25 @@ public final class ReferenceImplementation {
             }
         }
         for (LanguageServerTarget candidate : candidates) {
-            if (isCapable(declarations, candidate.language(), features, paddings)) {
+            if (isCapable(declarations, candidate, features, paddings)) {
                 return candidate;
             }
         }
         return candidates.get(0);
     }
 
-    /** Whether {@code language} declares every required Feature and padding. */
-    private static boolean isCapable(FeatureDeclarations declarations, String language,
+    /** Whether {@code target} declares every required Feature and padding. */
+    private static boolean isCapable(FeatureDeclarations declarations, LanguageServerTarget target,
             Set<String> features, Set<PaddingScheme> paddings) {
         for (String feature : features) {
-            if (!declarations.isSupported(language, feature)) {
+            if (!declarations.isSupported(
+                    target.language(), target.majorVersion(), target.repo(), feature)) {
                 return false;
             }
         }
         for (PaddingScheme padding : paddings) {
-            if (!declarations.supportsRawRsaPadding(language, padding)) {
+            if (!declarations.supportsRawRsaPadding(
+                    target.language(), target.majorVersion(), target.repo(), padding.getValue())) {
                 return false;
             }
         }

@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -42,7 +46,7 @@ class RawAesEdkTamperTests {
                             int ciphertextLen) {
     }
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -69,7 +73,7 @@ class RawAesEdkTamperTests {
         return new FirstEdk(providerInfoOffset, providerInfoLen, ciphertextOffset, ciphertextLen);
     }
 
-    private static byte[] encrypt(EndpointPair pair) {
+    private static byte[] encrypt(TargetPair pair) {
         return EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAes(), PLAINTEXT);
     }
 
@@ -79,7 +83,7 @@ class RawAesEdkTamperTests {
      */
     @ParameterizedTest(name = "garbledEdkCiphertextRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsGarbledEdkCiphertext(EndpointPair pair) {
+    void decryptRejectsGarbledEdkCiphertext(TargetPair pair) {
         FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = encrypt(pair);
         assertArrayEquals(PLAINTEXT,
@@ -103,7 +107,7 @@ class RawAesEdkTamperTests {
      */
     @ParameterizedTest(name = "malformedEdkIvLengthRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsMalformedEdkIvLength(EndpointPair pair) {
+    void decryptRejectsMalformedEdkIvLength(TargetPair pair) {
         FeatureGate.require(Set.of("raw-aes"), pair);
         byte[] ciphertext = encrypt(pair);
         FirstEdk edk = firstEdk(EsdkMessage.parse(ciphertext));

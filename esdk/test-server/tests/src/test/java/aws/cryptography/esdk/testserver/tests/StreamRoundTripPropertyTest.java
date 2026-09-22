@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import java.util.Set;
@@ -41,7 +45,7 @@ import net.jqwik.api.lifecycle.BeforeContainer;
  */
 class StreamRoundTripPropertyTest {
 
-    private static EndpointPair pair;
+    private static TargetPair pair;
 
     @BeforeContainer
     static void bootEndpoints() {

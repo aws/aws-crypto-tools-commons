@@ -1,8 +1,8 @@
-package aws.cryptography.esdk.testserver.orchestrator.launch;
+package aws.cryptography.testserver.orchestrator.launch;
 
-import aws.cryptography.esdk.testserver.orchestrator.config.ConfigurationEntry;
-import aws.cryptography.esdk.testserver.orchestrator.source.ComponentId;
-import aws.cryptography.esdk.testserver.orchestrator.source.MaterializedSources;
+import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
+import aws.cryptography.testserver.orchestrator.source.ComponentId;
+import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -10,9 +10,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * The Python {@code Language_Server} launch plan (task 6.3, Requirements 1.3,
- * 2.1). Builds and launches the Python server entirely from the run's
- * <em>resolved</em> sources:
+ * The Python {@code Language_Server} launch plan. Builds and launches the
+ * Python server entirely from the run's <em>resolved</em> sources:
  *
  * <ol>
  *   <li><b>Resolve.</b> The Python library directory (the materialized
@@ -20,7 +19,7 @@ import java.util.List;
  *       directory (the resolved {@code test-server} in
  *       {@code aws-encryption-sdk-python}) come from the
  *       {@link MaterializedSources}; a missing component is a {@code RESOLVE}
- *       launch failure (Requirement 2.5).</li>
+ *       launch failure.</li>
  *   <li><b>Environment.</b> Create a venv in this
  *       plan's work directory (skipped when its python already exists),
  *       upgrade pip, then a single editable install of the resolved library,
@@ -36,7 +35,7 @@ import java.util.List;
  *
  * <p>Command construction is pure ({@code static} builders) so the exact
  * subprocess invocations are unit-testable without running a real venv/pip;
- * the end-to-end launch is exercised by the orchestrated run (checkpoint 10).
+ * the end-to-end launch is exercised by the orchestrated run.
  */
 public final class PythonLaunchPlan implements Launcher {
 
@@ -48,7 +47,7 @@ public final class PythonLaunchPlan implements Launcher {
 
     /**
      * The wire-protocol codec, mirroring the server package's declared
-     * {@code cbor2>=5.6} dependency (installed explicitly per the design's
+     * {@code cbor2>=5.6} dependency (installed explicitly per the
      * launch-plan contract).
      */
     static final String CBOR2_REQUIREMENT = "cbor2>=5.6";
@@ -103,7 +102,7 @@ public final class PythonLaunchPlan implements Launcher {
             throws ServerLaunchException {
         String language = entry.language();
 
-        // 1. Resolve the materialized library + server directories (Req 2.5).
+        // 1. Resolve the materialized library + server directories.
         Path libraryDir = sources.directoryOf(ComponentId.library(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
         Path serverDir = sources.directoryOf(ComponentId.server(language))
@@ -195,7 +194,7 @@ public final class PythonLaunchPlan implements Launcher {
     /**
      * Run one synchronous environment-preparation step to completion. A step
      * that cannot start, is interrupted, or exits non-zero is a {@code BUILD}
-     * launch failure naming the step and carrying the tool output (Req 2.5).
+     * launch failure naming the step and carrying the tool output.
      */
     private void runSetupStep(String language, String step, List<String> command)
             throws ServerLaunchException {

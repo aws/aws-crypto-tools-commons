@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -105,6 +109,7 @@ class MutationFuzzTests {
 
     private static boolean supports(
             FeatureDeclarations declarations, LanguageServerTarget target, ConformanceKeyring source) {
-        return source.features().stream().allMatch(f -> declarations.isSupported(target.language(), f));
+        return source.features().stream().allMatch(f -> declarations.isSupported(
+            target.language(), target.majorVersion(), target.repo(), f));
     }
 }

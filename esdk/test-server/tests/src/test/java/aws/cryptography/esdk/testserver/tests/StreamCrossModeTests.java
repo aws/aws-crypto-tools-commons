@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
@@ -25,14 +29,14 @@ class StreamCrossModeTests {
         "esdk-test-server cross-mode streaming plaintext, spanning more than one frame or so"
             .getBytes(StandardCharsets.UTF_8);
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
     /** STREAM-002: one-shot encrypt, streamed decrypt round-trips. */
     @ParameterizedTest(name = "oneShotEncryptStreamDecrypt {0}")
     @MethodSource("pairs")
-    void oneShotEncryptDecryptsUnderStreaming(EndpointPair pair) {
+    void oneShotEncryptDecryptsUnderStreaming(TargetPair pair) {
         FeatureGate.require(Set.of("streaming"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT);
@@ -44,7 +48,7 @@ class StreamCrossModeTests {
     /** STREAM-002: streamed encrypt, one-shot decrypt round-trips. */
     @ParameterizedTest(name = "streamEncryptOneShotDecrypt {0}")
     @MethodSource("pairs")
-    void streamedEncryptDecryptsOneShot(EndpointPair pair) {
+    void streamedEncryptDecryptsOneShot(TargetPair pair) {
         FeatureGate.require(Set.of("streaming"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         byte[] ciphertext = EsdkOps.encryptStream(pair.encryptEndpoint(), config, PLAINTEXT);
@@ -66,7 +70,7 @@ class StreamCrossModeTests {
      */
     @ParameterizedTest(name = "multiFrameStreamAssemblyExact {0}")
     @MethodSource("pairs")
-    void multiFrameStreamingReproducesExactPlaintext(EndpointPair pair) {
+    void multiFrameStreamingReproducesExactPlaintext(TargetPair pair) {
         FeatureGate.require(Set.of("streaming", "raw-aes"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         long frameLength = 1024;

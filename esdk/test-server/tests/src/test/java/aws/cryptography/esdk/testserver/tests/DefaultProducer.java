@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
@@ -47,8 +51,8 @@ final class DefaultProducer {
         String preferred = language();
         LanguageServerTarget fallback = null;
         for (LanguageServerTarget target : targets) {
-            boolean supported =
-                features.stream().allMatch(f -> declarations.isSupported(target.language(), f));
+            boolean supported = features.stream().allMatch(f -> declarations.isSupported(
+                target.language(), target.majorVersion(), target.repo(), f));
             if (!supported) {
                 continue;
             }

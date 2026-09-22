@@ -1,5 +1,11 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,8 +38,8 @@ class PlaintextLengthBoundTests {
     }
 
     /** A single-target pair so the streaming Feature gate can be evaluated. */
-    private static EndpointPair samePair(LanguageServerTarget target) {
-        return new EndpointPair(target, target);
+    private static TargetPair samePair(LanguageServerTarget target) {
+        return new TargetPair(target, target);
     }
 
     /** ENC-007: streamed encrypt with a bound greater than or equal to the plaintext succeeds. */
@@ -56,7 +62,7 @@ class PlaintextLengthBoundTests {
         FeatureGate.require(Set.of("streaming"), samePair(target));
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         long bound = PLAINTEXT.length - 1;
-        KnownBugGate.gate("encrypt-stream-ignores-plaintext-length-bound", target,
+        KnownBugGate.gateDeclared("encrypt-stream-ignores-plaintext-length-bound", target,
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encryptStream(target.endpoint(), config, PLAINTEXT, bound),
                 "streamed encrypt of a plaintext longer than the plaintext-length bound must be rejected "
