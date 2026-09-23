@@ -50,7 +50,7 @@ class SourceMaterializerTest {
                 ResolutionReason.CONFIGURATION_ENTRY),
             new ResolvedComponentPlan(ComponentId.server("python"),
                 new SourcePlan.WorkingTree(Path.of("/work/commons"),
-                    "dbesdk/test-server/orchestrator"),
+                    "test-server-common/orchestrator"),
                 ResolutionReason.CONFIGURATION_ENTRY));
 
         List<SourceMaterializer.CloneKey> keys = SourceMaterializer.distinctCloneKeys(plans);
@@ -190,7 +190,7 @@ class SourceMaterializerTest {
         Path root = enclosingRepoRoot();
         var plan = new ResolvedComponentPlan(
             ComponentId.server("python"),
-            new SourcePlan.WorkingTree(root, "dbesdk/test-server/orchestrator"),
+            new SourcePlan.WorkingTree(root, "test-server-common/orchestrator"),
             ResolutionReason.CONFIGURATION_ENTRY);
 
         MaterializedSources sources =
@@ -199,7 +199,7 @@ class SourceMaterializerTest {
         assertEquals(1, sources.outcomes().size());
         var success = assertInstanceOf(MaterializedSources.Success.class,
             sources.outcomes().get(0));
-        assertEquals(root.resolve("dbesdk/test-server/orchestrator"), success.directory());
+        assertEquals(root.resolve("test-server-common/orchestrator"), success.directory());
         assertTrue(success.commit().matches("[0-9a-f]{40}"),
             "commit is the working tree's rev-parse HEAD: " + success.commit());
         assertNotNull(success.dirty(), "working-tree components carry the dirty flag");
@@ -252,7 +252,7 @@ class SourceMaterializerTest {
                 new SourcePlan.WorkingTree(root, "."),
                 ResolutionReason.WORKING_TREE),
             new ResolvedComponentPlan(ComponentId.server("python"),
-                new SourcePlan.WorkingTree(root, "dbesdk/test-server/orchestrator"),
+                new SourcePlan.WorkingTree(root, "test-server-common/orchestrator"),
                 ResolutionReason.WORKING_TREE));
 
         MaterializedSources sources =
