@@ -13,6 +13,7 @@ import aws.cryptography.testserver.orchestrator.launch.JavaLaunchPlan;
 import aws.cryptography.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.testserver.orchestrator.launch.LauncherFactory;
 import aws.cryptography.testserver.orchestrator.launch.NodeLaunchPlan;
+import aws.cryptography.testserver.orchestrator.launch.PythonLaunchPlan;
 import aws.cryptography.testserver.orchestrator.launch.RustLaunchPlan;
 import aws.cryptography.testserver.orchestrator.report.Result;
 import aws.cryptography.testserver.orchestrator.run.DuplicateTestsDetector;
@@ -177,6 +178,8 @@ public final class TestServerOrchestratorMain {
         LauncherFactory launchers = LauncherFactory.fromMap(Map.of(
             "java", (Launcher) new JavaLaunchPlan(
                 orchestratorBuildDir.resolve("launch/java"), modelDir),
+            "python", new PythonLaunchPlan(
+                orchestratorBuildDir.resolve("launch/python")),
             "rust", new RustLaunchPlan(
                 orchestratorBuildDir.resolve("launch/rust"), product),
             "rust-cpp", new CppShimLaunchPlan(

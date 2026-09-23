@@ -1,0 +1,9 @@
+# Makefile scratch dir (log / temp files created by make targets)
+/.make-tmp/
+
+# jqwik's local failure-sample database (developer-local, not shared)
+**/.jqwik-database
+
+# Local-only reference material (e.g. the S3EC Python workflows kept for
+# hand-implemented non-Java language servers). Never committed; do not delete.
+/temp-s3ec-py-example/
