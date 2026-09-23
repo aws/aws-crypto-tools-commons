@@ -60,6 +60,10 @@
     "raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error": {
       "description": "CreateClient rejects a Raw-AES wrapping key whose length does not match the wrapping suite as an ESDKClientError instead of the framework GenericServerError. The native Rust server and the C++ shim currently build the Raw-AES keyring through the Dafny MPL, which surfaces this config-validation failure as an ESDK error rather than a framework error.",
       "ticketId": null
+    },
+    "decrypt-stream-multi-frame-signed-releases-unverified-plaintext": {
+      "description": "decrypt_stream of a multi-frame message encrypted with a signing algorithm suite releases plaintext before signature verification, violating the streaming decrypt contract that plaintext must not be released until the signature is verified",
+      "ticketId": null
     }
   }
 }

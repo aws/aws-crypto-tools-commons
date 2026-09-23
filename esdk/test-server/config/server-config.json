@@ -41,36 +41,36 @@
       "language": "rust",
       "majorVersion": 1,
       "port": 8093,
-      "configPath": "esdk-test-server",
+      "configPath": "esdk/test-server",
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "kessplas/bug-config",
+        "branch": "esdk/move-test-servers",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "kessplas/bug-config",
-        "path": "esdk-test-server"
+        "ref": "esdk/move-test-servers",
+        "path": "esdk/test-server"
       }
     },
     {
       "language": "rust-cpp",
       "majorVersion": 1,
       "port": 8094,
-      "configPath": "esdk-cpp-test-server",
+      "configPath": "esdk/shims/aws-esdk-cpp/test-server",
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "kessplas/bug-config-cpp",
+        "branch": "esdk/move-test-servers",
         "path": "esdk/shims/aws-esdk-cpp"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "kessplas/bug-config-cpp",
-        "path": "esdk-cpp-test-server"
+        "ref": "esdk/move-test-servers",
+        "path": "esdk/shims/aws-esdk-cpp/test-server"
       }
     },
     {

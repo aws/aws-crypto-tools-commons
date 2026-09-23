@@ -11,18 +11,19 @@ import java.util.List;
 
 /**
  * The C++-shim {@code Language_Server} launch plan: builds the rpcv2Cbor server
- * that ships in aws-crypto-tools-rust ({@code esdk-cpp-test-server/}) and runs
- * every operation through the {@code aws-esdk-cpp} C++ facade, from the run's
- * <em>resolved</em> sources.
+ * that ships in aws-crypto-tools-rust ({@code esdk/shims/aws-esdk-cpp/test-server/})
+ * and runs every operation through the {@code aws-esdk-cpp} C++ facade, from the
+ * run's <em>resolved</em> sources.
  *
  * <ol>
- *   <li><b>Resolve.</b> The server directory (the {@code esdk-cpp-test-server}
- *       path within the materialized aws-crypto-tools-rust clone) comes from the
- *       {@link MaterializedSources}; the {@code esdk/shims/aws-esdk-cpp} shim and
- *       the sibling {@code esdk} / MPL crates it depends on live in the same
- *       clone. A missing component is a {@code RESOLVE} launch failure.</li>
- *   <li><b>Build the shim.</b> {@code cargo build --release} in
- *       {@code esdk/shims/aws-esdk-cpp}; the server's cdylib link requires it.
+ *   <li><b>Resolve.</b> The server directory (the {@code test-server/} crate
+ *       inside the {@code aws-esdk-cpp} shim) comes from the
+ *       {@link MaterializedSources}; the shim is the server's parent directory
+ *       (the same contract the server's build script uses), and the sibling
+ *       {@code esdk} / MPL crates it depends on live in the same clone. A
+ *       missing component is a {@code RESOLVE} launch failure.</li>
+ *   <li><b>Build the shim.</b> {@code cargo build --release} in the shim
+ *       directory; the server's cdylib link requires it.
  *       This step is built into the shim's own {@code target/} (its
  *       {@code CARGO_TARGET_DIR} is cleared) so the server's build script finds
  *       the cdylib where it looks for it.</li>
@@ -44,9 +45,6 @@ public final class CppShimLaunchPlan implements Launcher {
 
     /** The release binary name cargo produces. */
     static final String SERVER_BINARY_NAME = "esdk-cpp-test-server";
-
-    /** The aws-esdk-cpp shim directory, relative to the clone root. */
-    static final String SHIM_RELATIVE_PATH = "esdk/shims/aws-esdk-cpp";
 
     /** The default cargo target directory (relative to the server crate). */
     static final String DEFAULT_TARGET_DIR = "target";
@@ -94,16 +92,16 @@ public final class CppShimLaunchPlan implements Launcher {
             throws ServerLaunchException {
         String language = entry.language();
 
-        // 1. Resolve the materialized server directory. The shim and the library
-        //    crate are within the same clone, so only the server component is
-        //    resolved here.
+        // 1. Resolve the materialized server directory. The server crate ships at
+        //    test-server/ inside the aws-esdk-cpp shim (its build script resolves
+        //    the shim as its parent), so the shim directory is the server's parent.
         Path serverDir = sources.directoryOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
-        Path shimDir = serverDir.getParent().resolve(SHIM_RELATIVE_PATH);
-        if (!Files.isDirectory(shimDir)) {
+        Path shimDir = serverDir.getParent();
+        if (shimDir == null || !Files.isRegularFile(shimDir.resolve("Cargo.toml"))) {
             throw new ServerLaunchException(language, ServerLaunchException.Category.RESOLVE,
                 "the " + language + " Language_Server launch requires the aws-esdk-cpp shim at "
-                    + shimDir + ", but that directory is not present in the resolved sources");
+                    + shimDir + ", but no crate manifest is present there");
         }
 
         try {
