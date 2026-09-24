@@ -71,11 +71,20 @@ PRIMITIVES_RUST_REPO ?= $(abspath $(MAKEFILE_DIR)/../../../aws-crypto-tools-rust
 # Server_Location.
 RUST_OVERLAY := $(if $(wildcard $(PRIMITIVES_RUST_REPO)),workingTreeOverlay.aws-crypto-tools-rust=$(PRIMITIVES_RUST_REPO))
 
-# Combined orchestrator program args. referenceImplementation=rust: the Rust
-# server is the only configured language, so it plays the immaterial side of
-# single-sided Tests (the orchestrator's default of java would abort as an
-# unconfigured language). TESTS scopes the JUnit run when set.
-ORCH_ARGS := $(strip referenceImplementation=rust $(RUST_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)))
+# ----------------------------------------------------------------------------
+# Local aws-cryptographic-material-providers-library checkout — the source of
+# the Dafny-runtime Language_Servers (test-server/<lang>-v<major>-server/).
+# ----------------------------------------------------------------------------
+# Applied as a workingTreeOverlay only when PRIMITIVES_MPL_REPO exists, like the
+# Rust overlay above. Default: a sibling checkout,
+# ../../../aws-cryptographic-material-providers-library.
+PRIMITIVES_MPL_REPO ?= $(abspath $(MAKEFILE_DIR)/../../../aws-cryptographic-material-providers-library)
+
+MPL_OVERLAY := $(if $(wildcard $(PRIMITIVES_MPL_REPO)),workingTreeOverlay.aws-cryptographic-material-providers-library=$(PRIMITIVES_MPL_REPO))
+
+# Combined orchestrator program args (the orchestrator's default reference
+# implementation, java, is configured). TESTS scopes the JUnit run when set.
+ORCH_ARGS := $(strip $(RUST_OVERLAY) $(MPL_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)))
 
 # Makefile-owned scratch directory for temp files. Kept separate from the
 # per-module Gradle `build/` dirs to avoid confusion, and ignored via the
