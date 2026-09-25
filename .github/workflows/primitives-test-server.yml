@@ -255,10 +255,15 @@ jobs:
             [ "$attempt" -lt 3 ] || exit 1
             sleep 30
           done
-          # Run the probe once so Gradle's first-run download output can't leak
-          # into the option later, and fail here if it still can't compile.
-          option="$(cd "$mpl_dir/smithy-dafny/codegen/smithy-dafny-codegen-cli" && \
-            ./../gradlew run -q --args="if-dafny-at-least --dafny-version 4.8 --text --enforce-determinism")"
+          # The first probe run downloads codegen's Gradle wrapper and prints the
+          # progress to stdout, which would leak into the option; run it once to
+          # warm the wrapper, then fail here unless a clean run yields the option.
+          probe() {
+            (cd "$mpl_dir/smithy-dafny/codegen/smithy-dafny-codegen-cli" && \
+              ./../gradlew run -q --args="if-dafny-at-least --dafny-version 4.8 --text --enforce-determinism")
+          }
+          probe
+          option="$(probe)"
           echo "ENFORCE_DETERMINISM_OPTION probe: '$option'"
           [ "$option" = "--enforce-determinism" ]
 
