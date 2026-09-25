@@ -42,7 +42,7 @@
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
         "branch": "lucmcdon/primitives-test-server",
-        "path": "AwsCryptographyPrimitives/runtimes/java"
+        "path": "test-server/java-v1-server"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
@@ -60,7 +60,7 @@
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
         "branch": "lucmcdon/primitives-test-server",
-        "path": "AwsCryptographyPrimitives/runtimes/net"
+        "path": "test-server/net-v2-server"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
@@ -78,7 +78,7 @@
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
         "branch": "lucmcdon/primitives-test-server",
-        "path": "AwsCryptographyPrimitives/runtimes/python"
+        "path": "test-server/python-v1-server"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
