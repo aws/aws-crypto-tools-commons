@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,11 +57,11 @@ class SyntheticHeaderTests {
         return ec;
     }
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -66,7 +70,7 @@ class SyntheticHeaderTests {
         return keyring.config(POLICY);
     }
 
-    private static EsdkMessage encryptAndParse(EndpointPair pair, ESDKClientConfig config,
+    private static EsdkMessage encryptAndParse(TargetPair pair, ESDKClientConfig config,
                                                Map<String, String> ec) {
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -74,7 +78,7 @@ class SyntheticHeaderTests {
         return message;
     }
 
-    private static void assertRejected(EndpointPair pair, ESDKClientConfig config, byte[] tampered,
+    private static void assertRejected(TargetPair pair, ESDKClientConfig config, byte[] tampered,
                                        String what) {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
@@ -84,7 +88,7 @@ class SyntheticHeaderTests {
     /** HDR-021: an encryption-context pair count inflated far beyond the bytes present is rejected. */
     @ParameterizedTest(name = "inflatedPairCountRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsInflatedPairCount(EndpointPair pair) {
+    void decryptRejectsInflatedPairCount(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         EsdkMessage message = encryptAndParse(pair, config, twoPairContext());
         assertRejected(pair, config, EsdkHeaderEditor.withPairCount(message, 0xFFFF),
@@ -94,7 +98,7 @@ class SyntheticHeaderTests {
     /** HDR-021: a key-length field inflated past the AAD region is rejected. */
     @ParameterizedTest(name = "inflatedKeyLengthRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsInflatedKeyLength(EndpointPair pair) {
+    void decryptRejectsInflatedKeyLength(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         EsdkMessage message = encryptAndParse(pair, config, twoPairContext());
         assertRejected(pair, config, EsdkHeaderEditor.withFirstKeyLength(message, 0xFFFF),
@@ -104,7 +108,7 @@ class SyntheticHeaderTests {
     /** HDR-021: a zero-length encryption-context key is rejected. */
     @ParameterizedTest(name = "zeroKeyLengthRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsZeroKeyLength(EndpointPair pair) {
+    void decryptRejectsZeroKeyLength(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         EsdkMessage message = encryptAndParse(pair, config, twoPairContext());
         assertRejected(pair, config, EsdkHeaderEditor.withFirstKeyLength(message, 0),
@@ -114,7 +118,7 @@ class SyntheticHeaderTests {
     /** HDR-022: a header whose encryption context contains duplicate keys is rejected. */
     @ParameterizedTest(name = "duplicateEcKeyRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsDuplicateEncryptionContextKey(EndpointPair pair) {
+    void decryptRejectsDuplicateEncryptionContextKey(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         EsdkMessage message = encryptAndParse(pair, config, twoPairContext());
         assertRejected(pair, config, EsdkHeaderEditor.withDuplicateFirstKey(message),
@@ -124,7 +128,7 @@ class SyntheticHeaderTests {
     /** HDR-023: a header whose encryption-context key is not valid UTF-8 is rejected. */
     @ParameterizedTest(name = "nonUtf8EcKeyRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsNonUtf8EncryptionContextKey(EndpointPair pair) {
+    void decryptRejectsNonUtf8EncryptionContextKey(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         EsdkMessage message = encryptAndParse(pair, config, twoPairContext());
         // 0xFF is never a valid UTF-8 byte, so the first key is no longer valid UTF-8.
@@ -140,7 +144,7 @@ class SyntheticHeaderTests {
      */
     @ParameterizedTest(name = "inflatedEdkCountRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsInflatedEdkCount(EndpointPair pair) {
+    void decryptRejectsInflatedEdkCount(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         EsdkMessage message = encryptAndParse(pair, config, twoPairContext());
         byte[] tampered = message.bytes.clone();

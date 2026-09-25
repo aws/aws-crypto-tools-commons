@@ -1,5 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
@@ -67,7 +72,7 @@ class MessageRegionOrderingTests {
      * visible skip when it supports neither. Region ordering is keyring-independent, so the target
      * runs once, under this keyring.
      */
-    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+    private static ConformanceKeyring keyringFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -89,7 +94,7 @@ class MessageRegionOrderingTests {
     @ParameterizedTest(name = "regionOrdering[{1}] {0}")
     @MethodSource("cases")
     void headerPrecedesBodyAtExactBoundary(LanguageServerTarget target, Layout layout) {
-        ESDKClientConfig config = keyringFor(new EndpointPair(target, target)).config(layout.policy());
+        ESDKClientConfig config = keyringFor(new TargetPair(target, target)).config(layout.policy());
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             layout.suite(), FRAME_LENGTH);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

@@ -1,5 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,8 +44,8 @@ class ReferenceImplementationTest {
     @DisplayName("decrypt-side rows: one per target in configuration order, the reference producing every message")
     void composesOneRowPerTargetWithTheReferenceProducing() {
         FeatureDeclarations declarations = declarations(
-            "java:raw-aes=true;raw-rsa=false,python:raw-aes=true;raw-rsa=true,"
-                + "c:raw-aes=true;raw-rsa=true", null);
+            "java:3:aws-crypto-tools-java:raw-aes=true;raw-rsa=false,python:4:aws-encryption-sdk-python:raw-aes=true;raw-rsa=true,"
+                + "c:2:aws-encryption-sdk-c:raw-aes=true;raw-rsa=true", null);
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
             Set.of("raw-aes"), Set.of(), REGISTRY, declarations, "java");
@@ -61,8 +64,8 @@ class ReferenceImplementationTest {
     @DisplayName("a reference lacking a required Feature is substituted by the first capable target in configuration order")
     void substitutesOnMissingFeature() {
         FeatureDeclarations declarations = declarations(
-            "java:raw-aes=true;raw-rsa=false,python:raw-aes=true;raw-rsa=true,"
-                + "c:raw-aes=true;raw-rsa=true", null);
+            "java:3:aws-crypto-tools-java:raw-aes=true;raw-rsa=false,python:4:aws-encryption-sdk-python:raw-aes=true;raw-rsa=true,"
+                + "c:2:aws-encryption-sdk-c:raw-aes=true;raw-rsa=true", null);
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
             Set.of("raw-rsa"), Set.of(), REGISTRY, declarations, "java");
@@ -78,9 +81,9 @@ class ReferenceImplementationTest {
     @DisplayName("a reference lacking a required raw-RSA padding is substituted")
     void substitutesOnMissingPadding() {
         FeatureDeclarations declarations = declarations(
-            "java:raw-aes=true;raw-rsa=true,python:raw-aes=true;raw-rsa=true,"
-                + "c:raw-aes=true;raw-rsa=true",
-            "java:PKCS1");
+            "java:3:aws-crypto-tools-java:raw-aes=true;raw-rsa=true,python:4:aws-encryption-sdk-python:raw-aes=true;raw-rsa=true,"
+                + "c:2:aws-encryption-sdk-c:raw-aes=true;raw-rsa=true",
+            "java:3:aws-crypto-tools-java:PKCS1");
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
             Set.of("raw-rsa"), Set.of(PaddingScheme.OAEP_SHA256_MGF1),
@@ -95,7 +98,7 @@ class ReferenceImplementationTest {
     @DisplayName("a reference language with no configured target is substituted (single-language runs)")
     void substitutesWhenReferenceHasNoTarget() {
         LanguageServerRegistry cOnly = LanguageServerRegistry.parse("c:2:aws-encryption-sdk-c=http://127.0.0.1:3");
-        FeatureDeclarations declarations = declarations("c:raw-aes=true;raw-rsa=true", null);
+        FeatureDeclarations declarations = declarations("c:2:aws-encryption-sdk-c:raw-aes=true;raw-rsa=true", null);
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
             Set.of("raw-aes"), Set.of(), cOnly, declarations, "java");
@@ -108,8 +111,8 @@ class ReferenceImplementationTest {
     @DisplayName("with no capable language the rows are still composed so every decryptor feature-gates visibly")
     void composesRowsWhenNothingIsCapable() {
         FeatureDeclarations declarations = declarations(
-            "java:raw-aes=true;raw-rsa=false,python:raw-aes=true;raw-rsa=false,"
-                + "c:raw-aes=true;raw-rsa=false", null);
+            "java:3:aws-crypto-tools-java:raw-aes=true;raw-rsa=false,python:4:aws-encryption-sdk-python:raw-aes=true;raw-rsa=false,"
+                + "c:2:aws-encryption-sdk-c:raw-aes=true;raw-rsa=false", null);
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
             Set.of("raw-rsa"), Set.of(), REGISTRY, declarations, "java");
@@ -128,7 +131,7 @@ class ReferenceImplementationTest {
                 + "java:4:aws-crypto-tools-java=http://127.0.0.1:2,"
                 + "python:4:aws-encryption-sdk-python=http://127.0.0.1:3");
         FeatureDeclarations declarations = declarations(
-            "java:raw-aes=true;raw-rsa=true,python:raw-aes=true;raw-rsa=true", null);
+            "java:3:aws-crypto-tools-java:raw-aes=true;raw-rsa=true,python:4:aws-encryption-sdk-python:raw-aes=true;raw-rsa=true", null);
 
         List<ReferencePair> rows = ReferenceImplementation.decryptSide(
             Set.of("raw-aes"), Set.of(), twoMajors, declarations, "java");

@@ -1,5 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -109,7 +114,7 @@ class AlgorithmSuiteWireShapeTests {
      * visible skip when it supports neither. Wire shape is keyring-independent, so the target runs
      * once, under this keyring.
      */
-    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+    private static ConformanceKeyring keyringFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -121,7 +126,7 @@ class AlgorithmSuiteWireShapeTests {
     @ParameterizedTest(name = "suiteWireShape[{1}] {0}")
     @MethodSource("cases")
     void encryptedMessageHasSuiteWireShape(LanguageServerTarget target, SuiteShape shape) {
-        ESDKClientConfig config = keyringFor(new EndpointPair(target, target)).config(shape.policy());
+        ESDKClientConfig config = keyringFor(new TargetPair(target, target)).config(shape.policy());
         byte[] ciphertext = EsdkOps.encrypt(
             target.endpoint(), config, PLAINTEXT, Map.of(), shape.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);

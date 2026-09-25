@@ -1,7 +1,0 @@
-{
-  "_comment": "Dev-only local-development overlay. Copy this file to config/local-overrides.json (which is gitignored and MUST NOT be committed) and edit the paths. It maps a language to a local working-tree root the orchestrator uses in place of a clone, so `make orchestrate` runs your live local edits for that language while every other language is still a cached clone. Applies to any language except the own language of a context=language:<lang> run; wins over a configurationOverrides clone. Relative paths resolve against this file's directory.",
-  "repositories": {
-    "rust": "/abs/path/to/aws-crypto-tools-rust",
-    "javascript": "/abs/path/to/aws-encryption-sdk-javascript"
-  }
-}
