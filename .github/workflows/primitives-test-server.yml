@@ -227,6 +227,41 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Install smithy-dafny codegen dependencies into ~/.m2
+        # Every smithy-dafny make invocation compiles smithy-dafny-codegen with
+        # Gradle (SmithyDafnyMakefile.mk's ENFORCE_DETERMINISM_OPTION probe),
+        # which needs the smithy-rs and smithy-python codegen artifacts in
+        # ~/.m2. The MPL's own CI installs them with its
+        # install_smithy_dafny_codegen_dependencies action; this is the same
+        # make target, run against the smithy-dafny commit the MPL pins.
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          if [ -n "${{ inputs.mpl_ref }}" ]; then
+            mpl_dir="${{ github.workspace }}/.mpl-product-repo"
+          else
+            mpl_ref="$(jq -r '.entries[] | select(.language == "java") | .serverLocation.ref' \
+              primitives/test-server/config/server-config.json)"
+            mpl_dir="$RUNNER_TEMP/mpl-codegen-deps"
+            git clone --depth 1 --branch "$mpl_ref" \
+              https://github.com/aws/aws-cryptographic-material-providers-library.git "$mpl_dir"
+          fi
+          git -C "$mpl_dir" submodule update --init --depth 1 smithy-dafny
+          git -C "$mpl_dir/smithy-dafny" submodule update --init --depth 1 \
+            smithy-dafny-codegen-modules/smithy-rs
+          # Retried like the MPL action: the Gradle distribution downloads flake.
+          for attempt in 1 2 3; do
+            make -C "$mpl_dir/smithy-dafny" mvn_local_deploy_polymorph_dependencies && break
+            [ "$attempt" -lt 3 ] || exit 1
+            sleep 30
+          done
+          # Run the probe once so Gradle's first-run download output can't leak
+          # into the option later, and fail here if it still can't compile.
+          option="$(cd "$mpl_dir/smithy-dafny/codegen/smithy-dafny-codegen-cli" && \
+            ./../gradlew run -q --args="if-dafny-at-least --dafny-version 4.8 --text --enforce-determinism")"
+          echo "ENFORCE_DETERMINISM_OPTION probe: '$option'"
+          [ "$option" = "--enforce-determinism" ]
+
       - name: Validate model (smithy validate)
         working-directory: primitives/test-server
         run: make validate
