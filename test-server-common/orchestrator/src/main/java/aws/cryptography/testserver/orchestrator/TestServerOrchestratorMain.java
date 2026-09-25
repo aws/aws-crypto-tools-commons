@@ -179,7 +179,7 @@ public final class TestServerOrchestratorMain {
             "java", (Launcher) new JavaLaunchPlan(
                 orchestratorBuildDir.resolve("launch/java"), modelDir),
             "python", new PythonLaunchPlan(
-                orchestratorBuildDir.resolve("launch/python")),
+                orchestratorBuildDir.resolve("launch/python"), product),
             "rust", new RustLaunchPlan(
                 orchestratorBuildDir.resolve("launch/rust"), product),
             "rust-cpp", new CppShimLaunchPlan(
