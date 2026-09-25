@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -198,38 +199,43 @@ public final class PythonLaunchPlan implements Launcher {
      */
     private void runSetupStep(String language, String step, List<String> command)
             throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(workDirectory.toFile());
-        builder.redirectErrorStream(true);
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(workDirectory.toFile());
+            builder.redirectErrorStream(true);
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 

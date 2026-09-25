@@ -107,7 +107,7 @@
 # Resolution_Record to stdout before the first Test and before the result —
 # pass or fail — so this workflow's log always contains it. The JSON copy of
 # a Commons_Run is written against THIS working tree's test-server root at
-#   esdk/test-server/orchestrator/build/resolution-record.json
+#   esdk/test-server/build/resolution-record.json
 # and is uploaded as an artifact with `if: always()`.
 # ============================================================================
 
@@ -117,12 +117,14 @@ on:
   pull_request:
     paths:
       - "esdk/test-server/**"
+      - "test-server-common/**"
       - ".github/workflows/esdk-test-server.yml"
   push:
     branches:
       - main
     paths:
       - "esdk/test-server/**"
+      - "test-server-common/**"
       - ".github/workflows/esdk-test-server.yml"
   # Manual trigger from the Actions tab.
   workflow_dispatch:
@@ -329,7 +331,7 @@ jobs:
         # JavaLaunchPlan runs during the orchestrated run. Key on the three
         # gradle modules' build scripts + wrapper descriptors, path-depth
         # pinned (single `*` does not cross `/`) so gradle files inside the
-        # materialized clones under orchestrator/build/sources/ never enter
+        # materialized clones under build/sources/ never enter
         # the hash — the save-time key must equal the restore-time key.
         # Saved by the end-of-job save step (`if: always()` — see the cargo
         # restore note).
@@ -392,9 +394,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*
-            !esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
-          key: ${{ runner.os }}-sources-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
+            esdk/test-server/build/sources/aws-encryption-sdk@*
+            !esdk/test-server/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
+          key: ${{ runner.os }}-sources-v2-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
 
       - name: Restore the materialized aws-encryption-sdk-javascript clone
         # NodeLaunchPlan's stamp skips the root npm ci + lerna build-node +
@@ -404,8 +406,8 @@ jobs:
         id: sources-javascript
         uses: actions/cache/restore@v4
         with:
-          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-javascript-${{ steps.pins.outputs.javascript }}-node22
+          path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
+          key: ${{ runner.os }}-sources-v2-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Restore the materialized aws-encryption-sdk-c clone
         # The clone carries the cmake build tree (test-server/.build); on a
@@ -414,8 +416,8 @@ jobs:
         id: sources-c
         uses: actions/cache/restore@v4
         with:
-          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-c-${{ steps.pins.outputs.c }}
+          path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
+          key: ${{ runner.os }}-sources-v2-c-${{ steps.pins.outputs.c }}
 
       - name: Restore the NuGet package cache
         # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
@@ -635,7 +637,7 @@ jobs:
           # The Java plan builds inside this window (gradlew runServer), and with
           # nine servers building concurrently on a 2-core hosted runner the
           # default 180s starves it out — 900s absorbs the contention.
-          ESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
           ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
@@ -657,7 +659,7 @@ jobs:
         # are preserved whether the run passed or failed. A Commons_Run
         # executes against THIS working tree, so the orchestrator writes the
         # Resolution_Record JSON and the per-server launch logs under
-        # orchestrator/build/, and the Tests suite's JUnit reports under
+        # build/, and the Tests suite's JUnit reports under
         # tests/build/. The launch dir is the launch plans' scratch space
         # (Python venv, build cruft — tens of MB), so only the per-server
         # *.log files are uploaded, not the directory wholesale.
@@ -666,8 +668,8 @@ jobs:
         with:
           name: esdk-test-server-reports
           path: |
-            esdk/test-server/orchestrator/build/resolution-record.json
-            esdk/test-server/orchestrator/build/launch/*/*.log
+            esdk/test-server/build/resolution-record.json
+            esdk/test-server/build/launch/*/*.log
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results
           if-no-files-found: ignore
@@ -710,23 +712,23 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
-            esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*
-            !esdk/test-server/orchestrator/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
-          key: ${{ runner.os }}-sources-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
+            esdk/test-server/build/sources/aws-encryption-sdk@*
+            !esdk/test-server/build/sources/aws-encryption-sdk@*/esdk-test-servers/rust/target
+          key: ${{ runner.os }}-sources-v2-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0
 
       - name: Save the materialized aws-encryption-sdk-javascript clone
         if: always() && steps.sources-javascript.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-javascript-${{ steps.pins.outputs.javascript }}-node22
+          path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
+          key: ${{ runner.os }}-sources-v2-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Save the materialized aws-encryption-sdk-c clone
         if: always() && steps.sources-c.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: esdk/test-server/orchestrator/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-c-${{ steps.pins.outputs.c }}
+          path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
+          key: ${{ runner.os }}-sources-v2-c-${{ steps.pins.outputs.c }}
 
       - name: Save the NuGet package cache
         if: always() && steps.nuget-cache.outputs.cache-hit != 'true'

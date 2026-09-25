@@ -9,6 +9,7 @@ import aws.cryptography.testserver.orchestrator.config.CommonsConfigurationValid
 import aws.cryptography.testserver.orchestrator.config.ConfigurationValidation;
 import aws.cryptography.testserver.orchestrator.config.FeatureValidation;
 import aws.cryptography.testserver.orchestrator.launch.CloseResult;
+import aws.cryptography.testserver.orchestrator.launch.LaunchTimings;
 import aws.cryptography.testserver.orchestrator.launch.LaunchedServer;
 import aws.cryptography.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.testserver.orchestrator.launch.LauncherFactory;
@@ -30,6 +31,7 @@ import aws.cryptography.testserver.orchestrator.source.RunContext;
 import aws.cryptography.testserver.orchestrator.source.SourceResolver;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -359,7 +361,9 @@ public final class TestServerOrchestrator {
         // and filesystem I/O, capturing failures as data. ----
         List<ResolvedComponentPlan> plans = resolver.resolve(
             commonsConfiguration, context, overrides, workingTreeOverlays);
+        Instant materializeStartedAt = Instant.now();
         MaterializedSources sources = materializer.materialize(plans);
+        LaunchTimings.log("all", "source materialization (git)", materializeStartedAt);
 
         // ---- Stage 4 (emitted here so the record accompanies every
         // materialization outcome, failures included):
@@ -468,13 +472,21 @@ public final class TestServerOrchestrator {
                         + entry.language() + "'");
             }
         }
+        Instant launchStageStartedAt = Instant.now();
         ExecutorService launchPool =
             Executors.newFixedThreadPool(Math.max(1, effectiveEntries.size()));
         List<Future<LaunchedServer>> launchFutures = new ArrayList<>();
         try {
             for (ConfigurationEntry entry : effectiveEntries) {
                 Launcher launcher = launcherFactory.launcherFor(entry.language()).orElseThrow();
-                launchFutures.add(launchPool.submit(() -> launcher.launch(entry, sources)));
+                launchFutures.add(launchPool.submit(() -> {
+                    Instant languageStartedAt = Instant.now();
+                    try {
+                        return launcher.launch(entry, sources);
+                    } finally {
+                        LaunchTimings.log(entry.language(), "TOTAL build + launch", languageStartedAt);
+                    }
+                }));
             }
         } finally {
             launchPool.shutdown();
@@ -501,6 +513,8 @@ public final class TestServerOrchestrator {
                 }
             }
         }
+        LaunchTimings.log("all", "launch stage (every server reachable)", launchStageStartedAt);
+        LaunchTimings.printSummary("Language_Server build + launch timings");
         if (launchError != null) {
             return PipelineOutcome.aborted(launchError.getMessage());
         }
@@ -528,10 +542,13 @@ public final class TestServerOrchestrator {
         // cross-repo alike — flattened for the FeatureGate. ----
         TestRunInput input = testRunInput(effectiveEntries, launched, declarations);
         List<TestExecution> executions;
+        Instant testsStartedAt = Instant.now();
         try {
             executions = testRunner.run(input);
         } catch (MissingRuntimeConfigException e) {
             return PipelineOutcome.aborted(e.getMessage());
+        } finally {
+            LaunchTimings.log("all", "Tests run (gradle test)", testsStartedAt);
         }
         List<String> launchedLabels = input.targets().stream()
             .map(t -> t.language() + "-v" + t.majorVersion())

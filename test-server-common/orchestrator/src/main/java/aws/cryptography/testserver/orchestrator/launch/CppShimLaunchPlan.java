@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -199,41 +200,46 @@ public final class CppShimLaunchPlan implements Launcher {
      */
     private void runBuildStep(String language, String step, List<String> command, Path buildDir,
             boolean clearCargoTargetDir) throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(buildDir.toFile());
-        builder.redirectErrorStream(true);
-        if (clearCargoTargetDir) {
-            builder.environment().remove("CARGO_TARGET_DIR");
-        }
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(buildDir.toFile());
+            builder.redirectErrorStream(true);
+            if (clearCargoTargetDir) {
+                builder.environment().remove("CARGO_TARGET_DIR");
+            }
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 
