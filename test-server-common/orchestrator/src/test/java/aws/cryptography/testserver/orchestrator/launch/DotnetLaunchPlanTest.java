@@ -39,15 +39,6 @@ class DotnetLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the transpile prerequisites init the libraries and mpl submodules, like the repo's net workflow")
-    void submodules() {
-        assertEquals(List.of("git", "submodule", "update", "--init", "libraries"),
-            DotnetLaunchPlan.submoduleLibrariesCommand());
-        assertEquals(List.of("git", "submodule", "update", "--init", "--recursive", "mpl"),
-            DotnetLaunchPlan.submoduleMplCommand());
-    }
-
-    @Test
     @DisplayName("the library restores with make setup_net and transpiles with make transpile_net CORES=4")
     void setupAndTranspile() {
         assertEquals(List.of("make", "setup_net"),
@@ -86,15 +77,15 @@ class DotnetLaunchPlanTest {
             PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
         String path = "/nonexistent" + File.pathSeparator + tempDir;
 
-        assertTrue(DotnetLaunchPlan.commandOnPath("dafny", path));
+        assertTrue(DafnyProject.commandOnPath("dafny", path));
     }
 
     @Test
     @DisplayName("a missing or empty PATH yields dafny-not-found")
     void dafnyAbsent(@TempDir Path tempDir) {
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", null));
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", ""));
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", tempDir.toString()),
+        assertFalse(DafnyProject.commandOnPath("dafny", null));
+        assertFalse(DafnyProject.commandOnPath("dafny", ""));
+        assertFalse(DafnyProject.commandOnPath("dafny", tempDir.toString()),
             "a PATH entry without a dafny executable must not match");
     }
 

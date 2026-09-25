@@ -9,10 +9,14 @@ import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
 import aws.cryptography.testserver.orchestrator.source.ResolutionReason;
 import aws.cryptography.testserver.orchestrator.source.SourcePlan;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -184,5 +188,20 @@ class JavaLaunchPlanTest {
             ResolutionReason.CONFIGURATION_ENTRY,
             SERVER, "89abcdef0123456789abcdef0123456789abcdef",
             "kessplas/esdk-test-server", null);
+    }
+
+    @Test
+    @DisplayName("a JDK exported by actions/setup-java as JAVA_HOME_<major>_X64 is resolved, 1.8 reading major 8")
+    void setupJavaHome(@TempDir Path jdk) throws IOException {
+        Path javaBin = Files.createDirectories(jdk.resolve("bin")).resolve("java");
+        Files.writeString(javaBin, "");
+        javaBin.toFile().setExecutable(true);
+
+        assertEquals(Optional.of(jdk),
+            JavaLaunchPlan.setupJavaHome("17", Map.of("JAVA_HOME_17_X64", jdk.toString())));
+        assertEquals(Optional.of(jdk),
+            JavaLaunchPlan.setupJavaHome("1.8", Map.of("JAVA_HOME_8_ARM64", jdk.toString())));
+        assertEquals(Optional.empty(),
+            JavaLaunchPlan.setupJavaHome("11", Map.of("JAVA_HOME_17_X64", jdk.toString())));
     }
 }
