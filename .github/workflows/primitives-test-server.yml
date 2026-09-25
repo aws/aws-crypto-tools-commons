@@ -1,13 +1,16 @@
 # Primitives TestServer CI for aws-crypto-tools-commons. Runs `make orchestrate`:
 # it builds and launches each language server (rust-v1), runs the test suite
 # over every server combination — each server against every other and against
-# itself — and fails the build if any test fails. The aws-crypto-tools-rust
-# repo can also call this workflow and pass its own commit, so a change there
-# is tested against this suite.
+# itself — and fails the build if any test fails. The aws-crypto-tools-rust and
+# aws-cryptographic-material-providers-library repos can also call this workflow
+# and pass their own commit, so a change there is tested against this suite.
 #
-# The job sets up JDK 21 and Rust (plus Go, which the rust server needs to
-# build its aws-lc-sys native dependency). The tests are offline — no AWS
-# credentials are needed.
+# The native rust server lives in aws-crypto-tools-rust; the java, net, python,
+# go, and rust-dafny servers live in aws-cryptographic-material-providers-library
+# and build its Dafny runtimes from source. The job sets up every toolchain
+# those builds need: JDK 17 (the MPL Java build) and JDK 21 (the harness), Rust,
+# Go, .NET, Python 3.11, and Dafny. The tests are offline — no AWS credentials
+# are needed.
 #
 # PRIVATE RUST-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
 # clones aws-crypto-tools-rust per the Rust Configuration_Entry's
@@ -57,6 +60,16 @@ on:
         type: string
         required: false
         default: ""
+      mpl_ref:
+        description: >-
+          The aws-cryptographic-material-providers-library ref whose language
+          servers to test. Leave empty to clone the servers at the ref pinned
+          in config/server-config.json. The MPL repo, when it calls this
+          workflow, sets this to its own commit, and the servers are taken
+          straight from that checkout instead of being cloned.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -93,11 +106,49 @@ jobs:
           path: .rust-product-repo
           token: ${{ secrets.LANGUAGE_REPO_PAT }}
 
-      - name: Set up JDK 21 (Temurin)
+      - name: Checkout aws-cryptographic-material-providers-library at the requested server ref
+        # Only when mpl_ref is set: check out that commit's servers so make
+        # orchestrate (below) tests them directly instead of cloning them.
+        if: ${{ inputs.mpl_ref != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-cryptographic-material-providers-library
+          ref: ${{ inputs.mpl_ref }}
+          path: .mpl-product-repo
+
+      - name: Set up JDK 17 (Temurin) for the MPL Java build
+        # Exposes JAVA_HOME_17_X64, which the Java launch plan uses for the
+        # MPL's Gradle 7 build.
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up JDK 21 (Temurin) for the commons harness
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - name: Install Dafny 4.9.0 (for the MPL runtime transpiles)
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dafny --version 4.9.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          export PATH="$HOME/.dotnet/tools:$PATH"
+          dafny --version
 
       - name: Set up the Rust toolchain
         run: |
@@ -115,7 +166,7 @@ jobs:
           # go.sum; skip setup-go's cache to avoid its "file not found" warning.
           cache: false
 
-      - name: Restore Gradle + cargo caches
+      - name: Restore Gradle + cargo + NuGet caches
         uses: actions/cache/restore@v4
         id: caches
         with:
@@ -124,6 +175,7 @@ jobs:
             ~/.gradle/wrapper
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.nuget/packages
           key: >-
             ${{ runner.os }}-primitives-test-server-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
@@ -182,16 +234,20 @@ jobs:
       - name: Run the test suite (make orchestrate)
         working-directory: primitives/test-server
         env:
-          # Wide readiness window for the cargo release build on a 2-core runner.
-          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        # With rust_ref set, point orchestrate at the checked-out server above so it
-        # tests that commit; otherwise it clones it per config/server-config.json.
+          # Wide readiness window for the concurrent Dafny and cargo builds on a 2-core runner.
+          TESTSERVER_READY_TIMEOUT_SECONDS: "1800"
+        # With rust_ref / mpl_ref set, point orchestrate at the checked-out servers
+        # above so it tests those commits; otherwise it clones them per
+        # config/server-config.json.
         run: |
+          args=()
           if [ -n "${{ inputs.rust_ref }}" ]; then
-            make orchestrate PRIMITIVES_RUST_REPO="${{ github.workspace }}/.rust-product-repo"
-          else
-            make orchestrate
+            args+=(PRIMITIVES_RUST_REPO="${{ github.workspace }}/.rust-product-repo")
           fi
+          if [ -n "${{ inputs.mpl_ref }}" ]; then
+            args+=(PRIMITIVES_MPL_REPO="${{ github.workspace }}/.mpl-product-repo")
+          fi
+          make orchestrate "${args[@]}"
 
       - name: Publish test results to the run summary
         if: always()
@@ -208,11 +264,12 @@ jobs:
             test-server-common/orchestrator/build/resolution-record.json
             test-server-common/orchestrator/build/launch/*/*.log
             primitives/test-server/build/launch/*/*.log
+            primitives/test-server/build/launch/*/*/*.log
             primitives/test-server/tests/build/reports/tests
             primitives/test-server/tests/build/test-results
           if-no-files-found: ignore
 
-      - name: Save Gradle + cargo caches
+      - name: Save Gradle + cargo + NuGet caches
         if: always() && steps.caches.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
@@ -221,6 +278,7 @@ jobs:
             ~/.gradle/wrapper
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.nuget/packages
           key: >-
             ${{ runner.os }}-primitives-test-server-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
