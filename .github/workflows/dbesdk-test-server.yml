@@ -29,6 +29,16 @@ on:
       - "dbesdk/test-server/**"
       - ".github/workflows/dbesdk-test-server.yml"
   workflow_dispatch:
+    inputs:
+      java_native_ref:
+        description: >-
+          aws-crypto-tools-java ref whose native `java-native` server to test via
+          a working-tree overlay. Leave empty to clone it per
+          config/server-config.json. Set this to run the orchestrated suite
+          against the native server before it merges to that repo's main.
+        type: string
+        required: false
+        default: ""
   workflow_call:
     inputs:
       commons_ref:
@@ -48,6 +58,17 @@ on:
           config/server-config.json. The aws-database-encryption-sdk-dynamodb
           repo, when it calls this workflow, sets this to its own commit, and the
           servers are taken straight from that checkout instead of being cloned.
+        type: string
+        required: false
+        default: ""
+      java_native_ref:
+        description: >-
+          The aws-crypto-tools-java ref whose native (non-Dafny) `java-native`
+          server to test. Leave empty to clone it at the ref pinned in
+          config/server-config.json. The aws-crypto-tools-java repo, when it
+          calls this workflow, sets this to its own commit, so the native server
+          is taken straight from that checkout instead of being cloned — the path
+          the native server needs until it merges to that repo's main.
         type: string
         required: false
         default: ""
@@ -91,6 +112,17 @@ jobs:
           repository: aws/aws-database-encryption-sdk-dynamodb
           ref: ${{ inputs.dbe_ref }}
           path: .dbe-product-repo
+
+      - name: Checkout aws-crypto-tools-java at the requested native-server ref
+        # Only when java_native_ref is set: check out that commit's native server
+        # so make orchestrate (below) tests it directly via a working-tree overlay
+        # instead of cloning it from config/server-config.json.
+        if: ${{ inputs.java_native_ref != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-java
+          ref: ${{ inputs.java_native_ref }}
+          path: .java-native-repo
 
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v5
@@ -193,14 +225,18 @@ jobs:
         env:
           # Wide readiness window for the concurrent server builds on a 2-core runner.
           DBESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        # With dbe_ref set, point orchestrate at the checked-out servers above so it
-        # tests that commit; otherwise it clones them per config/server-config.json.
+        # With dbe_ref / java_native_ref set, point orchestrate at the servers
+        # checked out above (via working-tree overlays) so it tests those commits;
+        # otherwise each is cloned per config/server-config.json.
         run: |
+          EXTRA=()
           if [ -n "${{ inputs.dbe_ref }}" ]; then
-            make orchestrate DBESDK_DBE_REPO="${{ github.workspace }}/.dbe-product-repo"
-          else
-            make orchestrate
+            EXTRA+=(DBESDK_DBE_REPO="${{ github.workspace }}/.dbe-product-repo")
           fi
+          if [ -n "${{ inputs.java_native_ref }}" ]; then
+            EXTRA+=(DBESDK_JAVA_NATIVE_REPO="${{ github.workspace }}/.java-native-repo")
+          fi
+          make orchestrate "${EXTRA[@]}"
 
       - name: Publish test results to the run summary
         if: always()

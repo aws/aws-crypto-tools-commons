@@ -92,11 +92,29 @@ DBESDK_DBE_REPO ?= $(abspath $(MAKEFILE_DIR)/../../../../dbesdk/aws-database-enc
 # is resolved (git clone) from config/server-config.json's Server_Location.
 DBE_OVERLAY := $(if $(wildcard $(DBESDK_DBE_REPO)),workingTreeOverlay.aws-database-encryption-sdk-dynamodb=$(DBESDK_DBE_REPO))
 
-# Combined orchestrator program args: the overlay (if any) plus a TESTS scope
-# (if set). When BOTH are empty this is empty, and the recipe omits the gradle
+# ----------------------------------------------------------------------------
+# Local aws-crypto-tools-java checkout — the home of the native (non-Dafny)
+# Java server, resolved by the `java-native` entry in config/server-config.json.
+# ----------------------------------------------------------------------------
+# Mirrors the DBE overlay above: when this checkout exists, `make orchestrate`
+# runs the native server from the local working tree (e.g. its unverified
+# branch, before it merges to main) instead of cloning the ref pinned in
+# server-config.json. Default: ../../../aws-crypto-tools-java (sibling of the
+# commons checkout). Override with DBESDK_JAVA_NATIVE_REPO=<abs path> when the
+# checkout lives elsewhere.
+DBESDK_JAVA_NATIVE_REPO ?= $(abspath $(MAKEFILE_DIR)/../../../aws-crypto-tools-java)
+
+# Applied ONLY when the checkout actually exists (local development). In a
+# Commons_Run CI with no local checkout the overlay is omitted and the
+# java-native server is resolved (git clone) from server-config.json's
+# Server_Location — unless the workflow supplies the checkout+overlay itself.
+JAVA_NATIVE_OVERLAY := $(if $(wildcard $(DBESDK_JAVA_NATIVE_REPO)),workingTreeOverlay.aws-crypto-tools-java=$(DBESDK_JAVA_NATIVE_REPO))
+
+# Combined orchestrator program args: the overlays (if any) plus a TESTS scope
+# (if set). When ALL are empty this is empty, and the recipe omits the gradle
 # --args flag entirely — gradle rejects an empty --args="" — matching a plain
 # Commons_Run that clones from config, exactly like the ESDK harness.
-ORCH_ARGS := $(strip $(DBE_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)))
+ORCH_ARGS := $(strip $(DBE_OVERLAY) $(JAVA_NATIVE_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)))
 
 # Whether `deploy-kms-cdk` should CREATE the GitHub OIDC provider or import the
 # existing one. An AWS account may hold only one OIDC provider per URL

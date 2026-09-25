@@ -12,7 +12,16 @@
     "the test cases + shared harness (model/tests/orchestrator/tests-support/client-java)",
     "stay in commons. Each entry's serverLocation + libraryRepository therefore point",
     "at the product repo, and configPath names the DIRECTORY holding the per-server trio",
-    "(server-config.json/feature-config.json/bug-config.json) co-located with the server."
+    "(server-config.json/feature-config.json/bug-config.json) co-located with the server.",
+    "",
+    "EXCEPTION — the native-Java server: the 'java-native' entry's serverLocation +",
+    "libraryRepository point at the aws-crypto-tools-java repo (dbesdk/test-server/server),",
+    "the home of the native (non-Dafny) Java DB-ESDK. It uses a DISTINCT language token",
+    "('java-native', not 'java') because the orchestrator keys every per-language",
+    "component (ComponentId.server:<lang>/library:<lang>, the launcher map, the effective-",
+    "entry map) by language alone, so it must not collide with the Dafny 'java' entry; the",
+    "token is wired to JavaLaunchPlan in TestServerOrchestratorMain, exactly as 'rust-dafny'",
+    "reuses RustLaunchPlan."
   ],
   "product": "dbesdk",
   "entries": [
@@ -68,6 +77,24 @@
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
         "ref": "main",
         "path": "test-server/net-v4-server"
+      }
+    },
+    {
+      "language": "java-native",
+      "majorVersion": 1,
+      "port": 8104,
+      "configPath": "dbesdk/test-server/server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "branch": "main",
+        "path": "dbesdk/test-server/server"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-java",
+        "url": "git@github.com:aws/aws-crypto-tools-java.git",
+        "ref": "main",
+        "path": "dbesdk/test-server/server"
       }
     }
   ]

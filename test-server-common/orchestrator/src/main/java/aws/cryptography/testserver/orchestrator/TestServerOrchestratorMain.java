@@ -178,6 +178,14 @@ public final class TestServerOrchestratorMain {
         LauncherFactory launchers = LauncherFactory.fromMap(Map.of(
             "java", (Launcher) new JavaLaunchPlan(
                 orchestratorBuildDir.resolve("launch/java"), modelDir),
+            // The native (non-Dafny) Java server (aws-crypto-tools-java): same
+            // smithy-java runServer launch shape as "java", so it reuses
+            // JavaLaunchPlan — exactly as "rust-dafny" reuses RustLaunchPlan. A
+            // distinct language token is required because every per-language
+            // component is keyed by language alone, so it must not collide with
+            // the Dafny "java" entry.
+            "java-native", new JavaLaunchPlan(
+                orchestratorBuildDir.resolve("launch/java-native"), modelDir),
             "python", new PythonLaunchPlan(
                 orchestratorBuildDir.resolve("launch/python")),
             "rust", new RustLaunchPlan(
