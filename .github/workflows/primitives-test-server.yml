@@ -125,13 +125,12 @@ jobs:
             6.0.x
             8.0.x
 
-      - name: Install Dafny 4.9.0 (for the MPL runtime transpiles)
-        run: |
-          set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          export PATH="$HOME/.dotnet/tools:$PATH"
-          dafny --version
+      - name: Setup Dafny
+        # The MPL's own Dafny setup (.NET 9 SDK + dafny-lang/setup-dafny-action),
+        # at the dafnyVersion in the MPL's project.properties.
+        uses: ./.mpl-product-repo/.github/actions/setup_dafny
+        with:
+          dafny-version: "4.9.0"
 
       - name: Install Smithy-Dafny codegen dependencies
         # The MPL's own setup: JDK 17 (exposes JAVA_HOME_17_X64 for the Java
