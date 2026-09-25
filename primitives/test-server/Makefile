@@ -192,7 +192,7 @@ orchestrate: check-java ## Run the complete cross-language Commons_Run (all serv
 	@# (e.g. `make orchestrate TESTS=AesRoundTripTest`). Empty runs every test.
 	@cd "$(ORCH_DIR)" && GRADLE_OPTS="-Dorg.gradle.daemon=false $$GRADLE_OPTS" ./gradlew --console=plain run \
 		-Dtestserver.root=$(MAKEFILE_DIR) \
-		--args="$(ORCH_ARGS)"
+		$(if $(ORCH_ARGS),--args="$(ORCH_ARGS)")
 
 orchestrate-test: check-java ## Run the orchestrator's property + integration tests (pure pipeline logic)
 	@echo "==> Running orchestrator tests (test-server-common/orchestrator/)"
