@@ -244,7 +244,7 @@ jobs:
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
           esdk_tip=$(tip net)
-          emit net "$esdk_tip-dafny4.9.0-b2" \
+          emit net "$esdk_tip-dafny4.9.0-b3" \
             "$esdk/esdk-test-servers/net/bin/Release/net8.0" \
             "$esdk/esdk-test-servers/net/.esdk-build-stamp"
           # The Dafny transpile output depends only on these paths' content.
@@ -252,10 +252,10 @@ jobs:
           transpile=$(gh api "repos/$esdk_repo/git/trees/$esdk_tip" --jq \
             '[.tree[] | select(.path | IN("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "mpl")) | .sha] | join(" ")' \
             | sha256sum | cut -c1-16) || transpile="$esdk_tip"
-          emit nettranspile "$transpile-dafny4.9.0" \
+          emit nettranspile "$transpile-dafny4.9.0-s1" \
             "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \
             "$esdk/mpl/*/runtimes/net/ImplementationFromDafny*" \
-            "$esdk/AwsEncryptionSDK/.esdk-transpile-stamp"
+            "$esdk/AwsEncryptionSDK/.esdk-transpile-build-stamp"
           emit rustdafny "$esdk_tip" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
