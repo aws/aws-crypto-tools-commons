@@ -242,12 +242,12 @@ jobs:
           }
           emit() {
             local name="$1" key="$2"; shift 2
-            echo "key_$name=${RUNNER_OS}-out-v2-$name-$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${RUNNER_OS}-out-v3-$name-$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
           esdk_tip=$(tip net)
-          emit net "$esdk_tip-dafny4.9.0-b4" \
+          emit net "$esdk_tip-dafny4.9.0" \
             "$esdk/esdk-test-servers/net/bin/Release/net8.0" \
             "$esdk/esdk-test-servers/net/.esdk-build-stamp"
           # The Dafny transpile output depends only on these paths' content.
@@ -255,7 +255,7 @@ jobs:
           transpile=$(gh api "repos/$esdk_repo/git/trees/$esdk_tip" --jq \
             '[.tree[] | select(.path | IN("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "mpl")) | .sha] | join(" ")' \
             | sha256sum | cut -c1-16) || transpile="$esdk_tip"
-          emit nettranspile "$transpile-dafny4.9.0-s1" \
+          emit nettranspile "$transpile-dafny4.9.0" \
             "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \
             "$esdk/mpl/*/runtimes/net/ImplementationFromDafny*" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-build-stamp"
