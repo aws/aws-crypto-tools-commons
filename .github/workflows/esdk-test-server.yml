@@ -126,6 +126,10 @@ on:
       - "esdk/test-server/**"
       - "test-server-common/**"
       - ".github/workflows/esdk-test-server.yml"
+  # Nightly on main: rebuilds any language whose branch tip moved and saves it
+  # to main's caches, which every pull request can restore.
+  schedule:
+    - cron: "17 7 * * *"
   # Manual trigger from the Actions tab.
   workflow_dispatch:
   # Allow an aggregate/parent CI workflow to reuse this one.
