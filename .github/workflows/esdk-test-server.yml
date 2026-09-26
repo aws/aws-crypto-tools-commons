@@ -415,7 +415,9 @@ jobs:
               '.entries[] | select(.language==$l) | .serverLocation.url' "$config")
             ref=$(jq -r --arg l "$language" \
               '.entries[] | select(.language==$l) | .serverLocation.ref' "$config")
-            tip=$(git ls-remote "$url" "refs/heads/$ref" | cut -f1)
+            # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
+            # this repo) does not replace the private-repo PAT.
+            tip=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || tip=""
             if [ -z "$tip" ]; then
               echo "::warning::could not resolve $url @ $ref — the $name sources cache misses this run"
               tip="unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
