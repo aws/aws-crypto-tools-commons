@@ -87,6 +87,22 @@ So the scratch clones survive between runs (until `make clean` or a
 check does a per-run `git ls-remote`, so a fully offline run can only reuse
 working-tree sources — cloned languages need the network to verify the tip.
 
+Builds are skipped the same way: each server's clone holds a build stamp
+recording the commit it was built from, and a server whose stamp matches its
+clone's commit is launched without rebuilding. The .NET Dafny transpile has its
+own stamp, keyed on the Dafny sources and submodules, so a change elsewhere in
+the repository rebuilds only the .NET server.
+
+`ORCHESTRATE_ARGS` passes extra orchestrator tokens through:
+
+```
+make orchestrate ORCHESTRATE_ARGS="languages=rust,java"          # only these servers
+make orchestrate ORCHESTRATE_ARGS="languages=net stopAfter=launch" # build + start, no Tests
+make orchestrate ORCHESTRATE_ARGS="stopAfter=materialize"          # clone only
+```
+
+A `languages=` run tests only the pairs among the listed servers.
+
 ### Iterating on a single Language_Server with live edits
 
 To develop a server and have **your local, uncommitted edits used directly**

@@ -25,6 +25,14 @@
 #      Tests suite over the full pairwise cross-language matrix, and reports
 #      one fail-open result.
 #
+# JOBS: `plan` keys each heavy server (net, rust, rust-cpp, rust-dafny, go)
+# on its branch tip and lists the ones with no cached build; `build` builds
+# only those, one runner each, and caches each server's runnable output;
+# `esdk-test-server` does its setup and the light server builds in parallel
+# with `build`, waits for the heavy outputs, restores them into its clones,
+# and runs the Tests. The build stamps make every cached server launch
+# without rebuilding.
+#
 # The trigger paths (`esdk/test-server/**` + this file) cover every
 # commons-hosted ESDK TestServer component of Requirement 6.3: the
 # Smithy_Model (model/), the Test_Client (client-java/), the Tests (tests/),
