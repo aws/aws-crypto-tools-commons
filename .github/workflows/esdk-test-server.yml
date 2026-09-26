@@ -259,30 +259,6 @@ jobs:
           sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
           sccache --version
 
-      - name: Restore the Rust cargo downloads + sccache compiler cache
-        # Cache the cargo registry/git downloads AND the sccache compiler cache —
-        # NOT the compiled target dir. The orchestrated run clones aws-crypto-tools-rust
-        # mid-run, giving the sources fresh mtimes, so a restored target/ yields an
-        # incorrect cargo incremental build (observed: the Rust hierarchical keyring
-        # then failed on non-committing suites). Downloads are content-checksummed and
-        # sccache is content-hashed, so both reuse safely across runs while only the
-        # final link step runs fresh. A distinct key prefix (cargo- not rust-) avoids
-        # restoring the earlier target-containing caches.
-        #
-        # Explicit restore/save split: the orchestrate step exits non-zero on any
-        # failed Test (fail-open Result), and actions/cache's implicit post step
-        # only saves on job SUCCESS — so the combined action never saved anything
-        # here. The matching save step at the end of the job runs `if: always()`.
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-esdk-test-server-
-
       - name: Set up .NET (for the .NET Language_Server build)
         # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
         # library and server inside the aws-encryption-sdk clone. 6.0 + 8.0
@@ -293,36 +269,6 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
-
-      - name: Install Dafny 4.9.0 (for the .NET library transpile)
-        # The .NET library carries no committed generated code, so
-        # DotnetLaunchPlan runs `make setup_net && make transpile_net` in the
-        # clone, which needs dafny on PATH. Installed as a global dotnet tool
-        # pinned to the version the aws-encryption-sdk repo's
-        # project.properties declares (a deterministic download, no
-        # third-party action, matching the smithy-install rationale).
-        run: |
-          set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          export PATH="$HOME/.dotnet/tools:$PATH"
-          dafny --version
-
-      - name: Build aws-c-common (for the C Language_Server build)
-        # The orchestrated run's CLaunchPlan cmake-configures the
-        # aws-encryption-sdk-c clone, whose CMake requires an aws-c-common
-        # install; ubuntu runners ship none. Build it from source into the
-        # workspace and export CMAKE_PREFIX_PATH, which CLaunchPlan passes
-        # through to the configure — the same approach as that repo's own
-        # test-server workflow.
-        run: |
-          set -euo pipefail
-          git clone --depth 1 https://github.com/awslabs/aws-c-common "$RUNNER_TEMP/aws-c-common"
-          cmake -S "$RUNNER_TEMP/aws-c-common" -B "$RUNNER_TEMP/aws-c-common-build" \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/.aws-c-common-install" \
-            -DBUILD_TESTING=OFF
-          cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
-          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
 
       - name: Restore Gradle + Maven caches
         # Gradle: the client-java/tests/orchestrator builds under
@@ -538,6 +484,7 @@ jobs:
         # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
         # pays off when the esdk pin moves and the transpile runs cold.
         id: nuget-cache
+        if: steps.sources-esdk.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
@@ -549,6 +496,7 @@ jobs:
         # GoLaunchPlan's go build (modules + compiled packages) and the
         # aws-lc-sys native builds' Go tooling.
         id: go-cache
+        if: steps.sources-esdk.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -561,12 +509,75 @@ jobs:
       - name: Restore the npm download cache
         # Pays off when the javascript pin moves and npm ci runs cold.
         id: npm-cache
+        if: steps.sources-javascript.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
           restore-keys: |
             ${{ runner.os }}-npm-esdk-test-server-
+
+      - name: Install Dafny 4.9.0 (for the .NET library transpile)
+        # The .NET library carries no committed generated code, so
+        # DotnetLaunchPlan runs `make setup_net && make transpile_net` in the
+        # clone, which needs dafny on PATH. Installed as a global dotnet tool
+        # pinned to the version the aws-encryption-sdk repo's
+        # project.properties declares (a deterministic download, no
+        # third-party action, matching the smithy-install rationale).
+        # Only needed when the aws-encryption-sdk clone cache missed.
+        if: steps.sources-esdk.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dafny --version 4.9.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          export PATH="$HOME/.dotnet/tools:$PATH"
+          dafny --version
+
+      - name: Build aws-c-common (for the C Language_Server build)
+        # The orchestrated run's CLaunchPlan cmake-configures the
+        # aws-encryption-sdk-c clone, whose CMake requires an aws-c-common
+        # install; ubuntu runners ship none. Build it from source into the
+        # workspace and export CMAKE_PREFIX_PATH, which CLaunchPlan passes
+        # through to the configure — the same approach as that repo's own
+        # test-server workflow.
+        # Only needed when the aws-encryption-sdk-c clone cache missed.
+        if: steps.sources-c.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/awslabs/aws-c-common "$RUNNER_TEMP/aws-c-common"
+          cmake -S "$RUNNER_TEMP/aws-c-common" -B "$RUNNER_TEMP/aws-c-common-build" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/.aws-c-common-install" \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
+          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
+
+      - name: Restore the Rust cargo downloads + sccache compiler cache
+        # Cache the cargo registry/git downloads AND the sccache compiler cache —
+        # NOT the compiled target dir. The orchestrated run clones aws-crypto-tools-rust
+        # mid-run, giving the sources fresh mtimes, so a restored target/ yields an
+        # incorrect cargo incremental build (observed: the Rust hierarchical keyring
+        # then failed on non-committing suites). Downloads are content-checksummed and
+        # sccache is content-hashed, so both reuse safely across runs while only the
+        # final link step runs fresh. A distinct key prefix (cargo- not rust-) avoids
+        # restoring the earlier target-containing caches.
+        #
+        # Explicit restore/save split: the orchestrate step exits non-zero on any
+        # failed Test (fail-open Result), and actions/cache's implicit post step
+        # only saves on job SUCCESS — so the combined action never saved anything
+        # here. The matching save step at the end of the job runs `if: always()`.
+        #
+        # Only needed when a Rust clone cache missed (a warm clone skips cargo).
+        id: cargo-cache
+        if: steps.sources-rust.outputs.cache-hit != 'true' || steps.sources-rustcpp.outputs.cache-hit != 'true' || steps.sources-esdk.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-esdk-test-server-
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -782,7 +793,7 @@ jobs:
           done
 
       - name: Save the Rust cargo downloads + sccache compiler cache
-        if: always()
+        if: always() && steps.cargo-cache.outcome == 'success'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -861,14 +872,14 @@ jobs:
           key: ${{ runner.os }}-sources-v1-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Save the NuGet package cache
-        if: always() && steps.nuget-cache.outputs.cache-hit != 'true'
+        if: always() && steps.nuget-cache.outcome == 'success' && steps.nuget-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
 
       - name: Save the Go module + build caches
-        if: always() && steps.go-cache.outputs.cache-hit != 'true'
+        if: always() && steps.go-cache.outcome == 'success' && steps.go-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -877,7 +888,7 @@ jobs:
           key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
 
       - name: Save the npm download cache
-        if: always() && steps.npm-cache.outputs.cache-hit != 'true'
+        if: always() && steps.npm-cache.outcome == 'success' && steps.npm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
