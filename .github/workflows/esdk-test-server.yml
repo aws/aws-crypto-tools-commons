@@ -142,8 +142,366 @@ permissions:
   id-token: write
 
 jobs:
+  # Resolves each heavy server's cache key and lists the servers whose
+  # prebuilt output is missing, so the build job builds only those.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      key_net: ${{ steps.keys.outputs.key_net }}
+      paths_net: ${{ steps.keys.outputs.paths_net }}
+      key_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
+      paths_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
+      key_go: ${{ steps.keys.outputs.key_go }}
+      paths_go: ${{ steps.keys.outputs.paths_go }}
+      key_rust: ${{ steps.keys.outputs.key_rust }}
+      paths_rust: ${{ steps.keys.outputs.paths_rust }}
+      key_rustcpp: ${{ steps.keys.outputs.key_rustcpp }}
+      paths_rustcpp: ${{ steps.keys.outputs.paths_rustcpp }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
+        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
+        # Language_Server + live Java library) and aws-crypto-tools-rust (the
+        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
+        # Configuration_Entries' Server_Locations (config/server-config.json).
+        # GitHub Actions' default token only reaches THIS repo, so that
+        # cross-repo private clone needs its own credential. We supply a
+        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
+        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
+        # config/server-config.json or the Makefile changes. The public
+        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
+        #
+        # SECURITY NOTES:
+        #   - The PAT is passed only via the step `env:` below (never inlined
+        #     in the script), and GitHub automatically masks the secret value
+        #     in logs. We do NOT use `set -x`, so the configured URL is not
+        #     echoed.
+        #   - The token is written only to the ephemeral runner's global git
+        #     config (~/.gitconfig), which is discarded when the job ends.
+        #   - This rewrite is CI-ONLY. Local development is unaffected and
+        #     keeps using the SSH URL as-is.
+        #   - Required token scope: READ access to the contents of
+        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
+        #     with `Contents: Read` on each repo, or a classic PAT with the
+        #     `repo` scope).
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
+            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
+            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
+            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
+            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
+            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
+            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
+            echo "'repo' scope)." >&2
+            exit 1
+          fi
+          # Rewrite the SSH URL used in config/server-config.json to
+          # authenticated HTTPS so `git clone git@github.com:aws/...`
+          # transparently becomes an authenticated HTTPS clone.
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Resolve the prebuilt-server cache keys and paths
+        # Each key is the server's branch tip; each path list is the server's
+        # runnable output plus its build stamp, inside the materialized clone
+        # (<repo>@<sanitized ref>-<8-hex hash>).
+        id: keys
+        run: |
+          set -euo pipefail
+          config=esdk/test-server/config/server-config.json
+          sources=esdk/test-server/build/sources
+          field() {
+            jq -r --arg l "$1" ".entries[] | select(.language==\$l) | .serverLocation.$2" "$config"
+          }
+          clone() {
+            local url ref repo
+            url=$(field "$1" url); ref=$(field "$1" ref)
+            repo=$(basename "${url%.git}"); repo="${repo##*:}"
+            echo "$sources/${repo}@${ref//[^A-Za-z0-9._-]/_}-????????"
+          }
+          tip() {
+            local url ref sha
+            url=$(field "$1" url); ref=$(field "$1" ref)
+            # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
+            # this repo) does not replace the private-repo PAT.
+            sha=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || sha=""
+            echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
+          }
+          emit() {
+            local name="$1" key="$2"; shift 2
+            echo "key_$name=${RUNNER_OS}-out-v1-$name-$key" >> "$GITHUB_OUTPUT"
+            { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          }
+          esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
+          esdk_tip=$(tip net)
+          emit net "$esdk_tip-dafny4.9.0" \
+            "$esdk/esdk-test-servers/net/bin/Release/net8.0" \
+            "$esdk/esdk-test-servers/net/.esdk-build-stamp"
+          emit rustdafny "$esdk_tip" \
+            "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
+            "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
+          emit go "$esdk_tip" \
+            "$esdk/esdk-test-servers/go/esdk-test-server" \
+            "$esdk/esdk-test-servers/go/.esdk-build-stamp"
+          emit rust "$(tip rust)" \
+            "$rust/esdk-test-server/target/release/esdk-test-server" \
+            "$rust/esdk-test-server/.esdk-build-stamp"
+          emit rustcpp "$(tip rust-cpp)" \
+            "$rustcpp/esdk-cpp-test-server/target/release/esdk-cpp-test-server" \
+            "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
+            "$rustcpp/esdk-cpp-test-server/.esdk-build-stamp"
+          cat "$GITHUB_OUTPUT"
+
+      - name: Look up the prebuilt net server
+        id: look-net
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ steps.keys.outputs.paths_net }}
+          key: ${{ steps.keys.outputs.key_net }}
+
+      - name: Look up the prebuilt rust-dafny server
+        id: look-rustdafny
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ steps.keys.outputs.paths_rustdafny }}
+          key: ${{ steps.keys.outputs.key_rustdafny }}
+
+      - name: Look up the prebuilt go server
+        id: look-go
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ steps.keys.outputs.paths_go }}
+          key: ${{ steps.keys.outputs.key_go }}
+
+      - name: Look up the prebuilt rust server
+        id: look-rust
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ steps.keys.outputs.paths_rust }}
+          key: ${{ steps.keys.outputs.key_rust }}
+
+      - name: Look up the prebuilt rust-cpp server
+        id: look-rustcpp
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ steps.keys.outputs.paths_rustcpp }}
+          key: ${{ steps.keys.outputs.key_rustcpp }}
+
+      - name: List the servers to build
+        id: matrix
+        env:
+          HITS: >-
+            net=${{ steps.look-net.outputs.cache-hit }}
+            rust-dafny=${{ steps.look-rustdafny.outputs.cache-hit }}
+            go=${{ steps.look-go.outputs.cache-hit }}
+            rust=${{ steps.look-rust.outputs.cache-hit }}
+            rust-cpp=${{ steps.look-rustcpp.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for hit in $HITS; do
+            [ "${hit#*=}" = "true" ] || missing+=("${hit%%=*}")
+          done
+          matrix=$(printf '%s\n' "${missing[@]}" | jq -R . | jq -cs 'map(select(. != ""))')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "servers to build: $matrix"
+
+  # Builds each missing heavy server on its own runner, in parallel, and
+  # saves its runnable output for the test job.
+  build:
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+      RUSTC_WRAPPER: ${{ startsWith(matrix.language, 'rust') && 'sccache' || '' }}
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_IDLE_TIMEOUT: "0"
+      OUT_KEY: ${{ matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'rust' && needs.plan.outputs.key_rust || needs.plan.outputs.key_rustcpp }}
+      OUT_PATHS: ${{ matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'rust' && needs.plan.outputs.paths_rust || needs.plan.outputs.paths_rustcpp }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin) for the orchestrator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Restore Gradle caches (orchestrator dependencies)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.m2/repository
+          key: ${{ runner.os }}-gradle-${{ hashFiles(
+              'esdk/test-server/*/build.gradle.kts',
+              'esdk/test-server/*/settings.gradle.kts',
+              'esdk/test-server/*/gradle.properties',
+              'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Set up Go (Go server; aws-lc-sys native builds)
+        if: matrix.language != 'net'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Restore the Go module + build caches
+        if: matrix.language == 'go'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-esdk-test-server-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-go-esdk-test-server-
+
+      - name: Set up the Rust toolchain + sccache
+        if: startsWith(matrix.language, 'rust')
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          SCCACHE_VERSION="v0.8.2"
+          base="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
+          tmp="$(mktemp -d)"
+          curl -sSL "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${base}.tar.gz" -o "$tmp/sccache.tar.gz"
+          tar -xzf "$tmp/sccache.tar.gz" -C "$tmp"
+          sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
+
+      - name: Restore the cargo downloads + sccache compiler cache
+        if: startsWith(matrix.language, 'rust')
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.language }}-
+            ${{ runner.os }}-cargo-esdk-test-server-
+
+      - name: Set up .NET (.NET library transpile + build)
+        if: matrix.language == 'net'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - name: Install Dafny 4.9.0
+        if: matrix.language == 'net'
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dafny --version 4.9.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Restore the NuGet package cache
+        if: matrix.language == 'net'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-esdk-test-server-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-esdk-test-server-
+
+      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
+        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
+        # Language_Server + live Java library) and aws-crypto-tools-rust (the
+        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
+        # Configuration_Entries' Server_Locations (config/server-config.json).
+        # GitHub Actions' default token only reaches THIS repo, so that
+        # cross-repo private clone needs its own credential. We supply a
+        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
+        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
+        # config/server-config.json or the Makefile changes. The public
+        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
+        #
+        # SECURITY NOTES:
+        #   - The PAT is passed only via the step `env:` below (never inlined
+        #     in the script), and GitHub automatically masks the secret value
+        #     in logs. We do NOT use `set -x`, so the configured URL is not
+        #     echoed.
+        #   - The token is written only to the ephemeral runner's global git
+        #     config (~/.gitconfig), which is discarded when the job ends.
+        #   - This rewrite is CI-ONLY. Local development is unaffected and
+        #     keeps using the SSH URL as-is.
+        #   - Required token scope: READ access to the contents of
+        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
+        #     with `Contents: Read` on each repo, or a classic PAT with the
+        #     `repo` scope).
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.LANGUAGE_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
+            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
+            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
+            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
+            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
+            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
+            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
+            echo "'repo' scope)." >&2
+            exit 1
+          fi
+          # Rewrite the SSH URL used in config/server-config.json to
+          # authenticated HTTPS so `git clone git@github.com:aws/...`
+          # transparently becomes an authenticated HTTPS clone.
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Build and start the ${{ matrix.language }} server (no Tests)
+        working-directory: esdk/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        run: make orchestrate ORCHESTRATE_ARGS="languages=${{ matrix.language }} stopAfter=launch"
+
+      - name: Save the ${{ matrix.language }} server output
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.OUT_PATHS }}
+          key: ${{ env.OUT_KEY }}
+
+      - name: Save the cargo downloads + sccache compiler cache
+        if: always() && startsWith(matrix.language, 'rust')
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-cargo-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
+
   esdk-test-server:
-    # JVM + python3 + git; ubuntu is sufficient.
+    needs: [plan, build]
+    # Runs when the build job succeeded or had nothing to build.
+    if: >-
+      always() && needs.plan.result == 'success'
+      && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: ubuntu-latest
 
     env:
@@ -186,6 +544,49 @@ jobs:
         # clone from aws-encryption-sdk-python, and the commons-hosted Python
         # server + Tests + orchestrator from the tree itself.
         uses: actions/checkout@v4
+
+      # The build job saves each heavy server's runnable output to these
+      # caches; the lookups gate the toolchain steps that only a fallback
+      # in-job build would need.
+      - name: Look up the prebuilt net server
+        id: look-net
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ needs.plan.outputs.paths_net }}
+          key: ${{ needs.plan.outputs.key_net }}
+
+      - name: Look up the prebuilt rust-dafny server
+        id: look-rustdafny
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ needs.plan.outputs.paths_rustdafny }}
+          key: ${{ needs.plan.outputs.key_rustdafny }}
+
+      - name: Look up the prebuilt go server
+        id: look-go
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ needs.plan.outputs.paths_go }}
+          key: ${{ needs.plan.outputs.key_go }}
+
+      - name: Look up the prebuilt rust server
+        id: look-rust
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ needs.plan.outputs.paths_rust }}
+          key: ${{ needs.plan.outputs.key_rust }}
+
+      - name: Look up the prebuilt rust-cpp server
+        id: look-rustcpp
+        uses: actions/cache/restore@v4
+        with:
+          lookup-only: true
+          path: ${{ needs.plan.outputs.paths_rustcpp }}
+          key: ${{ needs.plan.outputs.key_rustcpp }}
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
@@ -400,21 +801,6 @@ jobs:
           echo "go_version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
           echo "python_version=$(python3 -c 'import platform; print(platform.python_version())')" >> "$GITHUB_OUTPUT"
 
-      - name: Restore the materialized aws-encryption-sdk clone (net transpile + go)
-        # The orchestrator reuses a materialized clone whose HEAD equals the
-        # live branch tip (SourceMaterializer), and DotnetLaunchPlan's stamp
-        # skips the submodule init + Dafny transpile + dotnet build when the
-        # stamped commit matches, and RustLaunchPlan's stamp skips the
-        # rust-dafny cargo build (the prune step keeps only its binary). Keyed
-        # on rustc too, since that binary rides in the clone. No restore-keys: a clone at
-        # any other commit is wiped by the materializer, so a stale restore
-        # is pure download cost.
-        id: sources-esdk
-        uses: actions/cache/restore@v4
-        with:
-          path: esdk/test-server/build/sources/aws-encryption-sdk@*
-          key: ${{ runner.os }}-sources-v5-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}-${{ steps.pins.outputs.go_version }}
-
       - name: Restore the materialized aws-encryption-sdk-javascript clone
         # NodeLaunchPlan's stamp skips the root npm ci + lerna build-node +
         # server tsc on a reused clone of the same commit; node_modules and
@@ -424,7 +810,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v2-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Restore the materialized aws-encryption-sdk-c clone
         # The clone carries the cmake build tree (test-server/.build); on a
@@ -434,26 +820,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v3-c-${{ steps.pins.outputs.c }}
-
-      - name: Restore the materialized aws-crypto-tools-rust clone (rust)
-        # The clone carries the built server binary and its build stamp, so
-        # RustLaunchPlan skips cargo on a reused clone of the same commit.
-        id: sources-rust
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.pins.outputs.rust_dir }}
-          key: ${{ runner.os }}-sources-v1-rust-${{ steps.pins.outputs.rust }}-rust${{ steps.pins.outputs.rustc }}
-
-      - name: Restore the materialized aws-crypto-tools-rust clone (rust-cpp)
-        # The clone carries the built server binary, the shim library it
-        # loads, and the build stamp, so CppShimLaunchPlan skips both cargo
-        # builds on a reused clone of the same commit.
-        id: sources-rustcpp
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.pins.outputs.rustcpp_dir }}
-          key: ${{ runner.os }}-sources-v1-rustcpp-${{ steps.pins.outputs.rustcpp }}-rust${{ steps.pins.outputs.rustc }}
+          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
         # The clone carries the server's Gradle outputs, and the local Maven
@@ -465,7 +832,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v1-java-${{ steps.pins.outputs.java }}
+          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Restore the materialized aws-encryption-sdk-python clone + venv
         # The venv holds editable installs of the clone and its build stamp,
@@ -476,13 +843,13 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v1-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Restore the NuGet package cache
         # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
         # pays off when the esdk pin moves and the transpile runs cold.
         id: nuget-cache
-        if: steps.sources-esdk.outputs.cache-hit != 'true'
+        if: steps.look-net.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
@@ -494,7 +861,7 @@ jobs:
         # GoLaunchPlan's go build (modules + compiled packages) and the
         # aws-lc-sys native builds' Go tooling.
         id: go-cache
-        if: steps.sources-esdk.outputs.cache-hit != 'true'
+        if: steps.look-go.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -522,8 +889,8 @@ jobs:
         # pinned to the version the aws-encryption-sdk repo's
         # project.properties declares (a deterministic download, no
         # third-party action, matching the smithy-install rationale).
-        # Only needed when the aws-encryption-sdk clone cache missed.
-        if: steps.sources-esdk.outputs.cache-hit != 'true'
+        # Only needed when the prebuilt .NET server is missing.
+        if: steps.look-net.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           dotnet tool install --global dafny --version 4.9.0
@@ -566,7 +933,7 @@ jobs:
         #
         # Only needed when a Rust clone cache missed (a warm clone skips cargo).
         id: cargo-cache
-        if: steps.sources-rust.outputs.cache-hit != 'true' || steps.sources-rustcpp.outputs.cache-hit != 'true' || steps.sources-esdk.outputs.cache-hit != 'true'
+        if: steps.look-rust.outputs.cache-hit != 'true' || steps.look-rustcpp.outputs.cache-hit != 'true' || steps.look-rustdafny.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -688,6 +1055,47 @@ jobs:
           done
           echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
 
+      - name: Materialize the sources (clones only)
+        # The prebuilt outputs restore into these clones; each server's build
+        # stamp then skips its build.
+        working-directory: esdk/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="stopAfter=materialize"
+
+      - name: Restore the prebuilt net server
+        id: out-net
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_net }}
+          key: ${{ needs.plan.outputs.key_net }}
+
+      - name: Restore the prebuilt rust-dafny server
+        id: out-rustdafny
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustdafny }}
+          key: ${{ needs.plan.outputs.key_rustdafny }}
+
+      - name: Restore the prebuilt go server
+        id: out-go
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_go }}
+          key: ${{ needs.plan.outputs.key_go }}
+
+      - name: Restore the prebuilt rust server
+        id: out-rust
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rust }}
+          key: ${{ needs.plan.outputs.key_rust }}
+
+      - name: Restore the prebuilt rust-cpp server
+        id: out-rustcpp
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustcpp }}
+          key: ${{ needs.plan.outputs.key_rustcpp }}
+
       - name: Orchestrated Commons_Run (make orchestrate)
         # THE single orchestrated entry point (Requirements 2.7, 6.1): one
         # invocation resolves every language from THIS working tree's
@@ -759,37 +1167,6 @@ jobs:
       # whose exact key was already restored are skipped.
       # ------------------------------------------------------------------
 
-      - name: Prune cargo target dirs to the launched artifacts (before the source-cache saves)
-        # A reused clone only needs the server binaries and the shim library;
-        # the rest of each target dir is several GB of intermediate output.
-        if: always()
-        run: |
-          set -euo pipefail
-          keep_only() {
-            local target="$1"; shift
-            [ -d "$target" ] || return 0
-            local tmp; tmp="$(mktemp -d)"
-            for keep in "$@"; do
-              if [ -e "$target/$keep" ]; then
-                mkdir -p "$tmp/$(dirname "$keep")"
-                mv "$target/$keep" "$tmp/$keep"
-              fi
-            done
-            rm -rf "$target"
-            mv "$tmp" "$target"
-            du -sh "$target"
-          }
-          shopt -s nullglob
-          sources=esdk/test-server/build/sources
-          for clone in "$sources"/aws-crypto-tools-rust@*; do
-            keep_only "$clone/esdk-test-server/target" release/esdk-test-server
-            keep_only "$clone/esdk-cpp-test-server/target" release/esdk-cpp-test-server
-            keep_only "$clone/esdk/shims/aws-esdk-cpp/target" release/libaws_esdk_cpp.so
-          done
-          for clone in "$sources"/aws-encryption-sdk@*; do
-            keep_only "$clone/esdk-test-servers/rust/target" release/esdk-test-server
-          done
-
       - name: Save the Rust cargo downloads + sccache compiler cache
         if: always() && steps.cargo-cache.outcome == 'success'
         uses: actions/cache/save@v4
@@ -816,40 +1193,19 @@ jobs:
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
 
-      - name: Save the materialized aws-encryption-sdk clone
-        if: always() && steps.sources-esdk.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: esdk/test-server/build/sources/aws-encryption-sdk@*
-          key: ${{ runner.os }}-sources-v5-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}-${{ steps.pins.outputs.go_version }}
-
       - name: Save the materialized aws-encryption-sdk-javascript clone
         if: always() && steps.sources-javascript.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v2-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Save the materialized aws-encryption-sdk-c clone
         if: always() && steps.sources-c.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v3-c-${{ steps.pins.outputs.c }}
-
-      - name: Save the materialized aws-crypto-tools-rust clone (rust)
-        if: always() && steps.sources-rust.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ steps.pins.outputs.rust_dir }}
-          key: ${{ runner.os }}-sources-v1-rust-${{ steps.pins.outputs.rust }}-rust${{ steps.pins.outputs.rustc }}
-
-      - name: Save the materialized aws-crypto-tools-rust clone (rust-cpp)
-        if: always() && steps.sources-rustcpp.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ steps.pins.outputs.rustcpp_dir }}
-          key: ${{ runner.os }}-sources-v1-rustcpp-${{ steps.pins.outputs.rustcpp }}-rust${{ steps.pins.outputs.rustc }}
+          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
         if: always() && steps.sources-java.outputs.cache-hit != 'true'
@@ -858,7 +1214,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v1-java-${{ steps.pins.outputs.java }}
+          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Save the materialized aws-encryption-sdk-python clone + venv
         if: always() && steps.sources-python.outputs.cache-hit != 'true'
@@ -867,7 +1223,42 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v1-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+
+      - name: Save the net server built in this job
+        if: always() && steps.out-net.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_net }}
+          key: ${{ needs.plan.outputs.key_net }}
+
+      - name: Save the rust-dafny server built in this job
+        if: always() && steps.out-rustdafny.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustdafny }}
+          key: ${{ needs.plan.outputs.key_rustdafny }}
+
+      - name: Save the go server built in this job
+        if: always() && steps.out-go.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_go }}
+          key: ${{ needs.plan.outputs.key_go }}
+
+      - name: Save the rust server built in this job
+        if: always() && steps.out-rust.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rust }}
+          key: ${{ needs.plan.outputs.key_rust }}
+
+      - name: Save the rust-cpp server built in this job
+        if: always() && steps.out-rustcpp.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustcpp }}
+          key: ${{ needs.plan.outputs.key_rustcpp }}
 
       - name: Save the NuGet package cache
         if: always() && steps.nuget-cache.outcome == 'success' && steps.nuget-cache.outputs.cache-hit != 'true'

@@ -211,6 +211,25 @@ public final class TestServerOrchestratorMain {
         // verbatim to ./gradlew test --tests <pattern>). Empty runs everything.
         String testFilter = cli.getOrDefault("tests", "");
 
+        // languages=<a,b> — run only these configured languages.
+        // stopAfter=materialize|launch — stop before the Tests.
+        java.util.Set<String> languages = new java.util.LinkedHashSet<>();
+        for (String language : cli.getOrDefault("languages", "").split(",")) {
+            if (!language.isBlank()) {
+                languages.add(language.trim());
+            }
+        }
+        TestServerOrchestrator.StopAfter stopAfter;
+        try {
+            stopAfter = TestServerOrchestrator.StopAfter.valueOf(
+                cli.getOrDefault("stopAfter", "none").trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            System.err.println("TestServerOrchestrator: stopAfter must be none, materialize, or launch");
+            System.err.println(usage());
+            System.exit(EXIT_USAGE);
+            return;
+        }
+
         TestServerOrchestrator orchestrator = new TestServerOrchestrator(
             set,
             context,
@@ -220,7 +239,9 @@ public final class TestServerOrchestratorMain {
             new DuplicateTestsDetector(),
             testServerRoot,
             referenceImplementation)
-            .withWorkingTreeOverlays(workingTreeOverlays);
+            .withWorkingTreeOverlays(workingTreeOverlays)
+            .withLanguages(languages)
+            .withStopAfter(stopAfter);
 
         System.out.println("==> TestServerOrchestrator run");
         System.out.println("    context: " + describeContext(context));
@@ -236,6 +257,12 @@ public final class TestServerOrchestratorMain {
         }
         if (!testFilter.isBlank()) {
             System.out.println("    tests: " + testFilter);
+        }
+        if (!languages.isEmpty()) {
+            System.out.println("    languages: " + String.join(",", languages));
+        }
+        if (stopAfter != TestServerOrchestrator.StopAfter.NONE) {
+            System.out.println("    stopAfter: " + stopAfter.name().toLowerCase(java.util.Locale.ROOT));
         }
         if (context.kind() == RunContext.Kind.LANGUAGE) {
             System.out.println("    languageRepoRoot: " + context.languageRepoRoot());
@@ -357,7 +384,9 @@ public final class TestServerOrchestratorMain {
             + " [invokingRepositoryName=<name>]"
             + " [referenceImplementation=<lang>]"
             + " [workingTreeOverlay.<repo>=<abs path> ...]"
-            + " [tests=<pattern>]";
+            + " [tests=<pattern>]"
+            + " [languages=<lang>,...]"
+            + " [stopAfter=none|materialize|launch]";
     }
 
     /**
