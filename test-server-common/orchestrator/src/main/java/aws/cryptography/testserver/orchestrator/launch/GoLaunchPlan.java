@@ -46,6 +46,7 @@ public final class GoLaunchPlan implements Launcher {
      * declares the module accordingly.
      */
     private final String serverBinaryName;
+    private final String product;
 
     private static final String SERVER_LOG_NAME = "go-server.log";
 
@@ -93,6 +94,7 @@ public final class GoLaunchPlan implements Launcher {
         this.go = go;
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryName = product + "-test-server";
+        this.product = product;
     }
 
     @Override
@@ -103,8 +105,9 @@ public final class GoLaunchPlan implements Launcher {
         // 1. Resolve the materialized server directory (Req 2.5). The library is
         //    a go.mod replace target within the same clone, so only the server
         //    component is resolved here.
-        Path serverDir = sources.directoryOf(ComponentId.server(language))
+        MaterializedSources.Success resolved = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
+        Path serverDir = resolved.directory();
 
         try {
             Files.createDirectories(workDirectory);
@@ -115,7 +118,14 @@ public final class GoLaunchPlan implements Launcher {
         }
 
         // 2. Build: go build -o esdk-test-server . in the server directory.
-        runBuildStep(language, "go build -buildvcs=false -o esdk-test-server .", buildCommand(go, serverBinaryName), serverDir);
+        //    Skipped when the stamp shows this commit's binary is already built.
+        BuildStamp stamp = new BuildStamp(serverDir, product);
+        if (!stamp.upToDate(resolved.commit(), resolved.dirty(),
+                List.of(serverDir.resolve(serverBinaryName)))) {
+            runBuildStep(language, "go build -buildvcs=false -o esdk-test-server .",
+                buildCommand(go, serverBinaryName), serverDir);
+            stamp.write(language, resolved.commit());
+        }
 
         // 3. Launch: <server>/esdk-test-server <port> from the server directory,
         //    via the shared probe/spawn/readiness/teardown.

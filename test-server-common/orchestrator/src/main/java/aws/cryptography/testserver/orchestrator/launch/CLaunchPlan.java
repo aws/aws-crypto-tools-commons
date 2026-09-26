@@ -55,6 +55,7 @@ public final class CLaunchPlan implements Launcher {
      * by product (each SDK's CMake target names it accordingly).
      */
     private final String serverBinaryRelativePath;
+    private final String product;
 
     private static final String SERVER_LOG_NAME = "c-server.log";
 
@@ -102,6 +103,7 @@ public final class CLaunchPlan implements Launcher {
         this.cmake = cmake;
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryRelativePath = "test-server/" + product + "-test-server";
+        this.product = product;
     }
 
     @Override
@@ -128,11 +130,17 @@ public final class CLaunchPlan implements Launcher {
 
         // 2. Configure + build: the server Makefile's configure and build-server
         //    recipes, with the ambient CMAKE_PREFIX_PATH passed through.
-        runBuildStep(language, "cmake configure (BUILD_TEST_SERVER=ON)",
-            configureCommand(cmake, repoRoot, buildDir, System.getenv("CMAKE_PREFIX_PATH")),
-            serverDir);
-        runBuildStep(language, "cmake --build --target esdk-test-server",
-            buildCommand(cmake, buildDir), serverDir);
+        //    Skipped when the stamp shows this commit's binary is already built.
+        BuildStamp stamp = new BuildStamp(serverDir, product);
+        if (!stamp.upToDate(server.commit(), server.dirty(),
+                List.of(buildDir.resolve(serverBinaryRelativePath)))) {
+            runBuildStep(language, "cmake configure (BUILD_TEST_SERVER=ON)",
+                configureCommand(cmake, repoRoot, buildDir, System.getenv("CMAKE_PREFIX_PATH")),
+                serverDir);
+            runBuildStep(language, "cmake --build --target esdk-test-server",
+                buildCommand(cmake, buildDir), serverDir);
+            stamp.write(language, server.commit());
+        }
 
         // 3. Launch: <.build>/test-server/esdk-test-server <port> via the shared
         //    probe/spawn/readiness/teardown.
