@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * A {@code .<product>-build-stamp} file recording the commit a directory's
+ * A {@code .<name>-build-stamp} file recording the commit a directory's
  * build outputs were produced from, so a reused clone of the same commit
  * skips its build.
  */
@@ -17,11 +17,10 @@ final class BuildStamp {
 
     /**
      * @param directory the directory holding the stamp file
-     * @param product   the SDK product identifier; the stamp file is
-     *                  {@code .<product>-build-stamp}
+     * @param name      the stamp file is {@code .<name>-build-stamp}
      */
-    BuildStamp(Path directory, String product) {
-        this.stampFile = directory.resolve("." + product + "-build-stamp");
+    BuildStamp(Path directory, String name) {
+        this.stampFile = directory.resolve("." + name + "-build-stamp");
     }
 
     /**

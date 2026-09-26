@@ -430,16 +430,24 @@ jobs:
           pin c c
           pin rust rust
           pin rustcpp rust-cpp
+          pin java java
+          pin python python
           # The materialized clone directory is <repo>@<sanitized ref>-<8-hex hash>.
           clone_glob() {
-            local name="$1" language="$2" ref
+            local name="$1" language="$2" url ref repo
+            url=$(jq -r --arg l "$language" \
+              '.entries[] | select(.language==$l) | .serverLocation.url' "$config")
             ref=$(jq -r --arg l "$language" \
               '.entries[] | select(.language==$l) | .serverLocation.ref' "$config")
-            echo "${name}_dir=esdk/test-server/build/sources/aws-crypto-tools-rust@${ref//[^A-Za-z0-9._-]/_}-????????" >> "$GITHUB_OUTPUT"
+            repo=$(basename "${url%.git}"); repo="${repo##*:}"
+            echo "${name}_dir=esdk/test-server/build/sources/${repo}@${ref//[^A-Za-z0-9._-]/_}-????????" >> "$GITHUB_OUTPUT"
           }
           clone_glob rust rust
           clone_glob rustcpp rust-cpp
+          clone_glob java java
+          clone_glob python python
           echo "rustc=$(rustc --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+          echo "python_version=$(python3 -c 'import platform; print(platform.python_version())')" >> "$GITHUB_OUTPUT"
 
       - name: Restore the materialized aws-encryption-sdk clone (net transpile + go)
         # The orchestrator reuses a materialized clone whose HEAD equals the
@@ -495,6 +503,29 @@ jobs:
         with:
           path: ${{ steps.pins.outputs.rustcpp_dir }}
           key: ${{ runner.os }}-sources-v1-rustcpp-${{ steps.pins.outputs.rustcpp }}-rust${{ steps.pins.outputs.rustc }}
+
+      - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
+        # The clone carries the server's Gradle outputs, and the local Maven
+        # repository entry is the library install stamped with its commit, so
+        # JavaLaunchPlan skips the install and Gradle finds the server up to date.
+        id: sources-java
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ steps.pins.outputs.java_dir }}
+            ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
+          key: ${{ runner.os }}-sources-v1-java-${{ steps.pins.outputs.java }}
+
+      - name: Restore the materialized aws-encryption-sdk-python clone + venv
+        # The venv holds editable installs of the clone and its build stamp,
+        # so PythonLaunchPlan skips venv setup for the same commit.
+        id: sources-python
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ steps.pins.outputs.python_dir }}
+            esdk/test-server/build/launch/python/venv
+          key: ${{ runner.os }}-sources-v1-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Restore the NuGet package cache
         # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
@@ -803,6 +834,24 @@ jobs:
         with:
           path: ${{ steps.pins.outputs.rustcpp_dir }}
           key: ${{ runner.os }}-sources-v1-rustcpp-${{ steps.pins.outputs.rustcpp }}-rust${{ steps.pins.outputs.rustc }}
+
+      - name: Save the materialized aws-encryption-sdk-java clone + stamped install
+        if: always() && steps.sources-java.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.pins.outputs.java_dir }}
+            ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
+          key: ${{ runner.os }}-sources-v1-java-${{ steps.pins.outputs.java }}
+
+      - name: Save the materialized aws-encryption-sdk-python clone + venv
+        if: always() && steps.sources-python.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.pins.outputs.python_dir }}
+            esdk/test-server/build/launch/python/venv
+          key: ${{ runner.os }}-sources-v1-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Save the NuGet package cache
         if: always() && steps.nuget-cache.outputs.cache-hit != 'true'

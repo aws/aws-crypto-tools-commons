@@ -104,10 +104,12 @@ public final class PythonLaunchPlan implements Launcher {
         String language = entry.language();
 
         // 1. Resolve the materialized library + server directories.
-        Path libraryDir = sources.directoryOf(ComponentId.library(language))
+        MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
-        Path serverDir = sources.directoryOf(ComponentId.server(language))
+        MaterializedSources.Success serverSource = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
+        Path libraryDir = library.directory();
+        Path serverDir = serverSource.directory();
 
         // 2. Environment: venv + editable installs (the Makefile's setup-python).
         Path venvDir = venvDirectory(workDirectory);
@@ -118,12 +120,21 @@ public final class PythonLaunchPlan implements Launcher {
                 "failed to create the " + language + " launch work directory "
                     + workDirectory + ": " + e.getMessage(), e);
         }
-        if (!Files.isExecutable(venvPython(venvDir))) {
-            runSetupStep(language, "create venv", createVenvCommand(python3, venvDir));
+        //    Skipped when the stamp shows the venv already holds editable
+        //    installs of these library and server commits.
+        BuildStamp stamp = new BuildStamp(venvDir, "venv");
+        String commits = library.commit() == null || serverSource.commit() == null
+            ? null : library.commit() + " " + serverSource.commit();
+        boolean dirty = Boolean.TRUE.equals(library.dirty()) || Boolean.TRUE.equals(serverSource.dirty());
+        if (!stamp.upToDate(commits, dirty, List.of(venvPython(venvDir)))) {
+            if (!Files.isExecutable(venvPython(venvDir))) {
+                runSetupStep(language, "create venv", createVenvCommand(python3, venvDir));
+            }
+            runSetupStep(language, "upgrade pip", upgradePipCommand(venvDir));
+            runSetupStep(language, "pip install library + MPL + cbor2 + server",
+                pipInstallCommand(venvDir, libraryDir, serverDir));
+            stamp.write(language, commits);
         }
-        runSetupStep(language, "upgrade pip", upgradePipCommand(venvDir));
-        runSetupStep(language, "pip install library + MPL + cbor2 + server",
-            pipInstallCommand(venvDir, libraryDir, serverDir));
 
         // 3. Launch: <venv python> -m esdk_test_server <port> from the server
         //    directory (the Makefile's run-python-server), via the shared

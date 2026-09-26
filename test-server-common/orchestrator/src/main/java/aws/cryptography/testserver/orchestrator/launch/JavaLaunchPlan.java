@@ -178,20 +178,27 @@ public final class JavaLaunchPlan implements Launcher {
         //    detected by the absence of a pom.xml at the resolved library
         //    root. In that case the server relies on its own
         //    gradle.properties-default version and never sees -PesdkVersion.
+        //    A clean clone is stamped with its commit, and the install is
+        //    skipped when that version is already in the local repository.
         String stampedVersion = null;
         if (Files.isRegularFile(libraryDir.resolve("pom.xml"))) {
-            stampedVersion = stampVersion(Instant.now());
+            MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
+                .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
+            boolean clean = library.commit() != null && !Boolean.TRUE.equals(library.dirty());
+            stampedVersion = clean ? stampVersion(library.commit()) : stampVersion(Instant.now());
 
-            runBuildStep(language, "stamp the live version (mvn versions:set)",
-                versionsSetCommand(stampedVersion), libraryDir, mavenJavaHome);
-            try {
-                runBuildStep(language, "install the live library (mvn install)",
-                    installCommand(), libraryDir, mavenJavaHome);
-            } finally {
-                // Best-effort restore, exactly like the Makefile's
-                // `mvn versions:revert || true`: the resolved tree must never stay
-                // stamped, and a revert hiccup must not mask the install result.
-                revertBestEffort(libraryDir, mavenJavaHome);
+            if (!(clean && installedLocally(stampedVersion))) {
+                runBuildStep(language, "stamp the live version (mvn versions:set)",
+                    versionsSetCommand(stampedVersion), libraryDir, mavenJavaHome);
+                try {
+                    runBuildStep(language, "install the live library (mvn install)",
+                        installCommand(), libraryDir, mavenJavaHome);
+                } finally {
+                    // Best-effort restore, exactly like the Makefile's
+                    // `mvn versions:revert || true`: the resolved tree must never stay
+                    // stamped, and a revert hiccup must not mask the install result.
+                    revertBestEffort(libraryDir, mavenJavaHome);
+                }
             }
         }
 
@@ -224,6 +231,29 @@ public final class JavaLaunchPlan implements Launcher {
      */
     static String stampVersion(Instant instant) {
         return STAMP_PREFIX + STAMP_TIMESTAMP.format(instant);
+    }
+
+    /** The version stamped onto a clean library clone: {@code 0.0.0-testserver-<commit>}. */
+    static String stampVersion(String commit) {
+        return STAMP_PREFIX + commit;
+    }
+
+    /**
+     * Whether {@code ~/.m2/repository} already holds an artifact installed at
+     * {@code version}. Stamped versions are unique to one library commit.
+     */
+    static boolean installedLocally(String version) {
+        Path repository = Path.of(System.getProperty("user.home"), ".m2", "repository");
+        if (!Files.isDirectory(repository)) {
+            return false;
+        }
+        try (var paths = Files.find(repository, 8,
+                (path, attributes) -> attributes.isDirectory()
+                    && path.getFileName().toString().equals(version))) {
+            return paths.findAny().isPresent();
+        } catch (IOException | java.io.UncheckedIOException e) {
+            return false;
+        }
     }
 
     /**
