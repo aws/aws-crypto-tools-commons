@@ -76,7 +76,7 @@ Source materialization reuses work across runs:
 
 - **Working-tree sources are never cloned.** (See the next section.)
 - **Clones are cached and deduplicated.** Each distinct `(url, ref)` is cloned
-  once into `orchestrator/build/` scratch. On the next run, an existing scratch
+  once into `build/` scratch. On the next run, an existing scratch
   clone is **reused in place** when its local `HEAD` still equals the live
   remote tip of the branch; it is only wiped and re-cloned when it is absent,
   not a repo, or the tip has moved. Components sharing `(url, ref)` share one
@@ -206,5 +206,5 @@ logic, with no git and no network.
 make clean            # gradle clean in every module + remove scratch
 ```
 
-Scratch clones live under `orchestrator/build/`; removing that directory forces
+Scratch clones live under `build/`; removing that directory forces
 fresh clones on the next orchestrated run.

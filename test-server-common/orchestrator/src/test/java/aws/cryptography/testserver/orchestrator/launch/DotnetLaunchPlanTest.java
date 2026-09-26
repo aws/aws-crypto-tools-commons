@@ -41,9 +41,10 @@ class DotnetLaunchPlanTest {
     @Test
     @DisplayName("the transpile prerequisites init the libraries and mpl submodules, like the repo's net workflow")
     void submodules() {
-        assertEquals(List.of("git", "submodule", "update", "--init", "libraries"),
+        assertEquals(List.of("git", "submodule", "update", "--init", "--depth", "1", "libraries"),
             DotnetLaunchPlan.submoduleLibrariesCommand());
-        assertEquals(List.of("git", "submodule", "update", "--init", "--recursive", "mpl"),
+        assertEquals(List.of("git", "submodule", "update", "--init", "--recursive",
+                "--depth", "1", "--jobs", "8", "mpl"),
             DotnetLaunchPlan.submoduleMplCommand());
     }
 

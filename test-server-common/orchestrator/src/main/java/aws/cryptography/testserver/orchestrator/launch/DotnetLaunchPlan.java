@@ -216,14 +216,18 @@ public final class DotnetLaunchPlan implements Launcher {
     // Pure command construction (unit-testable without a Dafny transpile).
     // ------------------------------------------------------------------
 
-    /** {@code git submodule update --init libraries} (clone root). */
+    /** {@code git submodule update --init --depth 1 libraries} (clone root). */
     static List<String> submoduleLibrariesCommand() {
-        return List.of("git", "submodule", "update", "--init", "libraries");
+        return List.of("git", "submodule", "update", "--init", "--depth", "1", "libraries");
     }
 
-    /** {@code git submodule update --init --recursive mpl} (clone root). */
+    /**
+     * {@code git submodule update --init --recursive --depth 1 --jobs 8 mpl}
+     * (clone root). The build reads only the pinned commits' trees.
+     */
     static List<String> submoduleMplCommand() {
-        return List.of("git", "submodule", "update", "--init", "--recursive", "mpl");
+        return List.of("git", "submodule", "update", "--init", "--recursive",
+            "--depth", "1", "--jobs", "8", "mpl");
     }
 
     /** {@code make setup_net} (AwsEncryptionSDK/). */

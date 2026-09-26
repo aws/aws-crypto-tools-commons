@@ -409,11 +409,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk@*
-          key: ${{ runner.os }}-sources-v4-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}-${{ steps.pins.outputs.go_version }}
-          # Same commit: the net and rust-dafny stamps still hold and only the
-          # Go build reruns.
-          restore-keys: |
-            ${{ runner.os }}-sources-v3-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}
+          key: ${{ runner.os }}-sources-v5-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}-${{ steps.pins.outputs.go_version }}
 
       - name: Restore the materialized aws-encryption-sdk-javascript clone
         # NodeLaunchPlan's stamp skips the root npm ci + lerna build-node +
@@ -435,8 +431,6 @@ jobs:
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
           key: ${{ runner.os }}-sources-v3-c-${{ steps.pins.outputs.c }}
-          restore-keys: |
-            ${{ runner.os }}-sources-v2-c-${{ steps.pins.outputs.c }}
 
       - name: Restore the materialized aws-crypto-tools-rust clone (rust)
         # The clone carries the built server binary and its build stamp, so
@@ -823,7 +817,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk@*
-          key: ${{ runner.os }}-sources-v4-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}-${{ steps.pins.outputs.go_version }}
+          key: ${{ runner.os }}-sources-v5-esdk-${{ steps.pins.outputs.esdk }}-dafny4.9.0-rust${{ steps.pins.outputs.rustc }}-${{ steps.pins.outputs.go_version }}
 
       - name: Save the materialized aws-encryption-sdk-javascript clone
         if: always() && steps.sources-javascript.outputs.cache-hit != 'true'
