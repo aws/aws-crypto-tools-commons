@@ -137,6 +137,9 @@ on:
 
 permissions:
   contents: read
+  # The test job polls this run's jobs and the repo's caches for the
+  # prebuilt servers.
+  actions: read
   # Required for the GitHub OIDC token exchange used by the
   # configure-aws-credentials step below (Requirement 6.5).
   id-token: write
@@ -244,7 +247,7 @@ jobs:
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
           esdk_tip=$(tip net)
-          emit net "$esdk_tip-dafny4.9.0-b3" \
+          emit net "$esdk_tip-dafny4.9.0-b4" \
             "$esdk/esdk-test-servers/net/bin/Release/net8.0" \
             "$esdk/esdk-test-servers/net/.esdk-build-stamp"
           # The Dafny transpile output depends only on these paths' content.
@@ -537,12 +540,11 @@ jobs:
             ${{ github.workspace }}/.sccache
           key: ${{ runner.os }}-cargo-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
 
+  # Starts alongside the build job; its setup and the light server builds
+  # overlap the heavy builds, and it waits for their outputs just before
+  # the run.
   esdk-test-server:
-    needs: [plan, build]
-    # Runs when the build job succeeded or had nothing to build.
-    if: >-
-      always() && needs.plan.result == 'success'
-      && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: plan
     runs-on: ubuntu-latest
 
     env:
@@ -565,17 +567,6 @@ jobs:
       # variable ESDK_TEST_SERVER_KMS_ROLE_ARN to target a different
       # account/role. This is an IAM role ARN, not a secret.
       KMS_CI_ROLE_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
-      # sccache as the Rust compiler cache (see the "Set up sccache" step). It
-      # content-hashes compiler inputs, so restored artifacts stay valid across the
-      # orchestrated run's fresh mid-run clone (unlike caching target/, which
-      # corrupted the build). RustLaunchPlan's cargo build inherits these, so its
-      # rustc invocations hit the cache.
-      RUSTC_WRAPPER: sccache
-      SCCACHE_DIR: ${{ github.workspace }}/.sccache
-      # Keep the sccache server alive for the whole job so the end-of-job
-      # stats step reports the orchestrated run's real hit/miss counts (the
-      # default 600s idle timeout kills the server long before that step).
-      SCCACHE_IDLE_TIMEOUT: "0"
 
     steps:
       - name: Checkout (working tree = the Configuration_Set every language resolves from)
@@ -585,49 +576,6 @@ jobs:
         # clone from aws-encryption-sdk-python, and the commons-hosted Python
         # server + Tests + orchestrator from the tree itself.
         uses: actions/checkout@v4
-
-      # The build job saves each heavy server's runnable output to these
-      # caches; the lookups gate the toolchain steps that only a fallback
-      # in-job build would need.
-      - name: Look up the prebuilt net server
-        id: look-net
-        uses: actions/cache/restore@v4
-        with:
-          lookup-only: true
-          path: ${{ needs.plan.outputs.paths_net }}
-          key: ${{ needs.plan.outputs.key_net }}
-
-      - name: Look up the prebuilt rust-dafny server
-        id: look-rustdafny
-        uses: actions/cache/restore@v4
-        with:
-          lookup-only: true
-          path: ${{ needs.plan.outputs.paths_rustdafny }}
-          key: ${{ needs.plan.outputs.key_rustdafny }}
-
-      - name: Look up the prebuilt go server
-        id: look-go
-        uses: actions/cache/restore@v4
-        with:
-          lookup-only: true
-          path: ${{ needs.plan.outputs.paths_go }}
-          key: ${{ needs.plan.outputs.key_go }}
-
-      - name: Look up the prebuilt rust server
-        id: look-rust
-        uses: actions/cache/restore@v4
-        with:
-          lookup-only: true
-          path: ${{ needs.plan.outputs.paths_rust }}
-          key: ${{ needs.plan.outputs.key_rust }}
-
-      - name: Look up the prebuilt rust-cpp server
-        id: look-rustcpp
-        uses: actions/cache/restore@v4
-        with:
-          lookup-only: true
-          path: ${{ needs.plan.outputs.paths_rustcpp }}
-          key: ${{ needs.plan.outputs.key_rustcpp }}
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
@@ -667,43 +615,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-
-      - name: Set up Go (for the Go Language_Server and the Rust servers' aws-lc-sys native builds)
-        # The orchestrated run's GoLaunchPlan builds the Go Language_Server
-        # from the aws-encryption-sdk clone, and the Rust launch plans'
-        # cargo builds compile aws-lc-sys native code with Go on hosted
-        # runners.
-        uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-
-      - name: Set up the Rust toolchain (for the Rust Language_Server build)
-        # RustLaunchPlan runs `cargo build --release` in the materialized Rust
-        # server crate. Select a stable toolchain via the runner's preinstalled
-        # rustup (no third-party action, matching the smithy-install rationale).
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          cargo --version
-
-      - name: Set up sccache (Rust compiler cache)
-        # sccache caches individual rustc compilations keyed by a hash of the inputs
-        # (sources, flags, compiler) — mtime-independent, so the orchestrated run's
-        # fresh clone of aws-crypto-tools-rust still hits the cache on warm runs
-        # (caching the compiled target/ instead corrupted the build). Installed from
-        # the pinned release binary, same rationale as the Smithy CLI (a
-        # deterministic download, no third-party action).
-        run: |
-          set -euo pipefail
-          SCCACHE_VERSION="v0.8.2"
-          base="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
-          url="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${base}.tar.gz"
-          tmp="$(mktemp -d)"
-          curl -sSL "$url" -o "$tmp/sccache.tar.gz"
-          tar -xzf "$tmp/sccache.tar.gz" -C "$tmp"
-          sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
-          sccache --version
 
       - name: Set up .NET (for the .NET Language_Server build)
         # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
@@ -886,32 +797,6 @@ jobs:
             esdk/test-server/build/launch/python/venv
           key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
-      - name: Restore the NuGet package cache
-        # DotnetLaunchPlan's setup_net/dotnet build restore into ~/.nuget;
-        # pays off when the esdk pin moves and the transpile runs cold.
-        id: nuget-cache
-        if: steps.look-net.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-esdk-test-server-
-
-      - name: Restore the Go module + build caches
-        # GoLaunchPlan's go build (modules + compiled packages) and the
-        # aws-lc-sys native builds' Go tooling.
-        id: go-cache
-        if: steps.look-go.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
-          restore-keys: |
-            ${{ runner.os }}-go-esdk-test-server-
-
       - name: Restore the npm download cache
         # Pays off when the javascript pin moves and npm ci runs cold.
         id: npm-cache
@@ -922,22 +807,6 @@ jobs:
           key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
           restore-keys: |
             ${{ runner.os }}-npm-esdk-test-server-
-
-      - name: Install Dafny 4.9.0 (for the .NET library transpile)
-        # The .NET library carries no committed generated code, so
-        # DotnetLaunchPlan runs `make setup_net && make transpile_net` in the
-        # clone, which needs dafny on PATH. Installed as a global dotnet tool
-        # pinned to the version the aws-encryption-sdk repo's
-        # project.properties declares (a deterministic download, no
-        # third-party action, matching the smithy-install rationale).
-        # Only needed when the prebuilt .NET server is missing.
-        if: steps.look-net.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          export PATH="$HOME/.dotnet/tools:$PATH"
-          dafny --version
 
       - name: Build aws-c-common (for the C Language_Server build)
         # The orchestrated run's CLaunchPlan cmake-configures the
@@ -956,34 +825,6 @@ jobs:
             -DBUILD_TESTING=OFF
           cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
           echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
-
-      - name: Restore the Rust cargo downloads + sccache compiler cache
-        # Cache the cargo registry/git downloads AND the sccache compiler cache —
-        # NOT the compiled target dir. The orchestrated run clones aws-crypto-tools-rust
-        # mid-run, giving the sources fresh mtimes, so a restored target/ yields an
-        # incorrect cargo incremental build (observed: the Rust hierarchical keyring
-        # then failed on non-committing suites). Downloads are content-checksummed and
-        # sccache is content-hashed, so both reuse safely across runs while only the
-        # final link step runs fresh. A distinct key prefix (cargo- not rust-) avoids
-        # restoring the earlier target-containing caches.
-        #
-        # Explicit restore/save split: the orchestrate step exits non-zero on any
-        # failed Test (fail-open Result), and actions/cache's implicit post step
-        # only saves on job SUCCESS — so the combined action never saved anything
-        # here. The matching save step at the end of the job runs `if: always()`.
-        #
-        # Only needed when a Rust clone cache missed (a warm clone skips cargo).
-        id: cargo-cache
-        if: steps.look-rust.outputs.cache-hit != 'true' || steps.look-rustcpp.outputs.cache-hit != 'true' || steps.look-rustdafny.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-esdk-test-server-
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -1096,6 +937,32 @@ jobs:
           done
           echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
 
+      - name: Build the light servers while the heavy ones build
+        # Their build stamps make the orchestrated run skip these builds.
+        working-directory: esdk/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        run: make orchestrate ORCHESTRATE_ARGS="languages=java,python,javascript,c stopAfter=launch"
+
+      - name: Wait for the prebuilt servers
+        # The build job saves each missing heavy server as it finishes.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEYS: ${{ needs.plan.outputs.key_net }} ${{ needs.plan.outputs.key_rustdafny }} ${{ needs.plan.outputs.key_go }} ${{ needs.plan.outputs.key_rust }} ${{ needs.plan.outputs.key_rustcpp }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 2700))
+          for key in $KEYS; do
+            until gh cache list -R "$GITHUB_REPOSITORY" --key "$key" --json key -q '.[].key' | grep -qxF "$key"; do
+              failed=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
+                -q '[.jobs[] | select(.name | startswith("build")) | select(.conclusion == "failure" or .conclusion == "cancelled")] | length')
+              if [ "$failed" != 0 ]; then echo "::error::a server build job failed"; exit 1; fi
+              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $key"; exit 1; fi
+              sleep 15
+            done
+            echo "ready after ${SECONDS}s: $key"
+          done
+
       - name: Materialize the sources (clones only)
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
@@ -1173,13 +1040,6 @@ jobs:
           ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
         run: make orchestrate
 
-      - name: Rust compiler cache stats (sccache)
-        # Surfaces the compiler cache hit/miss counts for the orchestrated run's
-        # Rust build — the insight the captured build output otherwise hides. Runs
-        # whether the build passed or failed; never fails the job.
-        if: always()
-        run: sccache --show-stats || true
-
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
         # the artifacts (including resolution-record.json, Requirement 5.3)
@@ -1207,16 +1067,6 @@ jobs:
       # cache that only saves on job success would never save here. Saves
       # whose exact key was already restored are skipped.
       # ------------------------------------------------------------------
-
-      - name: Save the Rust cargo downloads + sccache compiler cache
-        if: always() && steps.cargo-cache.outcome == 'success'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-esdk-test-server-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Save Gradle + Maven caches
         if: always() && steps.gradle-cache.outputs.cache-hit != 'true'
@@ -1265,57 +1115,6 @@ jobs:
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
           key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
-
-      - name: Save the net server built in this job
-        if: always() && steps.out-net.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_net }}
-          key: ${{ needs.plan.outputs.key_net }}
-
-      - name: Save the rust-dafny server built in this job
-        if: always() && steps.out-rustdafny.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_rustdafny }}
-          key: ${{ needs.plan.outputs.key_rustdafny }}
-
-      - name: Save the go server built in this job
-        if: always() && steps.out-go.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_go }}
-          key: ${{ needs.plan.outputs.key_go }}
-
-      - name: Save the rust server built in this job
-        if: always() && steps.out-rust.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_rust }}
-          key: ${{ needs.plan.outputs.key_rust }}
-
-      - name: Save the rust-cpp server built in this job
-        if: always() && steps.out-rustcpp.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_rustcpp }}
-          key: ${{ needs.plan.outputs.key_rustcpp }}
-
-      - name: Save the NuGet package cache
-        if: always() && steps.nuget-cache.outcome == 'success' && steps.nuget-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-esdk-test-server-${{ steps.pins.outputs.esdk }}
-
-      - name: Save the Go module + build caches
-        if: always() && steps.go-cache.outcome == 'success' && steps.go-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-esdk-test-server-${{ steps.pins.outputs.esdk }}
 
       - name: Save the npm download cache
         if: always() && steps.npm-cache.outcome == 'success' && steps.npm-cache.outputs.cache-hit != 'true'
