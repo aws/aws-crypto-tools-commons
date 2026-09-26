@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -63,6 +64,13 @@ public final class DotnetLaunchPlan implements Launcher {
     /** The Dafny version the repository's transpile pins (project.properties). */
     static final String REQUIRED_DAFNY_VERSION = "4.9.0";
 
+    /** The repository paths whose content determines the transpile output. */
+    static final List<String> TRANSPILE_INPUTS =
+        List.of("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "mpl");
+
+    /** A file the ESDK transpile writes, relative to the Dafny project. */
+    static final String TRANSPILED_FILE = "runtimes/net/ImplementationFromDafny.cs";
+
     /** The Dafny build directory, relative to the clone root. */
     static final String DAFNY_PROJECT_RELATIVE_PATH = "AwsEncryptionSDK";
 
@@ -96,6 +104,7 @@ public final class DotnetLaunchPlan implements Launcher {
     private final Path workDirectory;
     private final String dotnet;
     private final String make;
+    private final String product;
     private final SubprocessLauncher subprocessLauncher;
 
     /**
@@ -137,6 +146,7 @@ public final class DotnetLaunchPlan implements Launcher {
         this.workDirectory = workDirectory;
         this.dotnet = dotnet;
         this.make = make;
+        this.product = product;
         this.subprocessLauncher = subprocessLauncher;
         String titleCased = Character.toUpperCase(product.charAt(0)) + product.substring(1);
         this.csprojName = titleCased + "TestServer.csproj";
@@ -196,7 +206,18 @@ public final class DotnetLaunchPlan implements Launcher {
                 runBuildStep(language, "git submodule update --init --recursive mpl",
                     submoduleMplCommand(), repoRoot);
                 runBuildStep(language, "make setup_net", setupCommand(make), dafnyProjectDir);
-                runBuildStep(language, "make transpile_net", transpileCommand(make), dafnyProjectDir);
+                // The transpile output depends only on the Dafny sources, the
+                // submodules, and the shared Makefile, so it is skipped when
+                // its stamp records those same inputs (e.g. a test-server-only
+                // change on the branch).
+                String transpileInputs = transpileInputs(language, repoRoot);
+                BuildStamp transpileStamp = new BuildStamp(dafnyProjectDir, product + "-transpile");
+                if (!transpileStamp.upToDate(transpileInputs, server.dirty(),
+                        List.of(dafnyProjectDir.resolve(TRANSPILED_FILE)))) {
+                    runBuildStep(language, "make transpile (implementation + dependencies)",
+                        transpileCommand(make), dafnyProjectDir);
+                    transpileStamp.write(language, transpileInputs, server.dirty());
+                }
             }
             runBuildStep(language, "dotnet build " + csprojName + " -c Release",
                 buildCommand(dotnet, csprojName), serverDir);
@@ -235,9 +256,38 @@ public final class DotnetLaunchPlan implements Launcher {
         return List.of(make, "setup_net");
     }
 
-    /** {@code make transpile_net CORES=4} (AwsEncryptionSDK/). */
+    /**
+     * The {@code transpile_net} steps the server build needs, in order:
+     * {@code make _with_extern_pre_transpile transpile_implementation_net
+     * transpile_dependencies_net _with_extern_post_transpile CORES=4}
+     * (AwsEncryptionSDK/). The library's own Dafny tests are not transpiled.
+     */
     static List<String> transpileCommand(String make) {
-        return List.of(make, "transpile_net", "CORES=4");
+        return List.of(make, "_with_extern_pre_transpile", "transpile_implementation_net",
+            "transpile_dependencies_net", "_with_extern_post_transpile", "CORES=4");
+    }
+
+    /**
+     * The transpile inputs as recorded in the clone's {@code HEAD}: the tree,
+     * submodule, and blob ids of {@link #TRANSPILE_INPUTS}, plus the Dafny
+     * version. {@code null} (never up to date) when git cannot list them.
+     */
+    static String transpileInputs(String language, Path repoRoot) {
+        List<String> command = new ArrayList<>(List.of("git", "ls-tree", "HEAD"));
+        command.addAll(TRANSPILE_INPUTS);
+        try {
+            Process process = new ProcessBuilder(command).directory(repoRoot.toFile())
+                .redirectErrorStream(true).start();
+            String output = new String(process.getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8).trim();
+            return process.waitFor() == 0 && !output.isEmpty()
+                ? "dafny " + REQUIRED_DAFNY_VERSION + "\n" + output : null;
+        } catch (IOException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
     }
 
     /** {@code dotnet build <csproj> -c Release} (server directory). */

@@ -149,6 +149,8 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       key_net: ${{ steps.keys.outputs.key_net }}
+      key_nettranspile: ${{ steps.keys.outputs.key_nettranspile }}
+      paths_nettranspile: ${{ steps.keys.outputs.paths_nettranspile }}
       paths_net: ${{ steps.keys.outputs.paths_net }}
       key_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
       paths_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
@@ -212,6 +214,8 @@ jobs:
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>).
         id: keys
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           config=esdk/test-server/config/server-config.json
@@ -235,7 +239,7 @@ jobs:
           }
           emit() {
             local name="$1" key="$2"; shift 2
-            echo "key_$name=${RUNNER_OS}-out-v1-$name-$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${RUNNER_OS}-out-v2-$name-$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
@@ -243,6 +247,15 @@ jobs:
           emit net "$esdk_tip-dafny4.9.0" \
             "$esdk/esdk-test-servers/net/bin/Release/net8.0" \
             "$esdk/esdk-test-servers/net/.esdk-build-stamp"
+          # The Dafny transpile output depends only on these paths' content.
+          esdk_repo=$(field net url); esdk_repo=${esdk_repo#https://github.com/}; esdk_repo=${esdk_repo%.git}
+          transpile=$(gh api "repos/$esdk_repo/git/trees/$esdk_tip" --jq \
+            '[.tree[] | select(.path | IN("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "mpl")) | .sha] | join(" ")' \
+            | sha256sum | cut -c1-16) || transpile="$esdk_tip"
+          emit nettranspile "$transpile-dafny4.9.0" \
+            "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \
+            "$esdk/mpl/*/runtimes/net/ImplementationFromDafny*" \
+            "$esdk/AwsEncryptionSDK/.esdk-transpile-stamp"
           emit rustdafny "$esdk_tip" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
@@ -474,11 +487,39 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Clone the .NET sources and their submodules
+        # The transpile outputs restore into the submodule checkouts, so those
+        # exist first.
+        if: matrix.language == 'net'
+        working-directory: esdk/test-server
+        run: |
+          set -euo pipefail
+          make orchestrate ORCHESTRATE_ARGS="languages=net stopAfter=materialize"
+          for clone in build/sources/aws-encryption-sdk@*; do
+            git -C "$clone" submodule update --init --depth 1 libraries
+            git -C "$clone" submodule update --init --recursive --depth 1 --jobs 8 mpl
+          done
+
+      - name: Restore the .NET transpile outputs
+        id: net-transpile
+        if: matrix.language == 'net'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_nettranspile }}
+          key: ${{ needs.plan.outputs.key_nettranspile }}
+
       - name: Build and start the ${{ matrix.language }} server (no Tests)
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
         run: make orchestrate ORCHESTRATE_ARGS="languages=${{ matrix.language }} stopAfter=launch"
+
+      - name: Save the .NET transpile outputs
+        if: matrix.language == 'net' && steps.net-transpile.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_nettranspile }}
+          key: ${{ needs.plan.outputs.key_nettranspile }}
 
       - name: Save the ${{ matrix.language }} server output
         uses: actions/cache/save@v4
