@@ -124,7 +124,7 @@ public final class GoLaunchPlan implements Launcher {
                 List.of(serverDir.resolve(serverBinaryName)))) {
             runBuildStep(language, "go build -buildvcs=false -o esdk-test-server .",
                 buildCommand(go, serverBinaryName), serverDir);
-            stamp.write(language, resolved.commit());
+            stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
         // 3. Launch: <server>/esdk-test-server <port> from the server directory,

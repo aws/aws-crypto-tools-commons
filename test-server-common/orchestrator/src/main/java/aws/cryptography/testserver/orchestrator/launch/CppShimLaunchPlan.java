@@ -152,7 +152,7 @@ public final class CppShimLaunchPlan implements Launcher {
 
             // 3. Build the server.
             runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
-            stamp.write(language, resolved.commit());
+            stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
         // 4. Launch: <server>/target/release/esdk-cpp-test-server <port> via the

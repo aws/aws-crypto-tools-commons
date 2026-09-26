@@ -139,7 +139,7 @@ public final class CLaunchPlan implements Launcher {
                 serverDir);
             runBuildStep(language, "cmake --build --target esdk-test-server",
                 buildCommand(cmake, buildDir), serverDir);
-            stamp.write(language, server.commit());
+            stamp.write(language, server.commit(), server.dirty());
         }
 
         // 3. Launch: <.build>/test-server/esdk-test-server <port> via the shared

@@ -133,7 +133,7 @@ public final class PythonLaunchPlan implements Launcher {
             runSetupStep(language, "upgrade pip", upgradePipCommand(venvDir));
             runSetupStep(language, "pip install library + MPL + cbor2 + server",
                 pipInstallCommand(venvDir, libraryDir, serverDir));
-            stamp.write(language, commits);
+            stamp.write(language, commits, dirty);
         }
 
         // 3. Launch: <venv python> -m esdk_test_server <port> from the server

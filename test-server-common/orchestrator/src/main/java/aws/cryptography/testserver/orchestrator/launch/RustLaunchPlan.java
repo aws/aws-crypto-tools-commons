@@ -128,7 +128,7 @@ public final class RustLaunchPlan implements Launcher {
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary))) {
             runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir);
-            stamp.write(language, resolved.commit());
+            stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
         // 3. Launch: <server>/target/release/esdk-test-server <port> from the

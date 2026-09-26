@@ -44,10 +44,14 @@ final class BuildStamp {
         }
     }
 
-    /** Record a successful build of {@code commit}; a {@code null} commit clears the stamp. */
-    void write(String language, String commit) throws ServerLaunchException {
+    /**
+     * Record a successful build of {@code commit}. A dirty working tree or a
+     * {@code null} commit clears the stamp instead, so a later clean build of
+     * the same commit is not skipped.
+     */
+    void write(String language, String commit, Boolean dirty) throws ServerLaunchException {
         try {
-            if (commit == null) {
+            if (commit == null || Boolean.TRUE.equals(dirty)) {
                 Files.deleteIfExists(stampFile);
             } else {
                 Files.writeString(stampFile, commit, StandardCharsets.UTF_8);
