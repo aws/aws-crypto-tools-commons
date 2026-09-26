@@ -68,6 +68,7 @@ public final class CppShimLaunchPlan implements Launcher {
     private final Path workDirectory;
     private final String cargo;
     private final SubprocessLauncher subprocessLauncher;
+    private final String product;
 
     /**
      * @param workDirectory scratch directory owned by this plan; hosts the
@@ -108,6 +109,7 @@ public final class CppShimLaunchPlan implements Launcher {
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryName = product + "-cpp-test-server";
         this.shimRelativePath = product + "/shims/aws-" + product + "-cpp";
+        this.product = product;
     }
 
     @Override
@@ -118,8 +120,9 @@ public final class CppShimLaunchPlan implements Launcher {
         // 1. Resolve the materialized server directory. The shim and the library
         //    crate are within the same clone, so only the server component is
         //    resolved here.
-        Path serverDir = sources.directoryOf(ComponentId.server(language))
+        MaterializedSources.Success resolved = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
+        Path serverDir = resolved.directory();
         Path shimDir = serverDir.getParent().resolve(shimRelativePath);
         if (!Files.isDirectory(shimDir)) {
             throw new ServerLaunchException(language, ServerLaunchException.Category.RESOLVE,
@@ -137,11 +140,20 @@ public final class CppShimLaunchPlan implements Launcher {
 
         // 2. Build the shim into its own target/ (CARGO_TARGET_DIR cleared) so the
         //    server's build script finds the cdylib where it looks for it.
-        runBuildStep(language, "cargo build --release (aws-esdk-cpp shim)",
-            buildCommand(cargo), shimDir, true);
+        //    Both builds are skipped when the stamp shows this commit's server
+        //    binary and the shim library it loads are already built.
+        BuildStamp stamp = new BuildStamp(serverDir, product);
+        Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
+        Path shimLibrary = shimDir.resolve(DEFAULT_TARGET_DIR).resolve("release")
+            .resolve(System.mapLibraryName("aws_" + product + "_cpp"));
+        if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary, shimLibrary))) {
+            runBuildStep(language, "cargo build --release (aws-esdk-cpp shim)",
+                buildCommand(cargo), shimDir, true);
 
-        // 3. Build the server.
-        runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
+            // 3. Build the server.
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
+            stamp.write(language, resolved.commit());
+        }
 
         // 4. Launch: <server>/target/release/esdk-cpp-test-server <port> via the
         //    shared probe/spawn/readiness/teardown.
