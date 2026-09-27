@@ -101,7 +101,12 @@ make orchestrate ORCHESTRATE_ARGS="languages=net stopAfter=launch" # build + sta
 make orchestrate ORCHESTRATE_ARGS="stopAfter=materialize"          # clone only
 ```
 
-A `languages=` run tests only the pairs among the listed servers.
+A `languages=` run tests only the pairs among the listed servers. To keep
+every server but test only one language's pairs, use `focus=`:
+
+```
+make orchestrate ORCHESTRATE_ARGS="focus=java"   # java->X and X->java for every X
+```
 
 ### Iterating on a single Language_Server with live edits
 
