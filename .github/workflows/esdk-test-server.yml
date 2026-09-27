@@ -65,6 +65,6 @@ jobs:
     with:
       focus: rust,rust-cpp
       language-repository: aws/aws-crypto-tools-rust
-      language-ref: kessplas/bug-config
+      language-ref: kessplas/bug-config-cpp
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
