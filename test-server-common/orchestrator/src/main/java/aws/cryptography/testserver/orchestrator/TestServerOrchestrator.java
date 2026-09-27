@@ -133,6 +133,7 @@ public final class TestServerOrchestrator {
     private final String referenceImplementation;
     private Set<String> languages = Set.of();
     private StopAfter stopAfter = StopAfter.NONE;
+    private Set<String> focus = Set.of();
     private final ResultReporter reporter;
 
     /**
@@ -223,6 +224,18 @@ public final class TestServerOrchestrator {
         return this;
     }
 
+    /**
+     * Test only the pairs with one of {@code languages} on either leg. Every
+     * configured server still launches: the others are the counterparts.
+     * Empty tests every pair.
+     *
+     * @return this orchestrator, for chaining
+     */
+    public TestServerOrchestrator withFocus(Set<String> languages) {
+        this.focus = languages == null ? Set.of() : Set.copyOf(languages);
+        return this;
+    }
+
     /** @return this orchestrator, stopping after {@code stopAfter}, for chaining */
     public TestServerOrchestrator withStopAfter(StopAfter stopAfter) {
         this.stopAfter = stopAfter == null ? StopAfter.NONE : stopAfter;
@@ -270,7 +283,7 @@ public final class TestServerOrchestrator {
         // coverage floor over the launched Target pairs and
         // the teardown cleanup failures.
         return reporter.report(
-            outcome.executions(), outcome.launchedLabels(), cleanupFailureLanguages);
+            outcome.executions(), outcome.launchedLabels(), cleanupFailureLanguages, focus);
     }
 
     // ------------------------------------------------------------------
@@ -354,6 +367,12 @@ public final class TestServerOrchestrator {
             effectiveEntries = effectiveEntries.stream()
                 .filter(entry -> languages.contains(entry.language()))
                 .toList();
+        }
+        Set<String> launching = new LinkedHashSet<>();
+        effectiveEntries.forEach(entry -> launching.add(entry.language()));
+        if (!launching.containsAll(focus)) {
+            return PipelineOutcome.aborted("focus " + focus
+                + " must name languages this run launches " + launching);
         }
         List<String> catalog = commonsConfiguration.features();
 

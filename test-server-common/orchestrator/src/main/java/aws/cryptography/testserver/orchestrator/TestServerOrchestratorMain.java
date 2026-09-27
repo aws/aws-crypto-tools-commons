@@ -211,6 +211,13 @@ public final class TestServerOrchestratorMain {
         // verbatim to ./gradlew test --tests <pattern>). Empty runs everything.
         String testFilter = cli.getOrDefault("tests", "");
 
+        // focus=<a,b> — test only the pairs with one of these languages on a leg.
+        java.util.Set<String> focus = new java.util.LinkedHashSet<>();
+        for (String language : cli.getOrDefault("focus", "").split(",")) {
+            if (!language.isBlank()) {
+                focus.add(language.trim());
+            }
+        }
         // languages=<a,b> — run only these configured languages.
         // stopAfter=materialize|launch — stop before the Tests.
         java.util.Set<String> languages = new java.util.LinkedHashSet<>();
@@ -235,13 +242,14 @@ public final class TestServerOrchestratorMain {
             context,
             new SourceMaterializer(orchestratorBuildDir.resolve("sources")),
             launchers,
-            new GradleTestRunner(testsModuleDir).withTestFilter(testFilter),
+            new GradleTestRunner(testsModuleDir).withTestFilter(testFilter).withFocus(focus),
             new DuplicateTestsDetector(),
             testServerRoot,
             referenceImplementation)
             .withWorkingTreeOverlays(workingTreeOverlays)
             .withLanguages(languages)
-            .withStopAfter(stopAfter);
+            .withStopAfter(stopAfter)
+            .withFocus(focus);
 
         System.out.println("==> TestServerOrchestrator run");
         System.out.println("    context: " + describeContext(context));
@@ -260,6 +268,9 @@ public final class TestServerOrchestratorMain {
         }
         if (!languages.isEmpty()) {
             System.out.println("    languages: " + String.join(",", languages));
+        }
+        if (!focus.isEmpty()) {
+            System.out.println("    focus: " + String.join(",", focus));
         }
         if (stopAfter != TestServerOrchestrator.StopAfter.NONE) {
             System.out.println("    stopAfter: " + stopAfter.name().toLowerCase(java.util.Locale.ROOT));
@@ -386,6 +397,7 @@ public final class TestServerOrchestratorMain {
             + " [workingTreeOverlay.<repo>=<abs path> ...]"
             + " [tests=<pattern>]"
             + " [languages=<lang>,...]"
+            + " [focus=<lang>,...]"
             + " [stopAfter=none|materialize|launch]";
     }
 

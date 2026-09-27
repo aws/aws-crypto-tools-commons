@@ -75,6 +75,19 @@ class GradleTestRunnerTest {
             "no padding property when no language declares one: " + command);
     }
 
+    @Test
+    @DisplayName("a focus is passed as testserver.focus; no focus passes nothing")
+    void commandCarriesTheFocus() {
+        TestRunInput input = new TestRunInput(
+            List.of(new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091"))),
+            Map.of(), List.of(), Map.of(), "java");
+
+        assertTrue(GradleTestRunner.command(Path.of("tests"), input, "", "rust,rust-cpp")
+            .contains("-Dtestserver.focus=rust,rust-cpp"));
+        assertTrue(GradleTestRunner.command(Path.of("tests"), input, "").stream()
+            .noneMatch(a -> a.startsWith("-Dtestserver.focus")));
+    }
+
     // ---- JUnit XML parsing ----------------------------------------------
 
     @Test

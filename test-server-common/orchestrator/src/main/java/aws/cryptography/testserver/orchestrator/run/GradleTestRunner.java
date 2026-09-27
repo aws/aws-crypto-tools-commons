@@ -103,6 +103,21 @@ public final class GradleTestRunner implements TestRunner {
         return this;
     }
 
+    /** Runtime-config key: the comma-separated languages under test. */
+    public static final String FOCUS_PROPERTY = "testserver.focus";
+
+    /** Languages under test; empty tests every Target. */
+    private volatile String focus = "";
+
+    /**
+     * Pass {@code languages} to the Tests as {@value #FOCUS_PROPERTY}, which
+     * narrows them to the pairs with one of these languages on either leg.
+     */
+    public GradleTestRunner withFocus(java.util.Collection<String> languages) {
+        this.focus = languages == null ? "" : String.join(",", languages);
+        return this;
+    }
+
     /** @return the configured test filter, empty when unset. */
     public String testFilter() {
         return testFilter;
@@ -120,7 +135,7 @@ public final class GradleTestRunner implements TestRunner {
                 "no target endpoint configured for the Tests; refusing to run (Requirement 10.2)");
         }
 
-        ProcessBuilder pb = new ProcessBuilder(command(testsModuleDir, input, testFilter))
+        ProcessBuilder pb = new ProcessBuilder(command(testsModuleDir, input, testFilter, focus))
             .directory(testsModuleDir.toFile())
             .redirectErrorStream(true);
         // Inherit the environment (notably JAVA_HOME resolved to a JDK 21+).
@@ -157,6 +172,12 @@ public final class GradleTestRunner implements TestRunner {
      * argument passed verbatim to the child Gradle test task.
      */
     static List<String> command(Path testsModuleDir, TestRunInput input, String testFilter) {
+        return command(testsModuleDir, input, testFilter, "");
+    }
+
+    /** {@link #command(Path, TestRunInput, String)} plus a non-blank {@code focus}. */
+    static List<String> command(Path testsModuleDir, TestRunInput input, String testFilter,
+            String focus) {
         String gradlew = new File(testsModuleDir.toFile(), "gradlew").getAbsolutePath();
         List<String> command = new ArrayList<>(List.of(
             gradlew,
@@ -180,6 +201,9 @@ public final class GradleTestRunner implements TestRunner {
         }
         command.add("-D" + REFERENCE_IMPLEMENTATION_PROPERTY + "="
             + input.referenceImplementation());
+        if (focus != null && !focus.isBlank()) {
+            command.add("-D" + FOCUS_PROPERTY + "=" + focus);
+        }
         command.add("--console=plain");
         if (testFilter != null && !testFilter.isBlank()) {
             command.add("--tests");

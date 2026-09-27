@@ -95,13 +95,13 @@ public final class ReferenceImplementation {
             LanguageServerRegistry registry, FeatureDeclarations declarations,
             String referenceLanguage) {
         List<LanguageServerTarget> candidates = new ArrayList<>();
-        for (LanguageServerTarget target : registry.targets()) {
+        for (LanguageServerTarget target : registry.allTargets()) {
             if (target.language().equals(referenceLanguage)) {
                 candidates.add(target);
                 break;
             }
         }
-        for (LanguageServerTarget target : registry.targets()) {
+        for (LanguageServerTarget target : registry.allTargets()) {
             if (!candidates.contains(target)) {
                 candidates.add(target);
             }
