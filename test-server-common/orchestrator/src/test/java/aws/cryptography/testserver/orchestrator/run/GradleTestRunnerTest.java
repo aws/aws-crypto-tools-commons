@@ -95,7 +95,7 @@ class GradleTestRunnerTest {
     void parsesOneExecutionPerTestcase(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("TEST-RoundTrip.xml"), """
             <?xml version="1.0" encoding="UTF-8"?>
-            <testsuite name="RoundTrip" tests="4">
+            <testsuite name="RoundTrip" tests="5">
               <testcase classname="RoundTrip" name="passes"/>
               <testcase classname="RoundTrip" name="fails">
                 <failure message="expected X but was Y" type="org.opentest4j.AssertionFailedError">stack</failure>
@@ -106,17 +106,24 @@ class GradleTestRunnerTest {
               <testcase classname="RoundTrip" name="gated">
                 <skipped message="feature-gated skip: feature=streaming unsupported by [rust]"/>
               </testcase>
+              <testcase classname="StreamProperty" name="executionError">
+                <failure message="feature-gated skip: feature=streaming unsupported by [net-v5]"
+                    type="org.opentest4j.TestAbortedException">stack</failure>
+              </testcase>
             </testsuite>
             """.stripIndent());
 
         List<TestExecution> executions = GradleTestRunner.parseResults(dir);
 
-        assertEquals(4, executions.size(),
-            "4 testcase elements must yield exactly 4 executions");
+        assertEquals(5, executions.size(),
+            "5 testcase elements must yield exactly 5 executions");
         assertEquals(TestExecution.Outcome.PASSED, byName(executions, "passes").outcome());
         assertEquals(TestExecution.Outcome.FAILED, byName(executions, "fails").outcome());
         assertEquals(TestExecution.Outcome.UNREACHABLE, byName(executions, "unreachable").outcome());
         assertEquals(TestExecution.Outcome.SKIPPED, byName(executions, "gated").outcome());
+        assertEquals(TestExecution.Outcome.SKIPPED,
+            byName(executions, "executionError").outcome(),
+            "an aborted container is a skip, not a failure");
     }
 
     @Test

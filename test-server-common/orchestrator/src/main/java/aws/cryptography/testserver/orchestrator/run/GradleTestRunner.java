@@ -242,6 +242,8 @@ public final class GradleTestRunner implements TestRunner {
         return executions;
     }
 
+    private static final String ABORTED_TYPE = "org.opentest4j.TestAbortedException";
+
     private static TestExecution toExecution(Element testcase) {
         String name = testcase.getAttribute("classname") + "#" + testcase.getAttribute("name");
 
@@ -262,6 +264,11 @@ public final class GradleTestRunner implements TestRunner {
 
         String message = problem.getAttribute("message");
         String type = problem.getAttribute("type");
+        // An aborted container (e.g. a jqwik @BeforeContainer feature gate) is
+        // reported as a failure but was not executed.
+        if (ABORTED_TYPE.equals(type)) {
+            return TestExecution.skipped(name, message);
+        }
         String body = problem.getTextContent();
         String detail = (type.isBlank() ? "" : type + ": ") + message;
         String haystack = (detail + " " + body).toLowerCase(Locale.ROOT);

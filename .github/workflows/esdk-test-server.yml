@@ -54,7 +54,6 @@ jobs:
 
   # TEMPORARY: exercise focus + language-repository mode.
   focus-java:
-    if: false
     uses: ./.github/workflows/esdk-test-server-reusable.yml
     with:
       focus: java
