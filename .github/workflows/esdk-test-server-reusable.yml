@@ -205,6 +205,16 @@ jobs:
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
+      - name: Ignore build outputs in the language checkout
+        # The orchestrator treats a working tree with untracked files as
+        # modified and rebuilds it; the servers' build outputs and stamps are
+        # not source.
+        if: env.LANGUAGE_REPOSITORY != ''
+        run: |
+          printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
+            'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            >> language-repo/.git/info/exclude
+
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
         # Language_Server + live Java library) and aws-crypto-tools-rust (the
@@ -420,6 +430,16 @@ jobs:
           ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
+
+      - name: Ignore build outputs in the language checkout
+        # The orchestrator treats a working tree with untracked files as
+        # modified and rebuilds it; the servers' build outputs and stamps are
+        # not source.
+        if: env.LANGUAGE_REPOSITORY != ''
+        run: |
+          printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
+            'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            >> language-repo/.git/info/exclude
 
       - name: Set up JDK 21 (Temurin) for the orchestrator
         uses: actions/setup-java@v4
@@ -651,6 +671,16 @@ jobs:
           ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
+
+      - name: Ignore build outputs in the language checkout
+        # The orchestrator treats a working tree with untracked files as
+        # modified and rebuilds it; the servers' build outputs and stamps are
+        # not source.
+        if: env.LANGUAGE_REPOSITORY != ''
+        run: |
+          printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
+            'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            >> language-repo/.git/info/exclude
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
