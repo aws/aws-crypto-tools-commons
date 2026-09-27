@@ -43,28 +43,10 @@ permissions:
 
 jobs:
   esdk:
-    if: false
     uses: ./.github/workflows/esdk-test-server-reusable.yml
     with:
       focus: ${{ inputs.focus || '' }}
       language-repository: ${{ inputs.language-repository || '' }}
       language-ref: ${{ inputs.language-ref || '' }}
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
-
-  # TEMPORARY: exercise focus + language-repository mode.
-  focus-java:
-    uses: ./.github/workflows/esdk-test-server-reusable.yml
-    with:
-      focus: java
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
-
-  esdk-repo:
-    uses: ./.github/workflows/esdk-test-server-reusable.yml
-    with:
-      focus: net,go,rust-dafny
-      language-repository: aws/aws-encryption-sdk
-      language-ref: kessplas/bug-config
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
