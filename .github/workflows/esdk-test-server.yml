@@ -947,6 +947,11 @@ jobs:
 
       - name: Build the light servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
+        if: >-
+          steps.sources-javascript.outputs.cache-hit != 'true'
+          || steps.sources-c.outputs.cache-hit != 'true'
+          || steps.sources-java.outputs.cache-hit != 'true'
+          || steps.sources-python.outputs.cache-hit != 'true'
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
