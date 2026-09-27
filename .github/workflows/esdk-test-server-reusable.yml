@@ -292,7 +292,7 @@ jobs:
           }
           emit() {
             local name="$1" key="$2"; shift 2
-            echo "key_$name=${RUNNER_OS}-out-v3-$name-$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${RUNNER_OS}-out-v3-$name-${own:+$own-src-}$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
@@ -1025,22 +1025,29 @@ jobs:
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=launch"
 
       - name: Wait for the prebuilt servers
-        # The build job saves each missing heavy server as it finishes.
+        # Each server the plan found missing is saved by its build job; wait
+        # for those jobs to finish.
         env:
           GH_TOKEN: ${{ github.token }}
-          KEYS: ${{ needs.plan.outputs.key_net }} ${{ needs.plan.outputs.key_rustdafny }} ${{ needs.plan.outputs.key_go }} ${{ needs.plan.outputs.key_rust }} ${{ needs.plan.outputs.key_rustcpp }}
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+          # "failed", "done" (every matching build job succeeded), or "wait".
+          STATE: >-
+            [.jobs[] | select(.name | test("(^|/ )build \\(" + $language + "\\)$")) | .conclusion]
+            | if any(. == "failure" or . == "cancelled") then "failed"
+              elif length > 0 and all(. == "success") then "done" else "wait" end
         run: |
           set -euo pipefail
           deadline=$((SECONDS + 2700))
-          for key in $KEYS; do
-            until gh cache list -R "$GITHUB_REPOSITORY" --key "$key" --json key -q '.[].key' | grep -qxF "$key"; do
-              failed=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                -q '[.jobs[] | select(.name | test("(^|/ )build \\(")) | select(.conclusion == "failure" or .conclusion == "cancelled")] | length')
-              if [ "$failed" != 0 ]; then echo "::error::a server build job failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $key"; exit 1; fi
+          for language in $(jq -r '.[]' <<<"$MATRIX"); do
+            while :; do
+              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
+                | jq -r --arg language "$language" "$STATE")
+              [ "$state" = done ] && break
+              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
+              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
               sleep 15
             done
-            echo "ready after ${SECONDS}s: $key"
+            echo "ready after ${SECONDS}s: $language"
           done
 
       - name: Materialize the sources (clones only)
