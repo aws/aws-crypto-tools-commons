@@ -54,17 +54,18 @@ jobs:
 
   # TEMPORARY: exercise focus + language-repository mode.
   focus-java:
+    if: false
     uses: ./.github/workflows/esdk-test-server-reusable.yml
     with:
       focus: java
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
 
-  rust-repo:
+  esdk-repo:
     uses: ./.github/workflows/esdk-test-server-reusable.yml
     with:
-      focus: rust,rust-cpp
-      language-repository: aws/aws-crypto-tools-rust
-      language-ref: kessplas/bug-config-cpp
+      focus: net,go,rust-dafny
+      language-repository: aws/aws-encryption-sdk
+      language-ref: kessplas/bug-config
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
