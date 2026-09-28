@@ -314,15 +314,17 @@ jobs:
             sha=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || sha=""
             echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
           }
+          # emit <name> <language> <key> <paths...>: a checkout build gets its own key.
           emit() {
-            local name="$1" key="$2"; shift 2
-            echo "key_$name=${RUNNER_OS}-out-v3-$name-${own:+$own-src-}$key" >> "$GITHUB_OUTPUT"
+            local name="$1" language="$2" key="$3" src=""; shift 3
+            from_checkout "$language" && src="$own-src-"
+            echo "key_$name=${RUNNER_OS}-out-v3-$name-$src$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
           esdk_tip=$(tip net)
           echo "esdk_dir=$esdk" >> "$GITHUB_OUTPUT"
-          emit net "$esdk_tip-dafny4.9.0" \
+          emit net net "$esdk_tip-dafny4.9.0" \
             "$esdk/esdk-test-servers/net/bin/Release/net8.0" \
             "$esdk/esdk-test-servers/net/.esdk-build-stamp"
           # The Dafny transpile output depends only on these paths' content.
@@ -330,20 +332,20 @@ jobs:
           transpile=$(gh api "repos/$esdk_repo/git/trees/$esdk_tip" --jq \
             '[.tree[] | select(.path | IN("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "mpl")) | .sha] | join(" ")' \
             | sha256sum | cut -c1-16) || transpile="$esdk_tip"
-          emit nettranspile "$transpile-dafny4.9.0" \
+          emit nettranspile net "$transpile-dafny4.9.0" \
             "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \
             "$esdk/mpl/*/runtimes/net/ImplementationFromDafny*" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-build-stamp"
-          emit rustdafny "$esdk_tip" \
+          emit rustdafny rust-dafny "$esdk_tip" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
-          emit go "$esdk_tip" \
+          emit go go "$esdk_tip" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          emit rust "$(tip rust)" \
+          emit rust rust "$(tip rust)" \
             "$rust/esdk-test-server/target/release/esdk-test-server" \
             "$rust/esdk-test-server/.esdk-build-stamp"
-          emit rustcpp "$(tip rust-cpp)" \
+          emit rustcpp rust-cpp "$(tip rust-cpp)" \
             "$rustcpp/esdk-cpp-test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk-cpp-test-server/.esdk-build-stamp"

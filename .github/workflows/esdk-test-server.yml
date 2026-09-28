@@ -43,21 +43,10 @@ permissions:
 
 jobs:
   esdk:
-    if: false
     uses: ./.github/workflows/esdk-test-server-reusable.yml
     with:
       focus: ${{ inputs.focus || '' }}
       language-repository: ${{ inputs.language-repository || '' }}
       language-ref: ${{ inputs.language-ref || '' }}
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
-
-  # TEMPORARY: a Rust-repo call from a branch without the C++ shim server.
-  rust-repo:
-    uses: ./.github/workflows/esdk-test-server-reusable.yml
-    with:
-      focus: rust
-      language-repository: aws/aws-crypto-tools-rust
-      language-ref: kessplas/bug-config
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
