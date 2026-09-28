@@ -192,6 +192,7 @@ jobs:
   # Resolves each heavy server's cache key and lists the servers whose
   # prebuilt output is missing, so the prebuild job compiles only those.
   plan:
+    name: find uncached servers
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -668,6 +669,7 @@ jobs:
   # overlap the heavy builds, and it waits for their outputs just before
   # the run.
   esdk-test-server:
+    name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: plan
     runs-on: ubuntu-latest
 

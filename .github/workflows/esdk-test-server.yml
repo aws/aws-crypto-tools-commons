@@ -43,6 +43,7 @@ permissions:
 
 jobs:
   esdk:
+    name: TestServer
     uses: ./.github/workflows/esdk-test-server-reusable.yml
     with:
       focus: ${{ inputs.focus || '' }}
