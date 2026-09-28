@@ -1,0 +1,111 @@
+# Daily CI for aws-crypto-tools-commons — runs every TestServer suite this repo
+# hosts, once a day, on main.
+#
+# WHY THIS EXISTS: each `*-test-server.yml` workflow is path-triggered, so it
+# only runs when its own files change in a pull request, or when a language
+# repository calls it. Nothing re-runs the suites against a quiet main. That
+# leaves every OUTSIDE-IN break invisible: a language repository moving the
+# server branch tip pinned in config/server-config.json, a newly published
+# library version, a rotated or expired KMS / DynamoDB test resource, a
+# transitive dependency going bad. Today such a break is discovered by whoever
+# opens the next unrelated pull request. One scheduled run a day surfaces it on
+# its own instead.
+#
+# HOW: every job below reuses its product's existing workflow through
+# workflow_call, so there stays exactly ONE definition of each run and the
+# scheduled run cannot drift from the pull-request run. Adding a product to
+# Daily CI is adding a job here — never copying steps.
+#
+# COVERAGE: all three TestServers in the repo — ESDK (esdk/test-server),
+# DB-ESDK (dbesdk/test-server), and Primitives (primitives/test-server). Each
+# reused workflow internally runs its own full cross-language matrix via `make
+# orchestrate`, so this is every server combination of every product. A new
+# product's TestServer belongs here as soon as its workflow lands.
+#
+# SCHEDULE — 12:23 UTC every day (05:23 PDT / 04:23 PST):
+#   * A dead hour for this team, so a run that hammers the shared KMS keys and
+#     the branch-key DynamoDB table does not compete with anyone's interactive
+#     pull-request runs.
+#   * Deliberately NOT on the hour. GitHub queues all on-the-hour crons
+#     together and delays or silently DROPS scheduled runs under that load; an
+#     odd minute is the documented way to avoid it.
+#   * Deliberately away from the other AWS Crypto Tools daily CIs (14:00 and
+#     15:00 UTC), so several repositories' suites do not hit the same shared
+#     KMS test keys at once.
+# GitHub cron is UTC and has no DST, so the local time shifts an hour in
+# winter. That is fine here — nothing about these suites is clock-sensitive.
+#
+# NOTE: GitHub disables scheduled workflows in a repository with no commit
+# activity for 60 days. This repository is active, but if Daily CI ever stops
+# appearing in the Actions tab, that is the first thing to check.
+
+name: Daily CI
+
+on:
+  schedule:
+    - cron: "23 12 * * *"
+  # Manual trigger from the Actions tab, for re-running a day that failed on
+  # something transient without waiting for tomorrow.
+  workflow_dispatch:
+  # A change to this file gets a full live run on its own pull request. A
+  # `schedule` trigger only ever fires on the default branch, so this wiring is
+  # otherwise impossible to exercise before merge.
+  pull_request:
+    paths:
+      - ".github/workflows/daily_ci.yml"
+
+permissions:
+  contents: read
+  # The ESDK and DB-ESDK suites exchange this for AWS credentials via OIDC to
+  # reach their KMS keys and the DB-ESDK keystore table. A reused workflow can
+  # only narrow the caller's permissions, never widen them, so this has to be
+  # granted here as well as in those workflows.
+  id-token: write
+
+# One Daily CI run at a time. A manually dispatched run landing on top of the
+# scheduled one would double the load on the shared KMS and DynamoDB test
+# resources for no added signal. Queue rather than cancel: a nearly finished
+# run is worth more than a fresh one.
+concurrency:
+  group: daily-ci
+  cancel-in-progress: false
+
+jobs:
+
+  # The three suites run in parallel, exactly as they already do when several
+  # land on main together. If the shared AWS test resources ever throttle, chain
+  # the two AWS-backed suites with `needs:` rather than moving the schedule.
+
+  esdk-test-server:
+    name: ESDK TestServer
+    # No scheduled runs on forks: a fork has neither the KMS role trust nor the
+    # private-language-repository PAT, so its nightly run could only ever fail.
+    # A pull request or a deliberate dispatch on a fork still runs.
+    if: github.event_name != 'schedule' || github.repository_owner == 'aws'
+    uses: ./.github/workflows/esdk-test-server.yml
+    # `inherit` rather than an explicit list: this workflow reads
+    # `secrets.LANGUAGE_REPO_PAT` directly (to clone the private
+    # aws-crypto-tools-java and aws-crypto-tools-rust servers) instead of
+    # declaring it as a workflow_call secret, and that name only resolves for a
+    # caller that inherits.
+    secrets: inherit
+
+  dbesdk-test-server:
+    name: DB-ESDK TestServer
+    if: github.event_name != 'schedule' || github.repository_owner == 'aws'
+    # No `with:`: every input is optional, and leaving commons_ref and dbe_ref
+    # empty is what makes this a plain commons run — the tests come from this
+    # commit and each language server is cloned at the ref pinned in
+    # config/server-config.json, which is precisely the drift being watched for.
+    uses: ./.github/workflows/dbesdk-test-server.yml
+    # No secrets: this suite clones the public
+    # aws-database-encryption-sdk-dynamodb over HTTPS and gets its AWS access
+    # from OIDC, so it reads none.
+
+  primitives-test-server:
+    name: Primitives TestServer
+    if: github.event_name != 'schedule' || github.repository_owner == 'aws'
+    uses: ./.github/workflows/primitives-test-server.yml
+    # Needs LANGUAGE_REPO_PAT to clone the private aws-crypto-tools-rust
+    # server; see the ESDK job above for why this is `inherit`.
+    secrets: inherit
