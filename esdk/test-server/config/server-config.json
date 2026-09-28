@@ -45,13 +45,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "kessplas/bug-config",
+        "branch": "main",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "kessplas/bug-config",
+        "ref": "main",
         "path": "esdk-test-server"
       }
     },
