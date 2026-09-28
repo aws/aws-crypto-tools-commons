@@ -383,89 +383,38 @@ jobs:
           done
           cat "$GITHUB_OUTPUT"
 
-      - name: Restore the cached net server
-        id: look-net
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.keys.outputs.paths_net }}
-          key: ${{ steps.keys.outputs.key_net }}
-
-      - name: Restore the cached rust-dafny server
-        id: look-rustdafny
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.keys.outputs.paths_rustdafny }}
-          key: ${{ steps.keys.outputs.key_rustdafny }}
-
-      - name: Restore the cached go server
-        id: look-go
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.keys.outputs.paths_go }}
-          key: ${{ steps.keys.outputs.key_go }}
-
-      - name: Restore the cached rust server
-        id: look-rust
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.keys.outputs.paths_rust }}
-          key: ${{ steps.keys.outputs.key_rust }}
-
-      - name: Restore the cached rust-cpp server
-        id: look-rustcpp
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.keys.outputs.paths_rustcpp }}
-          key: ${{ steps.keys.outputs.key_rustcpp }}
-
-      - name: Pack the cached servers for this run
-        # The test job takes every heavy server from this run's artifacts, so a
-        # cache entry evicted after this point cannot leave it without one.
-        env:
-          HIT_net: ${{ steps.look-net.outputs.cache-hit }}
-          PATHS_net: ${{ steps.keys.outputs.paths_net }}
-          HIT_rustdafny: ${{ steps.look-rustdafny.outputs.cache-hit }}
-          PATHS_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
-          HIT_go: ${{ steps.look-go.outputs.cache-hit }}
-          PATHS_go: ${{ steps.keys.outputs.paths_go }}
-          HIT_rust: ${{ steps.look-rust.outputs.cache-hit }}
-          PATHS_rust: ${{ steps.keys.outputs.paths_rust }}
-          HIT_rustcpp: ${{ steps.look-rustcpp.outputs.cache-hit }}
-          PATHS_rustcpp: ${{ steps.keys.outputs.paths_rustcpp }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/prebuilt"
-          for pair in net:net rustdafny:rust-dafny go:go rust:rust rustcpp:rust-cpp; do
-            k=${pair%%:*}; language=${pair#*:}
-            hit_var="HIT_$k"; paths_var="PATHS_$k"
-            [ "${!hit_var}" = "true" ] || continue
-            mapfile -t paths < <(printf '%s\n' "${!paths_var}" | sed '/^$/d')
-            tar -czf "$RUNNER_TEMP/prebuilt/$language.tgz" -- "${paths[@]}"
-          done
-          ls -la "$RUNNER_TEMP/prebuilt"
-
-      - name: Upload the cached servers
-        uses: actions/upload-artifact@v4
-        with:
-          name: testserver-prebuilt-cached
-          path: ${{ runner.temp }}/prebuilt/*.tgz
-          if-no-files-found: ignore
-          retention-days: 1
-
       - name: List the servers to build
+        # A server is prebuilt when an artifact named by its key exists in this
+        # repository or in commons; the rest are built by the prebuild job.
         id: matrix
         env:
-          HITS: >-
-            net=${{ steps.look-net.outputs.cache-hit }}
-            rust-dafny=${{ steps.look-rustdafny.outputs.cache-hit }}
-            go=${{ steps.look-go.outputs.cache-hit }}
-            rust=${{ steps.look-rust.outputs.cache-hit }}
-            rust-cpp=${{ steps.look-rustcpp.outputs.cache-hit }}
+          RUN_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+          KEY_net: ${{ steps.keys.outputs.key_net }}
+          KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
+          KEY_go: ${{ steps.keys.outputs.key_go }}
+          KEY_rust: ${{ steps.keys.outputs.key_rust }}
+          KEY_rustcpp: ${{ steps.keys.outputs.key_rustcpp }}
         run: |
           set -euo pipefail
+          # This run's token reads this repository; the PAT reads commons.
+          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
+          # find <key>: the newest unexpired artifact named <key>, as
+          # "<repository> <artifact id>", looked up in this repository then commons.
+          find() {
+            local repo id
+            for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
+              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+                -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
+                2>/dev/null) || id=""
+              if [ -n "$id" ]; then echo "$repo $id"; return; fi
+            done
+          }
           missing=()
-          for hit in $HITS; do
-            [ "${hit#*=}" = "true" ] || missing+=("${hit%%=*}")
+          for pair in net:net rustdafny:rust-dafny go:go rust:rust rustcpp:rust-cpp; do
+            k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
+            found=$(find "${!key_var}")
+            if [ -n "$found" ]; then echo "prebuilt $language: $found"; else missing+=("$language"); fi
           done
           matrix=$(printf '%s\n' "${missing[@]}" | jq -R . | jq -cs 'map(select(. != ""))')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
@@ -679,27 +628,22 @@ jobs:
           path: ${{ needs.plan.outputs.paths_nettranspile }}
           key: ${{ needs.plan.outputs.key_nettranspile }}
 
-      - name: Pack the ${{ matrix.language }} server for this run
+      - name: Pack the ${{ matrix.language }} server
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prebuilt"
           mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
           tar -czf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
 
-      - name: Upload the ${{ matrix.language }} server
+      - name: Publish the ${{ matrix.language }} server
+        # Named by its key: later runs here, and runs in other repositories for
+        # servers built from commons' configuration, find it by that name.
         uses: actions/upload-artifact@v4
         with:
-          name: testserver-prebuilt-${{ matrix.language }}
+          name: ${{ env.OUT_KEY }}
           path: ${{ runner.temp }}/prebuilt/${{ matrix.language }}.tgz
           if-no-files-found: error
-          retention-days: 1
-
-      - name: Save the ${{ matrix.language }} server output
-        # Saved from every ref, for later runs; it is a few MB.
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.OUT_PATHS }}
-          key: ${{ env.OUT_KEY }}
+          retention-days: 90
 
       - name: Save the Go module + build caches
         if: matrix.language == 'go' && env.SAVE_CACHES == 'true' && steps.go-deps.outputs.cache-hit != 'true'
@@ -1115,7 +1059,7 @@ jobs:
         id: depkeys
         run: |
           set -euo pipefail
-          sum() { find "$@" -type f 2>/dev/null | LC_ALL=C sort | xargs -r sha256sum | sha256sum | cut -c1-16; }
+          sum() { local dir="$1"; shift; (cd "$dir" && find . "$@" -type f | LC_ALL=C sort | xargs -r sha256sum) | sha256sum | cut -c1-16; }
           java="${{ needs.plan.outputs.dir_java }}"
           javascript="${{ needs.plan.outputs.dir_javascript }}"
           python="${{ needs.plan.outputs.dir_python }}"
@@ -1236,18 +1180,40 @@ jobs:
         working-directory: esdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
 
-      - name: Download the prebuilt servers
-        uses: actions/download-artifact@v4
-        with:
-          pattern: testserver-prebuilt-*
-          path: ${{ runner.temp }}/prebuilt
-          merge-multiple: true
-
-      - name: Unpack the prebuilt servers into their clones
+      - name: Fetch the prebuilt servers into their clones
+        env:
+          RUN_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+          KEY_net: ${{ needs.plan.outputs.key_net }}
+          KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
+          KEY_go: ${{ needs.plan.outputs.key_go }}
+          KEY_rust: ${{ needs.plan.outputs.key_rust }}
+          KEY_rustcpp: ${{ needs.plan.outputs.key_rustcpp }}
         run: |
           set -euo pipefail
-          for archive in "$RUNNER_TEMP"/prebuilt/*.tgz; do
-            tar -xzf "$archive"
+          # This run's token reads this repository; the PAT reads commons.
+          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
+          # find <key>: the newest unexpired artifact named <key>, as
+          # "<repository> <artifact id>", looked up in this repository then commons.
+          find() {
+            local repo id
+            for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
+              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+                -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
+                2>/dev/null) || id=""
+              if [ -n "$id" ]; then echo "$repo $id"; return; fi
+            done
+          }
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          for pair in net:net rustdafny:rust-dafny go:go rust:rust rustcpp:rust-cpp; do
+            k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
+            found=$(find "${!key_var}")
+            [ -n "$found" ] || continue
+            read -r repo id <<<"$found"
+            echo "$language: $repo artifact $id"
+            GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
+            unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
+            tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
           done
 
       - name: Check every prebuilt server arrived
