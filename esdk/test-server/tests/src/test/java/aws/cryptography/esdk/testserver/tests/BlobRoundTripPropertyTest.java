@@ -1,12 +1,16 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs.Scenario;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
@@ -37,11 +41,25 @@ class BlobRoundTripPropertyTest {
 
     private static TargetPair pair;
 
+    /** The offline scenarios the primary target declares every Feature for. */
+    private static List<Scenario> supported;
+
     @BeforeContainer
     static void bootEndpoints() {
         // Plaintext-breadth property on a single server (the primary target's
         // self-pair); cross-language breadth is covered by MaterialsRoundTripTests.
         pair = LanguageServerRegistry.shared().selfPair();
+        FeatureDeclarations declarations = FeatureDeclarations.shared();
+        LanguageServerTarget target = pair.encryptTarget();
+        supported = EsdkClientConfigs.offlineScenarios().stream()
+            .filter(scenario -> scenario.features().stream().allMatch(feature ->
+                declarations.isSupported(target.language(), target.majorVersion(),
+                    target.repo(), feature)))
+            .toList();
+        if (supported.isEmpty()) {
+            // Aborts the container as a visible feature-gated skip.
+            FeatureGate.require(EsdkClientConfigs.offlineScenarios().get(0).features(), pair);
+        }
     }
 
     // Feature: esdk-test-server, Property 1: Blob round-trip preserves plaintext byte-for-byte
@@ -82,7 +100,7 @@ class BlobRoundTripPropertyTest {
      */
     @Provide
     Arbitrary<Scenario> scenarios() {
-        return Arbitraries.of(EsdkClientConfigs.offlineScenarios());
+        return Arbitraries.of(supported);
     }
 
     /**
