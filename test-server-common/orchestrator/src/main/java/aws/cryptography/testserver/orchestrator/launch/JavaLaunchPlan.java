@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,6 +54,13 @@ import java.util.Optional;
  *       cause, before any Maven step runs. Any failing Maven step is a
  *       {@code BUILD} launch failure naming the step and carrying the tool
  *       output.</li>
+ *   <li><b>Transpile-and-publish, when the resolved library is a smithy-dafny
+ *       {@code runtimes/java} directory</b> ({@link DafnyProject}): in the
+ *       clone root, {@code git submodule update --init --recursive} each
+ *       present Dafny submodule, then {@code make build_java mvn_local_deploy}
+ *       in the library's project directory under the Maven {@code JAVA_HOME},
+ *       so the server resolves this build from {@code mavenLocal()}. Dafny
+ *       must be on {@code PATH}.</li>
  *   <li><b>Launch.</b> {@code ./gradlew runServer --args=<port>
  *       [-PesdkVersion=<stamped>] -PmodelDir=<commons model dir>} in the
  *       resolved server directory under a JDK 21+ {@code JAVA_HOME}
@@ -181,7 +189,22 @@ public final class JavaLaunchPlan implements Launcher {
         //    A clean clone is stamped with its commit, and the install is
         //    skipped when that version is already in the local repository.
         String stampedVersion = null;
-        if (Files.isRegularFile(libraryDir.resolve("pom.xml"))) {
+        Optional<Path> dafnyProject = DafnyProject.of(libraryDir);
+        if (dafnyProject.isPresent()) {
+            if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
+                        + " was not found): the Java library transpiles from Dafny before building");
+            }
+            Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
+            synchronized (DafnyProject.lockFor(repoRoot)) {
+                for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                    runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, mavenJavaHome);
+                }
+                runBuildStep(language, "transpile + publish the library (make build_java mvn_local_deploy)",
+                    dafnyBuildCommand(), dafnyProject.get(), mavenJavaHome);
+            }
+        } else if (Files.isRegularFile(libraryDir.resolve("pom.xml"))) {
             MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
                 .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
             boolean clean = library.commit() != null && !Boolean.TRUE.equals(library.dirty());
@@ -282,6 +305,11 @@ public final class JavaLaunchPlan implements Launcher {
         return List.of(MVN, "-q", "versions:revert");
     }
 
+    /** {@code make build_java mvn_local_deploy CORES=4} (the smithy-dafny project directory). */
+    static List<String> dafnyBuildCommand() {
+        return List.of("make", "build_java", "mvn_local_deploy", "CORES=4");
+    }
+
     /**
      * {@code <serverDir>/gradlew runServer --args=<port>
      * -PesdkVersion=<stamped> -PmodelDir=<modelDir>} — the server's own
@@ -333,6 +361,28 @@ public final class JavaLaunchPlan implements Launcher {
                 if (candidate.isPresent()) {
                     return candidate;
                 }
+            }
+        }
+        for (String version : versions) {
+            Optional<Path> candidate = setupJavaHome(version, System.getenv());
+            if (candidate.isPresent()) {
+                return candidate;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The JDK home actions/setup-java exports as {@code JAVA_HOME_<major>_X64}
+     * (or {@code _ARM64}) for {@code version} ({@code 1.8} reads major 8).
+     */
+    static Optional<Path> setupJavaHome(String version, Map<String, String> env) {
+        String major = version.startsWith("1.") ? version.substring(2) : version;
+        for (String arch : List.of("X64", "ARM64")) {
+            String home = env.get("JAVA_HOME_" + major + "_" + arch);
+            if (home != null && !home.isBlank()
+                    && Files.isExecutable(Path.of(home).resolve("bin").resolve("java"))) {
+                return Optional.of(Path.of(home));
             }
         }
         return Optional.empty();

@@ -40,16 +40,6 @@ class DotnetLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the transpile prerequisites init the libraries and mpl submodules, like the repo's net workflow")
-    void submodules() {
-        assertEquals(List.of("git", "submodule", "update", "--init", "--depth", "1", "libraries"),
-            DotnetLaunchPlan.submoduleLibrariesCommand());
-        assertEquals(List.of("git", "submodule", "update", "--init", "--recursive",
-                "--depth", "1", "--jobs", "8", "mpl"),
-            DotnetLaunchPlan.submoduleMplCommand());
-    }
-
-    @Test
     @DisplayName("the library restores with make setup_net and transpiles its implementation and dependencies")
     void setupAndTranspile() {
         assertEquals(List.of("make", "setup_net"),
@@ -89,15 +79,15 @@ class DotnetLaunchPlanTest {
             PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
         String path = "/nonexistent" + File.pathSeparator + tempDir;
 
-        assertTrue(DotnetLaunchPlan.commandOnPath("dafny", path));
+        assertTrue(DafnyProject.commandOnPath("dafny", path));
     }
 
     @Test
     @DisplayName("a missing or empty PATH yields dafny-not-found")
     void dafnyAbsent(@TempDir Path tempDir) {
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", null));
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", ""));
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", tempDir.toString()),
+        assertFalse(DafnyProject.commandOnPath("dafny", null));
+        assertFalse(DafnyProject.commandOnPath("dafny", ""));
+        assertFalse(DafnyProject.commandOnPath("dafny", tempDir.toString()),
             "a PATH entry without a dafny executable must not match");
     }
 
@@ -176,15 +166,15 @@ class DotnetLaunchPlanTest {
         Files.writeString(repo.resolve("SharedMakefileV2.mk"), "");
         Files.writeString(repo.resolve("esdk-test-servers/net/Program.cs"), "// v1");
         commitAll(repo);
-        String initial = DotnetLaunchPlan.transpileInputs("net", repo);
+        String initial = DotnetLaunchPlan.transpileInputs(repo, repo.resolve("AwsEncryptionSDK"));
 
         Files.writeString(repo.resolve("esdk-test-servers/net/Program.cs"), "// v2");
         commitAll(repo);
-        assertEquals(initial, DotnetLaunchPlan.transpileInputs("net", repo));
+        assertEquals(initial, DotnetLaunchPlan.transpileInputs(repo, repo.resolve("AwsEncryptionSDK")));
 
         Files.writeString(repo.resolve("AwsEncryptionSDK/dafny/Index.dfy"), "module B {}");
         commitAll(repo);
-        assertNotEquals(initial, DotnetLaunchPlan.transpileInputs("net", repo));
+        assertNotEquals(initial, DotnetLaunchPlan.transpileInputs(repo, repo.resolve("AwsEncryptionSDK")));
     }
 
     private static void commitAll(Path repo) throws Exception {

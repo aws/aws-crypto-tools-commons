@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The Python {@code Language_Server} launch plan. Builds and launches the
@@ -26,10 +27,16 @@ import java.util.List;
  *       upgrade pip, then a single editable install of the resolved library,
  *       the Material Providers Library (the pinned version range), cbor2 (the
  *       wire-protocol codec the server package declares), and the server
- *       package. Any failing step is a {@code BUILD} launch failure naming the
+ *       package. When the resolved library is a smithy-dafny
+ *       {@code runtimes/python} directory ({@link DafnyProject}), the plan
+ *       first initializes the clone's Dafny submodules and runs
+ *       {@code make transpile_python CORES=4} in its project directory, and
+ *       installs the library without the pinned Material Providers Library:
+ *       its {@code pyproject.toml} path dependencies install the sibling
+ *       Dafny runtimes from the same clone. Any failing step is a {@code BUILD} launch failure naming the
  *       step and carrying the tool output.</li>
  *   <li><b>Launch.</b> {@code <venv python> -m
- *       esdk_test_server <port>} from the server directory, via the shared
+ *       <product>_test_server <port>} from the server directory, via the shared
  *       {@link SubprocessLauncher} (port probe, TCP readiness, process-tree
  *       teardown).</li>
  * </ol>
@@ -53,9 +60,6 @@ public final class PythonLaunchPlan implements Launcher {
      */
     static final String CBOR2_REQUIREMENT = "cbor2>=5.6";
 
-    /** The server's Python module: {@code python -m esdk_test_server <port>}. */
-    static final String SERVER_MODULE = "esdk_test_server";
-
     /** The interpreter used to create the venv (the Makefile's {@code PYTHON3 ?= python3}). */
     static final String DEFAULT_PYTHON3 = "python3";
 
@@ -66,26 +70,34 @@ public final class PythonLaunchPlan implements Launcher {
     private static final int MAX_FAILURE_OUTPUT_CHARS = 4000;
 
     private final Path workDirectory;
+    private final String serverModule;
     private final String python3;
     private final SubprocessLauncher subprocessLauncher;
 
     /**
      * @param workDirectory scratch directory owned by this plan; hosts the
      *                      venv and the server log
+     * @param product       the SDK product identifier — the server module is
+     *                      {@code <product>_test_server}
      */
-    public PythonLaunchPlan(Path workDirectory) {
-        this(workDirectory, DEFAULT_PYTHON3, new SubprocessLauncher());
+    public PythonLaunchPlan(Path workDirectory, String product) {
+        this(workDirectory, product, DEFAULT_PYTHON3, new SubprocessLauncher());
     }
 
     /**
      * @param workDirectory      scratch directory owned by this plan
+     * @param product            the SDK product identifier
      * @param python3            the interpreter used to create the venv
      * @param subprocessLauncher the shared launch machinery (injectable
      *                           readiness timeout for tests)
      */
-    public PythonLaunchPlan(Path workDirectory, String python3, SubprocessLauncher subprocessLauncher) {
+    public PythonLaunchPlan(Path workDirectory, String product, String python3,
+            SubprocessLauncher subprocessLauncher) {
         if (workDirectory == null) {
             throw new IllegalArgumentException("workDirectory is required");
+        }
+        if (product == null || product.isBlank()) {
+            throw new IllegalArgumentException("product is required");
         }
         if (python3 == null || python3.isBlank()) {
             throw new IllegalArgumentException("python3 is required");
@@ -94,6 +106,7 @@ public final class PythonLaunchPlan implements Launcher {
             throw new IllegalArgumentException("subprocessLauncher is required");
         }
         this.workDirectory = workDirectory;
+        this.serverModule = product + "_test_server";
         this.python3 = python3;
         this.subprocessLauncher = subprocessLauncher;
     }
@@ -131,15 +144,33 @@ public final class PythonLaunchPlan implements Launcher {
                 runSetupStep(language, "create venv", createVenvCommand(python3, venvDir));
             }
             runSetupStep(language, "upgrade pip", upgradePipCommand(venvDir));
-            runSetupStep(language, "pip install library + MPL + cbor2 + server",
-                pipInstallCommand(venvDir, libraryDir, serverDir));
+            Optional<Path> dafnyProject = DafnyProject.of(libraryDir);
+            if (dafnyProject.isPresent()) {
+                if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+                    throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                        "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
+                            + " was not found): the Python library transpiles from Dafny before install");
+                }
+                Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
+                synchronized (DafnyProject.lockFor(repoRoot)) {
+                    for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                        runSetupStep(language, String.join(" ", submodule), submodule, repoRoot);
+                    }
+                    runSetupStep(language, "make transpile_python", transpileCommand(), dafnyProject.get());
+                }
+                runSetupStep(language, "pip install library + cbor2 + server",
+                    dafnyPipInstallCommand(venvDir, libraryDir, serverDir));
+            } else {
+                runSetupStep(language, "pip install library + MPL + cbor2 + server",
+                    pipInstallCommand(venvDir, libraryDir, serverDir));
+            }
             stamp.write(language, commits, dirty);
         }
 
-        // 3. Launch: <venv python> -m esdk_test_server <port> from the server
+        // 3. Launch: <venv python> -m <product>_test_server <port> from the server
         //    directory (the Makefile's run-python-server), via the shared
         //    probe/spawn/readiness/teardown machinery.
-        ProcessBuilder server = new ProcessBuilder(serverCommand(venvDir, entry.port()));
+        ProcessBuilder server = new ProcessBuilder(serverCommand(venvDir, serverModule, entry.port()));
         server.directory(serverDir.toFile());
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
@@ -188,9 +219,26 @@ public final class PythonLaunchPlan implements Launcher {
             "-e", serverDir.toString());
     }
 
-    /** {@code <venv python> -m esdk_test_server <port>}. */
-    static List<String> serverCommand(Path venvDir, int port) {
-        return List.of(venvPython(venvDir).toString(), "-m", SERVER_MODULE, String.valueOf(port));
+    /** {@code make transpile_python CORES=4} (the smithy-dafny project directory). */
+    static List<String> transpileCommand() {
+        return List.of("make", "transpile_python", "CORES=4");
+    }
+
+    /**
+     * {@code pip install --quiet -e <library> <cbor2> -e <server>}: a
+     * smithy-dafny runtime brings its sibling runtimes as path dependencies,
+     * so the pinned Material Providers Library is omitted.
+     */
+    static List<String> dafnyPipInstallCommand(Path venvDir, Path libraryDir, Path serverDir) {
+        return List.of(venvPip(venvDir).toString(), "install", "--quiet",
+            "-e", libraryDir.toString(),
+            CBOR2_REQUIREMENT,
+            "-e", serverDir.toString());
+    }
+
+    /** {@code <venv python> -m <module> <port>}. */
+    static List<String> serverCommand(Path venvDir, String module, int port) {
+        return List.of(venvPython(venvDir).toString(), "-m", module, String.valueOf(port));
     }
 
     // ------------------------------------------------------------------
@@ -210,43 +258,53 @@ public final class PythonLaunchPlan implements Launcher {
      */
     private void runSetupStep(String language, String step, List<String> command)
             throws ServerLaunchException {
+        runSetupStep(language, step, command, workDirectory);
+    }
+
+    private void runSetupStep(String language, String step, List<String> command, Path directory)
+            throws ServerLaunchException {
         Instant startedAt = Instant.now();
         try {
-            ProcessBuilder builder = new ProcessBuilder(command);
-            builder.directory(workDirectory.toFile());
-            builder.redirectErrorStream(true);
-
-            Process process;
-            try {
-                process = builder.start();
-            } catch (IOException e) {
-                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                    buildFailureMessage(language, step, command, e.getMessage()), e);
-            }
-
-            String output;
-            int exitCode;
-            try {
-                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                exitCode = process.waitFor();
-            } catch (IOException e) {
-                process.destroyForcibly();
-                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                    buildFailureMessage(language, step, command, e.getMessage()), e);
-            } catch (InterruptedException e) {
-                process.destroyForcibly();
-                Thread.currentThread().interrupt();
-                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-            }
-
-            if (exitCode != 0) {
-                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                    buildFailureMessage(language, step, command,
-                        "exit code " + exitCode + "; output:\n" + tail(output)));
-            }
+            runSetupStepUntimed(language, step, command, directory);
         } finally {
             LaunchTimings.log(language, step, startedAt);
+        }
+    }
+
+    private void runSetupStepUntimed(String language, String step, List<String> command,
+            Path directory) throws ServerLaunchException {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(directory.toFile());
+        builder.redirectErrorStream(true);
+
+        Process process;
+        try {
+            process = builder.start();
+        } catch (IOException e) {
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                buildFailureMessage(language, step, command, e.getMessage()), e);
+        }
+
+        String output;
+        int exitCode;
+        try {
+            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            exitCode = process.waitFor();
+        } catch (IOException e) {
+            process.destroyForcibly();
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                buildFailureMessage(language, step, command, e.getMessage()), e);
+        } catch (InterruptedException e) {
+            process.destroyForcibly();
+            Thread.currentThread().interrupt();
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+        }
+
+        if (exitCode != 0) {
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                buildFailureMessage(language, step, command,
+                    "exit code " + exitCode + "; output:\n" + tail(output)));
         }
     }
 

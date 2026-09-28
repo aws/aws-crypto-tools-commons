@@ -350,7 +350,7 @@ jobs:
           # The Dafny transpile output depends only on these paths' content.
           esdk_repo=$(field net url); esdk_repo=${esdk_repo#https://github.com/}; esdk_repo=${esdk_repo%.git}
           transpile=$(gh api "repos/$esdk_repo/git/trees/$esdk_tip" --jq \
-            '[.tree[] | select(.path | IN("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "mpl")) | .sha] | join(" ")' \
+            '[.tree[] | select(.path | IN("AwsEncryptionSDK", "SharedMakefileV2.mk", "libraries", "smithy-dafny", "mpl")) | .sha] | join(" ")' \
             | sha256sum | cut -c1-16) || transpile="$esdk_tip"
           emit nettranspile net "$transpile-dafny4.9.0" \
             "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \

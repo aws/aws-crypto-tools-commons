@@ -122,7 +122,7 @@ public final class GoLaunchPlan implements Launcher {
         BuildStamp stamp = new BuildStamp(serverDir, product);
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(),
                 List.of(serverDir.resolve(serverBinaryName)))) {
-            runBuildStep(language, "go build -buildvcs=false -o esdk-test-server .",
+            runBuildStep(language, "go build -buildvcs=false -o " + serverBinaryName + " .",
                 buildCommand(go, serverBinaryName), serverDir);
             stamp.write(language, resolved.commit(), resolved.dirty());
         }

@@ -1,0 +1,127 @@
+{
+  "_comment": [
+    "Primitives TestServer commons server-config.json (design 'Server Configuration'):",
+    "product + one Configuration_Entry per language. The Feature_Catalog lives in the",
+    "sibling feature-set.json and the bug ledger in bug-list.json (the doc's",
+    "three-file layout) — the only supported configuration format. The shared",
+    "orchestrator (test-server-common/orchestrator/) loads this trio and resolves",
+    "each entry's server from its Server_Location.",
+    "",
+    "The Dafny-runtime Language_Servers (java, net, python, go, rust-dafny) live in",
+    "aws-cryptographic-material-providers-library under test-server/<lang>-v<major>-server/.",
+    "The Rust Language_Server lives in aws-crypto-tools-rust under prim-test-server/;",
+    "configPath names the DIRECTORY holding its per-server trio",
+    "(server-config.json/feature-config.json/bug-config.json) co-located with the server."
+  ],
+  "product": "primitives",
+  "entries": [
+    {
+      "language": "rust",
+      "majorVersion": 1,
+      "port": 8094,
+      "configPath": "prim-test-server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "aws-crypto-rust/primitives-test-server",
+        "path": "prim"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "aws-crypto-rust/primitives-test-server",
+        "path": "prim-test-server"
+      }
+    },
+    {
+      "language": "java",
+      "majorVersion": 1,
+      "port": 8110,
+      "configPath": "test-server/java-v1-server",
+      "libraryRepository": {
+        "name": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "branch": "lucmcdon/primitives-test-server",
+        "path": "test-server/java-v1-server"
+      },
+      "serverLocation": {
+        "repository": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "ref": "lucmcdon/primitives-test-server",
+        "path": "test-server/java-v1-server"
+      }
+    },
+    {
+      "language": "net",
+      "majorVersion": 2,
+      "port": 8111,
+      "configPath": "test-server/net-v2-server",
+      "libraryRepository": {
+        "name": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "branch": "lucmcdon/primitives-test-server",
+        "path": "test-server/net-v2-server"
+      },
+      "serverLocation": {
+        "repository": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "ref": "lucmcdon/primitives-test-server",
+        "path": "test-server/net-v2-server"
+      }
+    },
+    {
+      "language": "python",
+      "majorVersion": 1,
+      "port": 8112,
+      "configPath": "test-server/python-v1-server",
+      "libraryRepository": {
+        "name": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "branch": "lucmcdon/primitives-test-server",
+        "path": "test-server/python-v1-server"
+      },
+      "serverLocation": {
+        "repository": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "ref": "lucmcdon/primitives-test-server",
+        "path": "test-server/python-v1-server"
+      }
+    },
+    {
+      "language": "go",
+      "majorVersion": 1,
+      "port": 8113,
+      "configPath": "test-server/go-v1-server",
+      "libraryRepository": {
+        "name": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "branch": "lucmcdon/primitives-test-server",
+        "path": "releases/go/primitives"
+      },
+      "serverLocation": {
+        "repository": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "ref": "lucmcdon/primitives-test-server",
+        "path": "test-server/go-v1-server"
+      }
+    },
+    {
+      "language": "rust-dafny",
+      "majorVersion": 1,
+      "port": 8114,
+      "configPath": "test-server/rust-dafny-v1-server",
+      "libraryRepository": {
+        "name": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "branch": "lucmcdon/primitives-test-server",
+        "path": "releases/rust/mpl"
+      },
+      "serverLocation": {
+        "repository": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "ref": "lucmcdon/primitives-test-server",
+        "path": "test-server/rust-dafny-v1-server"
+      }
+    }
+  ]
+}
