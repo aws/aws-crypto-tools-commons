@@ -165,7 +165,7 @@ public final class SourceResolver {
         String path = pathOrDefault(library == null ? null : library.path());
         java.nio.file.Path overlayRoot = library == null
             ? null
-            : overlays.get(library.name());
+            : overlayFor(overlays, library.name(), library.url());
         SourcePlan plan;
         if (ownLanguage) {
             plan = new SourcePlan.WorkingTree(context.languageRepoRoot(), path);
@@ -194,7 +194,7 @@ public final class SourceResolver {
         String path = pathOrDefault(location == null ? null : location.path());
         java.nio.file.Path overlayRoot = location == null
             ? null
-            : overlays.get(location.repository());
+            : overlayFor(overlays, location.repository(), location.url());
         SourcePlan plan;
         if (ownLanguage) {
             plan = new SourcePlan.WorkingTree(context.languageRepoRoot(), path);
@@ -206,6 +206,28 @@ public final class SourceResolver {
             plan = new SourcePlan.Clone(location.url(), location.ref(), path);
         }
         return new ResolvedComponentPlan(ComponentId.server(language), plan, reason);
+    }
+
+    /**
+     * The overlay for a component, matched on its configured name or on the
+     * repository name in its URL (a configured name can be a label, e.g.
+     * {@code aws-crypto-tools-rust-cpp} for a server in aws-crypto-tools-rust).
+     */
+    private static java.nio.file.Path overlayFor(
+            Map<String, java.nio.file.Path> overlays, String name, String url) {
+        java.nio.file.Path byName = name == null ? null : overlays.get(name);
+        return byName != null ? byName : overlays.get(repositoryName(url));
+    }
+
+    /** The repository name at the end of a git URL, without {@code .git}. */
+    static String repositoryName(String url) {
+        if (url == null) {
+            return "";
+        }
+        String trimmed = url.replaceAll("/+$", "");
+        int slash = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf(':'));
+        String name = slash >= 0 ? trimmed.substring(slash + 1) : trimmed;
+        return name.endsWith(".git") ? name.substring(0, name.length() - 4) : name;
     }
 
     private static String pathOrDefault(String path) {

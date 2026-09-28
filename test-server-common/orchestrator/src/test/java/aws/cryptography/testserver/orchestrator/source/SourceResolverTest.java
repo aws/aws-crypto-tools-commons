@@ -201,7 +201,7 @@ class SourceResolverTest {
         ConfigurationEntry rustCpp = new ConfigurationEntry("rust-cpp", 1, 8094,
             new RepositoryCoordinates("aws-crypto-tools-rust",
                 "git@github.com:aws/aws-crypto-tools-rust.git", "cpp-branch", "esdk"),
-            new ServerLocation("aws-crypto-tools-rust",
+            new ServerLocation("aws-crypto-tools-rust-cpp",
                 "git@github.com:aws/aws-crypto-tools-rust.git", "cpp-branch", "esdk-cpp-test-server"),
             null, null);
         CommonsConfiguration set = new CommonsConfiguration("esdk", List.of(), List.of(rust, rustCpp));
@@ -218,5 +218,25 @@ class SourceResolverTest {
             plan.get(ComponentId.server("rust-cpp")).plan());
         assertEquals("cpp-branch", cppServer.ref());
         assertInstanceOf(SourcePlan.Clone.class, plan.get(ComponentId.library("rust-cpp")).plan());
+    }
+
+    @Test
+    @DisplayName("an overlay matches a server whose configured name is a label, by its URL")
+    void overlayMatchesAServerLabelByUrl() {
+        ConfigurationEntry rustCpp = new ConfigurationEntry("rust-cpp", 1, 8094,
+            new RepositoryCoordinates("aws-crypto-tools-rust",
+                "git@github.com:aws/aws-crypto-tools-rust.git", "cpp-branch", "esdk"),
+            new ServerLocation("aws-crypto-tools-rust-cpp",
+                "git@github.com:aws/aws-crypto-tools-rust.git", "cpp-branch", "esdk-cpp-test-server"),
+            null, null);
+        Path checkout = Path.of("/work/rust-checkout");
+
+        Map<ComponentId, ResolvedComponentPlan> plan = byComponent(new SourceResolver().resolve(
+            new CommonsConfiguration("esdk", List.of(), List.of(rustCpp)),
+            RunContext.commonsRun(COMMONS_ROOT, COMMONS), List.of(),
+            Map.of("aws-crypto-tools-rust", checkout), java.util.Set.of("rust-cpp")));
+
+        assertEquals(checkout, assertInstanceOf(SourcePlan.WorkingTree.class,
+            plan.get(ComponentId.server("rust-cpp")).plan()).root());
     }
 }
