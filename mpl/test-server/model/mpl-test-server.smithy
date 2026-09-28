@@ -13,8 +13,9 @@ use smithy.protocols#rpcv2Cbor
 /// CMM materials retrieval.
 ///
 /// Scope is the MPL surface every configured Language_Server implements: the
-/// Raw AES keyring and the Default CMM, over ESDK algorithm suites only. Keyrings, CMMs, and suite formats a server does
-/// not implement are not modeled.
+/// Raw AES keyring and the Default CMM, over ESDK algorithm suites only.
+/// Keyrings, CMMs, and suite formats a server does not implement are not
+/// modeled.
 ///
 /// Every Create* operation returns an opaque ResourceId into a server-side
 /// registry, because a keyring or CMM cannot cross the wire. Every operation on
