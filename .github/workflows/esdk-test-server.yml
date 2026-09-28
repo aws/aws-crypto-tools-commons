@@ -48,5 +48,7 @@ jobs:
       focus: ${{ inputs.focus || '' }}
       language-repository: ${{ inputs.language-repository || '' }}
       language-ref: ${{ inputs.language-ref || '' }}
+      # TEMPORARY: save from this PR to verify warm runs.
+      save-caches: true
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
