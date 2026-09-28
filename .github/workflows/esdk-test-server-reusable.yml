@@ -142,6 +142,14 @@ on:
         description: The language-repository ref to test. Defaults to the calling commit.
         type: string
         default: ""
+      checkout-languages:
+        description: >-
+          Comma-separated languages built from the language-repository checkout.
+          The repository's other languages clone from their configured branch.
+          Defaults to focus; empty with no focus takes every language the
+          repository hosts from the checkout.
+        type: string
+        default: ""
       commons-ref:
         description: The aws-crypto-tools-commons ref to run when called from another repository.
         type: string
@@ -166,6 +174,7 @@ permissions:
 env:
   # The language repository whose checkout replaces its configured branch.
   LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
+  CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
 
 jobs:
   # Resolves each heavy server's cache key and lists the servers whose
@@ -282,18 +291,23 @@ jobs:
           own=""
           if [ -n "$LANGUAGE_REPOSITORY" ]; then
             own=$(basename "$LANGUAGE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo" >> "$GITHUB_OUTPUT"
+            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
           fi
+          # Whether $1 builds from the checkout.
+          from_checkout() {
+            [ -n "$own" ] && [ "$(repo_of "$1")" = "$own" ] || return 1
+            [ -z "$CHECKOUT_LANGUAGES" ] || [[ ",$CHECKOUT_LANGUAGES," == *",$1,"* ]]
+          }
           clone() {
             local url ref repo
             url=$(field "$1" url); ref=$(field "$1" ref)
             repo=$(repo_of "$1")
-            if [ "$repo" = "$own" ]; then echo "language-repo"; return; fi
+            if from_checkout "$1"; then echo "language-repo"; return; fi
             echo "$sources/${repo}@${ref//[^A-Za-z0-9._-]/_}-????????"
           }
           tip() {
             local url ref sha
-            if [ "$(repo_of "$1")" = "$own" ]; then git -C language-repo rev-parse HEAD; return; fi
+            if from_checkout "$1"; then git -C language-repo rev-parse HEAD; return; fi
             url=$(field "$1" url); ref=$(field "$1" ref)
             # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
             # this repo) does not replace the private-repo PAT.

@@ -188,4 +188,35 @@ class SourceResolverTest {
         assertEquals("override-branch", overridden.branch());
         assertEquals(ResolutionReason.INVOCATION_OVERRIDE, overridden.reason());
     }
+
+    @Test
+    @DisplayName("an overlay limited to one language leaves the repository's other languages cloned")
+    void overlayAppliesOnlyToItsLanguages() {
+        ConfigurationEntry rust = new ConfigurationEntry("rust", 1, 8093,
+            new RepositoryCoordinates("aws-crypto-tools-rust",
+                "git@github.com:aws/aws-crypto-tools-rust.git", "rust-branch", "esdk"),
+            new ServerLocation("aws-crypto-tools-rust",
+                "git@github.com:aws/aws-crypto-tools-rust.git", "rust-branch", "esdk-test-server"),
+            null, null);
+        ConfigurationEntry rustCpp = new ConfigurationEntry("rust-cpp", 1, 8094,
+            new RepositoryCoordinates("aws-crypto-tools-rust",
+                "git@github.com:aws/aws-crypto-tools-rust.git", "cpp-branch", "esdk"),
+            new ServerLocation("aws-crypto-tools-rust",
+                "git@github.com:aws/aws-crypto-tools-rust.git", "cpp-branch", "esdk-cpp-test-server"),
+            null, null);
+        CommonsConfiguration set = new CommonsConfiguration("esdk", List.of(), List.of(rust, rustCpp));
+        Path checkout = Path.of("/work/rust-checkout");
+
+        Map<ComponentId, ResolvedComponentPlan> plan = byComponent(new SourceResolver().resolve(
+            set, RunContext.commonsRun(COMMONS_ROOT, COMMONS), List.of(),
+            Map.of("aws-crypto-tools-rust", checkout), java.util.Set.of("rust")));
+
+        SourcePlan.WorkingTree rustServer = assertInstanceOf(SourcePlan.WorkingTree.class,
+            plan.get(ComponentId.server("rust")).plan());
+        assertEquals(checkout, rustServer.root());
+        SourcePlan.Clone cppServer = assertInstanceOf(SourcePlan.Clone.class,
+            plan.get(ComponentId.server("rust-cpp")).plan());
+        assertEquals("cpp-branch", cppServer.ref());
+        assertInstanceOf(SourcePlan.Clone.class, plan.get(ComponentId.library("rust-cpp")).plan());
+    }
 }

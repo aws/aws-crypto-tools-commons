@@ -218,6 +218,13 @@ public final class TestServerOrchestratorMain {
                 focus.add(language.trim());
             }
         }
+        // workingTreeLanguages=<a,b> — the languages the overlays apply to.
+        java.util.Set<String> overlayLanguages = new java.util.LinkedHashSet<>();
+        for (String language : cli.getOrDefault("workingTreeLanguages", "").split(",")) {
+            if (!language.isBlank()) {
+                overlayLanguages.add(language.trim());
+            }
+        }
         // languages=<a,b> — run only these configured languages.
         // stopAfter=materialize|launch — stop before the Tests.
         java.util.Set<String> languages = new java.util.LinkedHashSet<>();
@@ -247,6 +254,7 @@ public final class TestServerOrchestratorMain {
             testServerRoot,
             referenceImplementation)
             .withWorkingTreeOverlays(workingTreeOverlays)
+            .withOverlayLanguages(overlayLanguages)
             .withLanguages(languages)
             .withStopAfter(stopAfter)
             .withFocus(focus);
@@ -398,6 +406,7 @@ public final class TestServerOrchestratorMain {
             + " [tests=<pattern>]"
             + " [languages=<lang>,...]"
             + " [focus=<lang>,...]"
+            + " [workingTreeLanguages=<lang>,...]"
             + " [stopAfter=none|materialize|launch]";
     }
 

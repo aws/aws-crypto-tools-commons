@@ -89,7 +89,22 @@ public final class SourceResolver {
             RunContext context,
             List<ConfigurationEntry> overrides,
             Map<String, java.nio.file.Path> workingTreeOverlays) {
-        Map<String, java.nio.file.Path> overlays = workingTreeOverlays == null
+        return resolve(set, context, overrides, workingTreeOverlays, java.util.Set.of());
+    }
+
+    /**
+     * {@link #resolve(CommonsConfiguration, RunContext, List, Map)} with the
+     * overlays applied only to {@code overlayLanguages}; the repository's other
+     * languages clone from their configured coordinates. Empty applies the
+     * overlays to every language.
+     */
+    public List<ResolvedComponentPlan> resolve(
+            CommonsConfiguration set,
+            RunContext context,
+            List<ConfigurationEntry> overrides,
+            Map<String, java.nio.file.Path> workingTreeOverlays,
+            java.util.Set<String> overlayLanguages) {
+        Map<String, java.nio.file.Path> allOverlays = workingTreeOverlays == null
             ? Map.of()
             : Map.copyOf(workingTreeOverlays);
         Map<String, ConfigurationEntry> overrideByLanguage = new LinkedHashMap<>();
@@ -126,6 +141,9 @@ public final class SourceResolver {
                     ? ResolutionReason.CONFIGURATION_OVERRIDE
                     : ResolutionReason.CONFIGURATION_ENTRY;
 
+            Map<String, java.nio.file.Path> overlays =
+                overlayLanguages == null || overlayLanguages.isEmpty()
+                    || overlayLanguages.contains(language) ? allOverlays : Map.of();
             plans.add(libraryPlan(language, effective, context, ownLanguage, reason, overlays));
             plans.add(serverPlan(language, effective, context, ownLanguage, reason, overlays));
         }

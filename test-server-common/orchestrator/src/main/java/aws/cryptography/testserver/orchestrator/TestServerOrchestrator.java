@@ -134,6 +134,7 @@ public final class TestServerOrchestrator {
     private Set<String> languages = Set.of();
     private StopAfter stopAfter = StopAfter.NONE;
     private Set<String> focus = Set.of();
+    private Set<String> overlayLanguages = Set.of();
     private final ResultReporter reporter;
 
     /**
@@ -200,6 +201,18 @@ public final class TestServerOrchestrator {
      */
     public TestServerOrchestrator withWorkingTreeOverlays(Map<String, Path> overlays) {
         this.workingTreeOverlays = overlays == null ? Map.of() : Map.copyOf(overlays);
+        return this;
+    }
+
+    /**
+     * Apply the working-tree overlays only to {@code languages}; the overlaid
+     * repository's other languages clone from their configured coordinates.
+     * Empty applies them to every language.
+     *
+     * @return this orchestrator, for chaining
+     */
+    public TestServerOrchestrator withOverlayLanguages(Set<String> languages) {
+        this.overlayLanguages = languages == null ? Set.of() : Set.copyOf(languages);
         return this;
     }
 
@@ -430,7 +443,7 @@ public final class TestServerOrchestrator {
         // materialization performs the git
         // and filesystem I/O, capturing failures as data. ----
         List<ResolvedComponentPlan> plans = resolver.resolve(
-            commonsConfiguration, context, overrides, workingTreeOverlays);
+            commonsConfiguration, context, overrides, workingTreeOverlays, overlayLanguages);
         if (!languages.isEmpty()) {
             plans = plans.stream()
                 .filter(plan -> plan.component().kind() == ComponentId.Kind.COMMONS
