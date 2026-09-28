@@ -3,12 +3,12 @@ package aws.cryptography.testserver.orchestrator.launch;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The .NET {@code Language_Server} launch plan: builds the rpcv2Cbor server
@@ -29,12 +29,14 @@ import java.util.List;
  *       from {@code PATH} is an eager {@code BUILD} failure naming the
  *       requirement (Dafny {@value #REQUIRED_DAFNY_VERSION}), before any make
  *       step runs.</li>
- *   <li><b>Transpile the library.</b> In the clone root: {@code git submodule
- *       update --init libraries} and {@code git submodule update --init
- *       --recursive mpl} (the transpile targets live in the mpl submodule's
- *       smithy-dafny makefile), then {@code make setup_net} and {@code make
- *       transpile_net CORES=4} in {@code AwsEncryptionSDK/} — the same steps
- *       the repository's own net workflow runs. A non-zero step is a
+ *   <li><b>Transpile the library.</b> When the library component is a
+ *       smithy-dafny {@code runtimes/net} directory ({@link DafnyProject}):
+ *       in the clone root, {@code git submodule update --init --recursive}
+ *       each present Dafny submodule ({@code libraries}, {@code smithy-dafny},
+ *       {@code mpl}), then {@code make setup_net} and {@code make
+ *       transpile_net CORES=4} in the library's project directory (e.g.
+ *       {@code AwsEncryptionSDK/}) — the same steps the repository's own net
+ *       workflow runs. A non-zero step is a
  *       {@code BUILD} launch failure carrying the tool output. A stamp file
  *       written after a successful build skips the transpile and build steps
  *       (Dafny gate included) when a reused clone already holds a build of
@@ -61,9 +63,6 @@ public final class DotnetLaunchPlan implements Launcher {
 
     /** The Dafny version the repository's transpile pins (project.properties). */
     static final String REQUIRED_DAFNY_VERSION = "4.9.0";
-
-    /** The Dafny build directory, relative to the clone root. */
-    static final String DAFNY_PROJECT_RELATIVE_PATH = "AwsEncryptionSDK";
 
     /**
      * Server csproj filename, resolved in the server directory. Derived from
@@ -153,8 +152,8 @@ public final class DotnetLaunchPlan implements Launcher {
         MaterializedSources.Success server = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
         Path serverDir = server.directory();
-        Path repoRoot = server.root();
-        Path dafnyProjectDir = repoRoot.resolve(DAFNY_PROJECT_RELATIVE_PATH);
+        Optional<Path> dafnyProject = sources.directoryOf(ComponentId.library(language))
+            .flatMap(DafnyProject::of);
 
         try {
             Files.createDirectories(workDirectory);
@@ -164,38 +163,36 @@ public final class DotnetLaunchPlan implements Launcher {
                     + workDirectory + ": " + e.getMessage(), e);
         }
 
-        // 2–3. Transpile the library and build the server. When the clone
-        //    holds a Dafny transpile project (AwsEncryptionSDK/Makefile — the
-        //    ESDK layout: no committed generated .NET code, transpiled from
-        //    Dafny before build), run submodules + setup_net + transpile_net
-        //    in the Dafny project directory before dotnet build. When it does
-        //    not (DB-ESDK layout: server consumes a published NuGet DBE
-        //    distribution directly), skip those steps and go straight to
-        //    dotnet build.
+        // 2–3. Transpile the library and build the server. A library that is
+        //    a smithy-dafny runtimes/net directory has no committed generated
+        //    .NET code, so run submodules + setup_net + transpile_net in its
+        //    project directory before dotnet build. Any other library (e.g. a
+        //    published NuGet distribution) goes straight to dotnet build.
         //
         //    All build steps are Dafny-gated: skipped when the stamp shows a
         //    successful build of this exact commit already sits in the
         //    (reused) clone.
-        boolean transpileFromDafny = Files.isRegularFile(
-            dafnyProjectDir.resolve("Makefile"));
         if (!buildUpToDate(serverDir, server.commit(), server.dirty(),
                 buildStampName, serverDllRelativePath)) {
-            if (transpileFromDafny) {
+            if (dafnyProject.isPresent()) {
+                Path dafnyProjectDir = dafnyProject.get();
+                Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
                 // The transpile cannot succeed without Dafny; fail eagerly
                 // with the requirement rather than deep inside make output.
-                if (!commandOnPath("dafny", System.getenv("PATH"))) {
+                if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
                     throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
                         "the " + language + " Language_Server build requires Dafny "
                             + REQUIRED_DAFNY_VERSION + " on PATH ('dafny' was not found): the .NET"
                             + " library carries no committed generated code and transpiles from Dafny"
                             + " before building");
                 }
-                runBuildStep(language, "git submodule update --init libraries",
-                    submoduleLibrariesCommand(), repoRoot);
-                runBuildStep(language, "git submodule update --init --recursive mpl",
-                    submoduleMplCommand(), repoRoot);
-                runBuildStep(language, "make setup_net", setupCommand(make), dafnyProjectDir);
-                runBuildStep(language, "make transpile_net", transpileCommand(make), dafnyProjectDir);
+                synchronized (DafnyProject.lockFor(repoRoot)) {
+                    for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                        runBuildStep(language, String.join(" ", submodule), submodule, repoRoot);
+                    }
+                    runBuildStep(language, "make setup_net", setupCommand(make), dafnyProjectDir);
+                    runBuildStep(language, "make transpile_net", transpileCommand(make), dafnyProjectDir);
+                }
             }
             runBuildStep(language, "dotnet build " + csprojName + " -c Release",
                 buildCommand(dotnet, csprojName), serverDir);
@@ -214,16 +211,6 @@ public final class DotnetLaunchPlan implements Launcher {
     // ------------------------------------------------------------------
     // Pure command construction (unit-testable without a Dafny transpile).
     // ------------------------------------------------------------------
-
-    /** {@code git submodule update --init libraries} (clone root). */
-    static List<String> submoduleLibrariesCommand() {
-        return List.of("git", "submodule", "update", "--init", "libraries");
-    }
-
-    /** {@code git submodule update --init --recursive mpl} (clone root). */
-    static List<String> submoduleMplCommand() {
-        return List.of("git", "submodule", "update", "--init", "--recursive", "mpl");
-    }
 
     /** {@code make setup_net} (AwsEncryptionSDK/). */
     static List<String> setupCommand(String make) {
@@ -288,27 +275,6 @@ public final class DotnetLaunchPlan implements Launcher {
                 "failed to write the " + language + " build stamp in " + serverDir
                     + ": " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * Whether an executable named {@code command} exists on {@code pathValue}
-     * (a {@code PATH}-style separated list of directories). Pure over its
-     * inputs so the dafny gate is unit-testable with a constructed PATH.
-     */
-    static boolean commandOnPath(String command, String pathValue) {
-        if (pathValue == null || pathValue.isBlank()) {
-            return false;
-        }
-        for (String dir : pathValue.split(File.pathSeparator)) {
-            if (dir.isBlank()) {
-                continue;
-            }
-            Path candidate = Path.of(dir).resolve(command);
-            if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // ------------------------------------------------------------------

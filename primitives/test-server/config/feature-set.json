@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Primitives TestServer commons feature-set.json (design 'Feature Configuration'):",
+    "the authoritative Feature_Catalog. Each language's server declares the",
+    "supported/unsupported half of every feature here in its own feature-config.json;",
+    "the union must equal this catalog. Each feature names one primitive operation",
+    "family a Language_Server may implement."
+  ],
+  "product": "primitives",
+  "features": [
+    "aes-gcm",
+    "hkdf",
+    "kbkdf-ctr-hmac",
+    "digest",
+    "hmac",
+    "ecdsa",
+    "random"
+  ]
+}

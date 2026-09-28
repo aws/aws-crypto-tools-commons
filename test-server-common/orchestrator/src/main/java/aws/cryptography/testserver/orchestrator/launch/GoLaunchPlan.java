@@ -114,7 +114,7 @@ public final class GoLaunchPlan implements Launcher {
         }
 
         // 2. Build: go build -o esdk-test-server . in the server directory.
-        runBuildStep(language, "go build -buildvcs=false -o esdk-test-server .", buildCommand(go, serverBinaryName), serverDir);
+        runBuildStep(language, "go build -buildvcs=false -o " + serverBinaryName + " .", buildCommand(go, serverBinaryName), serverDir);
 
         // 3. Launch: <server>/esdk-test-server <port> from the server directory,
         //    via the shared probe/spawn/readiness/teardown.
