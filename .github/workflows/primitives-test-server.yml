@@ -6,11 +6,11 @@
 # and pass their own commit, so a change there is tested against this suite.
 #
 # The native rust server lives in aws-crypto-tools-rust; the java, net, python,
-# go, and rust-dafny servers live in aws-cryptographic-material-providers-library
-# and build its Dafny runtimes from source. The job sets up every toolchain
-# those builds need: JDK 17 (the MPL Java build) and JDK 21 (the harness), Rust,
-# Go, .NET, Python 3.11, and Dafny. The tests are offline — no AWS credentials
-# are needed.
+# go, and rust-dafny servers live in aws-cryptographic-material-providers-library.
+# Like the DB-ESDK servers, they use published libraries (Maven Central, NuGet,
+# PyPI) or the MPL's committed generated code, so there is no Dafny build step.
+# The job sets up JDK 21, Rust, Go, .NET, and Python 3.11. The tests are
+# offline — no AWS credentials are needed.
 #
 # PRIVATE RUST-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
 # clones aws-crypto-tools-rust per the Rust Configuration_Entry's
@@ -116,14 +116,6 @@ jobs:
           ref: ${{ inputs.mpl_ref }}
           path: .mpl-product-repo
 
-      - name: Set up JDK 17 (Temurin) for the MPL Java build
-        # Exposes JAVA_HOME_17_X64, which the Java launch plan uses for the
-        # MPL's Gradle 7 build.
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-
       - name: Set up JDK 21 (Temurin) for the commons harness
         uses: actions/setup-java@v5
         with:
@@ -141,14 +133,6 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
-
-      - name: Install Dafny 4.9.0 (for the MPL runtime transpiles)
-        run: |
-          set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          export PATH="$HOME/.dotnet/tools:$PATH"
-          dafny --version
 
       - name: Set up the Rust toolchain
         run: |
@@ -234,7 +218,8 @@ jobs:
       - name: Run the test suite (make orchestrate)
         working-directory: primitives/test-server
         env:
-          # Wide readiness window for the concurrent Dafny and cargo builds on a 2-core runner.
+          # Wide readiness window for the concurrent server builds (two cargo release
+          # builds among them) on a 2-core runner.
           TESTSERVER_READY_TIMEOUT_SECONDS: "1800"
         # With rust_ref / mpl_ref set, point orchestrate at the checked-out servers
         # above so it tests those commits; otherwise it clones them per
