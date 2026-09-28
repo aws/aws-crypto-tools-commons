@@ -383,45 +383,74 @@ jobs:
           done
           cat "$GITHUB_OUTPUT"
 
-      - name: Look up the prebuilt net server
+      - name: Restore the cached net server
         id: look-net
         uses: actions/cache/restore@v4
         with:
-          lookup-only: true
           path: ${{ steps.keys.outputs.paths_net }}
           key: ${{ steps.keys.outputs.key_net }}
 
-      - name: Look up the prebuilt rust-dafny server
+      - name: Restore the cached rust-dafny server
         id: look-rustdafny
         uses: actions/cache/restore@v4
         with:
-          lookup-only: true
           path: ${{ steps.keys.outputs.paths_rustdafny }}
           key: ${{ steps.keys.outputs.key_rustdafny }}
 
-      - name: Look up the prebuilt go server
+      - name: Restore the cached go server
         id: look-go
         uses: actions/cache/restore@v4
         with:
-          lookup-only: true
           path: ${{ steps.keys.outputs.paths_go }}
           key: ${{ steps.keys.outputs.key_go }}
 
-      - name: Look up the prebuilt rust server
+      - name: Restore the cached rust server
         id: look-rust
         uses: actions/cache/restore@v4
         with:
-          lookup-only: true
           path: ${{ steps.keys.outputs.paths_rust }}
           key: ${{ steps.keys.outputs.key_rust }}
 
-      - name: Look up the prebuilt rust-cpp server
+      - name: Restore the cached rust-cpp server
         id: look-rustcpp
         uses: actions/cache/restore@v4
         with:
-          lookup-only: true
           path: ${{ steps.keys.outputs.paths_rustcpp }}
           key: ${{ steps.keys.outputs.key_rustcpp }}
+
+      - name: Pack the cached servers for this run
+        # The test job takes every heavy server from this run's artifacts, so a
+        # cache entry evicted after this point cannot leave it without one.
+        env:
+          HIT_net: ${{ steps.look-net.outputs.cache-hit }}
+          PATHS_net: ${{ steps.keys.outputs.paths_net }}
+          HIT_rustdafny: ${{ steps.look-rustdafny.outputs.cache-hit }}
+          PATHS_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
+          HIT_go: ${{ steps.look-go.outputs.cache-hit }}
+          PATHS_go: ${{ steps.keys.outputs.paths_go }}
+          HIT_rust: ${{ steps.look-rust.outputs.cache-hit }}
+          PATHS_rust: ${{ steps.keys.outputs.paths_rust }}
+          HIT_rustcpp: ${{ steps.look-rustcpp.outputs.cache-hit }}
+          PATHS_rustcpp: ${{ steps.keys.outputs.paths_rustcpp }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          for pair in net:net rustdafny:rust-dafny go:go rust:rust rustcpp:rust-cpp; do
+            k=${pair%%:*}; language=${pair#*:}
+            hit_var="HIT_$k"; paths_var="PATHS_$k"
+            [ "${!hit_var}" = "true" ] || continue
+            mapfile -t paths < <(printf '%s\n' "${!paths_var}" | sed '/^$/d')
+            tar -czf "$RUNNER_TEMP/prebuilt/$language.tgz" -- "${paths[@]}"
+          done
+          ls -la "$RUNNER_TEMP/prebuilt"
+
+      - name: Upload the cached servers
+        uses: actions/upload-artifact@v4
+        with:
+          name: testserver-prebuilt-cached
+          path: ${{ runner.temp }}/prebuilt/*.tgz
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: List the servers to build
         id: matrix
@@ -457,7 +486,7 @@ jobs:
       AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       GRADLE_OPTS: -Dorg.gradle.daemon=false
-      RUST_WORKSPACES: ${{ matrix.language == 'rust' && needs.plan.outputs.ws_rust || matrix.language == 'rust-cpp' && needs.plan.outputs.ws_rustcpp || matrix.language == 'rust-dafny' && needs.plan.outputs.ws_rustdafny || '' }}
+      PREBUILD_RUST_WORKSPACES: ${{ matrix.language == 'rust' && needs.plan.outputs.ws_rust || matrix.language == 'rust-cpp' && needs.plan.outputs.ws_rustcpp || matrix.language == 'rust-dafny' && needs.plan.outputs.ws_rustdafny || '' }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
       OUT_KEY: ${{ matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'rust' && needs.plan.outputs.key_rust || needs.plan.outputs.key_rustcpp }}
       OUT_PATHS: ${{ matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'rust' && needs.plan.outputs.paths_rust || needs.plan.outputs.paths_rustcpp }}
@@ -603,8 +632,8 @@ jobs:
         if: startsWith(matrix.language, 'rust')
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.language }}
-          workspaces: ${{ env.RUST_WORKSPACES }}
+          shared-key: ${{ matrix.language }}
+          workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
       - name: Restore the Go module + build caches
@@ -650,9 +679,23 @@ jobs:
           path: ${{ needs.plan.outputs.paths_nettranspile }}
           key: ${{ needs.plan.outputs.key_nettranspile }}
 
+      - name: Pack the ${{ matrix.language }} server for this run
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
+          tar -czf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+
+      - name: Upload the ${{ matrix.language }} server
+        uses: actions/upload-artifact@v4
+        with:
+          name: testserver-prebuilt-${{ matrix.language }}
+          path: ${{ runner.temp }}/prebuilt/${{ matrix.language }}.tgz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Save the ${{ matrix.language }} server output
-        # Saved from every ref: the test job restores it from here, and it is
-        # a few MB.
+        # Saved from every ref, for later runs; it is a few MB.
         uses: actions/cache/save@v4
         with:
           path: ${{ env.OUT_PATHS }}
@@ -1067,6 +1110,21 @@ jobs:
 
       # Dependency caches, keyed on each language's lockfiles so they carry
       # across branches and commits; only the code under test rebuilds.
+      - name: Compute the dependency cache keys
+        # Once, before the builds write into the trees, so save matches restore.
+        id: depkeys
+        run: |
+          set -euo pipefail
+          sum() { find "$@" -type f 2>/dev/null | LC_ALL=C sort | xargs -r sha256sum | sha256sum | cut -c1-16; }
+          java="${{ needs.plan.outputs.dir_java }}"
+          javascript="${{ needs.plan.outputs.dir_javascript }}"
+          python="${{ needs.plan.outputs.dir_python }}"
+          {
+            echo "java=$(sum "$java" \( -name pom.xml -o -name '*.gradle' -o -name '*.gradle.kts' \) -not -path '*/target/*' -not -path '*/build/*')"
+            echo "javascript=$(sum "$javascript" -maxdepth 1 -name package-lock.json)"
+            echo "python=$(sum "$python" \( -name setup.py -o -name pyproject.toml -o -name 'requirements*.txt' \) -not -path '*/build/*')"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Restore the Maven dependencies (java)
         id: m2-deps
         uses: actions/cache/restore@v4
@@ -1074,7 +1132,7 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ hashFiles(format('{0}/**/pom.xml', needs.plan.outputs.dir_java), format('{0}/**/*.gradle*', needs.plan.outputs.dir_java)) }}
+          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
           restore-keys: |
             ${{ runner.os }}-m2-
 
@@ -1083,7 +1141,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles(format('{0}/package-lock.json', needs.plan.outputs.dir_javascript)) }}
+          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
           restore-keys: |
             ${{ runner.os }}-npm-
 
@@ -1092,7 +1150,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ hashFiles(format('{0}/**/setup.py', needs.plan.outputs.dir_python), format('{0}/**/pyproject.toml', needs.plan.outputs.dir_python), format('{0}/**/requirements*.txt', needs.plan.outputs.dir_python), 'test-server-common/orchestrator/src/main/java/**/PythonLaunchPlan.java') }}
+          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
           restore-keys: |
             ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-
 
@@ -1178,55 +1236,27 @@ jobs:
         working-directory: esdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
 
-      - name: Restore the prebuilt net server
-        id: out-net
-        uses: actions/cache/restore@v4
+      - name: Download the prebuilt servers
+        uses: actions/download-artifact@v4
         with:
-          path: ${{ needs.plan.outputs.paths_net }}
-          key: ${{ needs.plan.outputs.key_net }}
+          pattern: testserver-prebuilt-*
+          path: ${{ runner.temp }}/prebuilt
+          merge-multiple: true
 
-      - name: Restore the prebuilt rust-dafny server
-        id: out-rustdafny
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_rustdafny }}
-          key: ${{ needs.plan.outputs.key_rustdafny }}
+      - name: Unpack the prebuilt servers into their clones
+        run: |
+          set -euo pipefail
+          for archive in "$RUNNER_TEMP"/prebuilt/*.tgz; do
+            tar -xzf "$archive"
+          done
 
-      - name: Restore the prebuilt go server
-        id: out-go
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_go }}
-          key: ${{ needs.plan.outputs.key_go }}
-
-      - name: Restore the prebuilt rust server
-        id: out-rust
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_rust }}
-          key: ${{ needs.plan.outputs.key_rust }}
-
-      - name: Restore the prebuilt rust-cpp server
-        id: out-rustcpp
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ needs.plan.outputs.paths_rustcpp }}
-          key: ${{ needs.plan.outputs.key_rustcpp }}
-
-      - name: Check every prebuilt server restored
+      - name: Check every prebuilt server arrived
         # A server missing here would be built cold inside the test run.
-        env:
-          HITS: >-
-            net=${{ steps.out-net.outputs.cache-hit }}
-            rust-dafny=${{ steps.out-rustdafny.outputs.cache-hit }}
-            go=${{ steps.out-go.outputs.cache-hit }}
-            rust=${{ steps.out-rust.outputs.cache-hit }}
-            rust-cpp=${{ steps.out-rustcpp.outputs.cache-hit }}
         run: |
           set -euo pipefail
           missing=""
-          for hit in $HITS; do
-            [ "${hit#*=}" = "true" ] || missing="$missing ${hit%%=*}"
+          for language in net rust-dafny go rust rust-cpp; do
+            [ -f "$RUNNER_TEMP/prebuilt/$language.tgz" ] || missing="$missing $language"
           done
           if [ -n "$missing" ]; then
             echo "::error::prebuilt servers not restored:$missing"
@@ -1306,21 +1336,21 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ hashFiles(format('{0}/**/pom.xml', needs.plan.outputs.dir_java), format('{0}/**/*.gradle*', needs.plan.outputs.dir_java)) }}
+          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
 
       - name: Save the npm downloads (javascript)
         if: always() && env.SAVE_CACHES == 'true' && steps.npm-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles(format('{0}/package-lock.json', needs.plan.outputs.dir_javascript)) }}
+          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
 
       - name: Save the pip downloads (python)
         if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ hashFiles(format('{0}/**/setup.py', needs.plan.outputs.dir_python), format('{0}/**/pyproject.toml', needs.plan.outputs.dir_python), format('{0}/**/requirements*.txt', needs.plan.outputs.dir_python), 'test-server-common/orchestrator/src/main/java/**/PythonLaunchPlan.java') }}
+          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
 
       - name: Save the aws-c-common install (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.awscc-install.outputs.cache-hit != 'true'
