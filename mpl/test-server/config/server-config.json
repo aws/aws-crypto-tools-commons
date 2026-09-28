@@ -8,11 +8,32 @@
     "each entry's server from its Server_Location.",
     "",
     "The Rust Language_Server lives in aws-crypto-tools-rust under mpl-test-server/;",
-    "configPath names the DIRECTORY holding its per-server trio",
-    "(server-config.json/feature-config.json/bug-config.json) co-located with the server."
+    "the Java Language_Server lives in aws-cryptographic-material-providers-library",
+    "under test-server/mpl/java-v1-server/ and runs against the published MPL on",
+    "Maven Central, so its libraryRepository path is the server directory (no",
+    "Dafny transpile). configPath names the DIRECTORY holding each server's",
+    "per-server trio (server-config.json/feature-config.json/bug-config.json)."
   ],
   "product": "mpl",
   "entries": [
+    {
+      "language": "java",
+      "majorVersion": 1,
+      "port": 8101,
+      "configPath": "test-server/mpl/java-v1-server",
+      "libraryRepository": {
+        "name": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "branch": "jocorell/mpl-test-server-java",
+        "path": "test-server/mpl/java-v1-server"
+      },
+      "serverLocation": {
+        "repository": "aws-cryptographic-material-providers-library",
+        "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
+        "ref": "jocorell/mpl-test-server-java",
+        "path": "test-server/mpl/java-v1-server"
+      }
+    },
     {
       "language": "rust",
       "majorVersion": 1,
