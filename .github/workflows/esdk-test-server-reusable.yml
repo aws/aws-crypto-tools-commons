@@ -199,6 +199,10 @@ jobs:
       overlay: ${{ steps.keys.outputs.overlay }}
       esdk_dir: ${{ steps.keys.outputs.esdk_dir }}
       go_dir: ${{ steps.keys.outputs.go_dir }}
+      dir_java: ${{ steps.keys.outputs.dir_java }}
+      dir_python: ${{ steps.keys.outputs.dir_python }}
+      dir_javascript: ${{ steps.keys.outputs.dir_javascript }}
+      dir_c: ${{ steps.keys.outputs.dir_c }}
       ws_rust: ${{ steps.keys.outputs.ws_rust }}
       ws_rustcpp: ${{ steps.keys.outputs.ws_rustcpp }}
       ws_rustdafny: ${{ steps.keys.outputs.ws_rustdafny }}
@@ -371,6 +375,9 @@ jobs:
           ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk-cpp-test-server"
           ws rustdafny "$esdk/esdk-test-servers/rust"
           echo "go_dir=$esdk/esdk-test-servers/go" >> "$GITHUB_OUTPUT"
+          for language in java python javascript c; do
+            echo "dir_$language=$(clone "$language")" >> "$GITHUB_OUTPUT"
+          done
           cat "$GITHUB_OUTPUT"
 
       - name: Look up the prebuilt net server
@@ -484,21 +491,20 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Restore Gradle caches (orchestrator dependencies)
+      - name: Restore the Gradle caches (orchestrator)
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.m2/repository
-          key: ${{ runner.os }}-gradle-${{ hashFiles(
+          key: ${{ runner.os }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-v2-
 
       - name: Set up Go (Go server; aws-lc-sys native builds)
         if: matrix.language != 'net'
@@ -772,7 +778,7 @@ jobs:
             6.0.x
             8.0.x
 
-      - name: Restore Gradle + Maven caches
+      - name: Restore the Gradle caches (orchestrator + Java server)
         # Gradle: the client-java/tests/orchestrator builds under
         # esdk/test-server plus the Java server build the orchestrated run
         # executes inside its clone. Maven: the live ESDK `mvn install`
@@ -789,16 +795,15 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.m2/repository
           key: >-
-            ${{ runner.os }}-gradle-${{ hashFiles(
+            ${{ runner.os }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-v2-
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -941,35 +946,6 @@ jobs:
             esdk/test-server/build/launch/python/venv
           key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
-      - name: Restore the npm download cache
-        # Pays off when the javascript pin moves and npm ci runs cold.
-        id: npm-cache
-        if: steps.sources-javascript.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
-          restore-keys: |
-            ${{ runner.os }}-npm-esdk-test-server-
-
-      - name: Build aws-c-common (for the C Language_Server build)
-        # The orchestrated run's CLaunchPlan cmake-configures the
-        # aws-encryption-sdk-c clone, whose CMake requires an aws-c-common
-        # install; ubuntu runners ship none. Build it from source into the
-        # workspace and export CMAKE_PREFIX_PATH, which CLaunchPlan passes
-        # through to the configure — the same approach as that repo's own
-        # test-server workflow.
-        # Only needed when the aws-encryption-sdk-c clone cache missed.
-        if: steps.sources-c.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          git clone --depth 1 https://github.com/awslabs/aws-c-common "$RUNNER_TEMP/aws-c-common"
-          cmake -S "$RUNNER_TEMP/aws-c-common" -B "$RUNNER_TEMP/aws-c-common-build" \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/.aws-c-common-install" \
-            -DBUILD_TESTING=OFF
-          cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
-          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install" >> "$GITHUB_ENV"
-
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
         # bash smoke checks. The Smithy CLI is NOT preinstalled on ubuntu-latest,
@@ -1081,13 +1057,87 @@ jobs:
           done
           echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
 
-      - name: Build the light servers while the heavy ones build
+      - name: Materialize the java, python, javascript, and c sources
+        # The dependency caches below are keyed on these clones' lockfiles.
+        working-directory: esdk/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=materialize"
+
+      # Dependency caches, keyed on each language's lockfiles so they carry
+      # across branches and commits; only the code under test rebuilds.
+      - name: Restore the Maven dependencies (java)
+        id: m2-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository
+            !~/.m2/repository/**/0.0.0-testserver-*
+          key: ${{ runner.os }}-m2-${{ hashFiles(format('{0}/**/pom.xml', needs.plan.outputs.dir_java), format('{0}/**/*.gradle*', needs.plan.outputs.dir_java)) }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore the npm downloads (javascript)
+        id: npm-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles(format('{0}/package-lock.json', needs.plan.outputs.dir_javascript)) }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Restore the pip downloads (python)
+        id: pip-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ hashFiles(format('{0}/**/setup.py', needs.plan.outputs.dir_python), format('{0}/**/pyproject.toml', needs.plan.outputs.dir_python), format('{0}/**/requirements*.txt', needs.plan.outputs.dir_python), 'test-server-common/orchestrator/src/main/java/**/PythonLaunchPlan.java') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-
+
+      - name: Resolve the aws-c-common commit (c)
+        id: awscc
+        run: echo "sha=$(git ls-remote https://github.com/awslabs/aws-c-common HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the aws-c-common install (c)
+        id: awscc-install
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/.aws-c-common-install
+          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+
+      - name: Build aws-c-common (c)
+        # CLaunchPlan's cmake configure needs an aws-c-common install;
+        # CLaunchPlan passes CMAKE_PREFIX_PATH through to it.
+        if: steps.awscc-install.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/awslabs/aws-c-common "$RUNNER_TEMP/aws-c-common"
+          cmake -S "$RUNNER_TEMP/aws-c-common" -B "$RUNNER_TEMP/aws-c-common-build" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/.aws-c-common-install" \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/aws-c-common-build" --target install -- -j
+
+      - name: Set up ccache (c)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq ccache >/dev/null
+          {
+            echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install"
+            echo "CCACHE_DIR=${{ github.workspace }}/.ccache"
+            echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
+            echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+          } >> "$GITHUB_ENV"
+
+      - name: Restore the C compiler cache (c)
+        id: ccache-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: Build the java, python, javascript, and c servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
-        if: >-
-          steps.sources-javascript.outputs.cache-hit != 'true'
-          || steps.sources-c.outputs.cache-hit != 'true'
-          || steps.sources-java.outputs.cache-hit != 'true'
-          || steps.sources-python.outputs.cache-hit != 'true'
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
@@ -1226,16 +1276,52 @@ jobs:
       # whose exact key was already restored are skipped.
       # ------------------------------------------------------------------
 
-      - name: Save Gradle + Maven caches
+      - name: Save the Maven dependencies (java)
+        if: always() && env.SAVE_CACHES == 'true' && steps.m2-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.m2/repository
+            !~/.m2/repository/**/0.0.0-testserver-*
+          key: ${{ runner.os }}-m2-${{ hashFiles(format('{0}/**/pom.xml', needs.plan.outputs.dir_java), format('{0}/**/*.gradle*', needs.plan.outputs.dir_java)) }}
+
+      - name: Save the npm downloads (javascript)
+        if: always() && env.SAVE_CACHES == 'true' && steps.npm-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles(format('{0}/package-lock.json', needs.plan.outputs.dir_javascript)) }}
+
+      - name: Save the pip downloads (python)
+        if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ hashFiles(format('{0}/**/setup.py', needs.plan.outputs.dir_python), format('{0}/**/pyproject.toml', needs.plan.outputs.dir_python), format('{0}/**/requirements*.txt', needs.plan.outputs.dir_python), 'test-server-common/orchestrator/src/main/java/**/PythonLaunchPlan.java') }}
+
+      - name: Save the aws-c-common install (c)
+        if: always() && env.SAVE_CACHES == 'true' && steps.awscc-install.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.aws-c-common-install
+          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+
+      - name: Save the C compiler cache (c)
+        if: always() && env.SAVE_CACHES == 'true' && steps.ccache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+
+      - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.m2/repository
           key: >-
-            ${{ runner.os }}-gradle-${{ hashFiles(
+            ${{ runner.os }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
@@ -1274,9 +1360,3 @@ jobs:
             esdk/test-server/build/launch/python/venv
           key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
-      - name: Save the npm download cache
-        if: always() && env.SAVE_CACHES == 'true' && steps.npm-cache.outcome == 'success' && steps.npm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-esdk-test-server-${{ steps.pins.outputs.javascript }}
