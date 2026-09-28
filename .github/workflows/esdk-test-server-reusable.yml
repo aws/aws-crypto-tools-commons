@@ -154,6 +154,13 @@ on:
         description: The aws-crypto-tools-commons ref to run when called from another repository.
         type: string
         default: main
+      save-caches:
+        description: >-
+          Save the dependency caches from this run. They are saved from the
+          default branch (push and schedule) by default; every other ref only
+          restores them.
+        type: boolean
+        default: false
     secrets:
       repo-pat:
         description: >-
@@ -175,6 +182,11 @@ env:
   # The language repository whose checkout replaces its configured branch.
   LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
   CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
+  # Dependency caches (cargo, Gradle/Maven, npm, NuGet, Go, prebuilt clones)
+  # are written only from the default branch, so every branch restores the
+  # same warm set and pull requests never churn the cache store.
+  SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  CARGO_INCREMENTAL: "0"
 
 jobs:
   # Resolves each heavy server's cache key and lists the servers whose
@@ -185,6 +197,10 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       esdk_dir: ${{ steps.keys.outputs.esdk_dir }}
+      go_dir: ${{ steps.keys.outputs.go_dir }}
+      ws_rust: ${{ steps.keys.outputs.ws_rust }}
+      ws_rustcpp: ${{ steps.keys.outputs.ws_rustcpp }}
+      ws_rustdafny: ${{ steps.keys.outputs.ws_rustdafny }}
       key_net: ${{ steps.keys.outputs.key_net }}
       key_nettranspile: ${{ steps.keys.outputs.key_nettranspile }}
       paths_nettranspile: ${{ steps.keys.outputs.paths_nettranspile }}
@@ -299,11 +315,10 @@ jobs:
             [ -z "$CHECKOUT_LANGUAGES" ] || [[ ",$CHECKOUT_LANGUAGES," == *",$1,"* ]]
           }
           clone() {
-            local url ref repo
+            local url ref
             url=$(field "$1" url); ref=$(field "$1" ref)
-            repo=$(repo_of "$1")
             if from_checkout "$1"; then echo "language-repo"; return; fi
-            echo "$sources/${repo}@${ref//[^A-Za-z0-9._-]/_}-????????"
+            echo "$sources/$(python3 -c 'import re,sys,functools; u,r=sys.argv[1:3]; n=re.split("[/:]", u.rstrip("/"))[-1]; n=n[:-4] if n.endswith(".git") else n; s=lambda v: re.sub("[^A-Za-z0-9._-]", "_", v) or "_"; h=functools.reduce(lambda a, c: (31*a+ord(c)) & 0xffffffff, u+chr(10)+r, 0); print("%s@%s-%08x" % (s(n), s(r), h))' "$url" "$ref")"
           }
           tip() {
             local url ref sha
@@ -349,6 +364,12 @@ jobs:
             "$rustcpp/esdk-cpp-test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk-cpp-test-server/.esdk-build-stamp"
+          # Cargo workspaces per Rust server, for rust-cache.
+          ws() { local name="$1"; shift; { echo "ws_$name<<EOF"; printf '%s -> target\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"; }
+          ws rust "$rust/esdk-test-server"
+          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk-cpp-test-server"
+          ws rustdafny "$esdk/esdk-test-servers/rust"
+          echo "go_dir=$esdk/esdk-test-servers/go" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
       - name: Look up the prebuilt net server
@@ -424,9 +445,7 @@ jobs:
       AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       GRADLE_OPTS: -Dorg.gradle.daemon=false
-      RUSTC_WRAPPER: ${{ startsWith(matrix.language, 'rust') && 'sccache' || '' }}
-      SCCACHE_DIR: ${{ github.workspace }}/.sccache
-      SCCACHE_IDLE_TIMEOUT: "0"
+      RUST_WORKSPACES: ${{ matrix.language == 'rust' && needs.plan.outputs.ws_rust || matrix.language == 'rust-cpp' && needs.plan.outputs.ws_rustcpp || matrix.language == 'rust-dafny' && needs.plan.outputs.ws_rustdafny || '' }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
       OUT_KEY: ${{ matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'rust' && needs.plan.outputs.key_rust || needs.plan.outputs.key_rustcpp }}
       OUT_PATHS: ${{ matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'rust' && needs.plan.outputs.paths_rust || needs.plan.outputs.paths_rustcpp }}
@@ -485,42 +504,12 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Restore the Go module + build caches
-        if: matrix.language == 'go'
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-esdk-test-server-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-go-esdk-test-server-
-
-      - name: Set up the Rust toolchain + sccache
+      - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
         run: |
           set -euo pipefail
           rustup toolchain install stable --profile minimal
           rustup default stable
-          SCCACHE_VERSION="v0.8.2"
-          base="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
-          tmp="$(mktemp -d)"
-          curl -sSL "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${base}.tar.gz" -o "$tmp/sccache.tar.gz"
-          tar -xzf "$tmp/sccache.tar.gz" -C "$tmp"
-          sudo install -m 0755 "$tmp/${base}/sccache" /usr/local/bin/sccache
-
-      - name: Restore the cargo downloads + sccache compiler cache
-        if: startsWith(matrix.language, 'rust')
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.language }}-
-            ${{ runner.os }}-cargo-esdk-test-server-
 
       - name: Set up .NET (.NET library transpile + build)
         if: matrix.language == 'net'
@@ -536,15 +525,6 @@ jobs:
           set -euo pipefail
           dotnet tool install --global dafny --version 4.9.0
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-
-      - name: Restore the NuGet package cache
-        if: matrix.language == 'net'
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-esdk-test-server-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-esdk-test-server-
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -592,18 +572,51 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
-      - name: Clone the .NET sources and their submodules
-        # The transpile outputs restore into the submodule checkouts, so those
-        # exist first.
-        if: matrix.language == 'net'
+      - name: Materialize the ${{ matrix.language }} sources
+        # The caches below restore into the clone, so it exists first.
         working-directory: esdk/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+
+      - name: Initialize the .NET submodules
+        # The transpile outputs restore into the submodule checkouts.
+        if: matrix.language == 'net'
         run: |
           set -euo pipefail
-          make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=net stopAfter=materialize"
-          for clone in $GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}; do
-            git -C "$clone" submodule update --init --depth 1 libraries
-            git -C "$clone" submodule update --init --recursive --depth 1 --jobs 8 mpl
-          done
+          clone="$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}"
+          git -C "$clone" submodule update --init --depth 1 libraries
+          git -C "$clone" submodule update --init --recursive --depth 1 --jobs 8 mpl
+
+      - name: Restore the cargo registry and compiled dependencies
+        # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
+        # are cleaned before saving, so every branch reuses the dependencies.
+        if: startsWith(matrix.language, 'rust')
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.language }}
+          workspaces: ${{ env.RUST_WORKSPACES }}
+          save-if: ${{ env.SAVE_CACHES == 'true' }}
+
+      - name: Restore the Go module + build caches
+        if: matrix.language == 'go'
+        id: go-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Restore the NuGet packages
+        if: matrix.language == 'net'
+        id: nuget-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore the .NET transpile outputs
         id: net-transpile
@@ -627,20 +640,28 @@ jobs:
           key: ${{ needs.plan.outputs.key_nettranspile }}
 
       - name: Save the ${{ matrix.language }} server output
+        # Saved from every ref: the test job restores it from here, and it is
+        # a few MB.
         uses: actions/cache/save@v4
         with:
           path: ${{ env.OUT_PATHS }}
           key: ${{ env.OUT_KEY }}
 
-      - name: Save the cargo downloads + sccache compiler cache
-        if: always() && startsWith(matrix.language, 'rust')
+      - name: Save the Go module + build caches
+        if: matrix.language == 'go' && env.SAVE_CACHES == 'true' && steps.go-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-cargo-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+
+      - name: Save the NuGet packages
+        if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
 
   # Starts alongside the build job; its setup and the light server builds
   # overlap the heavy builds, and it waits for their outputs just before
@@ -856,15 +877,14 @@ jobs:
           pin rustcpp rust-cpp
           pin java java
           pin python python
-          # The materialized clone directory is <repo>@<sanitized ref>-<8-hex hash>.
+          # The materialized clone directory, exactly as SourceMaterializer names it.
           clone_glob() {
-            local name="$1" language="$2" url ref repo
+            local name="$1" language="$2" url ref
             url=$(jq -r --arg l "$language" \
               '.entries[] | select(.language==$l) | .serverLocation.url' "$config")
             ref=$(jq -r --arg l "$language" \
               '.entries[] | select(.language==$l) | .serverLocation.ref' "$config")
-            repo=$(basename "${url%.git}"); repo="${repo##*:}"
-            echo "${name}_dir=esdk/test-server/build/sources/${repo}@${ref//[^A-Za-z0-9._-]/_}-????????" >> "$GITHUB_OUTPUT"
+            echo "${name}_dir=esdk/test-server/build/sources/$(python3 -c 'import re,sys,functools; u,r=sys.argv[1:3]; n=re.split("[/:]", u.rstrip("/"))[-1]; n=n[:-4] if n.endswith(".git") else n; s=lambda v: re.sub("[^A-Za-z0-9._-]", "_", v) or "_"; h=functools.reduce(lambda a, c: (31*a+ord(c)) & 0xffffffff, u+chr(10)+r, 0); print("%s@%s-%08x" % (s(n), s(r), h))' "$url" "$ref")" >> "$GITHUB_OUTPUT"
           }
           clone_glob rust rust
           clone_glob rustcpp rust-cpp
@@ -1196,14 +1216,15 @@ jobs:
           if-no-files-found: ignore
 
       # ------------------------------------------------------------------
-      # Cache saves. Every save runs `if: always()` because the orchestrate
+      # Cache saves, from the default branch only (SAVE_CACHES). Every save
+      # runs `if: always()` because the orchestrate
       # step exits non-zero on any failed Test (the fail-open Result), and a
       # cache that only saves on job success would never save here. Saves
       # whose exact key was already restored are skipped.
       # ------------------------------------------------------------------
 
       - name: Save Gradle + Maven caches
-        if: always() && steps.gradle-cache.outputs.cache-hit != 'true'
+        if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -1219,21 +1240,21 @@ jobs:
             ) }}
 
       - name: Save the materialized aws-encryption-sdk-javascript clone
-        if: always() && steps.sources-javascript.outputs.cache-hit != 'true'
+        if: always() && env.SAVE_CACHES == 'true' && steps.sources-javascript.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
           key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Save the materialized aws-encryption-sdk-c clone
-        if: always() && steps.sources-c.outputs.cache-hit != 'true'
+        if: always() && env.SAVE_CACHES == 'true' && steps.sources-c.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
           key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
-        if: always() && steps.sources-java.outputs.cache-hit != 'true'
+        if: always() && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -1242,7 +1263,7 @@ jobs:
           key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Save the materialized aws-encryption-sdk-python clone + venv
-        if: always() && steps.sources-python.outputs.cache-hit != 'true'
+        if: always() && env.SAVE_CACHES == 'true' && steps.sources-python.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -1251,7 +1272,7 @@ jobs:
           key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Save the npm download cache
-        if: always() && steps.npm-cache.outcome == 'success' && steps.npm-cache.outputs.cache-hit != 'true'
+        if: always() && env.SAVE_CACHES == 'true' && steps.npm-cache.outcome == 'success' && steps.npm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
