@@ -2,6 +2,7 @@ package aws.cryptography.mpl.testserver.tests;
 
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
+import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
 import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
 import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmOutput;
@@ -84,7 +85,14 @@ public class RawAesRoundTripTest {
         assertTrue(encMaterials.getPlaintextDataKey().remaining() > 0);
         assertNotNull(encMaterials.getEncryptedDataKeys());
         assertFalse(encMaterials.getEncryptedDataKeys().isEmpty());
-        assertNotNull(encMaterials.getAlgorithmSuiteId());
+        // With no suite requested, the Default CMM picks the commitment policy's
+        // default: REQUIRE_ENCRYPT_REQUIRE_DECRYPT -> the committing ECDSA P-384 suite,
+        // which signs, so the materials carry a signing key.
+        assertEquals(AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384.getValue(),
+            encMaterials.getAlgorithmSuiteId().getValue());
+        assertNotNull(encMaterials.getSigningKey());
+        assertTrue(encMaterials.getEncryptionContext().containsKey("aws-crypto-public-key"),
+            "a signing suite adds the verification key to the encryption context");
 
         // Create keyring + CMM on the decrypt target (same key)
         CreateRawAesKeyringOutput decKeyringOut = MplTestServerClients.withRetry(() ->
