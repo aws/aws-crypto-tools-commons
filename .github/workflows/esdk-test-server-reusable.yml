@@ -335,10 +335,13 @@ jobs:
             echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
           }
           # emit <name> <language> <key> <paths...>: a checkout build gets its own key.
+          # The key carries a hash of the cached paths: GitHub scopes an entry to
+          # its paths, so an entry saved under other paths must not share a key.
           emit() {
-            local name="$1" language="$2" key="$3" src=""; shift 3
+            local name="$1" language="$2" key="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
-            echo "key_$name=${RUNNER_OS}-out-v3-$name-$src$key" >> "$GITHUB_OUTPUT"
+            paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
+            echo "key_$name=${RUNNER_OS}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
@@ -1209,6 +1212,26 @@ jobs:
         with:
           path: ${{ needs.plan.outputs.paths_rustcpp }}
           key: ${{ needs.plan.outputs.key_rustcpp }}
+
+      - name: Check every prebuilt server restored
+        # A server missing here would be built cold inside the test run.
+        env:
+          HITS: >-
+            net=${{ steps.out-net.outputs.cache-hit }}
+            rust-dafny=${{ steps.out-rustdafny.outputs.cache-hit }}
+            go=${{ steps.out-go.outputs.cache-hit }}
+            rust=${{ steps.out-rust.outputs.cache-hit }}
+            rust-cpp=${{ steps.out-rustcpp.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for hit in $HITS; do
+            [ "${hit#*=}" = "true" ] || missing="$missing ${hit%%=*}"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::prebuilt servers not restored:$missing"
+            exit 1
+          fi
 
       - name: Orchestrated Commons_Run (make orchestrate)
         # THE single orchestrated entry point (Requirements 2.7, 6.1): one
