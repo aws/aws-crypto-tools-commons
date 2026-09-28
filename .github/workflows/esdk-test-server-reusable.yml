@@ -26,10 +26,10 @@
 #      one fail-open result.
 #
 # JOBS: `plan` keys each heavy server (net, rust, rust-cpp, rust-dafny, go)
-# on its branch tip and lists the ones with no cached build; `build` builds
-# only those, one runner each, and caches each server's runnable output;
+# on its branch tip and lists the ones with no cached build; `prebuild`
+# compiles only those, one runner each, and caches each server's binary;
 # `esdk-test-server` does its setup and the light server builds in parallel
-# with `build`, waits for the heavy outputs, restores them into its clones,
+# with `prebuild`, waits for the heavy binaries, restores them into its clones,
 # and runs the Tests. The build stamps make every cached server launch
 # without rebuilding.
 #
@@ -190,7 +190,7 @@ env:
 
 jobs:
   # Resolves each heavy server's cache key and lists the servers whose
-  # prebuilt output is missing, so the build job builds only those.
+  # prebuilt output is missing, so the prebuild job compiles only those.
   plan:
     runs-on: ubuntu-latest
     outputs:
@@ -429,11 +429,12 @@ jobs:
           done
           matrix=$(printf '%s\n' "${missing[@]}" | jq -R . | jq -cs 'map(select(. != ""))')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          echo "servers to build: $matrix"
+          echo "servers to prebuild: $matrix"
 
-  # Builds each missing heavy server on its own runner, in parallel, and
-  # saves its runnable output for the test job.
-  build:
+  # Compiles each missing heavy server on its own runner, in parallel, and
+  # caches its binary; the test job restores it and runs it there.
+  prebuild:
+    name: prebuild (${{ matrix.language }})
     needs: plan
     if: needs.plan.outputs.matrix != '[]'
     runs-on: ubuntu-latest
@@ -626,7 +627,7 @@ jobs:
           path: ${{ needs.plan.outputs.paths_nettranspile }}
           key: ${{ needs.plan.outputs.key_nettranspile }}
 
-      - name: Build and start the ${{ matrix.language }} server (no Tests)
+      - name: Build the ${{ matrix.language }} server and check it starts
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
@@ -663,7 +664,7 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
 
-  # Starts alongside the build job; its setup and the light server builds
+  # Starts alongside the prebuild job; its setup and the light server builds
   # overlap the heavy builds, and it waits for their outputs just before
   # the run.
   esdk-test-server:
@@ -1091,14 +1092,14 @@ jobs:
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=launch"
 
       - name: Wait for the prebuilt servers
-        # Each server the plan found missing is saved by its build job; wait
+        # Each server the plan found missing is cached by its prebuild job; wait
         # for those jobs to finish.
         env:
           GH_TOKEN: ${{ github.token }}
           MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching build job succeeded), or "wait".
+          # "failed", "done" (every matching prebuild job succeeded), or "wait".
           STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )build \\(" + $language + "\\)$")) | .conclusion]
+            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
             | if any(. == "failure" or . == "cancelled") then "failed"
               elif length > 0 and all(. == "success") then "done" else "wait" end
         run: |
