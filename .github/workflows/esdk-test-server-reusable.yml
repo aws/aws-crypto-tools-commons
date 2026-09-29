@@ -427,7 +427,6 @@ jobs:
   # Compiles each missing heavy server on its own runner, in parallel, and
   # caches its binary; the test job restores it and runs it there.
   prebuild:
-    name: prebuild (${{ matrix.language }})
     needs: plan
     if: needs.plan.outputs.matrix != '[]'
     runs-on: ubuntu-latest
