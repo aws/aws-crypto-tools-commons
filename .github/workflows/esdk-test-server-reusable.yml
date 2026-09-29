@@ -26,12 +26,16 @@
 #      one fail-open result.
 #
 # JOBS: `plan` keys each heavy server (net, rust, rust-cpp, rust-dafny, go)
-# on its branch tip and lists the ones with no cached build; `prebuild`
-# compiles only those, one runner each, and caches each server's binary;
-# `esdk-test-server` does its setup and the light server builds in parallel
-# with `prebuild`, waits for the heavy binaries, restores them into its clones,
-# and runs the Tests. The build stamps make every cached server launch
-# without rebuilding.
+# on its commit and lists the ones with no prebuilt binary; `prebuild`
+# compiles only those, one runner each, and publishes each binary as an
+# artifact named by its key; `esdk-test-server` does its setup and the light
+# server builds in parallel with `prebuild`, waits for it, fetches every
+# heavy binary into its clones, and runs the Tests. The build stamps make
+# every fetched server launch without rebuilding.
+#
+# Prebuilt binaries are artifacts, found by name in the calling repository and
+# then in commons, so a server built from commons' configuration is shared by
+# every caller. Artifacts are not evicted by other workflows' cache use.
 #
 # The trigger paths (`esdk/test-server/**` + this file) cover every
 # commons-hosted ESDK TestServer component of Requirement 6.3: the
@@ -171,8 +175,8 @@ on:
 # Callers must grant these.
 permissions:
   contents: read
-  # The test job polls this run's jobs and the repo's caches for the
-  # prebuilt servers.
+  # The plan and test jobs read this run's jobs and the prebuilt-server
+  # artifacts.
   actions: read
   # Required for the GitHub OIDC token exchange used by the
   # configure-aws-credentials step below (Requirement 6.5).
@@ -182,17 +186,17 @@ env:
   # The language repository whose checkout replaces its configured branch.
   LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
   CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
-  # Dependency caches (cargo, Gradle/Maven, npm, NuGet, Go, prebuilt clones)
+  # Dependency caches (cargo, Gradle/Maven, npm, pip, NuGet, Go, C)
   # are written only from the default branch, so every branch restores the
   # same warm set and pull requests never churn the cache store.
   SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   CARGO_INCREMENTAL: "0"
 
 jobs:
-  # Resolves each heavy server's cache key and lists the servers whose
-  # prebuilt output is missing, so the prebuild job compiles only those.
+  # Resolves each heavy server's key and lists the servers with no prebuilt
+  # binary, so the prebuild job compiles only those.
   plan:
-    name: find uncached servers
+    name: find servers to prebuild
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -291,7 +295,7 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
-      - name: Resolve the prebuilt-server cache keys and paths
+      - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's branch tip; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>).
@@ -1149,8 +1153,8 @@ jobs:
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=launch"
 
       - name: Wait for the prebuilt servers
-        # Each server the plan found missing is cached by its prebuild job; wait
-        # for those jobs to finish.
+        # Each server the plan found missing is published by its prebuild job;
+        # wait for those jobs to finish.
         env:
           GH_TOKEN: ${{ github.token }}
           MATRIX: ${{ needs.plan.outputs.matrix }}

@@ -49,6 +49,8 @@ jobs:
       repo-pat: ${{ secrets.COMMONS_REPO_PAT }}
 ```
 
-The calling branch must carry every server its repository hosts. Caches are
-per repository, so the scheduled run keeps the default branch's prebuilt
-servers warm for pull requests.
+The checkout supplies only the `checkout-languages` (default: `focus`); the
+repository's other servers use their configured branches. Every other server
+is fetched prebuilt: binaries are artifacts named by their key, looked up in
+the calling repository and then in commons. Dependency caches are saved from
+the default branch only; the scheduled run keeps them warm for pull requests.
