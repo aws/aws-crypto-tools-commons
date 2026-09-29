@@ -60,10 +60,6 @@
     "raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error": {
       "description": "CreateClient rejects a Raw-AES wrapping key whose length does not match the wrapping suite as an ESDKClientError instead of the framework GenericServerError. The native Rust server and the C++ shim currently build the Raw-AES keyring through the Dafny MPL, which surfaces this config-validation failure as an ESDK error rather than a framework error.",
       "ticketId": null
-    },
-    "esdk-client-error-empty-message": {
-      "description": "an ESDK failure surfaces as an ESDKClientError with an empty message instead of the forwarded ESDK exception message",
-      "ticketId": null
     }
   }
 }

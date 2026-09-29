@@ -1,6 +1,5 @@
 package aws.cryptography.esdk.testserver.tests.meta;
 
-import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.TargetPair;
 
@@ -83,11 +82,9 @@ class ModeledErrorTransmissionTest {
         // assertThrows already proves the wire error deserialized to the EXACT
         // modeled type ESDKClientError (distinct from GenericServerError), not a
         // bare CallException. Also confirm the forwarded ESDK message is present.
-        KnownBugGate.gateDeclared("esdk-client-error-empty-message", pair.decryptTarget(), () -> {
-            assertNotNull(error.getMessage());
-            assertFalse(error.getMessage().isEmpty(),
-                "ESDKClientError must forward the (non-empty) ESDK exception message");
-        });
+        assertNotNull(error.getMessage());
+        assertFalse(error.getMessage().isEmpty(),
+            "ESDKClientError must forward the (non-empty) ESDK exception message");
     }
 
     @Test
