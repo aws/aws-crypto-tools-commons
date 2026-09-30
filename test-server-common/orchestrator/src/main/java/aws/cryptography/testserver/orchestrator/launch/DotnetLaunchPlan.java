@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,6 +66,13 @@ public final class DotnetLaunchPlan implements Launcher {
     /** The Dafny version the repository's transpile pins (project.properties). */
     static final String REQUIRED_DAFNY_VERSION = "4.9.0";
 
+    /** Repository paths, besides the Dafny project, whose content determines the transpile output. */
+    static final List<String> TRANSPILE_SHARED_INPUTS =
+        List.of("SharedMakefileV2.mk", "libraries", "smithy-dafny", "mpl");
+
+    /** A file the transpile writes, relative to the Dafny project. */
+    static final String TRANSPILED_FILE = "runtimes/net/ImplementationFromDafny.cs";
+
     /**
      * Server csproj filename, resolved in the server directory. Derived from
      * {@code product}: {@code <Product>TestServer.csproj} (title-cased),
@@ -94,6 +103,7 @@ public final class DotnetLaunchPlan implements Launcher {
     private final Path workDirectory;
     private final String dotnet;
     private final String make;
+    private final String product;
     private final SubprocessLauncher subprocessLauncher;
 
     /**
@@ -135,6 +145,7 @@ public final class DotnetLaunchPlan implements Launcher {
         this.workDirectory = workDirectory;
         this.dotnet = dotnet;
         this.make = make;
+        this.product = product;
         this.subprocessLauncher = subprocessLauncher;
         String titleCased = Character.toUpperCase(product.charAt(0)) + product.substring(1);
         this.csprojName = titleCased + "TestServer.csproj";
@@ -191,7 +202,18 @@ public final class DotnetLaunchPlan implements Launcher {
                         runBuildStep(language, String.join(" ", submodule), submodule, repoRoot);
                     }
                     runBuildStep(language, "make setup_net", setupCommand(make), dafnyProjectDir);
-                    runBuildStep(language, "make transpile_net", transpileCommand(make), dafnyProjectDir);
+                    // The transpile output depends only on the Dafny sources, the
+                    // submodules, and the shared Makefile, so it is skipped when
+                    // its stamp records those same inputs (e.g. a test-server-only
+                    // change on the branch).
+                    String transpileInputs = transpileInputs(repoRoot, dafnyProjectDir);
+                    BuildStamp transpileStamp = new BuildStamp(dafnyProjectDir, product + "-transpile");
+                    if (!transpileStamp.upToDate(transpileInputs, server.dirty(),
+                            List.of(dafnyProjectDir.resolve(TRANSPILED_FILE)))) {
+                        runBuildStep(language, "make transpile (implementation + dependencies)",
+                            transpileCommand(make), dafnyProjectDir);
+                        transpileStamp.write(language, transpileInputs, server.dirty());
+                    }
                 }
             }
             runBuildStep(language, "dotnet build " + csprojName + " -c Release",
@@ -217,9 +239,40 @@ public final class DotnetLaunchPlan implements Launcher {
         return List.of(make, "setup_net");
     }
 
-    /** {@code make transpile_net CORES=4} (AwsEncryptionSDK/). */
+    /**
+     * The {@code transpile_net} steps the server build needs, in order:
+     * {@code make _with_extern_pre_transpile transpile_implementation_net
+     * transpile_dependencies_net _with_extern_post_transpile CORES=4}
+     * (AwsEncryptionSDK/). The library's own Dafny tests are not transpiled.
+     */
     static List<String> transpileCommand(String make) {
-        return List.of(make, "transpile_net", "CORES=4");
+        return List.of(make, "_with_extern_pre_transpile", "transpile_implementation_net",
+            "transpile_dependencies_net", "_with_extern_post_transpile", "CORES=4");
+    }
+
+    /**
+     * The transpile inputs as recorded in the clone's {@code HEAD}: the tree,
+     * submodule, and blob ids of the Dafny project and
+     * {@link #TRANSPILE_SHARED_INPUTS}, plus the Dafny version. {@code null}
+     * (never up to date) when git cannot list them.
+     */
+    static String transpileInputs(Path repoRoot, Path dafnyProjectDir) {
+        List<String> command = new ArrayList<>(List.of("git", "ls-tree", "HEAD",
+            repoRoot.relativize(dafnyProjectDir).toString()));
+        command.addAll(TRANSPILE_SHARED_INPUTS);
+        try {
+            Process process = new ProcessBuilder(command).directory(repoRoot.toFile())
+                .redirectErrorStream(true).start();
+            String output = new String(process.getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8).trim();
+            return process.waitFor() == 0 && !output.isEmpty()
+                ? "dafny " + REQUIRED_DAFNY_VERSION + "\n" + output : null;
+        } catch (IOException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
     }
 
     /** {@code dotnet build <csproj> -c Release} (server directory). */
@@ -294,38 +347,43 @@ public final class DotnetLaunchPlan implements Launcher {
      */
     private void runBuildStep(String language, String step, List<String> command, Path buildDir)
             throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(buildDir.toFile());
-        builder.redirectErrorStream(true);
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(buildDir.toFile());
+            builder.redirectErrorStream(true);
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 

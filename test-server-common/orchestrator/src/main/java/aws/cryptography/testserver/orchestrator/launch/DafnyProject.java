@@ -60,7 +60,8 @@ final class DafnyProject {
         List<List<String>> commands = new ArrayList<>();
         for (String name : SUBMODULES) {
             if (Files.isDirectory(repositoryRoot.resolve(name))) {
-                commands.add(List.of("git", "submodule", "update", "--init", "--recursive", name));
+                commands.add(List.of("git", "submodule", "update", "--init", "--recursive",
+                    "--depth", "1", "--jobs", "8", name));
             }
         }
         return commands;

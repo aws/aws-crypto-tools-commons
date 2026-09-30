@@ -158,6 +158,20 @@ class ResultReporterTest {
     }
 
     @Test
+    void aFocusedFloorSpansOnlyThePairsWithAFocusLeg() {
+        List<String> targets = List.of("java-v3", "python-v4", "rust-v1");
+        List<TestExecution> executions = new ArrayList<>(fullKmsCoverage(targets));
+        executions.removeIf(e -> e.name().contains("python-v4->rust-v1"));
+
+        Result focused = reporter.report(executions, targets, NO_CLEANUP, java.util.Set.of("java"));
+        assertTrue(focused.succeeded(), () -> "a non-focus pair is not required: " + focused);
+
+        executions.removeIf(e -> e.name().contains("java-v3->rust-v1"));
+        Result hole = reporter.report(executions, targets, NO_CLEANUP, java.util.Set.of("java"));
+        assertFalse(hole.succeeded(), "a focus pair is still required");
+    }
+
+    @Test
     void aScenarioLabelPrefixDoesNotSatisfyTheFloor() {
         // awsKmsMrk coverage must not satisfy the awsKms requirement even though
         // "awsKms" is a prefix of "awsKmsMrk" (label-boundary matching).

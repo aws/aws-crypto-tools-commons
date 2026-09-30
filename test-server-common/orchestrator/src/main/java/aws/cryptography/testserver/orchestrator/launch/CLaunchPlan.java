@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,6 +55,7 @@ public final class CLaunchPlan implements Launcher {
      * by product (each SDK's CMake target names it accordingly).
      */
     private final String serverBinaryRelativePath;
+    private final String product;
 
     private static final String SERVER_LOG_NAME = "c-server.log";
 
@@ -101,6 +103,7 @@ public final class CLaunchPlan implements Launcher {
         this.cmake = cmake;
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryRelativePath = "test-server/" + product + "-test-server";
+        this.product = product;
     }
 
     @Override
@@ -127,11 +130,17 @@ public final class CLaunchPlan implements Launcher {
 
         // 2. Configure + build: the server Makefile's configure and build-server
         //    recipes, with the ambient CMAKE_PREFIX_PATH passed through.
-        runBuildStep(language, "cmake configure (BUILD_TEST_SERVER=ON)",
-            configureCommand(cmake, repoRoot, buildDir, System.getenv("CMAKE_PREFIX_PATH")),
-            serverDir);
-        runBuildStep(language, "cmake --build --target esdk-test-server",
-            buildCommand(cmake, buildDir), serverDir);
+        //    Skipped when the stamp shows this commit's binary is already built.
+        BuildStamp stamp = new BuildStamp(serverDir, product);
+        if (!stamp.upToDate(server.commit(), server.dirty(),
+                List.of(buildDir.resolve(serverBinaryRelativePath)))) {
+            runBuildStep(language, "cmake configure (BUILD_TEST_SERVER=ON)",
+                configureCommand(cmake, repoRoot, buildDir, System.getenv("CMAKE_PREFIX_PATH")),
+                serverDir);
+            runBuildStep(language, "cmake --build --target esdk-test-server",
+                buildCommand(cmake, buildDir), serverDir);
+            stamp.write(language, server.commit(), server.dirty());
+        }
 
         // 3. Launch: <.build>/test-server/esdk-test-server <port> via the shared
         //    probe/spawn/readiness/teardown.
@@ -192,38 +201,43 @@ public final class CLaunchPlan implements Launcher {
      */
     private void runBuildStep(String language, String step, List<String> command, Path buildDir)
             throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(buildDir.toFile());
-        builder.redirectErrorStream(true);
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(buildDir.toFile());
+            builder.redirectErrorStream(true);
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 

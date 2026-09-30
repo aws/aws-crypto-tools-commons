@@ -76,7 +76,7 @@ Source materialization reuses work across runs:
 
 - **Working-tree sources are never cloned.** (See the next section.)
 - **Clones are cached and deduplicated.** Each distinct `(url, ref)` is cloned
-  once into `orchestrator/build/` scratch. On the next run, an existing scratch
+  once into `build/` scratch. On the next run, an existing scratch
   clone is **reused in place** when its local `HEAD` still equals the live
   remote tip of the branch; it is only wiped and re-cloned when it is absent,
   not a repo, or the tip has moved. Components sharing `(url, ref)` share one
@@ -86,6 +86,27 @@ So the scratch clones survive between runs (until `make clean` or a
 `./gradlew clean`), and unchanged branches are not re-fetched. Note the reuse
 check does a per-run `git ls-remote`, so a fully offline run can only reuse
 working-tree sources — cloned languages need the network to verify the tip.
+
+Builds are skipped the same way: each server's clone holds a build stamp
+recording the commit it was built from, and a server whose stamp matches its
+clone's commit is launched without rebuilding. The .NET Dafny transpile has its
+own stamp, keyed on the Dafny sources and submodules, so a change elsewhere in
+the repository rebuilds only the .NET server.
+
+`ORCHESTRATE_ARGS` passes extra orchestrator tokens through:
+
+```
+make orchestrate ORCHESTRATE_ARGS="languages=rust,java"          # only these servers
+make orchestrate ORCHESTRATE_ARGS="languages=net stopAfter=launch" # build + start, no Tests
+make orchestrate ORCHESTRATE_ARGS="stopAfter=materialize"          # clone only
+```
+
+A `languages=` run tests only the pairs among the listed servers. To keep
+every server but test only one language's pairs, use `focus=`:
+
+```
+make orchestrate ORCHESTRATE_ARGS="focus=java"   # java->X and X->java for every X
+```
 
 ### Iterating on a single Language_Server with live edits
 
@@ -206,5 +227,5 @@ logic, with no git and no network.
 make clean            # gradle clean in every module + remove scratch
 ```
 
-Scratch clones live under `orchestrator/build/`; removing that directory forces
+Scratch clones live under `build/`; removing that directory forces
 fresh clones on the next orchestrated run.

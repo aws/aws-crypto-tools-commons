@@ -47,7 +47,7 @@ final class DefaultProducer {
      */
     static URI producerFor(Set<String> features) {
         FeatureDeclarations declarations = FeatureDeclarations.shared();
-        List<LanguageServerTarget> targets = LanguageServerRegistry.shared().targets();
+        List<LanguageServerTarget> targets = LanguageServerRegistry.shared().allTargets();
         String preferred = language();
         LanguageServerTarget fallback = null;
         for (LanguageServerTarget target : targets) {
