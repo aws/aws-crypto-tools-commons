@@ -20,7 +20,8 @@
 # token only grants access to THIS repo — so that cross-repo clone fails
 # without extra auth. The "Configure git auth" step below rewrites the SSH URL
 # to authenticated HTTPS for the duration of the job via git insteadOf, using
-# the LANGUAGE_REPO_PAT secret with READ-ONLY scope.
+# the LANGUAGE_REPO_PAT secret with READ-ONLY scope. A repository that calls
+# this workflow passes its token as the LANGUAGE_REPO_PAT call secret.
 
 name: Primitives TestServer
 
@@ -70,6 +71,14 @@ on:
         type: string
         required: false
         default: ""
+    secrets:
+      LANGUAGE_REPO_PAT:
+        description: >-
+          Read-only token for the private aws-crypto-tools-rust clone and
+          checkout. A called workflow does not see the caller's secrets, so a
+          calling repository passes its own token here. Direct commons runs
+          use the commons LANGUAGE_REPO_PAT secret.
+        required: false
 
 permissions:
   contents: read
