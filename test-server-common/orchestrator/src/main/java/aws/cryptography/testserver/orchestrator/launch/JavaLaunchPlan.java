@@ -86,6 +86,13 @@ public final class JavaLaunchPlan implements Launcher {
     /** Maven from PATH, exactly as the Makefile's {@code build-live-esdk} invokes it. */
     static final String MVN = "mvn";
 
+    /**
+     * A Dafny library's stamp is {@code .java-library-build-stamp} in its
+     * smithy-dafny project directory, recording the library commit the local
+     * Maven install was built from.
+     */
+    static final String DAFNY_LIBRARY_STAMP = "java-library";
+
     private static final DateTimeFormatter STAMP_TIMESTAMP =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
 
@@ -191,18 +198,27 @@ public final class JavaLaunchPlan implements Launcher {
         String stampedVersion = null;
         Optional<Path> dafnyProject = DafnyProject.of(libraryDir);
         if (dafnyProject.isPresent()) {
-            if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
-                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                    "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
-                        + " was not found): the Java library transpiles from Dafny before building");
-            }
-            Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
-            synchronized (DafnyProject.lockFor(repoRoot)) {
-                for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
-                    runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, mavenJavaHome);
+            // Skipped when the stamp shows this library commit is already
+            // transpiled and published to the local Maven repository (a
+            // prebuilt install restored alongside its stamp).
+            MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
+                .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
+            BuildStamp stamp = new BuildStamp(dafnyProject.get(), DAFNY_LIBRARY_STAMP);
+            if (!stamp.upToDate(library.commit(), library.dirty(), List.of())) {
+                if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+                    throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                        "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
+                            + " was not found): the Java library transpiles from Dafny before building");
                 }
-                runBuildStep(language, "transpile + publish the library (make build_java mvn_local_deploy)",
-                    dafnyBuildCommand(), dafnyProject.get(), mavenJavaHome);
+                Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
+                synchronized (DafnyProject.lockFor(repoRoot)) {
+                    for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                        runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, mavenJavaHome);
+                    }
+                    runBuildStep(language, "transpile + publish the library (make build_java mvn_local_deploy)",
+                        dafnyBuildCommand(), dafnyProject.get(), mavenJavaHome);
+                }
+                stamp.write(language, library.commit(), library.dirty());
             }
         } else if (Files.isRegularFile(libraryDir.resolve("pom.xml"))) {
             MaterializedSources.Success library = sources.successOf(ComponentId.library(language))

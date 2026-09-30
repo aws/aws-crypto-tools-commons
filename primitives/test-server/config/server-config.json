@@ -41,13 +41,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "lucmcdon/primitives-test-server",
-        "path": "test-server/java-v1-server"
+        "branch": "jocorell/primitives-test-server-source",
+        "path": "AwsCryptographyPrimitives/runtimes/java"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "lucmcdon/primitives-test-server",
+        "ref": "jocorell/primitives-test-server-source",
         "path": "test-server/java-v1-server"
       }
     },
@@ -59,13 +59,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "lucmcdon/primitives-test-server",
-        "path": "test-server/net-v2-server"
+        "branch": "jocorell/primitives-test-server-source",
+        "path": "AwsCryptographyPrimitives/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "lucmcdon/primitives-test-server",
+        "ref": "jocorell/primitives-test-server-source",
         "path": "test-server/net-v2-server"
       }
     },
@@ -77,13 +77,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "lucmcdon/primitives-test-server",
-        "path": "test-server/python-v1-server"
+        "branch": "jocorell/primitives-test-server-source",
+        "path": "AwsCryptographyPrimitives/runtimes/python"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "lucmcdon/primitives-test-server",
+        "ref": "jocorell/primitives-test-server-source",
         "path": "test-server/python-v1-server"
       }
     },
@@ -95,13 +95,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "lucmcdon/primitives-test-server",
+        "branch": "jocorell/primitives-test-server-source",
         "path": "releases/go/primitives"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "lucmcdon/primitives-test-server",
+        "ref": "jocorell/primitives-test-server-source",
         "path": "test-server/go-v1-server"
       }
     },
@@ -113,13 +113,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "lucmcdon/primitives-test-server",
+        "branch": "jocorell/primitives-test-server-source",
         "path": "releases/rust/mpl"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "lucmcdon/primitives-test-server",
+        "ref": "jocorell/primitives-test-server-source",
         "path": "test-server/rust-dafny-v1-server"
       }
     }

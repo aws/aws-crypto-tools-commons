@@ -6,20 +6,25 @@
 # rust server lives in aws-crypto-tools-rust (prim-test-server/); the java,
 # net, python, go, and rust-dafny servers live in
 # aws-cryptographic-material-providers-library (test-server/<lang>-v<major>-server/).
-# They use published libraries or the MPL's committed generated code, so there
-# is no Dafny build. The Tests are offline: no AWS credentials are needed.
+# The java, net, and python servers build on the MPL's own AtomicPrimitives
+# source: each transpiles AwsCryptographyPrimitives from Dafny (smithy-dafny,
+# Dafny 4.9.0) and builds that runtime. The go and rust-dafny servers build on
+# the MPL's committed generated code (releases/). The Tests are offline: no AWS
+# credentials are needed.
 #
-# JOBS: `plan` keys each heavy server (rust, rust-dafny, net, go) on its
-# commit and lists the ones with no prebuilt binary; `prebuild` compiles only
-# those, one runner each, and publishes each binary as an artifact named by
-# its key; `primitives-test-server` builds the light servers (java, python) in
-# parallel with `prebuild`, waits for it, fetches every heavy binary into its
-# clone, and runs the Tests. The build stamps make every fetched server launch
-# without rebuilding.
+# JOBS: `plan` keys every server on its commit and lists the ones with no
+# prebuilt output; `prebuild` builds only
+# those, one runner each, and publishes each output as an artifact named by its
+# key; `primitives-test-server` does its setup in parallel with `prebuild`,
+# waits for it, fetches every output into its clone, and runs the Tests. The
+# build stamps make every fetched server launch without rebuilding, so the
+# test job needs neither Dafny nor the Rust, Go, or smithy-dafny toolchains.
+# Each Dafny transpile runs alone on its own runner.
 #
-# Prebuilt binaries are artifacts, found by name in the calling repository and
+# Prebuilt outputs are artifacts, found by name in the calling repository and
 # then in commons, so a server built from commons' configuration is shared by
-# every caller.
+# every caller. The python output (a venv with editable installs, which record
+# absolute paths) is keyed per repository.
 #
 # FOCUS: with `focus` set, every server still launches but only the pairs
 # with a focus language on either leg run.
@@ -96,20 +101,23 @@ env:
   # No daemon, so each server/Tests JVM the orchestrator forks inherits the
   # live step environment.
   GRADLE_OPTS: -Dorg.gradle.daemon=false
+  # The Python the python server's venv is built on. The venv links to it, so
+  # the prebuild and test jobs set up the same version, and its key carries it.
+  PYTHON_VERSION: "3.11"
+  DAFNY_VERSION: "4.9.0"
 
 jobs:
-  # Resolves each heavy server's key and lists the servers with no prebuilt
-  # binary, so the prebuild job compiles only those.
+  # Resolves each prebuilt server's key and lists the servers with no prebuilt
+  # output, so the prebuild job builds only those.
   plan:
     name: find servers to prebuild
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
+      mpl_root: ${{ steps.keys.outputs.mpl_root }}
       go_dir: ${{ steps.keys.outputs.go_dir }}
       net_dir: ${{ steps.keys.outputs.net_dir }}
-      python_dir: ${{ steps.keys.outputs.python_dir }}
-      python_tip: ${{ steps.keys.outputs.python_tip }}
       ws_rust: ${{ steps.keys.outputs.ws_rust }}
       ws_rustdafny: ${{ steps.keys.outputs.ws_rustdafny }}
       key_rust: ${{ steps.keys.outputs.key_rust }}
@@ -120,6 +128,10 @@ jobs:
       paths_net: ${{ steps.keys.outputs.paths_net }}
       key_go: ${{ steps.keys.outputs.key_go }}
       paths_go: ${{ steps.keys.outputs.paths_go }}
+      key_java: ${{ steps.keys.outputs.key_java }}
+      paths_java: ${{ steps.keys.outputs.paths_java }}
+      key_python: ${{ steps.keys.outputs.key_python }}
+      paths_python: ${{ steps.keys.outputs.paths_python }}
     steps:
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
@@ -136,6 +148,12 @@ jobs:
           ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
+
+      - name: Set up Python (its version keys the python server output)
+        id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
         # The run clones aws-crypto-tools-rust via the SSH URL in its
@@ -164,12 +182,17 @@ jobs:
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>) or the checkout.
         id: keys
+        env:
+          PYTHON_FULL_VERSION: ${{ steps.python.outputs.python-version }}
         run: |
           set -euo pipefail
           config=primitives/test-server/config/server-config.json
           sources=primitives/test-server/build/sources
           field() {
             jq -r --arg l "$1" ".entries[] | select(.language==\$l) | .serverLocation.$2" "$config"
+          }
+          library_path() {
+            jq -r --arg l "$1" '.entries[] | select(.language==$l) | .libraryRepository.path' "$config"
           }
           repo_of() {
             local url; url=$(field "$1" url); url=$(basename "${url%.git}"); echo "${url##*:}"
@@ -185,13 +208,14 @@ jobs:
             [ -n "$own" ] && [ "$(repo_of "$1")" = "$own" ] || return 1
             [ -z "$CHECKOUT_LANGUAGES" ] || [[ ",$CHECKOUT_LANGUAGES," == *",$1,"* ]]
           }
-          # The server directory of $1, exactly as SourceMaterializer names its clone.
-          server_dir() {
-            local url ref path
-            url=$(field "$1" url); ref=$(field "$1" ref); path=$(field "$1" path)
-            if from_checkout "$1"; then echo "language-repo/$path"; return; fi
-            echo "$sources/$(python3 -c 'import re,sys,functools; u,r=sys.argv[1:3]; n=re.split("[/:]", u.rstrip("/"))[-1]; n=n[:-4] if n.endswith(".git") else n; s=lambda v: re.sub("[^A-Za-z0-9._-]", "_", v) or "_"; h=functools.reduce(lambda a, c: (31*a+ord(c)) & 0xffffffff, u+chr(10)+r, 0); print("%s@%s-%08x" % (s(n), s(r), h))' "$url" "$ref")/$path"
+          # The repository root holding $1, exactly as SourceMaterializer names its clone.
+          repo_root() {
+            local url ref
+            url=$(field "$1" url); ref=$(field "$1" ref)
+            if from_checkout "$1"; then echo "language-repo"; return; fi
+            echo "$sources/$(python3 -c 'import re,sys,functools; u,r=sys.argv[1:3]; n=re.split("[/:]", u.rstrip("/"))[-1]; n=n[:-4] if n.endswith(".git") else n; s=lambda v: re.sub("[^A-Za-z0-9._-]", "_", v) or "_"; h=functools.reduce(lambda a, c: (31*a+ord(c)) & 0xffffffff, u+chr(10)+r, 0); print("%s@%s-%08x" % (s(n), s(r), h))' "$url" "$ref")"
           }
+          server_dir() { echo "$(repo_root "$1")/$(field "$1" path)"; }
           tip() {
             local url ref sha
             if from_checkout "$1"; then git -C language-repo rev-parse HEAD; return; fi
@@ -201,40 +225,52 @@ jobs:
             sha=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || sha=""
             echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
           }
-          # emit <name> <language> <paths...>: a checkout build gets its own key.
-          # The key carries a hash of the cached paths: an artifact built at
-          # other paths must not share a key.
+          # emit <name> <language> <key suffix> <paths...>: a checkout build gets
+          # its own key. The key carries a hash of the paths: an artifact built
+          # at other paths must not share a key.
           emit() {
-            local name="$1" language="$2" src="" paths; shift 2
+            local name="$1" language="$2" suffix="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-primitives-out-$name-$paths-$src$(tip "$language")" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${RUNNER_OS}-primitives-out-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
+          mpl=$(repo_root java)
           rust=$(server_dir rust); rustdafny=$(server_dir rust-dafny)
-          net=$(server_dir net); go=$(server_dir go); python=$(server_dir python)
-          emit rust rust \
+          net=$(server_dir net); go=$(server_dir go)
+          java_project="$mpl/$(dirname "$(dirname "$(library_path java)")")"
+          python_library="$mpl/$(library_path python)"
+          m2=$HOME/.m2/repository/software/amazon/cryptography
+          emit rust rust "" \
             "$rust/target/release/primitives-test-server" \
             "$rust/.primitives-build-stamp"
-          emit rustdafny rust-dafny \
+          emit rustdafny rust-dafny "" \
             "$rustdafny/target/release/primitives-test-server" \
             "$rustdafny/.primitives-build-stamp"
-          emit net net \
+          emit net net "-dafny$DAFNY_VERSION" \
             "$net/bin/Release/net8.0" \
             "$net/.primitives-build-stamp"
-          emit go go \
+          emit go go "" \
             "$go/primitives-test-server" \
             "$go/.primitives-build-stamp"
-          # Cargo workspaces per Rust server (for rust-cache) and the dirs the
-          # dependency caches key on.
-          python_src=""; from_checkout python && python_src="$own-src-"
+          # The transpiled library installed in the local Maven repository,
+          # plus its stamp; the java server itself builds in the test job.
+          emit java java "-dafny$DAFNY_VERSION" \
+            "$m2/AwsCryptographyPrimitives/1.0-SNAPSHOT" \
+            "$m2/StandardLibrary/1.0-SNAPSHOT" \
+            "$java_project/.java-library-build-stamp"
+          # The venv (editable installs of the transpiled library and the
+          # server, plus its stamp) and the transpiled library source.
+          repo_key=$(echo "$GITHUB_REPOSITORY" | tr '/' '_')
+          emit python python "-dafny$DAFNY_VERSION-py$PYTHON_FULL_VERSION-$repo_key" \
+            "primitives/test-server/build/launch/python/venv" \
+            "$python_library"
           {
+            echo "mpl_root=$mpl"
             echo "ws_rust=$rust -> target"
             echo "ws_rustdafny=$rustdafny -> target"
             echo "go_dir=$go"
             echo "net_dir=$net"
-            echo "python_dir=$python"
-            echo "python_tip=$python_src$(tip python)"
           } >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
@@ -249,6 +285,8 @@ jobs:
           KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
           KEY_net: ${{ steps.keys.outputs.key_net }}
           KEY_go: ${{ steps.keys.outputs.key_go }}
+          KEY_java: ${{ steps.keys.outputs.key_java }}
+          KEY_python: ${{ steps.keys.outputs.key_python }}
         run: |
           set -euo pipefail
           # This run's token reads this repository; the PAT reads commons.
@@ -265,7 +303,7 @@ jobs:
             done
           }
           missing=()
-          for pair in rust:rust rustdafny:rust-dafny net:net go:go; do
+          for pair in rust:rust rustdafny:rust-dafny net:net go:go java:java python:python; do
             k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
             found=$(find "${!key_var}")
             if [ -n "$found" ]; then echo "prebuilt $language: $found"; else missing+=("$language"); fi
@@ -274,8 +312,8 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           echo "servers to prebuild: $matrix"
 
-  # Compiles each missing heavy server on its own runner, in parallel, and
-  # publishes its binary; the test job fetches it and runs it there.
+  # Builds each missing server on its own runner, in parallel, and publishes
+  # its output; the test job fetches it and runs it there.
   prebuild:
     needs: plan
     if: needs.plan.outputs.matrix != '[]'
@@ -287,8 +325,10 @@ jobs:
     env:
       PREBUILD_RUST_WORKSPACES: ${{ matrix.language == 'rust' && needs.plan.outputs.ws_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.ws_rustdafny || '' }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
-      OUT_KEY: ${{ matrix.language == 'rust' && needs.plan.outputs.key_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'net' && needs.plan.outputs.key_net || needs.plan.outputs.key_go }}
-      OUT_PATHS: ${{ matrix.language == 'rust' && needs.plan.outputs.paths_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'net' && needs.plan.outputs.paths_net || needs.plan.outputs.paths_go }}
+      # The servers that transpile the MPL's AtomicPrimitives from Dafny.
+      DAFNY_BUILD: ${{ contains(fromJSON('["java", "net", "python"]'), matrix.language) }}
+      OUT_KEY: ${{ matrix.language == 'rust' && needs.plan.outputs.key_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'java' && needs.plan.outputs.key_java || needs.plan.outputs.key_python }}
+      OUT_PATHS: ${{ matrix.language == 'rust' && needs.plan.outputs.paths_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'java' && needs.plan.outputs.paths_java || needs.plan.outputs.paths_python }}
     steps:
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
@@ -316,6 +356,15 @@ jobs:
             '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
             >> language-repo/.git/info/exclude
 
+      # JDK 17 first (the MPL Java build and the smithy-dafny codegen), then
+      # JDK 21 last so it owns JAVA_HOME (the orchestrator + Java server).
+      - name: Set up JDK 17 (Temurin) for the MPL Java build + smithy-dafny
+        if: env.DAFNY_BUILD == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Set up JDK 21 (Temurin) for the orchestrator
         uses: actions/setup-java@v4
         with:
@@ -337,8 +386,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-primitives-gradle-
 
+      - name: Set up Python (the python server venv; the Dafny Python formatters)
+        if: env.DAFNY_BUILD == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Set up Go (Go server; aws-lc-sys native builds)
-        if: matrix.language != 'net'
+        if: startsWith(matrix.language, 'rust') || matrix.language == 'go'
         uses: actions/setup-go@v5
         with:
           go-version: "stable"
@@ -351,13 +406,25 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Set up .NET
-        if: matrix.language == 'net'
+      - name: Set up .NET (the .NET build; the Dafny tool)
+        if: env.DAFNY_BUILD == 'true'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Install Dafny ${{ env.DAFNY_VERSION }}
+        # The dafnyVersion in the MPL's project.properties.
+        if: env.DAFNY_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dafny --version "$DAFNY_VERSION"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Install the Python formatters the Dafny Python transpile runs
+        if: matrix.language == 'python'
+        run: python -m pip install black==25.1 docformatter==1.7.7
 
       - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
         env:
@@ -372,6 +439,23 @@ jobs:
         # The caches below restore into the clone, so it exists first.
         working-directory: primitives/test-server
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+
+      - name: Initialize the MPL submodules + install the smithy-dafny codegen dependencies
+        # The launch plan would initialize the submodules itself; smithy-dafny
+        # is needed first, for the codegen artifacts the MPL's own CI installs
+        # (install_smithy_dafny_codegen_dependencies) and its Makefile probes.
+        if: env.DAFNY_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          mpl="$GITHUB_WORKSPACE/${{ needs.plan.outputs.mpl_root }}"
+          git -C "$mpl" submodule update --init --recursive --depth 1 --jobs 8 libraries smithy-dafny
+          JAVA_HOME="$JAVA_HOME_17_X64" make -C "$mpl/smithy-dafny" mvn_local_deploy_polymorph_dependencies
+          # The Makefile's --enforce-determinism probe runs the codegen CLI with
+          # `gradlew -q` and splices its stdout into the dafny command line; a
+          # first run's "Downloading gradle-..." progress would land there too.
+          # Download the codegen's Gradle distribution now, as the MPL's own CI
+          # does.
+          (cd "$mpl/smithy-dafny/codegen" && JAVA_HOME="$JAVA_HOME_17_X64" ./gradlew --version)
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -401,22 +485,25 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/*.csproj', needs.plan.outputs.net_dir)) }}
+          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
           restore-keys: |
             ${{ runner.os }}-primitives-nuget-
 
       - name: Build the ${{ matrix.language }} server and check it starts
+        # For java, net, and python this transpiles AwsCryptographyPrimitives
+        # (and StandardLibrary) from Dafny and builds that runtime first.
         working-directory: primitives/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Pack the ${{ matrix.language }} server
+        # -P keeps the absolute ~/.m2 paths of the java output as they are.
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prebuilt"
           mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
-          tar -czf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
 
       - name: Publish the ${{ matrix.language }} server
         # Named by its key: later runs here, and runs in other repositories for
@@ -442,11 +529,10 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/*.csproj', needs.plan.outputs.net_dir)) }}
+          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
 
-  # Starts alongside the prebuild job; its setup and the light server builds
-  # overlap the heavy builds, and it waits for their outputs just before the
-  # run.
+  # Starts alongside the prebuild job; its setup overlaps the builds, and it
+  # waits for their outputs just before the run.
   primitives-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: plan
@@ -483,11 +569,10 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Python 3.11 (Python server)
-        id: python
+      - name: Set up Python (the prebuilt python server venv links to it)
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up .NET (runs the prebuilt .NET server)
         uses: actions/setup-dotnet@v5
@@ -535,37 +620,11 @@ jobs:
         working-directory: primitives/test-server
         run: make validate
 
-      - name: Materialize the java and python sources
-        # The caches below are keyed on these clones' contents.
+      - name: Materialize the sources (clones only)
+        # The prebuilt outputs restore into these clones; each server's build
+        # stamp then skips its build.
         working-directory: primitives/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python stopAfter=materialize"
-
-      - name: Restore the pip downloads (python)
-        id: pip-deps
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-primitives-pip-${{ steps.python.outputs.python-version }}-${{ hashFiles(format('{0}/pyproject.toml', needs.plan.outputs.python_dir)) }}
-          restore-keys: |
-            ${{ runner.os }}-primitives-pip-${{ steps.python.outputs.python-version }}-
-
-      - name: Restore the Python server venv
-        # The venv holds editable installs of the clone and its build stamp,
-        # so PythonLaunchPlan skips venv setup for the same commit. Editable
-        # installs record the clone's absolute path, so the key carries the
-        # calling repository (whose name is in the workspace path).
-        id: python-venv
-        uses: actions/cache/restore@v4
-        with:
-          path: primitives/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-primitives-venv-${{ github.repository }}-${{ needs.plan.outputs.python_tip }}-py${{ steps.python.outputs.python-version }}
-
-      - name: Build the java and python servers while the heavy ones build
-        # Their build stamps make the orchestrated run skip these builds.
-        working-directory: primitives/test-server
-        env:
-          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
 
       - name: Wait for the prebuilt servers
         # Each server the plan found missing is published by its prebuild job;
@@ -580,7 +639,7 @@ jobs:
               elif length > 0 and all(. == "success") then "done" else "wait" end
         run: |
           set -euo pipefail
-          deadline=$((SECONDS + 2700))
+          deadline=$((SECONDS + 3600))
           for language in $(jq -r '.[]' <<<"$MATRIX"); do
             while :; do
               state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
@@ -593,12 +652,6 @@ jobs:
             echo "ready after ${SECONDS}s: $language"
           done
 
-      - name: Materialize the sources (clones only)
-        # The prebuilt outputs restore into these clones; each server's build
-        # stamp then skips its build.
-        working-directory: primitives/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
-
       - name: Fetch the prebuilt servers into their clones
         env:
           RUN_TOKEN: ${{ github.token }}
@@ -607,6 +660,8 @@ jobs:
           KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
           KEY_net: ${{ needs.plan.outputs.key_net }}
           KEY_go: ${{ needs.plan.outputs.key_go }}
+          KEY_java: ${{ needs.plan.outputs.key_java }}
+          KEY_python: ${{ needs.plan.outputs.key_python }}
         run: |
           set -euo pipefail
           # This run's token reads this repository; the PAT reads commons.
@@ -623,7 +678,7 @@ jobs:
             done
           }
           mkdir -p "$RUNNER_TEMP/prebuilt"
-          for pair in rust:rust rustdafny:rust-dafny net:net go:go; do
+          for pair in rust:rust rustdafny:rust-dafny net:net go:go java:java python:python; do
             k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
             found=$(find "${!key_var}")
             [ -n "$found" ] || continue
@@ -631,7 +686,7 @@ jobs:
             echo "$language: $repo artifact $id"
             GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
-            tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
+            tar -xzPf "$RUNNER_TEMP/prebuilt/$language.tgz"
           done
 
       - name: Check every prebuilt server arrived
@@ -640,7 +695,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=""
-          for language in rust rust-dafny net go; do
+          for language in rust rust-dafny net go java python; do
             [ -f "$RUNNER_TEMP/prebuilt/$language.tgz" ] || missing="$missing $language"
           done
           if [ -n "$missing" ]; then
@@ -649,9 +704,10 @@ jobs:
           fi
 
       - name: Run the test suite (make orchestrate)
-        # Launches every configured server (all builds skipped by their
-        # stamps), runs the Tests over the server pairs (only the focus pairs
-        # when focus is set), and exits non-zero on any failed Test.
+        # Launches every configured server (every library build skipped by its
+        # stamp; the java server itself builds here, against the prebuilt
+        # library in ~/.m2), runs the Tests over the server pairs (only the
+        # focus pairs when focus is set), and exits non-zero on any failed Test.
         working-directory: primitives/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
@@ -679,22 +735,7 @@ jobs:
 
       # Cache saves, from the default branch only (SAVE_CACHES). `if: always()`
       # because the orchestrate step exits non-zero on any failed Test, and a
-      # cache that only saves on job success would never save then. Saves whose
-      # exact key was already restored are skipped.
-      - name: Save the pip downloads (python)
-        if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-primitives-pip-${{ steps.python.outputs.python-version }}-${{ hashFiles(format('{0}/pyproject.toml', needs.plan.outputs.python_dir)) }}
-
-      - name: Save the Python server venv
-        if: always() && env.SAVE_CACHES == 'true' && steps.python-venv.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: primitives/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-primitives-venv-${{ github.repository }}-${{ needs.plan.outputs.python_tip }}-py${{ steps.python.outputs.python-version }}
-
+      # cache that only saves on job success would never save then.
       - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
