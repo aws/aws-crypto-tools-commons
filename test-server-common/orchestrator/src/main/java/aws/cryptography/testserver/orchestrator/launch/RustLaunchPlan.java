@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -59,6 +60,7 @@ public final class RustLaunchPlan implements Launcher {
     private final Path workDirectory;
     private final String cargo;
     private final SubprocessLauncher subprocessLauncher;
+    private final String product;
 
     /**
      * @param workDirectory scratch directory owned by this plan; hosts the
@@ -97,6 +99,7 @@ public final class RustLaunchPlan implements Launcher {
         this.cargo = cargo;
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryName = product + "-test-server";
+        this.product = product;
     }
 
     @Override
@@ -107,8 +110,9 @@ public final class RustLaunchPlan implements Launcher {
         // 1. Resolve the materialized server directory (Req 2.5). The library
         //    crate is a cargo path dependency within the same clone, so only the
         //    server component is resolved here.
-        Path serverDir = sources.directoryOf(ComponentId.server(language))
+        MaterializedSources.Success resolved = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
+        Path serverDir = resolved.directory();
 
         try {
             Files.createDirectories(workDirectory);
@@ -119,7 +123,13 @@ public final class RustLaunchPlan implements Launcher {
         }
 
         // 2. Build: cargo build --release in the server directory.
-        runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir);
+        //    Skipped when the stamp shows this commit's binary is already built.
+        BuildStamp stamp = new BuildStamp(serverDir, product);
+        Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
+        if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary))) {
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir);
+            stamp.write(language, resolved.commit(), resolved.dirty());
+        }
 
         // 3. Launch: <server>/target/release/esdk-test-server <port> from the
         //    server directory, via the shared probe/spawn/readiness/teardown.
@@ -177,38 +187,43 @@ public final class RustLaunchPlan implements Launcher {
      */
     private void runBuildStep(String language, String step, List<String> command, Path serverDir)
             throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(serverDir.toFile());
-        builder.redirectErrorStream(true);
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(serverDir.toFile());
+            builder.redirectErrorStream(true);
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 

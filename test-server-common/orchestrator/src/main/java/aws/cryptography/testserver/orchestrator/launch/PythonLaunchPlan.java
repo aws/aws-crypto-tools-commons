@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -116,10 +117,12 @@ public final class PythonLaunchPlan implements Launcher {
         String language = entry.language();
 
         // 1. Resolve the materialized library + server directories.
-        Path libraryDir = sources.directoryOf(ComponentId.library(language))
+        MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
-        Path serverDir = sources.directoryOf(ComponentId.server(language))
+        MaterializedSources.Success serverSource = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
+        Path libraryDir = library.directory();
+        Path serverDir = serverSource.directory();
 
         // 2. Environment: venv + editable installs (the Makefile's setup-python).
         Path venvDir = venvDirectory(workDirectory);
@@ -130,29 +133,38 @@ public final class PythonLaunchPlan implements Launcher {
                 "failed to create the " + language + " launch work directory "
                     + workDirectory + ": " + e.getMessage(), e);
         }
-        if (!Files.isExecutable(venvPython(venvDir))) {
-            runSetupStep(language, "create venv", createVenvCommand(python3, venvDir));
-        }
-        runSetupStep(language, "upgrade pip", upgradePipCommand(venvDir));
-        Optional<Path> dafnyProject = DafnyProject.of(libraryDir);
-        if (dafnyProject.isPresent()) {
-            if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
-                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                    "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
-                        + " was not found): the Python library transpiles from Dafny before install");
+        //    Skipped when the stamp shows the venv already holds editable
+        //    installs of these library and server commits.
+        BuildStamp stamp = new BuildStamp(venvDir, "venv");
+        String commits = library.commit() == null || serverSource.commit() == null
+            ? null : library.commit() + " " + serverSource.commit();
+        boolean dirty = Boolean.TRUE.equals(library.dirty()) || Boolean.TRUE.equals(serverSource.dirty());
+        if (!stamp.upToDate(commits, dirty, List.of(venvPython(venvDir)))) {
+            if (!Files.isExecutable(venvPython(venvDir))) {
+                runSetupStep(language, "create venv", createVenvCommand(python3, venvDir));
             }
-            Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
-            synchronized (DafnyProject.lockFor(repoRoot)) {
-                for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
-                    runSetupStep(language, String.join(" ", submodule), submodule, repoRoot);
+            runSetupStep(language, "upgrade pip", upgradePipCommand(venvDir));
+            Optional<Path> dafnyProject = DafnyProject.of(libraryDir);
+            if (dafnyProject.isPresent()) {
+                if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+                    throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                        "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
+                            + " was not found): the Python library transpiles from Dafny before install");
                 }
-                runSetupStep(language, "make transpile_python", transpileCommand(), dafnyProject.get());
+                Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
+                synchronized (DafnyProject.lockFor(repoRoot)) {
+                    for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                        runSetupStep(language, String.join(" ", submodule), submodule, repoRoot);
+                    }
+                    runSetupStep(language, "make transpile_python", transpileCommand(), dafnyProject.get());
+                }
+                runSetupStep(language, "pip install library + cbor2 + server",
+                    dafnyPipInstallCommand(venvDir, libraryDir, serverDir));
+            } else {
+                runSetupStep(language, "pip install library + MPL + cbor2 + server",
+                    pipInstallCommand(venvDir, libraryDir, serverDir));
             }
-            runSetupStep(language, "pip install library + cbor2 + server",
-                dafnyPipInstallCommand(venvDir, libraryDir, serverDir));
-        } else {
-            runSetupStep(language, "pip install library + MPL + cbor2 + server",
-                pipInstallCommand(venvDir, libraryDir, serverDir));
+            stamp.write(language, commits, dirty);
         }
 
         // 3. Launch: <venv python> -m <product>_test_server <port> from the server
@@ -251,6 +263,16 @@ public final class PythonLaunchPlan implements Launcher {
 
     private void runSetupStep(String language, String step, List<String> command, Path directory)
             throws ServerLaunchException {
+        Instant startedAt = Instant.now();
+        try {
+            runSetupStepUntimed(language, step, command, directory);
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
+        }
+    }
+
+    private void runSetupStepUntimed(String language, String step, List<String> command,
+            Path directory) throws ServerLaunchException {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(directory.toFile());
         builder.redirectErrorStream(true);

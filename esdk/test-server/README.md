@@ -18,3 +18,39 @@ To build and run the TestServer locally, see
 [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md); for the design of the
 Configuration — the Server, Feature, and Bug config and how the Orchestrator
 resolves sources — see [docs/CONFIG_DESIGN.md](docs/CONFIG_DESIGN.md).
+
+## Running it from a language repository's CI
+
+A language repository calls the reusable workflow; its own checkout replaces
+the branch `config/server-config.json` pins for it, and every other language
+resolves as configured:
+
+```yaml
+name: ESDK TestServer
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 7 * * *"
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+jobs:
+  test-server:
+    uses: aws/aws-crypto-tools-commons/.github/workflows/esdk-test-server-reusable.yml@main
+    with:
+      # Test only the pairs involving this repository's languages; omit for the
+      # full matrix.
+      focus: ${{ github.event_name == 'pull_request' && 'rust,rust-cpp' || '' }}
+    secrets:
+      # Read access to aws-crypto-tools-commons and every private language repository.
+      repo-pat: ${{ secrets.COMMONS_REPO_PAT }}
+```
+
+The checkout supplies only the `checkout-languages` (default: `focus`); the
+repository's other servers use their configured branches. Every other server
+is fetched prebuilt: binaries are artifacts named by their key, looked up in
+the calling repository and then in commons. Dependency caches are saved from
+the default branch only; the scheduled run keeps them warm for pull requests.

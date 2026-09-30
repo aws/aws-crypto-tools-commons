@@ -2,6 +2,7 @@ package aws.cryptography.testserver.orchestrator.report;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Produces the fail-open {@link Result} from the executed {@code Test} outcomes,
@@ -104,6 +105,19 @@ public final class ResultReporter {
             List<TestExecution> executions,
             List<String> launchedTargetLabels,
             List<String> cleanupFailureLanguages) {
+        return report(executions, launchedTargetLabels, cleanupFailureLanguages, Set.of());
+    }
+
+    /**
+     * {@link #report(List, List, List)} for a run focused on {@code focus}: the
+     * KMS coverage floor spans only the pairs with a focus language on either
+     * leg. An empty focus spans every pair.
+     */
+    public Result report(
+            List<TestExecution> executions,
+            List<String> launchedTargetLabels,
+            List<String> cleanupFailureLanguages,
+            Set<String> focus) {
         List<TestExecution> all = executions == null ? List.of() : executions;
         List<String> targets = launchedTargetLabels == null ? List.of() : launchedTargetLabels;
         List<String> cleanupFailures =
@@ -133,7 +147,7 @@ public final class ResultReporter {
 
         // KMS coverage floor (Requirement 10.4): every launched (encrypt, decrypt)
         // pair × every required KMS scenario needs at least one PASSED execution.
-        List<String> kmsHoles = kmsCoverageHoles(all, targets);
+        List<String> kmsHoles = kmsCoverageHoles(all, targets, focus);
 
         boolean succeeded = executed > 0
             && unreachable.isEmpty()
@@ -204,7 +218,8 @@ public final class ResultReporter {
      * @return one detail line per hole, naming the scenario and the pair.
      */
     private List<String> kmsCoverageHoles(
-            List<TestExecution> executions, List<String> launchedTargetLabels) {
+            List<TestExecution> executions, List<String> launchedTargetLabels,
+            Set<String> focus) {
         List<String> holes = new ArrayList<>();
         List<String> passedNames = executions.stream()
             .filter(e -> e.outcome() == TestExecution.Outcome.PASSED)
@@ -222,6 +237,10 @@ public final class ResultReporter {
             .toList();
         for (String encrypt : launchedTargetLabels) {
             for (String decrypt : launchedTargetLabels) {
+                if (!focus.isEmpty() && !focus.contains(labelLanguage(encrypt))
+                        && !focus.contains(labelLanguage(decrypt))) {
+                    continue;
+                }
                 String pair = encrypt + "->" + decrypt;
                 for (String scenario : requiredKmsScenarios) {
                     boolean covered = passedNames.stream().anyMatch(
@@ -237,6 +256,12 @@ public final class ResultReporter {
             }
         }
         return holes;
+    }
+
+    /** The language of a {@code <language>-v<major>} Target label. */
+    private static String labelLanguage(String label) {
+        int v = label.lastIndexOf("-v");
+        return v < 0 ? label : label.substring(0, v);
     }
 
     /**

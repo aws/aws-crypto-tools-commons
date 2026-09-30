@@ -125,9 +125,11 @@ public final class SubprocessLauncher {
 
         // 3. Poll readiness: a successful TCP connect to the configured port
         //    is the only reachability signal (Requirement 2.9).
-        Instant deadline = Instant.now().plus(readinessTimeout);
+        Instant spawnedAt = Instant.now();
+        Instant deadline = spawnedAt.plus(readinessTimeout);
         while (Instant.now().isBefore(deadline)) {
             if (Ports.acceptsConnection(port)) {
+                LaunchTimings.log(language, "server start (spawn to TCP ready)", spawnedAt);
                 URI endpoint = URI.create("http://127.0.0.1:" + port);
                 return LaunchedServer.forProcess(language, port, endpoint, process);
             }

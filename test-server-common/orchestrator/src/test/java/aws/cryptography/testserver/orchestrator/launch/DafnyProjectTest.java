@@ -47,8 +47,8 @@ class DafnyProjectTest {
 
         assertEquals(
             List.of(
-                List.of("git", "submodule", "update", "--init", "--recursive", "libraries"),
-                List.of("git", "submodule", "update", "--init", "--recursive", "mpl")),
+                List.of("git", "submodule", "update", "--init", "--recursive", "--depth", "1", "--jobs", "8", "libraries"),
+                List.of("git", "submodule", "update", "--init", "--recursive", "--depth", "1", "--jobs", "8", "mpl")),
             DafnyProject.submoduleCommands(repo));
     }
 }

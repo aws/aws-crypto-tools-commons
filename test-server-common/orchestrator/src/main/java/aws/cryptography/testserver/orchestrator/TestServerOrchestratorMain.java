@@ -211,16 +211,53 @@ public final class TestServerOrchestratorMain {
         // verbatim to ./gradlew test --tests <pattern>). Empty runs everything.
         String testFilter = cli.getOrDefault("tests", "");
 
+        // focus=<a,b> — test only the pairs with one of these languages on a leg.
+        java.util.Set<String> focus = new java.util.LinkedHashSet<>();
+        for (String language : cli.getOrDefault("focus", "").split(",")) {
+            if (!language.isBlank()) {
+                focus.add(language.trim());
+            }
+        }
+        // workingTreeLanguages=<a,b> — the languages the overlays apply to.
+        java.util.Set<String> overlayLanguages = new java.util.LinkedHashSet<>();
+        for (String language : cli.getOrDefault("workingTreeLanguages", "").split(",")) {
+            if (!language.isBlank()) {
+                overlayLanguages.add(language.trim());
+            }
+        }
+        // languages=<a,b> — run only these configured languages.
+        // stopAfter=materialize|launch — stop before the Tests.
+        java.util.Set<String> languages = new java.util.LinkedHashSet<>();
+        for (String language : cli.getOrDefault("languages", "").split(",")) {
+            if (!language.isBlank()) {
+                languages.add(language.trim());
+            }
+        }
+        TestServerOrchestrator.StopAfter stopAfter;
+        try {
+            stopAfter = TestServerOrchestrator.StopAfter.valueOf(
+                cli.getOrDefault("stopAfter", "none").trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            System.err.println("TestServerOrchestrator: stopAfter must be none, materialize, or launch");
+            System.err.println(usage());
+            System.exit(EXIT_USAGE);
+            return;
+        }
+
         TestServerOrchestrator orchestrator = new TestServerOrchestrator(
             set,
             context,
             new SourceMaterializer(orchestratorBuildDir.resolve("sources")),
             launchers,
-            new GradleTestRunner(testsModuleDir).withTestFilter(testFilter),
+            new GradleTestRunner(testsModuleDir).withTestFilter(testFilter).withFocus(focus),
             new DuplicateTestsDetector(),
             testServerRoot,
             referenceImplementation)
-            .withWorkingTreeOverlays(workingTreeOverlays);
+            .withWorkingTreeOverlays(workingTreeOverlays)
+            .withOverlayLanguages(overlayLanguages)
+            .withLanguages(languages)
+            .withStopAfter(stopAfter)
+            .withFocus(focus);
 
         System.out.println("==> TestServerOrchestrator run");
         System.out.println("    context: " + describeContext(context));
@@ -236,6 +273,15 @@ public final class TestServerOrchestratorMain {
         }
         if (!testFilter.isBlank()) {
             System.out.println("    tests: " + testFilter);
+        }
+        if (!languages.isEmpty()) {
+            System.out.println("    languages: " + String.join(",", languages));
+        }
+        if (!focus.isEmpty()) {
+            System.out.println("    focus: " + String.join(",", focus));
+        }
+        if (stopAfter != TestServerOrchestrator.StopAfter.NONE) {
+            System.out.println("    stopAfter: " + stopAfter.name().toLowerCase(java.util.Locale.ROOT));
         }
         if (context.kind() == RunContext.Kind.LANGUAGE) {
             System.out.println("    languageRepoRoot: " + context.languageRepoRoot());
@@ -357,7 +403,11 @@ public final class TestServerOrchestratorMain {
             + " [invokingRepositoryName=<name>]"
             + " [referenceImplementation=<lang>]"
             + " [workingTreeOverlay.<repo>=<abs path> ...]"
-            + " [tests=<pattern>]";
+            + " [tests=<pattern>]"
+            + " [languages=<lang>,...]"
+            + " [focus=<lang>,...]"
+            + " [workingTreeLanguages=<lang>,...]"
+            + " [stopAfter=none|materialize|launch]";
     }
 
     /**
