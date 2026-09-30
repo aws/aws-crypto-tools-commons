@@ -1,0 +1,710 @@
+# Primitives TestServer CI (aws-crypto-tools-commons), callable by the
+# language repositories. primitives-test-server.yml runs it for commons.
+#
+# A run builds and launches every configured Primitives Language_Server, runs
+# the Tests over the server pairs, and fails on any failed Test. The native
+# rust server lives in aws-crypto-tools-rust (prim-test-server/); the java,
+# net, python, go, and rust-dafny servers live in
+# aws-cryptographic-material-providers-library (test-server/<lang>-v<major>-server/).
+# They use published libraries or the MPL's committed generated code, so there
+# is no Dafny build. The Tests are offline: no AWS credentials are needed.
+#
+# JOBS: `plan` keys each heavy server (rust, rust-dafny, net, go) on its
+# commit and lists the ones with no prebuilt binary; `prebuild` compiles only
+# those, one runner each, and publishes each binary as an artifact named by
+# its key; `primitives-test-server` builds the light servers (java, python) in
+# parallel with `prebuild`, waits for it, fetches every heavy binary into its
+# clone, and runs the Tests. The build stamps make every fetched server launch
+# without rebuilding.
+#
+# Prebuilt binaries are artifacts, found by name in the calling repository and
+# then in commons, so a server built from commons' configuration is shared by
+# every caller.
+#
+# FOCUS: with `focus` set, every server still launches but only the pairs
+# with a focus language on either leg run.
+#
+# CALLING REPOSITORY: its checkout replaces the configured branch for the
+# languages it hosts (all of them, or `checkout-languages`), so the run tests
+# the calling commit.
+
+name: Primitives TestServer
+
+on:
+  workflow_call:
+    inputs:
+      focus:
+        description: >-
+          Comma-separated languages under test (e.g. "rust"). Every server
+          still launches; only the pairs with a focus language on either leg
+          run. Empty runs the full matrix.
+        type: string
+        default: ""
+      language-repository:
+        description: >-
+          owner/name of a language repository to test from source instead of
+          its configured branch. Defaults to the calling repository when that
+          is not aws-crypto-tools-commons.
+        type: string
+        default: ""
+      language-ref:
+        description: The language-repository ref to test. Defaults to the calling commit.
+        type: string
+        default: ""
+      checkout-languages:
+        description: >-
+          Comma-separated languages built from the language-repository checkout.
+          The repository's other languages clone from their configured branch.
+          Defaults to focus; empty with no focus takes every language the
+          repository hosts from the checkout.
+        type: string
+        default: ""
+      commons-ref:
+        description: The aws-crypto-tools-commons ref to run when called from another repository.
+        type: string
+        default: main
+      save-caches:
+        description: >-
+          Save the dependency caches from this run. They are saved from the
+          default branch (push and schedule) by default; every other ref only
+          restores them.
+        type: boolean
+        default: false
+    secrets:
+      repo-pat:
+        description: >-
+          Read-only token for the private repositories the run clones
+          (aws-crypto-tools-rust).
+        required: true
+
+# Callers must grant these.
+permissions:
+  contents: read
+  # The plan and test jobs read this run's jobs and the prebuilt-server
+  # artifacts.
+  actions: read
+
+env:
+  # The language repository whose checkout replaces its configured branch.
+  LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
+  CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
+  # Dependency caches are written only from the default branch, so every
+  # branch restores the same warm set and pull requests never churn the cache
+  # store.
+  SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  CARGO_INCREMENTAL: "0"
+  # No daemon, so each server/Tests JVM the orchestrator forks inherits the
+  # live step environment.
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  # Resolves each heavy server's key and lists the servers with no prebuilt
+  # binary, so the prebuild job compiles only those.
+  plan:
+    name: find servers to prebuild
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      overlay: ${{ steps.keys.outputs.overlay }}
+      go_dir: ${{ steps.keys.outputs.go_dir }}
+      net_dir: ${{ steps.keys.outputs.net_dir }}
+      python_dir: ${{ steps.keys.outputs.python_dir }}
+      python_tip: ${{ steps.keys.outputs.python_tip }}
+      ws_rust: ${{ steps.keys.outputs.ws_rust }}
+      ws_rustdafny: ${{ steps.keys.outputs.ws_rustdafny }}
+      key_rust: ${{ steps.keys.outputs.key_rust }}
+      paths_rust: ${{ steps.keys.outputs.paths_rust }}
+      key_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
+      paths_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
+      key_net: ${{ steps.keys.outputs.key_net }}
+      paths_net: ${{ steps.keys.outputs.paths_net }}
+      key_go: ${{ steps.keys.outputs.key_go }}
+      paths_go: ${{ steps.keys.outputs.paths_go }}
+    steps:
+      - name: Check out aws-crypto-tools-commons
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Check out the language repository under test
+        if: env.LANGUAGE_REPOSITORY != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.LANGUAGE_REPOSITORY }}
+          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
+          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          path: language-repo
+
+      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
+        # The run clones aws-crypto-tools-rust via the SSH URL in its
+        # Configuration_Entry; GitHub Actions' default token only reaches the
+        # calling repository, so the PAT rewrites that URL to authenticated
+        # HTTPS. The PAT is passed only via `env:` (masked in logs), is
+        # written only to the ephemeral runner's ~/.gitconfig, and needs only
+        # READ access to aws-crypto-tools-rust contents.
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
+            echo "ERROR: the repo-pat secret is empty or unset." >&2
+            echo "The private aws-crypto-tools-rust clone the run performs WILL FAIL without it." >&2
+            echo "Pass a token with read access to aws-crypto-tools-rust contents (a fine-grained" >&2
+            echo "PAT with 'Contents: Read', or a classic PAT with the 'repo' scope)." >&2
+            exit 1
+          fi
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Resolve the prebuilt-server keys and paths
+        # Each key is the server's commit; each path list is the server's
+        # runnable output plus its build stamp, inside the materialized clone
+        # (<repo>@<sanitized ref>-<8-hex hash>) or the checkout.
+        id: keys
+        run: |
+          set -euo pipefail
+          config=primitives/test-server/config/server-config.json
+          sources=primitives/test-server/build/sources
+          field() {
+            jq -r --arg l "$1" ".entries[] | select(.language==\$l) | .serverLocation.$2" "$config"
+          }
+          repo_of() {
+            local url; url=$(field "$1" url); url=$(basename "${url%.git}"); echo "${url##*:}"
+          }
+          # The language repository under test is a working tree, not a clone.
+          own=""
+          if [ -n "$LANGUAGE_REPOSITORY" ]; then
+            own=$(basename "$LANGUAGE_REPOSITORY")
+            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
+          fi
+          # Whether $1 builds from the checkout.
+          from_checkout() {
+            [ -n "$own" ] && [ "$(repo_of "$1")" = "$own" ] || return 1
+            [ -z "$CHECKOUT_LANGUAGES" ] || [[ ",$CHECKOUT_LANGUAGES," == *",$1,"* ]]
+          }
+          # The server directory of $1, exactly as SourceMaterializer names its clone.
+          server_dir() {
+            local url ref path
+            url=$(field "$1" url); ref=$(field "$1" ref); path=$(field "$1" path)
+            if from_checkout "$1"; then echo "language-repo/$path"; return; fi
+            echo "$sources/$(python3 -c 'import re,sys,functools; u,r=sys.argv[1:3]; n=re.split("[/:]", u.rstrip("/"))[-1]; n=n[:-4] if n.endswith(".git") else n; s=lambda v: re.sub("[^A-Za-z0-9._-]", "_", v) or "_"; h=functools.reduce(lambda a, c: (31*a+ord(c)) & 0xffffffff, u+chr(10)+r, 0); print("%s@%s-%08x" % (s(n), s(r), h))' "$url" "$ref")/$path"
+          }
+          tip() {
+            local url ref sha
+            if from_checkout "$1"; then git -C language-repo rev-parse HEAD; return; fi
+            url=$(field "$1" url); ref=$(field "$1" ref)
+            # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
+            # this repo) does not replace the private-repo PAT.
+            sha=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || sha=""
+            echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
+          }
+          # emit <name> <language> <paths...>: a checkout build gets its own key.
+          # The key carries a hash of the cached paths: an artifact built at
+          # other paths must not share a key.
+          emit() {
+            local name="$1" language="$2" src="" paths; shift 2
+            from_checkout "$language" && src="$own-src-"
+            paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
+            echo "key_$name=${RUNNER_OS}-primitives-out-$name-$paths-$src$(tip "$language")" >> "$GITHUB_OUTPUT"
+            { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          }
+          rust=$(server_dir rust); rustdafny=$(server_dir rust-dafny)
+          net=$(server_dir net); go=$(server_dir go); python=$(server_dir python)
+          emit rust rust \
+            "$rust/target/release/primitives-test-server" \
+            "$rust/.primitives-build-stamp"
+          emit rustdafny rust-dafny \
+            "$rustdafny/target/release/primitives-test-server" \
+            "$rustdafny/.primitives-build-stamp"
+          emit net net \
+            "$net/bin/Release/net8.0" \
+            "$net/.primitives-build-stamp"
+          emit go go \
+            "$go/primitives-test-server" \
+            "$go/.primitives-build-stamp"
+          # Cargo workspaces per Rust server (for rust-cache) and the dirs the
+          # dependency caches key on.
+          python_src=""; from_checkout python && python_src="$own-src-"
+          {
+            echo "ws_rust=$rust -> target"
+            echo "ws_rustdafny=$rustdafny -> target"
+            echo "go_dir=$go"
+            echo "net_dir=$net"
+            echo "python_dir=$python"
+            echo "python_tip=$python_src$(tip python)"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: List the servers to build
+        # A server is prebuilt when an artifact named by its key exists in this
+        # repository or in commons; the rest are built by the prebuild job.
+        id: matrix
+        env:
+          RUN_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+          KEY_rust: ${{ steps.keys.outputs.key_rust }}
+          KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
+          KEY_net: ${{ steps.keys.outputs.key_net }}
+          KEY_go: ${{ steps.keys.outputs.key_go }}
+        run: |
+          set -euo pipefail
+          # This run's token reads this repository; the PAT reads commons.
+          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
+          # find <key>: the newest unexpired artifact named <key>, as
+          # "<repository> <artifact id>", looked up in this repository then commons.
+          find() {
+            local repo id
+            for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
+              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+                -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
+                2>/dev/null) || id=""
+              if [ -n "$id" ]; then echo "$repo $id"; return; fi
+            done
+          }
+          missing=()
+          for pair in rust:rust rustdafny:rust-dafny net:net go:go; do
+            k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
+            found=$(find "${!key_var}")
+            if [ -n "$found" ]; then echo "prebuilt $language: $found"; else missing+=("$language"); fi
+          done
+          matrix=$(printf '%s\n' "${missing[@]}" | jq -R . | jq -cs 'map(select(. != ""))')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "servers to prebuild: $matrix"
+
+  # Compiles each missing heavy server on its own runner, in parallel, and
+  # publishes its binary; the test job fetches it and runs it there.
+  prebuild:
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      PREBUILD_RUST_WORKSPACES: ${{ matrix.language == 'rust' && needs.plan.outputs.ws_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.ws_rustdafny || '' }}
+      OVERLAY: ${{ needs.plan.outputs.overlay }}
+      OUT_KEY: ${{ matrix.language == 'rust' && needs.plan.outputs.key_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'net' && needs.plan.outputs.key_net || needs.plan.outputs.key_go }}
+      OUT_PATHS: ${{ matrix.language == 'rust' && needs.plan.outputs.paths_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'net' && needs.plan.outputs.paths_net || needs.plan.outputs.paths_go }}
+    steps:
+      - name: Check out aws-crypto-tools-commons
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Check out the language repository under test
+        if: env.LANGUAGE_REPOSITORY != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.LANGUAGE_REPOSITORY }}
+          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
+          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          path: language-repo
+
+      - name: Ignore build outputs in the language checkout
+        # The orchestrator treats a working tree with untracked files as
+        # modified and rebuilds it; the servers' build outputs and stamps are
+        # not source.
+        if: env.LANGUAGE_REPOSITORY != ''
+        run: |
+          printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
+            '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
+            >> language-repo/.git/info/exclude
+
+      - name: Set up JDK 21 (Temurin) for the orchestrator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Restore the Gradle caches (orchestrator)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-primitives-gradle-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'primitives/test-server/*/build.gradle.kts',
+              'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-primitives-gradle-
+
+      - name: Set up Go (Go server; aws-lc-sys native builds)
+        if: matrix.language != 'net'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: false
+
+      - name: Set up the Rust toolchain
+        if: startsWith(matrix.language, 'rust')
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Set up .NET
+        if: matrix.language == 'net'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
+        run: |
+          set -euo pipefail
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Materialize the ${{ matrix.language }} sources
+        # The caches below restore into the clone, so it exists first.
+        working-directory: primitives/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+
+      - name: Restore the cargo registry and compiled dependencies
+        # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
+        # are cleaned before saving, so every branch reuses the dependencies.
+        if: startsWith(matrix.language, 'rust')
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: primitives-${{ matrix.language }}
+          workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
+          save-if: ${{ env.SAVE_CACHES == 'true' }}
+
+      - name: Restore the Go module + build caches
+        if: matrix.language == 'go'
+        id: go-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          restore-keys: |
+            ${{ runner.os }}-primitives-go-
+
+      - name: Restore the NuGet packages
+        if: matrix.language == 'net'
+        id: nuget-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/*.csproj', needs.plan.outputs.net_dir)) }}
+          restore-keys: |
+            ${{ runner.os }}-primitives-nuget-
+
+      - name: Build the ${{ matrix.language }} server and check it starts
+        working-directory: primitives/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+
+      - name: Pack the ${{ matrix.language }} server
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
+          tar -czf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+
+      - name: Publish the ${{ matrix.language }} server
+        # Named by its key: later runs here, and runs in other repositories for
+        # servers built from commons' configuration, find it by that name.
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUT_KEY }}
+          path: ${{ runner.temp }}/prebuilt/${{ matrix.language }}.tgz
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Save the Go module + build caches
+        if: matrix.language == 'go' && env.SAVE_CACHES == 'true' && steps.go-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+
+      - name: Save the NuGet packages
+        if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/*.csproj', needs.plan.outputs.net_dir)) }}
+
+  # Starts alongside the prebuild job; its setup and the light server builds
+  # overlap the heavy builds, and it waits for their outputs just before the
+  # run.
+  primitives-test-server:
+    name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
+    needs: plan
+    runs-on: ubuntu-latest
+    env:
+      OVERLAY: ${{ needs.plan.outputs.overlay }}
+    steps:
+      - name: Check out aws-crypto-tools-commons
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Check out the language repository under test
+        if: env.LANGUAGE_REPOSITORY != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.LANGUAGE_REPOSITORY }}
+          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
+          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          path: language-repo
+
+      - name: Ignore build outputs in the language checkout
+        if: env.LANGUAGE_REPOSITORY != ''
+        run: |
+          printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
+            '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
+            >> language-repo/.git/info/exclude
+
+      - name: Set up JDK 21 (Temurin) for the commons harness + Java server
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Python 3.11 (Python server)
+        id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up .NET (runs the prebuilt .NET server)
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore the Gradle caches (orchestrator + Java server)
+        id: gradle-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-primitives-gradle-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'primitives/test-server/*/build.gradle.kts',
+              'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ runner.os }}-primitives-gradle-
+
+      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
+        env:
+          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
+        run: |
+          set -euo pipefail
+          git config --global \
+            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
+            "git@github.com:"
+
+      - name: Install Smithy CLI
+        # Needed by `make validate`; pinned official release.
+        run: |
+          set -euo pipefail
+          SMITHY_VERSION="1.58.0"
+          url="https://github.com/smithy-lang/smithy/releases/download/${SMITHY_VERSION}/smithy-cli-linux-x86_64.zip"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/smithy-cli.zip"
+          unzip -q "$tmp/smithy-cli.zip" -d "$tmp"
+          sudo "$tmp/smithy-cli-linux-x86_64/install"
+          smithy --version
+
+      - name: Validate model (smithy validate)
+        working-directory: primitives/test-server
+        run: make validate
+
+      - name: Materialize the java and python sources
+        # The caches below are keyed on these clones' contents.
+        working-directory: primitives/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python stopAfter=materialize"
+
+      - name: Restore the pip downloads (python)
+        id: pip-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-primitives-pip-${{ steps.python.outputs.python-version }}-${{ hashFiles(format('{0}/pyproject.toml', needs.plan.outputs.python_dir)) }}
+          restore-keys: |
+            ${{ runner.os }}-primitives-pip-${{ steps.python.outputs.python-version }}-
+
+      - name: Restore the Python server venv
+        # The venv holds editable installs of the clone and its build stamp,
+        # so PythonLaunchPlan skips venv setup for the same commit. Editable
+        # installs record the clone's absolute path, so the key carries the
+        # calling repository (whose name is in the workspace path).
+        id: python-venv
+        uses: actions/cache/restore@v4
+        with:
+          path: primitives/test-server/build/launch/python/venv
+          key: ${{ runner.os }}-primitives-venv-${{ github.repository }}-${{ needs.plan.outputs.python_tip }}-py${{ steps.python.outputs.python-version }}
+
+      - name: Build the java and python servers while the heavy ones build
+        # Their build stamps make the orchestrated run skip these builds.
+        working-directory: primitives/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python stopAfter=launch"
+
+      - name: Wait for the prebuilt servers
+        # Each server the plan found missing is published by its prebuild job;
+        # wait for those jobs to finish.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+          # "failed", "done" (every matching prebuild job succeeded), or "wait".
+          STATE: >-
+            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
+            | if any(. == "failure" or . == "cancelled") then "failed"
+              elif length > 0 and all(. == "success") then "done" else "wait" end
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 2700))
+          for language in $(jq -r '.[]' <<<"$MATRIX"); do
+            while :; do
+              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
+                | jq -r --arg language "$language" "$STATE")
+              [ "$state" = "done" ] && break
+              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
+              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
+              sleep 15
+            done
+            echo "ready after ${SECONDS}s: $language"
+          done
+
+      - name: Materialize the sources (clones only)
+        # The prebuilt outputs restore into these clones; each server's build
+        # stamp then skips its build.
+        working-directory: primitives/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
+
+      - name: Fetch the prebuilt servers into their clones
+        env:
+          RUN_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+          KEY_rust: ${{ needs.plan.outputs.key_rust }}
+          KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
+          KEY_net: ${{ needs.plan.outputs.key_net }}
+          KEY_go: ${{ needs.plan.outputs.key_go }}
+        run: |
+          set -euo pipefail
+          # This run's token reads this repository; the PAT reads commons.
+          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
+          # find <key>: the newest unexpired artifact named <key>, as
+          # "<repository> <artifact id>", looked up in this repository then commons.
+          find() {
+            local repo id
+            for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
+              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+                -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
+                2>/dev/null) || id=""
+              if [ -n "$id" ]; then echo "$repo $id"; return; fi
+            done
+          }
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          for pair in rust:rust rustdafny:rust-dafny net:net go:go; do
+            k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
+            found=$(find "${!key_var}")
+            [ -n "$found" ] || continue
+            read -r repo id <<<"$found"
+            echo "$language: $repo artifact $id"
+            GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
+            unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
+            tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
+          done
+
+      - name: Check every prebuilt server arrived
+        # A server missing here would be built cold inside the test run, on a
+        # runner without its toolchain.
+        run: |
+          set -euo pipefail
+          missing=""
+          for language in rust rust-dafny net go; do
+            [ -f "$RUNNER_TEMP/prebuilt/$language.tgz" ] || missing="$missing $language"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::prebuilt servers not restored:$missing"
+            exit 1
+          fi
+
+      - name: Run the test suite (make orchestrate)
+        # Launches every configured server (all builds skipped by their
+        # stamps), runs the Tests over the server pairs (only the focus pairs
+        # when focus is set), and exits non-zero on any failed Test.
+        working-directory: primitives/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          FOCUS: ${{ inputs.focus }}
+        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+
+      - name: Publish test results to the run summary
+        if: always()
+        run: |
+          python3 test-server-common/tools/ci_summary.py \
+            primitives/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test reports + Resolution_Record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: primitives-test-server-reports
+          path: |
+            primitives/test-server/build/resolution-record.json
+            test-server-common/orchestrator/build/resolution-record.json
+            primitives/test-server/build/launch/*/*.log
+            primitives/test-server/tests/build/reports/tests
+            primitives/test-server/tests/build/test-results
+          if-no-files-found: ignore
+
+      # Cache saves, from the default branch only (SAVE_CACHES). `if: always()`
+      # because the orchestrate step exits non-zero on any failed Test, and a
+      # cache that only saves on job success would never save then. Saves whose
+      # exact key was already restored are skipped.
+      - name: Save the pip downloads (python)
+        if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-primitives-pip-${{ steps.python.outputs.python-version }}-${{ hashFiles(format('{0}/pyproject.toml', needs.plan.outputs.python_dir)) }}
+
+      - name: Save the Python server venv
+        if: always() && env.SAVE_CACHES == 'true' && steps.python-venv.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: primitives/test-server/build/launch/python/venv
+          key: ${{ runner.os }}-primitives-venv-${{ github.repository }}-${{ needs.plan.outputs.python_tip }}-py${{ steps.python.outputs.python-version }}
+
+      - name: Save the Gradle caches (orchestrator + Java server)
+        if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-primitives-gradle-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'primitives/test-server/*/build.gradle.kts',
+              'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
