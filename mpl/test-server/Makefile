@@ -84,7 +84,10 @@ MPL_OVERLAY := $(if $(wildcard $(MPL_JAVA_REPO)),workingTreeOverlay.aws-cryptogr
 
 # Combined orchestrator program args (the orchestrator's default reference
 # implementation, java, is configured). TESTS scopes the JUnit run when set.
-ORCH_ARGS := $(strip $(RUST_OVERLAY) $(MPL_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)))
+# ORCHESTRATE_ARGS passes extra key=value tokens through, e.g.
+# `make orchestrate ORCHESTRATE_ARGS="languages=rust stopAfter=launch"` or
+# `make orchestrate ORCHESTRATE_ARGS="focus=rust"`.
+ORCH_ARGS := $(strip $(RUST_OVERLAY) $(MPL_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)) $(ORCHESTRATE_ARGS))
 
 # Makefile-owned scratch directory for temp files. Kept separate from the
 # per-module Gradle `build/` dirs to avoid confusion, and ignored via the
