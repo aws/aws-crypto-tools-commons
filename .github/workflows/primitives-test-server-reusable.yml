@@ -323,6 +323,14 @@ jobs:
       matrix:
         language: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
+      # smithy-dafny sets `LANG=<language>` as a make variable on
+      # transpile_dependencies_<language>, and make exports it to the
+      # dependency transpiles, so Dafny (.NET) starts with LANG=java or
+      # LANG=python and segfaults resolving that locale. LC_ALL takes
+      # precedence over LANG, and invariant globalization keeps .NET off the
+      # locale entirely.
+      LC_ALL: C.UTF-8
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
       PREBUILD_RUST_WORKSPACES: ${{ matrix.language == 'rust' && needs.plan.outputs.ws_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.ws_rustdafny || '' }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
       # The servers that transpile the MPL's AtomicPrimitives from Dafny.
