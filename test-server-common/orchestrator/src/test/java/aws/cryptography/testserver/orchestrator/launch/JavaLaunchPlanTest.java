@@ -1,6 +1,7 @@
 package aws.cryptography.testserver.orchestrator.launch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -153,6 +154,36 @@ class JavaLaunchPlanTest {
         assertEquals("java", ex.language(), "the abort must name the language");
         assertTrue(ex.getMessage().contains(bogusHome.toString()),
             "the abort must name the unusable JAVA_HOME");
+    }
+
+    // ------------------------------------------------------------------
+    // Fixtures.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a Dafny library whose stamp records its commit skips the transpile + publish")
+    void stampedDafnyLibrarySkipsTheTranspile(@TempDir Path tempDir) throws IOException {
+        Path project = Files.createDirectories(tempDir.resolve("repo/AwsCryptographyPrimitives"));
+        Path library = Files.createDirectories(project.resolve("runtimes/java"));
+        // Were the transpile to run, this target would leave a marker behind.
+        Files.writeString(project.resolve("Makefile"), "build_java:\n\ttouch transpiled\n");
+        String commit = "0123456789abcdef0123456789abcdef01234567";
+        Files.writeString(project.resolve("." + JavaLaunchPlan.DAFNY_LIBRARY_STAMP + "-build-stamp"), commit);
+        Path server = Files.createDirectories(tempDir.resolve("repo/test-server/java-v1-server"));
+        MaterializedSources sources = new MaterializedSources(List.of(
+            new MaterializedSources.Success(ComponentId.library("java"),
+                new SourcePlan.Clone("git@github.com:aws/mpl.git", "main", "AwsCryptographyPrimitives/runtimes/java"),
+                ResolutionReason.CONFIGURATION_ENTRY, library, commit, "main", null),
+            new MaterializedSources.Success(ComponentId.server("java"),
+                new SourcePlan.Clone("git@github.com:aws/mpl.git", "main", "test-server/java-v1-server"),
+                ResolutionReason.CONFIGURATION_ENTRY, server, commit, "main", null)));
+
+        // The server directory has no gradlew, so the launch itself fails;
+        // what matters is that it got past the library build without Dafny.
+        ServerLaunchException ex = assertThrows(ServerLaunchException.class,
+            () -> newPlan(tempDir.resolve("work")).launch(javaEntry(), sources));
+        assertFalse(ex.getMessage().contains("requires Dafny"), ex.getMessage());
+        assertFalse(Files.exists(project.resolve("transpiled")), "the transpile must not run");
     }
 
     // ------------------------------------------------------------------
