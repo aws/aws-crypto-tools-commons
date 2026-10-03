@@ -15,7 +15,7 @@
     "(server-config.json/feature-config.json/bug-config.json) co-located with the server.",
     "",
     "EXCEPTION — the native-Java server: the 'java-native' entry's serverLocation +",
-    "libraryRepository point at the aws-crypto-tools-java repo (dbesdk/test-server/server),",
+    "libraryRepository point at the aws-crypto-tools-java repo (test-server/dbesdk),",
     "the home of the native (non-Dafny) Java DB-ESDK. It uses a DISTINCT language token",
     "('java-native', not 'java') because the orchestrator keys every per-language",
     "component (ComponentId.server:<lang>/library:<lang>, the launcher map, the effective-",
@@ -83,18 +83,18 @@
       "language": "java-native",
       "majorVersion": 1,
       "port": 8104,
-      "configPath": "dbesdk/test-server/server",
+      "configPath": "test-server/dbesdk",
       "libraryRepository": {
         "name": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
         "branch": "main",
-        "path": "dbesdk/test-server/server"
+        "path": "test-server/dbesdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
         "ref": "main",
-        "path": "dbesdk/test-server/server"
+        "path": "test-server/dbesdk"
       }
     }
   ]
