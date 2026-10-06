@@ -361,7 +361,7 @@ jobs:
         if: env.LANGUAGE_REPOSITORY != ''
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
-            '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
+            '*.egg-info/' '__pycache__/' '**/internaldafny/generated/' 'test-server/go-v1-server/primitives-test-server' \
             >> language-repo/.git/info/exclude
 
       # JDK 17 first (the MPL Java build and the smithy-dafny codegen), then
@@ -568,7 +568,7 @@ jobs:
         if: env.LANGUAGE_REPOSITORY != ''
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
-            '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
+            '*.egg-info/' '__pycache__/' '**/internaldafny/generated/' 'test-server/go-v1-server/primitives-test-server' \
             >> language-repo/.git/info/exclude
 
       - name: Set up JDK 21 (Temurin) for the commons harness + Java server
