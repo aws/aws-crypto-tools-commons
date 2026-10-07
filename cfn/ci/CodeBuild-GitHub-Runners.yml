@@ -63,12 +63,12 @@ Parameters:
     Type: Number
     Description: Fleet instances kept running at all times.
     MinValue: 1
-    Default: 4
+    Default: 2
   FleetMaxCapacity:
     Type: Number
     Description: Fleet instances target tracking may scale up to. Builds beyond this run on demand.
     MinValue: 1
-    Default: 12
+    Default: 10
   FleetTargetUtilization:
     Type: Number
     Description: Fleet utilization percentage that target tracking holds.
