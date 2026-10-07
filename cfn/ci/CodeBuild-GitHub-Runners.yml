@@ -32,12 +32,6 @@ Parameters:
     Type: CommaDelimitedList
     Description: owner/name of each GitHub repository that gets runner projects.
     Default: aws/aws-crypto-tools-rust
-  AllowedActorIds:
-    Type: String
-    Description: >-
-      Regex of numeric GitHub user IDs whose jobs may start a build. Jobs from
-      anyone else are ignored by the webhook.
-    Default: '^(19524298)$'
   ProjectPrefix:
     Type: String
     Description: Prefix of each fleet and runner project name.
@@ -213,8 +207,6 @@ Resources:
             FilterGroups:
               - - Type: EVENT
                   Pattern: WORKFLOW_JOB_QUEUED
-                - Type: ACTOR_ACCOUNT_ID
-                  Pattern: !Ref AllowedActorIds
 
       MacRunner&{Repo}:
         Type: AWS::CodeBuild::Project
@@ -248,8 +240,6 @@ Resources:
             FilterGroups:
               - - Type: EVENT
                   Pattern: WORKFLOW_JOB_QUEUED
-                - Type: ACTOR_ACCOUNT_ID
-                  Pattern: !Ref AllowedActorIds
 
       WindowsRunner&{Repo}:
         Type: AWS::CodeBuild::Project
@@ -283,8 +273,6 @@ Resources:
             FilterGroups:
               - - Type: EVENT
                   Pattern: WORKFLOW_JOB_QUEUED
-                - Type: ACTOR_ACCOUNT_ID
-                  Pattern: !Ref AllowedActorIds
 
       QueueAlarmLinux&{Repo}:
         Type: AWS::CloudWatch::Alarm
