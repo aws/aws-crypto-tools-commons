@@ -222,7 +222,7 @@ Resources:
           - MetricType: FLEET_UTILIZATION_RATE
             TargetValue: !Ref FleetTargetUtilization
 
-  Fn::ForEach::Repositories:
+  Fn::ForEach::RepositoryRunners:
     - Repo
     - !Ref Repositories
     - LinuxRunner&{Repo}:
