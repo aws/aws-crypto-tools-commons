@@ -75,6 +75,12 @@ on:
           restores them.
         type: boolean
         default: false
+      runner:
+        description: >-
+          Runner label for every job. Callers on CodeBuild-hosted runners pass
+          codebuild-<project>-<run_id>-<run_attempt>.
+        type: string
+        default: ubuntu-latest
     secrets:
       repo-pat:
         description: >-
@@ -111,7 +117,7 @@ jobs:
   # output, so the prebuild job builds only those.
   plan:
     name: find servers to prebuild
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
@@ -316,7 +322,7 @@ jobs:
   prebuild:
     needs: plan
     if: needs.plan.outputs.matrix != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -543,7 +549,7 @@ jobs:
   mpl-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     env:
       OVERLAY: ${{ needs.plan.outputs.overlay }}
     steps:

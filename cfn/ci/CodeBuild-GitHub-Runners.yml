@@ -1,0 +1,429 @@
+# CodeBuild-hosted GitHub Actions runners for the Crypto Tools repositories.
+#
+# Creates a reserved-capacity fleet that overflows to on-demand compute, one
+# runner project per repository (each project registers its own repository
+# webhook), and a CloudWatch dashboard of runner usage.
+#
+# Prerequisite: a GitHub credential that is admin on every listed repository,
+# either an AVAILABLE CodeConnections GitHub connection or a Secrets Manager
+# secret holding a GitHub token.
+#
+# Deploy:
+#   aws cloudformation deploy \
+#     --region us-east-1 \
+#     --stack-name CryptoTools-CodeBuild-GitHub-Runners \
+#     --template-file cfn/ci/CodeBuild-GitHub-Runners.yml \
+#     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+#     --parameter-overrides SourceAuthArn=<connection-or-secret-arn>
+#
+# A workflow job selects a runner with:
+#   runs-on: codebuild-<ProjectPrefix>-<repo-name>-${{ github.run_id }}-${{ github.run_attempt }}
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::LanguageExtensions
+Description: CodeBuild-hosted GitHub Actions runners for Crypto Tools CI
+
+Parameters:
+  Repositories:
+    Type: CommaDelimitedList
+    Description: owner/name of each GitHub repository that gets a runner project.
+    Default: aws/aws-crypto-tools-rust
+  AllowedActorIds:
+    Type: String
+    Description: >-
+      Regex of numeric GitHub user IDs whose jobs may start a build. Jobs from
+      anyone else are ignored by the webhook.
+    Default: '^(19524298)$'
+  ProjectPrefix:
+    Type: String
+    Description: Prefix of each runner project's name.
+    Default: CryptoToolsCI
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9_-]*$'
+  SourceAuthType:
+    Type: String
+    Description: How CodeBuild authenticates to GitHub.
+    AllowedValues: [CODECONNECTIONS, SECRETS_MANAGER]
+    Default: CODECONNECTIONS
+  SourceAuthArn:
+    Type: String
+    Description: ARN of the CodeConnections connection or the Secrets Manager secret.
+  ComputeType:
+    Type: String
+    Description: Compute type of the fleet and of on-demand overflow builds.
+    AllowedValues:
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
+      - BUILD_GENERAL1_XLARGE
+      - BUILD_GENERAL1_2XLARGE
+    Default: BUILD_GENERAL1_LARGE
+  Image:
+    Type: String
+    Description: CodeBuild image the runner builds use.
+    Default: aws/codebuild/standard:7.0
+  FleetBaseCapacity:
+    Type: Number
+    Description: Fleet instances kept running at all times.
+    MinValue: 1
+    Default: 4
+  FleetMaxCapacity:
+    Type: Number
+    Description: Fleet instances target tracking may scale up to. Builds beyond this run on demand.
+    MinValue: 1
+    Default: 12
+  FleetTargetUtilization:
+    Type: Number
+    Description: Fleet utilization percentage that target tracking holds.
+    MinValue: 1
+    MaxValue: 100
+    Default: 70
+  BuildTimeoutMinutes:
+    Type: Number
+    Description: Maximum minutes one runner build (one workflow job) may run.
+    MinValue: 5
+    MaxValue: 2160
+    Default: 360
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+  AlarmTopicArn:
+    Type: String
+    Description: SNS topic notified by the alarms. Empty creates alarms with no action.
+    Default: ''
+
+Conditions:
+  UseConnection: !Equals [!Ref SourceAuthType, CODECONNECTIONS]
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
+
+Resources:
+  BuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/${ProjectPrefix}
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Jobs on these runners get this role's credentials, so it carries only what
+  # the runner itself needs. Workflows that call AWS keep assuming their own
+  # role through GitHub OIDC.
+  RunnerServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: runner
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub ${BuildLogGroup.Arn}:*
+              - !If
+                - UseConnection
+                - Effect: Allow
+                  Action:
+                    - codeconnections:GetConnection
+                    - codeconnections:GetConnectionToken
+                    - codeconnections:UseConnection
+                    - codestar-connections:GetConnection
+                    - codestar-connections:GetConnectionToken
+                    - codestar-connections:UseConnection
+                  Resource: !Ref SourceAuthArn
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref SourceAuthArn
+
+  Fleet:
+    Type: AWS::CodeBuild::Fleet
+    Properties:
+      Name: !Sub ${ProjectPrefix}-fleet
+      EnvironmentType: LINUX_CONTAINER
+      ComputeType: !Ref ComputeType
+      BaseCapacity: !Ref FleetBaseCapacity
+      OverflowBehavior: ON_DEMAND
+      ScalingConfiguration:
+        ScalingType: TARGET_TRACKING_SCALING
+        MaxCapacity: !Ref FleetMaxCapacity
+        TargetTrackingScalingConfigs:
+          - MetricType: FLEET_UTILIZATION_RATE
+            TargetValue: !Ref FleetTargetUtilization
+
+  Fn::ForEach::Repositories:
+    - Repo
+    - !Ref Repositories
+    - RunnerProject&{Repo}:
+        Type: AWS::CodeBuild::Project
+        Properties:
+          Name: !Join ['-', [!Ref ProjectPrefix, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions runner for ', !Ref Repo]]
+          ServiceRole: !GetAtt RunnerServiceRole.Arn
+          TimeoutInMinutes: !Ref BuildTimeoutMinutes
+          Artifacts:
+            Type: NO_ARTIFACTS
+          Source:
+            Type: GITHUB
+            Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            Auth:
+              Type: !Ref SourceAuthType
+              Resource: !Ref SourceAuthArn
+          Environment:
+            Type: LINUX_CONTAINER
+            ComputeType: !Ref ComputeType
+            Image: !Ref Image
+            PrivilegedMode: false
+            Fleet:
+              FleetArn: !GetAtt Fleet.Arn
+          LogsConfig:
+            CloudWatchLogs:
+              Status: ENABLED
+              GroupName: !Ref BuildLogGroup
+              StreamName: !Select [1, !Split ['/', !Ref Repo]]
+          Triggers:
+            Webhook: true
+            FilterGroups:
+              - - Type: EVENT
+                  Pattern: WORKFLOW_JOB_QUEUED
+                - Type: ACTOR_ACCOUNT_ID
+                  Pattern: !Ref AllowedActorIds
+
+      QueuedDurationAlarm&{Repo}:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+          AlarmDescription: !Join ['', ['p90 runner queue wait above 5 minutes for ', !Ref Repo]]
+          Namespace: AWS/CodeBuild
+          MetricName: QueuedDuration
+          Dimensions:
+            - Name: ProjectName
+              Value: !Join ['-', [!Ref ProjectPrefix, !Select [1, !Split ['/', !Ref Repo]]]]
+          ExtendedStatistic: p90
+          Period: 300
+          EvaluationPeriods: 3
+          Threshold: 300
+          ComparisonOperator: GreaterThanThreshold
+          TreatMissingData: notBreaching
+          AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+  # Publishes the number of running and queued runner builds every minute.
+  # CodeBuild has no concurrency metric of its own.
+  UsageMetricsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: usage-metrics
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: codebuild:ListProjects
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codebuild:ListBuildsForProject
+                  - codebuild:BatchGetBuilds
+                Resource: !Sub arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/${ProjectPrefix}-*
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: CryptoTools/CodeBuildRunners
+
+  UsageMetricsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 50
+      Role: !GetAtt UsageMetricsRole.Arn
+      Environment:
+        Variables:
+          PROJECT_PREFIX: !Sub ${ProjectPrefix}-
+          NAMESPACE: CryptoTools/CodeBuildRunners
+      Code:
+        ZipFile: |
+          import os
+
+          import boto3
+
+          codebuild = boto3.client("codebuild")
+          cloudwatch = boto3.client("cloudwatch")
+          PREFIX = os.environ["PROJECT_PREFIX"]
+          NAMESPACE = os.environ["NAMESPACE"]
+          # In-progress builds are among a project's most recent builds.
+          RECENT_BUILDS = 300
+          WAITING_PHASES = {"SUBMITTED", "QUEUED"}
+
+
+          def projects():
+              for page in codebuild.get_paginator("list_projects").paginate():
+                  yield from (p for p in page["projects"] if p.startswith(PREFIX))
+
+
+          def count(project):
+              ids = []
+              for page in codebuild.get_paginator("list_builds_for_project").paginate(
+                  projectName=project, sortOrder="DESCENDING"
+              ):
+                  ids.extend(page["ids"])
+                  if len(ids) >= RECENT_BUILDS:
+                      break
+              running = queued = 0
+              for i in range(0, min(len(ids), RECENT_BUILDS), 100):
+                  for build in codebuild.batch_get_builds(ids=ids[i : i + 100])["builds"]:
+                      if build["buildStatus"] != "IN_PROGRESS":
+                          continue
+                      if build.get("currentPhase") in WAITING_PHASES:
+                          queued += 1
+                      else:
+                          running += 1
+              return running, queued
+
+
+          def datum(name, value, project=None):
+              d = {"MetricName": name, "Value": value, "Unit": "Count"}
+              if project:
+                  d["Dimensions"] = [{"Name": "Project", "Value": project}]
+              return d
+
+
+          def handler(event, context):
+              data = []
+              total_running = total_queued = 0
+              for project in projects():
+                  running, queued = count(project)
+                  total_running += running
+                  total_queued += queued
+                  data += [datum("RunningBuilds", running, project), datum("QueuedBuilds", queued, project)]
+              data += [datum("RunningBuilds", total_running), datum("QueuedBuilds", total_queued)]
+              for i in range(0, len(data), 1000):
+                  cloudwatch.put_metric_data(Namespace=NAMESPACE, MetricData=data[i : i + 1000])
+
+  UsageMetricsSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      Targets:
+        - Id: usage-metrics
+          Arn: !GetAtt UsageMetricsFunction.Arn
+
+  UsageMetricsSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UsageMetricsFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UsageMetricsSchedule.Arn
+
+  UsageDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${ProjectPrefix}-runners
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric", "x": 0, "y": 0, "width": 24, "height": 6,
+              "properties": {
+                "title": "Concurrent runner builds (all repositories)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", {"label": "Running"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", {"label": "Queued"}]
+                ],
+                "annotations": {"horizontal": [
+                  {"label": "Fleet base capacity", "value": ${FleetBaseCapacity}},
+                  {"label": "Fleet max capacity", "value": ${FleetMaxCapacity}}
+                ]},
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Running builds by repository",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "metrics": [[{"expression": "SEARCH('{CryptoTools/CodeBuildRunners,Project} MetricName=\"RunningBuilds\"', 'Maximum', 60)", "id": "running"}]],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Queue wait p90 (seconds)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300,
+                "metrics": [[{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"QueuedDuration\" ProjectName=\"${ProjectPrefix}\"', 'p90', 300)", "id": "queued"}]],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 12, "width": 12, "height": 6,
+              "properties": {
+                "title": "Jobs started per hour",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
+                "metrics": [[{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"Builds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "builds"}]],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 12, "width": 12, "height": 6,
+              "properties": {
+                "title": "Job duration p50 / p90 (seconds)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"Duration\" ProjectName=\"${ProjectPrefix}\"', 'p50', 3600)", "id": "p50"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"Duration\" ProjectName=\"${ProjectPrefix}\"', 'p90', 3600)", "id": "p90"}]
+                ],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 18, "width": 12, "height": 6,
+              "properties": {
+                "title": "Succeeded / failed jobs per hour",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"SucceededBuilds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "ok"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"FailedBuilds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "failed"}]
+                ],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 18, "width": 12, "height": 6,
+              "properties": {
+                "title": "CPU / memory utilization p90 (%)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300,
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=\"${ProjectPrefix}\"', 'p90', 300)", "id": "cpu"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=\"${ProjectPrefix}\"', 'p90', 300)", "id": "mem"}]
+                ],
+                "yAxis": {"left": {"min": 0, "max": 100}}
+              }
+            }
+          ]
+        }
+
+Outputs:
+  FleetArn:
+    Value: !GetAtt Fleet.Arn
+  RunnerServiceRoleArn:
+    Value: !GetAtt RunnerServiceRole.Arn
+  DashboardUrl:
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards/dashboard/${ProjectPrefix}-runners
