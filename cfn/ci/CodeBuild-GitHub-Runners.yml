@@ -527,9 +527,9 @@ Resources:
                 "title": "Linux: concurrent jobs",
                 "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"label": "On the fleet"}],
-                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"label": "On demand"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Waiting"}]
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"label": "On the fleet", "color": "#1f77b4"}],
+                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"label": "On demand", "color": "#ff7f0e"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Waiting", "color": "#2ca02c"}]
                 ],
                 "annotations": {"horizontal": [{"label": "Fleet capacity", "value": ${LinuxFleetCapacity}}]},
                 "yAxis": {"left": {"min": 0}}
@@ -541,8 +541,8 @@ Resources:
                 "title": "macOS: concurrent jobs",
                 "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "macos", {"label": "On the fleet"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "macos", {"label": "Waiting"}]
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "macos", {"label": "On the fleet", "color": "#1f77b4"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "macos", {"label": "Waiting", "color": "#2ca02c"}]
                 ],
                 "annotations": {"horizontal": [{"label": "Fleet capacity (beyond this queues)", "value": ${MacFleetCapacity}}]},
                 "yAxis": {"left": {"min": 0}}
@@ -554,9 +554,9 @@ Resources:
                 "title": "Windows: concurrent jobs",
                 "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "windows", {"label": "On the fleet"}],
-                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "windows", {"label": "On demand"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "windows", {"label": "Waiting"}]
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "windows", {"label": "On the fleet", "color": "#1f77b4"}],
+                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "windows", {"label": "On demand", "color": "#ff7f0e"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "windows", {"label": "Waiting", "color": "#2ca02c"}]
                 ],
                 "annotations": {"horizontal": [{"label": "Fleet capacity", "value": ${WindowsFleetCapacity}}]},
                 "yAxis": {"left": {"min": 0}}
@@ -565,15 +565,12 @@ Resources:
             {
               "type": "metric", "x": 0, "y": 6, "width": 24, "height": 6,
               "properties": {
-                "title": "Longest wait for a runner (minutes)",
+                "title": "Longest wait for a runner",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "linux", {"id": "wl", "visible": false}],
-                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "macos", {"id": "wm", "visible": false}],
-                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "windows", {"id": "ww", "visible": false}],
-                  [{"expression": "wl/60", "id": "linux", "label": "Linux"}],
-                  [{"expression": "wm/60", "id": "macos", "label": "macOS"}],
-                  [{"expression": "ww/60", "id": "windows", "label": "Windows"}]
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "linux", {"label": "Linux", "color": "#1f77b4"}],
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "macos", {"label": "macOS", "color": "#7f7f7f"}],
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "windows", {"label": "Windows", "color": "#17becf"}]
                 ],
                 "yAxis": {"left": {"min": 0}}
               }
@@ -585,14 +582,14 @@ Resources:
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60,
                 "metrics": [
                   [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 60)", "id": "s0", "visible": false}],
-                  [{"expression": "MAX(s0)", "id": "max0", "label": "Linux busiest job"}],
-                  [{"expression": "AVG(s0)", "id": "avg0", "label": "Linux average job"}],
+                  [{"expression": "MAX(s0)", "id": "max0", "label": "Linux busiest job", "color": "#1f77b4"}],
+                  [{"expression": "AVG(s0)", "id": "avg0", "label": "Linux average job", "color": "#aec7e8"}],
                   [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=macos', 'Average', 60)", "id": "s1", "visible": false}],
-                  [{"expression": "MAX(s1)", "id": "max1", "label": "macOS busiest job"}],
-                  [{"expression": "AVG(s1)", "id": "avg1", "label": "macOS average job"}],
+                  [{"expression": "MAX(s1)", "id": "max1", "label": "macOS busiest job", "color": "#7f7f7f"}],
+                  [{"expression": "AVG(s1)", "id": "avg1", "label": "macOS average job", "color": "#c7c7c7"}],
                   [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=windows', 'Average', 60)", "id": "s2", "visible": false}],
-                  [{"expression": "MAX(s2)", "id": "max2", "label": "Windows busiest job"}],
-                  [{"expression": "AVG(s2)", "id": "avg2", "label": "Windows average job"}]
+                  [{"expression": "MAX(s2)", "id": "max2", "label": "Windows busiest job", "color": "#17becf"}],
+                  [{"expression": "AVG(s2)", "id": "avg2", "label": "Windows average job", "color": "#9edae5"}]
                 ],
                 "yAxis": {"left": {"min": 0, "max": 100}}
               }
@@ -604,14 +601,14 @@ Resources:
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60,
                 "metrics": [
                   [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 60)", "id": "s0", "visible": false}],
-                  [{"expression": "MAX(s0)", "id": "max0", "label": "Linux busiest job"}],
-                  [{"expression": "AVG(s0)", "id": "avg0", "label": "Linux average job"}],
+                  [{"expression": "MAX(s0)", "id": "max0", "label": "Linux busiest job", "color": "#1f77b4"}],
+                  [{"expression": "AVG(s0)", "id": "avg0", "label": "Linux average job", "color": "#aec7e8"}],
                   [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=macos', 'Average', 60)", "id": "s1", "visible": false}],
-                  [{"expression": "MAX(s1)", "id": "max1", "label": "macOS busiest job"}],
-                  [{"expression": "AVG(s1)", "id": "avg1", "label": "macOS average job"}],
+                  [{"expression": "MAX(s1)", "id": "max1", "label": "macOS busiest job", "color": "#7f7f7f"}],
+                  [{"expression": "AVG(s1)", "id": "avg1", "label": "macOS average job", "color": "#c7c7c7"}],
                   [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=windows', 'Average', 60)", "id": "s2", "visible": false}],
-                  [{"expression": "MAX(s2)", "id": "max2", "label": "Windows busiest job"}],
-                  [{"expression": "AVG(s2)", "id": "avg2", "label": "Windows average job"}]
+                  [{"expression": "MAX(s2)", "id": "max2", "label": "Windows busiest job", "color": "#17becf"}],
+                  [{"expression": "AVG(s2)", "id": "avg2", "label": "Windows average job", "color": "#9edae5"}]
                 ],
                 "yAxis": {"left": {"min": 0, "max": 100}}
               }
