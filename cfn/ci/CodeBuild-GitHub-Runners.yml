@@ -8,17 +8,17 @@
 # overflow to on-demand compute; CodeBuild has no on-demand macOS compute, so
 # macOS jobs beyond the fleet's capacity queue.
 #
-# Prerequisite: a GitHub credential that is admin on every listed repository,
-# either an AVAILABLE CodeConnections GitHub connection or a Secrets Manager
-# secret holding a GitHub token.
+# Prerequisite: connect CodeBuild to GitHub once per account and region
+# (CodeBuild console > Settings > Source providers > GitHub), as a GitHub user
+# who is admin on every listed repository. The runner projects use that
+# account-level credential.
 #
 # Deploy:
 #   aws cloudformation deploy \
 #     --region us-east-1 \
 #     --stack-name CryptoTools-CodeBuild-GitHub-Runners \
 #     --template-file cfn/ci/CodeBuild-GitHub-Runners.yml \
-#     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
-#     --parameter-overrides SourceAuthArn=<connection-or-secret-arn>
+#     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND
 #
 # A workflow job selects a runner with:
 #   runs-on: codebuild-<ProjectPrefix>-<linux|macos|windows>-<repo-name>-${{ github.run_id }}-${{ github.run_attempt }}
@@ -42,17 +42,6 @@ Parameters:
     Description: Prefix of each fleet and runner project name.
     Default: CryptoToolsCI
     AllowedPattern: '^[A-Za-z][A-Za-z0-9_-]*$'
-  SourceAuthType:
-    Type: String
-    Description: How CodeBuild authenticates to GitHub.
-    AllowedValues: [CODECONNECTIONS, SECRETS_MANAGER]
-    Default: CODECONNECTIONS
-  SourceAuthArn:
-    Type: String
-    Description: ARN of the CodeConnections connection or the Secrets Manager secret.
-    AllowedPattern: '^arn:aws[a-z-]*:(codeconnections|codestar-connections|secretsmanager):[a-z0-9-]+:[0-9]{12}:.+$'
-    ConstraintDescription: >-
-      must be a full ARN, e.g. arn:aws:codeconnections:us-east-1:111122223333:connection/<id>
   BuildTimeoutMinutes:
     Type: Number
     Description: Maximum minutes one runner build (one workflow job) may run.
@@ -115,7 +104,6 @@ Parameters:
     Default: 1
 
 Conditions:
-  UseConnection: !Equals [!Ref SourceAuthType, CODECONNECTIONS]
   HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
   MacFleet: !Equals [!Ref EnableMacFleet, 'true']
   WindowsFleet: !Equals [!Ref EnableWindowsFleet, 'true']
@@ -153,20 +141,13 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${BuildLogGroup}:log-stream:*
-              - !If
-                - UseConnection
-                - Effect: Allow
-                  Action:
-                    - codeconnections:GetConnection
-                    - codeconnections:GetConnectionToken
-                    - codeconnections:UseConnection
-                    - codestar-connections:GetConnection
-                    - codestar-connections:GetConnectionToken
-                    - codestar-connections:UseConnection
-                  Resource: !Ref SourceAuthArn
-                - Effect: Allow
-                  Action: secretsmanager:GetSecretValue
-                  Resource: !Ref SourceAuthArn
+              # Used when the account's GitHub credential is a GitHub App connection.
+              - Effect: Allow
+                Action:
+                  - codeconnections:GetConnection
+                  - codeconnections:GetConnectionToken
+                  - codeconnections:UseConnection
+                Resource: !Sub arn:${AWS::Partition}:codeconnections:${AWS::Region}:${AWS::AccountId}:connection/*
 
   LinuxFleet:
     Type: AWS::CodeBuild::Fleet
@@ -212,9 +193,6 @@ Resources:
           Source:
             Type: GITHUB
             Location: !Join ['', ['https://github.com/', !Ref Repo]]
-            Auth:
-              Type: !Ref SourceAuthType
-              Resource: !Ref SourceAuthArn
           Environment:
             Type: LINUX_CONTAINER
             ComputeType: !Ref LinuxComputeType
@@ -248,9 +226,6 @@ Resources:
           Source:
             Type: GITHUB
             Location: !Join ['', ['https://github.com/', !Ref Repo]]
-            Auth:
-              Type: !Ref SourceAuthType
-              Resource: !Ref SourceAuthArn
           Environment:
             Type: MAC_ARM
             ComputeType: !Ref MacComputeType
@@ -283,9 +258,6 @@ Resources:
           Source:
             Type: GITHUB
             Location: !Join ['', ['https://github.com/', !Ref Repo]]
-            Auth:
-              Type: !Ref SourceAuthType
-              Resource: !Ref SourceAuthArn
           Environment:
             Type: WINDOWS_SERVER_2019_CONTAINER
             ComputeType: !Ref WindowsComputeType
@@ -592,18 +564,6 @@ Resources:
                   [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"FailedBuilds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "failed"}]
                 ],
                 "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 12, "y": 18, "width": 12, "height": 6,
-              "properties": {
-                "title": "CPU / memory utilization p90 (%)",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 300,
-                "metrics": [
-                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=\"${ProjectPrefix}\"', 'p90', 300)", "id": "cpu"}],
-                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=\"${ProjectPrefix}\"', 'p90', 300)", "id": "mem"}]
-                ],
-                "yAxis": {"left": {"min": 0, "max": 100}}
               }
             }
           ]
