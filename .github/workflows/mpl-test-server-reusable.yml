@@ -119,6 +119,7 @@ jobs:
     name: find servers to prebuild
     runs-on: ${{ inputs.runner }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       mpl_root: ${{ steps.keys.outputs.mpl_root }}
@@ -183,12 +184,19 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's commit; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>) or the checkout.
         id: keys
         env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
           PYTHON_FULL_VERSION: ${{ steps.python.outputs.python-version }}
         run: |
           set -euo pipefail
@@ -239,7 +247,7 @@ jobs:
             local name="$1" language="$2" suffix="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-mpl-out2-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-mpl-out2-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           mpl=$(repo_root java)
@@ -391,14 +399,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-mpl-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-mpl-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
               'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-gradle-
+            ${{ needs.plan.outputs.platform }}-mpl-gradle-
 
       - name: Set up Python (the python server venv; the Dafny Python formatters)
         if: env.DAFNY_BUILD == 'true'
@@ -424,6 +432,16 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: env.DAFNY_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Install Dafny ${{ env.DAFNY_VERSION }}
         # The dafnyVersion in the MPL's project.properties.
@@ -475,6 +493,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: mpl-${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -486,9 +505,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-go-
+            ${{ needs.plan.outputs.platform }}-mpl-go-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -496,9 +515,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-nuget-
+            ${{ needs.plan.outputs.platform }}-mpl-nuget-
 
       - name: Build the ${{ matrix.language }} server and check it starts
         # For java, net, and python this transpiles AwsCryptographicMaterialProviders
@@ -541,14 +560,14 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
 
   # Starts alongside the prebuild job; its setup overlaps the builds, and it
   # waits for their outputs just before the run.
@@ -598,6 +617,15 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
       - name: Restore the Gradle caches (orchestrator + Java server)
         id: gradle-cache
         uses: actions/cache/restore@v4
@@ -605,14 +633,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-mpl-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-mpl-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
               'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-gradle-
+            ${{ needs.plan.outputs.platform }}-mpl-gradle-
 
       - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
         env:
@@ -778,7 +806,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-mpl-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-mpl-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',

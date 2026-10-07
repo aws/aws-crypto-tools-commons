@@ -205,6 +205,7 @@ jobs:
     name: find servers to prebuild
     runs-on: ${{ inputs.runner }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       esdk_dir: ${{ steps.keys.outputs.esdk_dir }}
@@ -301,12 +302,19 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's branch tip; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>).
         id: keys
         env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -352,7 +360,7 @@ jobs:
             local name="$1" language="$2" key="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
@@ -488,14 +496,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-v2-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-v2-
+            ${{ needs.plan.outputs.platform }}-gradle-v2-
 
       - name: Set up Go (Go server; aws-lc-sys native builds)
         if: matrix.language != 'net'
@@ -514,6 +522,16 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: matrix.language == 'net'
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Install Dafny 4.9.0
         if: matrix.language == 'net'
@@ -589,6 +607,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -600,9 +619,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ needs.plan.outputs.platform }}-go-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -610,9 +629,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
+            ${{ needs.plan.outputs.platform }}-nuget-
 
       - name: Restore the .NET transpile outputs
         id: net-transpile
@@ -659,14 +678,14 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
 
   # Starts alongside the prebuild job; its setup and the light server builds
   # overlap the heavy builds, and it waits for their outputs just before
@@ -783,6 +802,15 @@ jobs:
             6.0.x
             8.0.x
 
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
       - name: Restore the Gradle caches (orchestrator + Java server)
         # Gradle: the client-java/tests/orchestrator builds under
         # esdk/test-server plus the Java server build the orchestrated run
@@ -801,14 +829,14 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-gradle-v2-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-v2-
+            ${{ needs.plan.outputs.platform }}-gradle-v2-
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -916,7 +944,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ needs.plan.outputs.platform }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Restore the materialized aws-encryption-sdk-c clone
         # The clone carries the cmake build tree (test-server/.build); on a
@@ -926,7 +954,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
         # The clone carries the server's Gradle outputs, and the local Maven
@@ -938,7 +966,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Restore the materialized aws-encryption-sdk-python clone + venv
         # The venv holds editable installs of the clone and its build stamp,
@@ -949,7 +977,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -1091,27 +1119,27 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-m2-${{ steps.depkeys.outputs.java }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ needs.plan.outputs.platform }}-m2-
 
       - name: Restore the npm downloads (javascript)
         id: npm-deps
         uses: actions/cache/restore@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
+          key: ${{ needs.plan.outputs.platform }}-npm-${{ steps.depkeys.outputs.javascript }}
           restore-keys: |
-            ${{ runner.os }}-npm-
+            ${{ needs.plan.outputs.platform }}-npm-
 
       - name: Restore the pip downloads (python)
         id: pip-deps
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
+          key: ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
           restore-keys: |
-            ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-
+            ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-
 
       - name: Install cmake and ccache (c)
         run: |
@@ -1128,7 +1156,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.aws-c-common-install
-          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+          key: ${{ needs.plan.outputs.platform }}-aws-c-common-${{ steps.awscc.outputs.sha }}
 
       - name: Build aws-c-common (c)
         # CLaunchPlan's cmake configure needs an aws-c-common install;
@@ -1157,9 +1185,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-ccache-
+            ${{ needs.plan.outputs.platform }}-ccache-
 
       - name: Build the java, python, javascript, and c servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
@@ -1209,6 +1237,7 @@ jobs:
           KEY_go: ${{ needs.plan.outputs.key_go }}
           KEY_rust: ${{ needs.plan.outputs.key_rust }}
           KEY_rustcpp: ${{ needs.plan.outputs.key_rustcpp }}
+          PATHS_rustcpp: ${{ needs.plan.outputs.paths_rustcpp }}
         run: |
           set -euo pipefail
           # This run's token reads this repository; the PAT reads commons.
@@ -1235,6 +1264,13 @@ jobs:
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
             tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
           done
+          # The rust-cpp server's rpath names the shim directory of the runner
+          # that built it, so name this runner's copy on the library path.
+          while IFS= read -r path; do
+            case "$path" in
+              *.so) echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/$(dirname "$path")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV" ;;
+            esac
+          done <<<"$PATHS_rustcpp"
 
       - name: Check every prebuilt server arrived
         # A server missing here would be built cold inside the test run.
@@ -1322,35 +1358,35 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-m2-${{ steps.depkeys.outputs.java }}
 
       - name: Save the npm downloads (javascript)
         if: always() && env.SAVE_CACHES == 'true' && steps.npm-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
+          key: ${{ needs.plan.outputs.platform }}-npm-${{ steps.depkeys.outputs.javascript }}
 
       - name: Save the pip downloads (python)
         if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
+          key: ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
 
       - name: Save the aws-c-common install (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.awscc-install.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.aws-c-common-install
-          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+          key: ${{ needs.plan.outputs.platform }}-aws-c-common-${{ steps.awscc.outputs.sha }}
 
       - name: Save the C compiler cache (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.ccache-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
 
       - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
@@ -1360,7 +1396,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-gradle-v2-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
@@ -1372,14 +1408,14 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ needs.plan.outputs.platform }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Save the materialized aws-encryption-sdk-c clone
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-c.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
@@ -1388,7 +1424,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Save the materialized aws-encryption-sdk-python clone + venv
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-python.outputs.cache-hit != 'true'
@@ -1397,5 +1433,5 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
