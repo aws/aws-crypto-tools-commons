@@ -50,6 +50,9 @@ Parameters:
   SourceAuthArn:
     Type: String
     Description: ARN of the CodeConnections connection or the Secrets Manager secret.
+    AllowedPattern: '^arn:aws[a-z-]*:(codeconnections|codestar-connections|secretsmanager):[a-z0-9-]+:[0-9]{12}:.+$'
+    ConstraintDescription: >-
+      must be a full ARN, e.g. arn:aws:codeconnections:us-east-1:111122223333:connection/<id>
   BuildTimeoutMinutes:
     Type: Number
     Description: Maximum minutes one runner build (one workflow job) may run.
@@ -149,7 +152,7 @@ Resources:
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !Sub ${BuildLogGroup.Arn}:*
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${BuildLogGroup}:log-stream:*
               - !If
                 - UseConnection
                 - Effect: Allow
