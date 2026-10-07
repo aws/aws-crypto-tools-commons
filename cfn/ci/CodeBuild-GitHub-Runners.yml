@@ -112,9 +112,6 @@ Parameters:
   LinuxOnDemandRate:
     Type: Number
     Default: 0.020
-  MacReservedRate:
-    Type: Number
-    Default: 0.020
   WindowsReservedRate:
     Type: Number
     Default: 0.0216
@@ -403,7 +400,7 @@ Resources:
           LINUX_RESERVED_RATE: !Ref LinuxReservedRate
           LINUX_ON_DEMAND_RATE: !Ref LinuxOnDemandRate
           MACOS_CAPACITY: !If [MacFleet, !Ref MacFleetCapacity, 0]
-          MACOS_RESERVED_RATE: !Ref MacReservedRate
+          MACOS_RESERVED_RATE: !If [MacFleetLarge, 0.036, 0.020]
           MACOS_ON_DEMAND_RATE: 0
           WINDOWS_CAPACITY: !If [WindowsFleet, !Ref WindowsFleetCapacity, 0]
           WINDOWS_RESERVED_RATE: !Ref WindowsReservedRate
@@ -412,6 +409,7 @@ Resources:
         ZipFile: |
           import os
           from collections import Counter
+          from datetime import datetime, timezone
 
           import boto3
 
@@ -422,7 +420,8 @@ Resources:
           FLEETS = ("linux", "macos", "windows")
           # In-progress builds are among a project's most recent builds.
           RECENT_BUILDS = 300
-          WAITING_PHASES = {"SUBMITTED", "QUEUED"}
+          # Phases before the workflow job starts running.
+          WAITING_PHASES = {"SUBMITTED", "QUEUED", "PROVISIONING"}
 
 
           def projects():
@@ -430,7 +429,7 @@ Resources:
                   yield from (p for p in page["projects"] if p.startswith(PREFIX))
 
 
-          def count(project):
+          def count(project, now):
               ids = []
               # Newest first by default; CodeBuild rejects sortOrder alongside nextToken.
               for page in codebuild.get_paginator("list_builds_for_project").paginate(
@@ -439,16 +438,26 @@ Resources:
                   ids.extend(page["ids"])
                   if len(ids) >= RECENT_BUILDS:
                       break
-              running = queued = 0
+              c = Counter()
               for i in range(0, min(len(ids), RECENT_BUILDS), 100):
                   for build in codebuild.batch_get_builds(ids=ids[i : i + 100])["builds"]:
                       if build["buildStatus"] != "IN_PROGRESS":
                           continue
                       if build.get("currentPhase") in WAITING_PHASES:
-                          queued += 1
+                          c["QueuedBuilds"] += 1
+                          wait = (now - build["startTime"]).total_seconds()
+                          c["LongestWaitSeconds"] = max(c["LongestWaitSeconds"], wait)
+                      elif build["environment"].get("fleet"):
+                          c["FleetBuilds"] += 1
                       else:
-                          running += 1
-              return running, queued
+                          c["OnDemandBuilds"] += 1
+              return c
+
+
+          def minute_cost(fleet, on_demand):
+              # Fleet instances bill every minute; overflow builds bill on demand.
+              env = lambda key: float(os.environ[f"{fleet.upper()}_{key}"])
+              return env("CAPACITY") * env("RESERVED_RATE") + on_demand * env("ON_DEMAND_RATE")
 
 
           def datum(name, value, dims, unit="Count"):
@@ -460,34 +469,27 @@ Resources:
               }
 
 
-          def minute_cost(fleet, running):
-              # Reserved instances bill every minute; builds beyond them bill on demand.
-              env = lambda key: float(os.environ[f"{fleet.upper()}_{key}"])
-              capacity = env("CAPACITY")
-              overflow = max(running - capacity, 0)
-              return capacity * env("RESERVED_RATE") + overflow * env("ON_DEMAND_RATE")
-
-
           def handler(event, context):
-              data = []
-              running_by_fleet, queued_by_fleet = Counter(), Counter()
+              now = datetime.now(timezone.utc)
+              names = ("FleetBuilds", "OnDemandBuilds", "QueuedBuilds")
+              data, totals, longest = [], {f: Counter() for f in FLEETS}, Counter()
               for project in projects():
                   fleet = project[len(PREFIX) :].split("-", 1)[0]
                   if fleet not in FLEETS:
                       continue
-                  running, queued = count(project)
-                  running_by_fleet[fleet] += running
-                  queued_by_fleet[fleet] += queued
+                  c = count(project, now)
+                  totals[fleet].update({n: c[n] for n in names})
+                  longest[fleet] = max(longest[fleet], c["LongestWaitSeconds"])
                   dims = {"Fleet": fleet, "Project": project}
-                  data += [datum("RunningBuilds", running, dims), datum("QueuedBuilds", queued, dims)]
+                  data += [datum(n, c[n], dims) for n in names]
               total_cost = 0.0
               for fleet in FLEETS:
                   dims = {"Fleet": fleet}
-                  cost = minute_cost(fleet, running_by_fleet[fleet])
+                  cost = minute_cost(fleet, totals[fleet]["OnDemandBuilds"])
                   total_cost += cost
+                  data += [datum(n, totals[fleet][n], dims) for n in names]
                   data += [
-                      datum("RunningBuilds", running_by_fleet[fleet], dims),
-                      datum("QueuedBuilds", queued_by_fleet[fleet], dims),
+                      datum("LongestWaitSeconds", longest[fleet], dims, "Seconds"),
                       datum("EstimatedCostUSD", cost, dims, "None"),
                   ]
               data.append(datum("EstimatedCostUSD", total_cost, {}, "None"))
@@ -520,10 +522,105 @@ Resources:
           "periodOverride": "inherit",
           "widgets": [
             {
-              "type": "metric", "x": 0, "y": 0, "width": 24, "height": 4,
+              "type": "metric", "x": 0, "y": 0, "width": 8, "height": 6,
+              "properties": {
+                "title": "Linux: concurrent jobs",
+                "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"label": "On the fleet"}],
+                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"label": "On demand"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Waiting"}]
+                ],
+                "annotations": {"horizontal": [{"label": "Fleet capacity", "value": ${LinuxFleetCapacity}}]},
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 8, "y": 0, "width": 8, "height": 6,
+              "properties": {
+                "title": "macOS: concurrent jobs",
+                "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "macos", {"label": "On the fleet"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "macos", {"label": "Waiting"}]
+                ],
+                "annotations": {"horizontal": [{"label": "Fleet capacity (beyond this queues)", "value": ${MacFleetCapacity}}]},
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 16, "y": 0, "width": 8, "height": 6,
+              "properties": {
+                "title": "Windows: concurrent jobs",
+                "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "windows", {"label": "On the fleet"}],
+                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "windows", {"label": "On demand"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "windows", {"label": "Waiting"}]
+                ],
+                "annotations": {"horizontal": [{"label": "Fleet capacity", "value": ${WindowsFleetCapacity}}]},
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 6, "width": 24, "height": 6,
+              "properties": {
+                "title": "Longest wait for a runner (minutes)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "linux", {"id": "wl", "visible": false}],
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "macos", {"id": "wm", "visible": false}],
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "windows", {"id": "ww", "visible": false}],
+                  [{"expression": "wl/60", "id": "linux", "label": "Linux"}],
+                  [{"expression": "wm/60", "id": "macos", "label": "macOS"}],
+                  [{"expression": "ww/60", "id": "windows", "label": "Windows"}]
+                ],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 12, "width": 12, "height": 6,
+              "properties": {
+                "title": "CPU utilization (%, on-demand jobs)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60,
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 60)", "id": "s0", "visible": false}],
+                  [{"expression": "MAX(s0)", "id": "max0", "label": "Linux busiest job"}],
+                  [{"expression": "AVG(s0)", "id": "avg0", "label": "Linux average job"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=macos', 'Average', 60)", "id": "s1", "visible": false}],
+                  [{"expression": "MAX(s1)", "id": "max1", "label": "macOS busiest job"}],
+                  [{"expression": "AVG(s1)", "id": "avg1", "label": "macOS average job"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=windows', 'Average', 60)", "id": "s2", "visible": false}],
+                  [{"expression": "MAX(s2)", "id": "max2", "label": "Windows busiest job"}],
+                  [{"expression": "AVG(s2)", "id": "avg2", "label": "Windows average job"}]
+                ],
+                "yAxis": {"left": {"min": 0, "max": 100}}
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 12, "width": 12, "height": 6,
+              "properties": {
+                "title": "Memory utilization (%, on-demand jobs)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60,
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 60)", "id": "s0", "visible": false}],
+                  [{"expression": "MAX(s0)", "id": "max0", "label": "Linux busiest job"}],
+                  [{"expression": "AVG(s0)", "id": "avg0", "label": "Linux average job"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=macos', 'Average', 60)", "id": "s1", "visible": false}],
+                  [{"expression": "MAX(s1)", "id": "max1", "label": "macOS busiest job"}],
+                  [{"expression": "AVG(s1)", "id": "avg1", "label": "macOS average job"}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=windows', 'Average', 60)", "id": "s2", "visible": false}],
+                  [{"expression": "MAX(s2)", "id": "max2", "label": "Windows busiest job"}],
+                  [{"expression": "AVG(s2)", "id": "avg2", "label": "Windows average job"}]
+                ],
+                "yAxis": {"left": {"min": 0, "max": 100}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 18, "width": 24, "height": 4,
               "properties": {
                 "title": "Estimated cost over the selected time range (USD)",
-                "region": "${AWS::Region}", "view": "singleValue", "stat": "Sum",
+                "region": "${AWS::Region}", "view": "singleValue", "stat": "Sum", "period": 60,
                 "setPeriodToTimeRange": true,
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", {"label": "Total"}],
@@ -531,102 +628,6 @@ Resources:
                   ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "macos", {"label": "macOS"}],
                   ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "windows", {"label": "Windows"}]
                 ]
-              }
-            },
-            {
-              "type": "metric", "x": 0, "y": 4, "width": 8, "height": 6,
-              "properties": {
-                "title": "Linux fleet: concurrent builds",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
-                "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", "Fleet", "linux", {"label": "Running"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Queued"}]
-                ],
-                "annotations": {"horizontal": [
-                  {"label": "Fleet capacity (beyond this runs on demand)", "value": ${LinuxFleetCapacity}}
-                ]},
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 8, "y": 4, "width": 8, "height": 6,
-              "properties": {
-                "title": "macOS fleet: concurrent builds",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
-                "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", "Fleet", "macos", {"label": "Running"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "macos", {"label": "Queued"}]
-                ],
-                "annotations": {"horizontal": [
-                  {"label": "Capacity (beyond this queues)", "value": ${MacFleetCapacity}}
-                ]},
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 16, "y": 4, "width": 8, "height": 6,
-              "properties": {
-                "title": "Windows fleet: concurrent builds",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
-                "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", "Fleet", "windows", {"label": "Running"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "windows", {"label": "Queued"}]
-                ],
-                "annotations": {"horizontal": [
-                  {"label": "Fleet capacity (beyond this runs on demand)", "value": ${WindowsFleetCapacity}}
-                ]},
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 0, "y": 10, "width": 12, "height": 6,
-              "properties": {
-                "title": "Running builds by project",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
-                "metrics": [[{"expression": "SEARCH('{CryptoTools/CodeBuildRunners,Fleet,Project} MetricName=\"RunningBuilds\"', 'Maximum', 60)", "id": "running"}]],
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 12, "y": 10, "width": 12, "height": 6,
-              "properties": {
-                "title": "Queue wait p90 (seconds)",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 300,
-                "metrics": [[{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"QueuedDuration\" ProjectName=\"${ProjectPrefix}\"', 'p90', 300)", "id": "queued"}]],
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 0, "y": 16, "width": 12, "height": 6,
-              "properties": {
-                "title": "Jobs started per hour",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
-                "metrics": [[{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"Builds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "builds"}]],
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 12, "y": 16, "width": 12, "height": 6,
-              "properties": {
-                "title": "Job duration p50 / p90 (seconds)",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
-                "metrics": [
-                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"Duration\" ProjectName=\"${ProjectPrefix}\"', 'p50', 3600)", "id": "p50"}],
-                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"Duration\" ProjectName=\"${ProjectPrefix}\"', 'p90', 3600)", "id": "p90"}]
-                ],
-                "yAxis": {"left": {"min": 0}}
-              }
-            },
-            {
-              "type": "metric", "x": 0, "y": 22, "width": 12, "height": 6,
-              "properties": {
-                "title": "Succeeded / failed jobs per hour",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
-                "metrics": [
-                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"SucceededBuilds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "ok"}],
-                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"FailedBuilds\" ProjectName=\"${ProjectPrefix}\"', 'Sum', 3600)", "id": "failed"}]
-                ],
-                "yAxis": {"left": {"min": 0}}
               }
             }
           ]
