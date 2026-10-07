@@ -15,7 +15,7 @@
 #
 # Deploy:
 #   aws cloudformation deploy \
-#     --region us-east-1 \
+#     --region us-west-2 \
 #     --stack-name CryptoTools-CodeBuild-GitHub-Runners \
 #     --template-file cfn/ci/CodeBuild-GitHub-Runners.yml \
 #     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND
@@ -72,7 +72,7 @@ Parameters:
   EnableMacFleet:
     Type: String
     AllowedValues: ['true', 'false']
-    Default: 'false'
+    Default: 'true'
   MacComputeType:
     Type: String
     AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE]
