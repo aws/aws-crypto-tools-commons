@@ -4,8 +4,9 @@
 # project per repository and fleet (each project registers its own repository
 # webhook), and a CloudWatch dashboard of runner usage.
 #
-# The Linux and Windows fleets overflow to on-demand compute. CodeBuild has no
-# on-demand macOS compute, so macOS jobs beyond the fleet's capacity queue.
+# Each fleet has a fixed number of instances. The Linux and Windows fleets
+# overflow to on-demand compute; CodeBuild has no on-demand macOS compute, so
+# macOS jobs beyond the fleet's capacity queue.
 #
 # Prerequisite: a GitHub credential that is admin on every listed repository,
 # either an AVAILABLE CodeConnections GitHub connection or a Secrets Manager
@@ -70,16 +71,11 @@ Parameters:
   LinuxImage:
     Type: String
     Default: aws/codebuild/standard:7.0
-  LinuxFleetBaseCapacity:
+  LinuxFleetCapacity:
     Type: Number
-    Description: Linux fleet instances kept running at all times.
+    Description: Linux fleet instances. Builds beyond them run on demand.
     MinValue: 1
     Default: 2
-  LinuxFleetMaxCapacity:
-    Type: Number
-    Description: Linux fleet instances target tracking may scale up to. Builds beyond this run on demand.
-    MinValue: 1
-    Default: 10
 
   EnableMacFleet:
     Type: String
@@ -109,23 +105,11 @@ Parameters:
   WindowsImage:
     Type: String
     Default: aws/codebuild/windows-base:2019-3.0
-  WindowsFleetBaseCapacity:
+  WindowsFleetCapacity:
     Type: Number
-    Description: Windows fleet instances kept running at all times.
+    Description: Windows fleet instances. Builds beyond them run on demand.
     MinValue: 1
     Default: 1
-  WindowsFleetMaxCapacity:
-    Type: Number
-    Description: Windows fleet instances target tracking may scale up to. Builds beyond this run on demand.
-    MinValue: 1
-    Default: 4
-
-  FleetTargetUtilization:
-    Type: Number
-    Description: Fleet utilization percentage that target tracking holds on the Linux and Windows fleets.
-    MinValue: 1
-    MaxValue: 100
-    Default: 70
 
 Conditions:
   UseConnection: !Equals [!Ref SourceAuthType, CODECONNECTIONS]
@@ -187,14 +171,8 @@ Resources:
       Name: !Sub ${ProjectPrefix}-linux
       EnvironmentType: LINUX_CONTAINER
       ComputeType: !Ref LinuxComputeType
-      BaseCapacity: !Ref LinuxFleetBaseCapacity
+      BaseCapacity: !Ref LinuxFleetCapacity
       OverflowBehavior: ON_DEMAND
-      ScalingConfiguration:
-        ScalingType: TARGET_TRACKING_SCALING
-        MaxCapacity: !Ref LinuxFleetMaxCapacity
-        TargetTrackingScalingConfigs:
-          - MetricType: FLEET_UTILIZATION_RATE
-            TargetValue: !Ref FleetTargetUtilization
 
   MacFleet:
     Type: AWS::CodeBuild::Fleet
@@ -213,14 +191,8 @@ Resources:
       Name: !Sub ${ProjectPrefix}-windows
       EnvironmentType: WINDOWS_SERVER_2019_CONTAINER
       ComputeType: !Ref WindowsComputeType
-      BaseCapacity: !Ref WindowsFleetBaseCapacity
+      BaseCapacity: !Ref WindowsFleetCapacity
       OverflowBehavior: ON_DEMAND
-      ScalingConfiguration:
-        ScalingType: TARGET_TRACKING_SCALING
-        MaxCapacity: !Ref WindowsFleetMaxCapacity
-        TargetTrackingScalingConfigs:
-          - MetricType: FLEET_UTILIZATION_RATE
-            TargetValue: !Ref FleetTargetUtilization
 
   Fn::ForEach::RepositoryRunners:
     - Repo
@@ -533,8 +505,7 @@ Resources:
                   ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Queued"}]
                 ],
                 "annotations": {"horizontal": [
-                  {"label": "Base capacity", "value": ${LinuxFleetBaseCapacity}},
-                  {"label": "Max capacity (beyond this runs on demand)", "value": ${LinuxFleetMaxCapacity}}
+                  {"label": "Fleet capacity (beyond this runs on demand)", "value": ${LinuxFleetCapacity}}
                 ]},
                 "yAxis": {"left": {"min": 0}}
               }
@@ -564,8 +535,7 @@ Resources:
                   ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "windows", {"label": "Queued"}]
                 ],
                 "annotations": {"horizontal": [
-                  {"label": "Base capacity", "value": ${WindowsFleetBaseCapacity}},
-                  {"label": "Max capacity (beyond this runs on demand)", "value": ${WindowsFleetMaxCapacity}}
+                  {"label": "Fleet capacity (beyond this runs on demand)", "value": ${WindowsFleetCapacity}}
                 ]},
                 "yAxis": {"left": {"min": 0}}
               }
