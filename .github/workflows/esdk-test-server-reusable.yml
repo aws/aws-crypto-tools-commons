@@ -504,10 +504,7 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up .NET (.NET library transpile + build)
         if: matrix.language == 'net'
@@ -765,6 +762,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
 
       - name: Set up .NET (for the .NET Language_Server build)
         # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
