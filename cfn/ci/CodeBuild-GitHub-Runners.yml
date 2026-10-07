@@ -153,7 +153,7 @@ Resources:
   LinuxFleet:
     Type: AWS::CodeBuild::Fleet
     Properties:
-      Name: !Sub ${ProjectPrefix}-linux
+      Name: !Sub ${ProjectPrefix}-linux-fleet
       EnvironmentType: LINUX_CONTAINER
       ComputeType: !Ref LinuxComputeType
       BaseCapacity: !Ref LinuxFleetCapacity
@@ -163,7 +163,7 @@ Resources:
     Type: AWS::CodeBuild::Fleet
     Condition: MacFleet
     Properties:
-      Name: !Sub ${ProjectPrefix}-macos
+      Name: !Sub ${ProjectPrefix}-macos-fleet
       EnvironmentType: MAC_ARM
       ComputeType: !Ref MacComputeType
       BaseCapacity: !Ref MacFleetCapacity
@@ -173,7 +173,7 @@ Resources:
     Type: AWS::CodeBuild::Fleet
     Condition: WindowsFleet
     Properties:
-      Name: !Sub ${ProjectPrefix}-windows
+      Name: !Sub ${ProjectPrefix}-windows-fleet
       EnvironmentType: WINDOWS_SERVER_2019_CONTAINER
       ComputeType: !Ref WindowsComputeType
       BaseCapacity: !Ref WindowsFleetCapacity
