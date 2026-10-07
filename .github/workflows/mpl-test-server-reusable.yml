@@ -207,7 +207,8 @@ jobs:
           own=""
           if [ -n "$LANGUAGE_REPOSITORY" ]; then
             own=$(basename "$LANGUAGE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
           from_checkout() {
@@ -448,7 +449,7 @@ jobs:
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
         working-directory: mpl/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
       - name: Initialize the MPL submodules + install the smithy-dafny codegen dependencies
         # The launch plan would initialize the submodules itself; smithy-dafny
@@ -505,7 +506,7 @@ jobs:
         working-directory: mpl/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Pack the ${{ matrix.language }} server
         # -P keeps the absolute ~/.m2 paths of the java output as they are.
@@ -634,7 +635,7 @@ jobs:
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
         working-directory: mpl/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
       - name: Wait for the prebuilt servers
         # Each server the plan found missing is published by its prebuild job;
@@ -722,7 +723,7 @@ jobs:
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
       - name: Publish test results to the run summary
         if: always()
