@@ -101,6 +101,24 @@ Parameters:
     MinValue: 1
     Default: 1
 
+  # USD per minute, used only for the dashboard's cost estimate. Defaults are
+  # the us-west-2 prices for the default compute types.
+  LinuxReservedRate:
+    Type: Number
+    Default: 0.012
+  LinuxOnDemandRate:
+    Type: Number
+    Default: 0.020
+  MacReservedRate:
+    Type: Number
+    Default: 0.020
+  WindowsReservedRate:
+    Type: Number
+    Default: 0.0216
+  WindowsOnDemandRate:
+    Type: Number
+    Default: 0.036
+
 Conditions:
   HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
   MacFleet: !Equals [!Ref EnableMacFleet, 'true']
@@ -372,6 +390,15 @@ Resources:
         Variables:
           PROJECT_PREFIX: !Sub ${ProjectPrefix}-
           NAMESPACE: CryptoTools/CodeBuildRunners
+          LINUX_CAPACITY: !Ref LinuxFleetCapacity
+          LINUX_RESERVED_RATE: !Ref LinuxReservedRate
+          LINUX_ON_DEMAND_RATE: !Ref LinuxOnDemandRate
+          MACOS_CAPACITY: !If [MacFleet, !Ref MacFleetCapacity, 0]
+          MACOS_RESERVED_RATE: !Ref MacReservedRate
+          MACOS_ON_DEMAND_RATE: 0
+          WINDOWS_CAPACITY: !If [WindowsFleet, !Ref WindowsFleetCapacity, 0]
+          WINDOWS_RESERVED_RATE: !Ref WindowsReservedRate
+          WINDOWS_ON_DEMAND_RATE: !Ref WindowsOnDemandRate
       Code:
         ZipFile: |
           import os
@@ -414,13 +441,21 @@ Resources:
               return running, queued
 
 
-          def datum(name, value, dims):
+          def datum(name, value, dims, unit="Count"):
               return {
                   "MetricName": name,
                   "Value": value,
-                  "Unit": "Count",
+                  "Unit": unit,
                   "Dimensions": [{"Name": k, "Value": v} for k, v in dims.items()],
               }
+
+
+          def minute_cost(fleet, running):
+              # Reserved instances bill every minute; builds beyond them bill on demand.
+              env = lambda key: float(os.environ[f"{fleet.upper()}_{key}"])
+              capacity = env("CAPACITY")
+              overflow = max(running - capacity, 0)
+              return capacity * env("RESERVED_RATE") + overflow * env("ON_DEMAND_RATE")
 
 
           def handler(event, context):
@@ -435,12 +470,17 @@ Resources:
                   queued_by_fleet[fleet] += queued
                   dims = {"Fleet": fleet, "Project": project}
                   data += [datum("RunningBuilds", running, dims), datum("QueuedBuilds", queued, dims)]
+              total_cost = 0.0
               for fleet in FLEETS:
                   dims = {"Fleet": fleet}
+                  cost = minute_cost(fleet, running_by_fleet[fleet])
+                  total_cost += cost
                   data += [
                       datum("RunningBuilds", running_by_fleet[fleet], dims),
                       datum("QueuedBuilds", queued_by_fleet[fleet], dims),
+                      datum("EstimatedCostUSD", cost, dims, "None"),
                   ]
+              data.append(datum("EstimatedCostUSD", total_cost, {}, "None"))
               for i in range(0, len(data), 1000):
                   cloudwatch.put_metric_data(Namespace=NAMESPACE, MetricData=data[i : i + 1000])
 
@@ -466,9 +506,25 @@ Resources:
       DashboardName: !Sub ${ProjectPrefix}-runners
       DashboardBody: !Sub |
         {
+          "start": "-P7D",
+          "periodOverride": "inherit",
           "widgets": [
             {
-              "type": "metric", "x": 0, "y": 0, "width": 8, "height": 6,
+              "type": "metric", "x": 0, "y": 0, "width": 24, "height": 4,
+              "properties": {
+                "title": "Estimated cost over the selected time range (USD)",
+                "region": "${AWS::Region}", "view": "singleValue", "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", {"label": "Total"}],
+                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "linux", {"label": "Linux"}],
+                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "macos", {"label": "macOS"}],
+                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "windows", {"label": "Windows"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 4, "width": 8, "height": 6,
               "properties": {
                 "title": "Linux fleet: concurrent builds",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
@@ -483,7 +539,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 8, "y": 0, "width": 8, "height": 6,
+              "type": "metric", "x": 8, "y": 4, "width": 8, "height": 6,
               "properties": {
                 "title": "macOS fleet: concurrent builds",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
@@ -498,7 +554,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 16, "y": 0, "width": 8, "height": 6,
+              "type": "metric", "x": 16, "y": 4, "width": 8, "height": 6,
               "properties": {
                 "title": "Windows fleet: concurrent builds",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
@@ -513,7 +569,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 6, "width": 12, "height": 6,
+              "type": "metric", "x": 0, "y": 10, "width": 12, "height": 6,
               "properties": {
                 "title": "Running builds by project",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
@@ -522,7 +578,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 12, "y": 6, "width": 12, "height": 6,
+              "type": "metric", "x": 12, "y": 10, "width": 12, "height": 6,
               "properties": {
                 "title": "Queue wait p90 (seconds)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300,
@@ -531,7 +587,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 12, "width": 12, "height": 6,
+              "type": "metric", "x": 0, "y": 16, "width": 12, "height": 6,
               "properties": {
                 "title": "Jobs started per hour",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
@@ -540,7 +596,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 12, "y": 12, "width": 12, "height": 6,
+              "type": "metric", "x": 12, "y": 16, "width": 12, "height": 6,
               "properties": {
                 "title": "Job duration p50 / p90 (seconds)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
@@ -552,7 +608,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 18, "width": 12, "height": 6,
+              "type": "metric", "x": 0, "y": 22, "width": 12, "height": 6,
               "properties": {
                 "title": "Succeeded / failed jobs per hour",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
