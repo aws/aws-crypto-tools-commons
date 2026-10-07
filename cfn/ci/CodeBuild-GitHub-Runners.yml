@@ -423,8 +423,9 @@ Resources:
 
           def count(project):
               ids = []
+              # Newest first by default; CodeBuild rejects sortOrder alongside nextToken.
               for page in codebuild.get_paginator("list_builds_for_project").paginate(
-                  projectName=project, sortOrder="DESCENDING"
+                  projectName=project
               ):
                   ids.extend(page["ids"])
                   if len(ids) >= RECENT_BUILDS:
