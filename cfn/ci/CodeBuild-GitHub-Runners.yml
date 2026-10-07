@@ -73,8 +73,11 @@ Parameters:
     Default: 'true'
   MacComputeType:
     Type: String
+    Description: >-
+      macOS fleet compute type. CodeBuild cannot change a macOS fleet's compute
+      type in place, so changing this replaces the fleet.
     AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE]
-    Default: BUILD_GENERAL1_MEDIUM
+    Default: BUILD_GENERAL1_LARGE
   MacImage:
     Type: String
     Default: aws/codebuild/macos-arm-base:15
@@ -122,6 +125,7 @@ Parameters:
 Conditions:
   HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
   MacFleet: !Equals [!Ref EnableMacFleet, 'true']
+  MacFleetLarge: !Equals [!Ref MacComputeType, BUILD_GENERAL1_LARGE]
   WindowsFleet: !Equals [!Ref EnableWindowsFleet, 'true']
 
 Resources:
@@ -174,7 +178,12 @@ Resources:
     Type: AWS::CodeBuild::Fleet
     Condition: MacFleet
     Properties:
-      Name: !Sub ${ProjectPrefix}-macos-fleet
+      # The name can only be set at creation, so naming the fleet by its
+      # compute type makes a new compute type create a new fleet and then
+      # delete the old one.
+      Name: !Sub
+        - ${ProjectPrefix}-macos-${Size}-fleet
+        - Size: !If [MacFleetLarge, large, medium]
       EnvironmentType: MAC_ARM
       ComputeType: !Ref MacComputeType
       BaseCapacity: !Ref MacFleetCapacity
