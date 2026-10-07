@@ -211,6 +211,8 @@ Resources:
           Source:
             Type: GITHUB
             Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
+            ReportBuildStatus: false
             Auth:
               Type: SECRETS_MANAGER
               Resource: !Ref GitHubTokenSecretArn
@@ -245,6 +247,8 @@ Resources:
           Source:
             Type: GITHUB
             Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
+            ReportBuildStatus: false
             Auth:
               Type: SECRETS_MANAGER
               Resource: !Ref GitHubTokenSecretArn
@@ -278,6 +282,8 @@ Resources:
           Source:
             Type: GITHUB
             Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
+            ReportBuildStatus: false
             Auth:
               Type: SECRETS_MANAGER
               Resource: !Ref GitHubTokenSecretArn
