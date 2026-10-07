@@ -525,7 +525,7 @@ Resources:
               "type": "metric", "x": 0, "y": 0, "width": 8, "height": 6,
               "properties": {
                 "title": "Linux: concurrent jobs",
-                "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"label": "On the fleet", "color": "#1f77b4"}],
                   ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"label": "On demand", "color": "#ff7f0e"}],
@@ -539,7 +539,7 @@ Resources:
               "type": "metric", "x": 8, "y": 0, "width": 8, "height": 6,
               "properties": {
                 "title": "macOS: concurrent jobs",
-                "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "macos", {"label": "On the fleet", "color": "#1f77b4"}],
                   ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "macos", {"label": "Waiting", "color": "#2ca02c"}]
@@ -552,7 +552,7 @@ Resources:
               "type": "metric", "x": 16, "y": 0, "width": 8, "height": 6,
               "properties": {
                 "title": "Windows: concurrent jobs",
-                "region": "${AWS::Region}", "view": "timeSeries", "stacked": true, "period": 60, "stat": "Maximum",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "windows", {"label": "On the fleet", "color": "#1f77b4"}],
                   ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "windows", {"label": "On demand", "color": "#ff7f0e"}],
