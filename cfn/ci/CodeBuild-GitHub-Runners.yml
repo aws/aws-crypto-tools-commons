@@ -46,7 +46,6 @@ Parameters:
   GitHubTokenSecretArn:
     Type: String
     Description: ARN of the Secrets Manager secret holding the GitHub token.
-    AllowedPattern: '^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$'
   BuildTimeoutMinutes:
     Type: Number
     Description: Maximum minutes one runner build (one workflow job) may run.
