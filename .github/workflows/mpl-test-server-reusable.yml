@@ -239,7 +239,7 @@ jobs:
             local name="$1" language="$2" suffix="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-mpl-out-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${RUNNER_OS}-mpl-out2-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           mpl=$(repo_root java)
@@ -510,11 +510,19 @@ jobs:
 
       - name: Pack the ${{ matrix.language }} server
         # -P keeps the absolute ~/.m2 paths of the java output as they are.
+        # The runner's work directory differs between runners (CodeBuild puts
+        # it under a per-build path), so absolute paths and symlink targets
+        # under it are stored as @RUNNER_ROOT@, and the directory is recorded
+        # in <language>.root for the unpack step to rewrite file contents.
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prebuilt"
+          root=$(dirname "$RUNNER_WORKSPACE")
+          echo "$root" > "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.root"
           mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
-          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" \
+            --transform "s|^$root/|@RUNNER_ROOT@/|" \
+            -- "${paths[@]}" "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.root"
 
       - name: Publish the ${{ matrix.language }} server
         # Named by its key: later runs here, and runs in other repositories for
@@ -688,6 +696,22 @@ jobs:
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
             done
           }
+          # unpack <archive> <root file>: extracts under this runner's work
+          # directory and rewrites the packing runner's directory in the
+          # extracted text files (e.g. venv scripts and pyvenv.cfg).
+          unpack() {
+            local archive="$1" root_file="$2" root old f
+            root=$(dirname "$RUNNER_WORKSPACE")
+            tar -xzPf "$archive" --transform "s|^@RUNNER_ROOT@/|$root/|"
+            old=$(cat "$root_file")
+            [ "$old" != "$root" ] || return 0
+            tar -tzPf "$archive" | sed "s|^@RUNNER_ROOT@/|$root/|" |
+              while IFS= read -r f; do
+                if [ -f "$f" ] && [ ! -L "$f" ] && grep -qIF -- "$old" "$f"; then
+                  sed -i "s|$old|$root|g" "$f"
+                fi
+              done
+          }
           mkdir -p "$RUNNER_TEMP/prebuilt"
           for pair in rust:rust rustdafny:rust-dafny net:net go:go java:java python:python; do
             k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
@@ -697,7 +721,7 @@ jobs:
             echo "$language: $repo artifact $id"
             GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
-            tar -xzPf "$RUNNER_TEMP/prebuilt/$language.tgz"
+            unpack "$RUNNER_TEMP/prebuilt/$language.tgz" "$RUNNER_TEMP/prebuilt/$language.root"
           done
 
       - name: Check every prebuilt server arrived
