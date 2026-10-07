@@ -1,8 +1,11 @@
 # CodeBuild-hosted GitHub Actions runners for the Crypto Tools repositories.
 #
-# Creates a reserved-capacity fleet that overflows to on-demand compute, one
-# runner project per repository (each project registers its own repository
+# Creates three reserved-capacity fleets (Linux, macOS, Windows), one runner
+# project per repository and fleet (each project registers its own repository
 # webhook), and a CloudWatch dashboard of runner usage.
+#
+# The Linux and Windows fleets overflow to on-demand compute. CodeBuild has no
+# on-demand macOS compute, so macOS jobs beyond the fleet's capacity queue.
 #
 # Prerequisite: a GitHub credential that is admin on every listed repository,
 # either an AVAILABLE CodeConnections GitHub connection or a Secrets Manager
@@ -17,7 +20,7 @@
 #     --parameter-overrides SourceAuthArn=<connection-or-secret-arn>
 #
 # A workflow job selects a runner with:
-#   runs-on: codebuild-<ProjectPrefix>-<repo-name>-${{ github.run_id }}-${{ github.run_attempt }}
+#   runs-on: codebuild-<ProjectPrefix>-<linux|macos|windows>-<repo-name>-${{ github.run_id }}-${{ github.run_attempt }}
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::LanguageExtensions
 Description: CodeBuild-hosted GitHub Actions runners for Crypto Tools CI
@@ -25,7 +28,7 @@ Description: CodeBuild-hosted GitHub Actions runners for Crypto Tools CI
 Parameters:
   Repositories:
     Type: CommaDelimitedList
-    Description: owner/name of each GitHub repository that gets a runner project.
+    Description: owner/name of each GitHub repository that gets runner projects.
     Default: aws/aws-crypto-tools-rust
   AllowedActorIds:
     Type: String
@@ -35,7 +38,7 @@ Parameters:
     Default: '^(19524298)$'
   ProjectPrefix:
     Type: String
-    Description: Prefix of each runner project's name.
+    Description: Prefix of each fleet and runner project name.
     Default: CryptoToolsCI
     AllowedPattern: '^[A-Za-z][A-Za-z0-9_-]*$'
   SourceAuthType:
@@ -46,35 +49,6 @@ Parameters:
   SourceAuthArn:
     Type: String
     Description: ARN of the CodeConnections connection or the Secrets Manager secret.
-  ComputeType:
-    Type: String
-    Description: Compute type of the fleet and of on-demand overflow builds.
-    AllowedValues:
-      - BUILD_GENERAL1_MEDIUM
-      - BUILD_GENERAL1_LARGE
-      - BUILD_GENERAL1_XLARGE
-      - BUILD_GENERAL1_2XLARGE
-    Default: BUILD_GENERAL1_LARGE
-  Image:
-    Type: String
-    Description: CodeBuild image the runner builds use.
-    Default: aws/codebuild/standard:7.0
-  FleetBaseCapacity:
-    Type: Number
-    Description: Fleet instances kept running at all times.
-    MinValue: 1
-    Default: 2
-  FleetMaxCapacity:
-    Type: Number
-    Description: Fleet instances target tracking may scale up to. Builds beyond this run on demand.
-    MinValue: 1
-    Default: 10
-  FleetTargetUtilization:
-    Type: Number
-    Description: Fleet utilization percentage that target tracking holds.
-    MinValue: 1
-    MaxValue: 100
-    Default: 70
   BuildTimeoutMinutes:
     Type: Number
     Description: Maximum minutes one runner build (one workflow job) may run.
@@ -89,9 +63,75 @@ Parameters:
     Description: SNS topic notified by the alarms. Empty creates alarms with no action.
     Default: ''
 
+  LinuxComputeType:
+    Type: String
+    AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE, BUILD_GENERAL1_XLARGE, BUILD_GENERAL1_2XLARGE]
+    Default: BUILD_GENERAL1_LARGE
+  LinuxImage:
+    Type: String
+    Default: aws/codebuild/standard:7.0
+  LinuxFleetBaseCapacity:
+    Type: Number
+    Description: Linux fleet instances kept running at all times.
+    MinValue: 1
+    Default: 2
+  LinuxFleetMaxCapacity:
+    Type: Number
+    Description: Linux fleet instances target tracking may scale up to. Builds beyond this run on demand.
+    MinValue: 1
+    Default: 10
+
+  EnableMacFleet:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+  MacComputeType:
+    Type: String
+    AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE]
+    Default: BUILD_GENERAL1_MEDIUM
+  MacImage:
+    Type: String
+    Default: aws/codebuild/macos-arm-base:15
+  MacFleetCapacity:
+    Type: Number
+    Description: macOS fleet instances. Fixed size; jobs beyond it queue.
+    MinValue: 1
+    Default: 2
+
+  EnableWindowsFleet:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+  WindowsComputeType:
+    Type: String
+    AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE]
+    Default: BUILD_GENERAL1_LARGE
+  WindowsImage:
+    Type: String
+    Default: aws/codebuild/windows-base:2019-3.0
+  WindowsFleetBaseCapacity:
+    Type: Number
+    Description: Windows fleet instances kept running at all times.
+    MinValue: 1
+    Default: 1
+  WindowsFleetMaxCapacity:
+    Type: Number
+    Description: Windows fleet instances target tracking may scale up to. Builds beyond this run on demand.
+    MinValue: 1
+    Default: 4
+
+  FleetTargetUtilization:
+    Type: Number
+    Description: Fleet utilization percentage that target tracking holds on the Linux and Windows fleets.
+    MinValue: 1
+    MaxValue: 100
+    Default: 70
+
 Conditions:
   UseConnection: !Equals [!Ref SourceAuthType, CODECONNECTIONS]
   HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
+  MacFleet: !Equals [!Ref EnableMacFleet, 'true']
+  WindowsFleet: !Equals [!Ref EnableWindowsFleet, 'true']
 
 Resources:
   BuildLogGroup:
@@ -141,17 +181,43 @@ Resources:
                   Action: secretsmanager:GetSecretValue
                   Resource: !Ref SourceAuthArn
 
-  Fleet:
+  LinuxFleet:
     Type: AWS::CodeBuild::Fleet
     Properties:
-      Name: !Sub ${ProjectPrefix}-fleet
+      Name: !Sub ${ProjectPrefix}-linux
       EnvironmentType: LINUX_CONTAINER
-      ComputeType: !Ref ComputeType
-      BaseCapacity: !Ref FleetBaseCapacity
+      ComputeType: !Ref LinuxComputeType
+      BaseCapacity: !Ref LinuxFleetBaseCapacity
       OverflowBehavior: ON_DEMAND
       ScalingConfiguration:
         ScalingType: TARGET_TRACKING_SCALING
-        MaxCapacity: !Ref FleetMaxCapacity
+        MaxCapacity: !Ref LinuxFleetMaxCapacity
+        TargetTrackingScalingConfigs:
+          - MetricType: FLEET_UTILIZATION_RATE
+            TargetValue: !Ref FleetTargetUtilization
+
+  MacFleet:
+    Type: AWS::CodeBuild::Fleet
+    Condition: MacFleet
+    Properties:
+      Name: !Sub ${ProjectPrefix}-macos
+      EnvironmentType: MAC_ARM
+      ComputeType: !Ref MacComputeType
+      BaseCapacity: !Ref MacFleetCapacity
+      OverflowBehavior: QUEUE
+
+  WindowsFleet:
+    Type: AWS::CodeBuild::Fleet
+    Condition: WindowsFleet
+    Properties:
+      Name: !Sub ${ProjectPrefix}-windows
+      EnvironmentType: WINDOWS_SERVER_2019_CONTAINER
+      ComputeType: !Ref WindowsComputeType
+      BaseCapacity: !Ref WindowsFleetBaseCapacity
+      OverflowBehavior: ON_DEMAND
+      ScalingConfiguration:
+        ScalingType: TARGET_TRACKING_SCALING
+        MaxCapacity: !Ref WindowsFleetMaxCapacity
         TargetTrackingScalingConfigs:
           - MetricType: FLEET_UTILIZATION_RATE
             TargetValue: !Ref FleetTargetUtilization
@@ -159,11 +225,11 @@ Resources:
   Fn::ForEach::Repositories:
     - Repo
     - !Ref Repositories
-    - RunnerProject&{Repo}:
+    - LinuxRunner&{Repo}:
         Type: AWS::CodeBuild::Project
         Properties:
-          Name: !Join ['-', [!Ref ProjectPrefix, !Select [1, !Split ['/', !Ref Repo]]]]
-          Description: !Join ['', ['GitHub Actions runner for ', !Ref Repo]]
+          Name: !Join ['-', [!Ref ProjectPrefix, linux, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions Linux runner for ', !Ref Repo]]
           ServiceRole: !GetAtt RunnerServiceRole.Arn
           TimeoutInMinutes: !Ref BuildTimeoutMinutes
           Artifacts:
@@ -176,16 +242,16 @@ Resources:
               Resource: !Ref SourceAuthArn
           Environment:
             Type: LINUX_CONTAINER
-            ComputeType: !Ref ComputeType
-            Image: !Ref Image
+            ComputeType: !Ref LinuxComputeType
+            Image: !Ref LinuxImage
             PrivilegedMode: false
             Fleet:
-              FleetArn: !GetAtt Fleet.Arn
+              FleetArn: !GetAtt LinuxFleet.Arn
           LogsConfig:
             CloudWatchLogs:
               Status: ENABLED
               GroupName: !Ref BuildLogGroup
-              StreamName: !Select [1, !Split ['/', !Ref Repo]]
+              StreamName: !Join ['/', [linux, !Select [1, !Split ['/', !Ref Repo]]]]
           Triggers:
             Webhook: true
             FilterGroups:
@@ -194,15 +260,85 @@ Resources:
                 - Type: ACTOR_ACCOUNT_ID
                   Pattern: !Ref AllowedActorIds
 
-      QueuedDurationAlarm&{Repo}:
+      MacRunner&{Repo}:
+        Type: AWS::CodeBuild::Project
+        Condition: MacFleet
+        Properties:
+          Name: !Join ['-', [!Ref ProjectPrefix, macos, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions macOS runner for ', !Ref Repo]]
+          ServiceRole: !GetAtt RunnerServiceRole.Arn
+          TimeoutInMinutes: !Ref BuildTimeoutMinutes
+          Artifacts:
+            Type: NO_ARTIFACTS
+          Source:
+            Type: GITHUB
+            Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            Auth:
+              Type: !Ref SourceAuthType
+              Resource: !Ref SourceAuthArn
+          Environment:
+            Type: MAC_ARM
+            ComputeType: !Ref MacComputeType
+            Image: !Ref MacImage
+            Fleet:
+              FleetArn: !GetAtt MacFleet.Arn
+          LogsConfig:
+            CloudWatchLogs:
+              Status: ENABLED
+              GroupName: !Ref BuildLogGroup
+              StreamName: !Join ['/', [macos, !Select [1, !Split ['/', !Ref Repo]]]]
+          Triggers:
+            Webhook: true
+            FilterGroups:
+              - - Type: EVENT
+                  Pattern: WORKFLOW_JOB_QUEUED
+                - Type: ACTOR_ACCOUNT_ID
+                  Pattern: !Ref AllowedActorIds
+
+      WindowsRunner&{Repo}:
+        Type: AWS::CodeBuild::Project
+        Condition: WindowsFleet
+        Properties:
+          Name: !Join ['-', [!Ref ProjectPrefix, windows, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions Windows runner for ', !Ref Repo]]
+          ServiceRole: !GetAtt RunnerServiceRole.Arn
+          TimeoutInMinutes: !Ref BuildTimeoutMinutes
+          Artifacts:
+            Type: NO_ARTIFACTS
+          Source:
+            Type: GITHUB
+            Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            Auth:
+              Type: !Ref SourceAuthType
+              Resource: !Ref SourceAuthArn
+          Environment:
+            Type: WINDOWS_SERVER_2019_CONTAINER
+            ComputeType: !Ref WindowsComputeType
+            Image: !Ref WindowsImage
+            Fleet:
+              FleetArn: !GetAtt WindowsFleet.Arn
+          LogsConfig:
+            CloudWatchLogs:
+              Status: ENABLED
+              GroupName: !Ref BuildLogGroup
+              StreamName: !Join ['/', [windows, !Select [1, !Split ['/', !Ref Repo]]]]
+          Triggers:
+            Webhook: true
+            FilterGroups:
+              - - Type: EVENT
+                  Pattern: WORKFLOW_JOB_QUEUED
+                - Type: ACTOR_ACCOUNT_ID
+                  Pattern: !Ref AllowedActorIds
+
+      QueueAlarmLinux&{Repo}:
         Type: AWS::CloudWatch::Alarm
         Properties:
-          AlarmDescription: !Join ['', ['p90 runner queue wait above 5 minutes for ', !Ref Repo]]
+          AlarmDescription: !Join ['', ['p90 linux runner queue wait above 5 minutes for ', !Ref Repo]]
           Namespace: AWS/CodeBuild
           MetricName: QueuedDuration
           Dimensions:
             - Name: ProjectName
-              Value: !Join ['-', [!Ref ProjectPrefix, !Select [1, !Split ['/', !Ref Repo]]]]
+              Value: !Join ['-', [!Ref ProjectPrefix, linux, !Select [1, !Split ['/', !Ref Repo]]]]
           ExtendedStatistic: p90
           Period: 300
           EvaluationPeriods: 3
@@ -211,8 +347,44 @@ Resources:
           TreatMissingData: notBreaching
           AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
 
-  # Publishes the number of running and queued runner builds every minute.
-  # CodeBuild has no concurrency metric of its own.
+      QueueAlarmMac&{Repo}:
+        Type: AWS::CloudWatch::Alarm
+        Condition: MacFleet
+        Properties:
+          AlarmDescription: !Join ['', ['p90 macos runner queue wait above 5 minutes for ', !Ref Repo]]
+          Namespace: AWS/CodeBuild
+          MetricName: QueuedDuration
+          Dimensions:
+            - Name: ProjectName
+              Value: !Join ['-', [!Ref ProjectPrefix, macos, !Select [1, !Split ['/', !Ref Repo]]]]
+          ExtendedStatistic: p90
+          Period: 300
+          EvaluationPeriods: 3
+          Threshold: 300
+          ComparisonOperator: GreaterThanThreshold
+          TreatMissingData: notBreaching
+          AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+      QueueAlarmWindows&{Repo}:
+        Type: AWS::CloudWatch::Alarm
+        Condition: WindowsFleet
+        Properties:
+          AlarmDescription: !Join ['', ['p90 windows runner queue wait above 5 minutes for ', !Ref Repo]]
+          Namespace: AWS/CodeBuild
+          MetricName: QueuedDuration
+          Dimensions:
+            - Name: ProjectName
+              Value: !Join ['-', [!Ref ProjectPrefix, windows, !Select [1, !Split ['/', !Ref Repo]]]]
+          ExtendedStatistic: p90
+          Period: 300
+          EvaluationPeriods: 3
+          Threshold: 300
+          ComparisonOperator: GreaterThanThreshold
+          TreatMissingData: notBreaching
+          AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+  # Publishes the number of running and queued runner builds per fleet every
+  # minute. CodeBuild has no concurrency metric of its own.
   UsageMetricsRole:
     Type: AWS::IAM::Role
     Properties:
@@ -259,6 +431,7 @@ Resources:
       Code:
         ZipFile: |
           import os
+          from collections import Counter
 
           import boto3
 
@@ -266,6 +439,7 @@ Resources:
           cloudwatch = boto3.client("cloudwatch")
           PREFIX = os.environ["PROJECT_PREFIX"]
           NAMESPACE = os.environ["NAMESPACE"]
+          FLEETS = ("linux", "macos", "windows")
           # In-progress builds are among a project's most recent builds.
           RECENT_BUILDS = 300
           WAITING_PHASES = {"SUBMITTED", "QUEUED"}
@@ -296,22 +470,33 @@ Resources:
               return running, queued
 
 
-          def datum(name, value, project=None):
-              d = {"MetricName": name, "Value": value, "Unit": "Count"}
-              if project:
-                  d["Dimensions"] = [{"Name": "Project", "Value": project}]
-              return d
+          def datum(name, value, dims):
+              return {
+                  "MetricName": name,
+                  "Value": value,
+                  "Unit": "Count",
+                  "Dimensions": [{"Name": k, "Value": v} for k, v in dims.items()],
+              }
 
 
           def handler(event, context):
               data = []
-              total_running = total_queued = 0
+              running_by_fleet, queued_by_fleet = Counter(), Counter()
               for project in projects():
+                  fleet = project[len(PREFIX) :].split("-", 1)[0]
+                  if fleet not in FLEETS:
+                      continue
                   running, queued = count(project)
-                  total_running += running
-                  total_queued += queued
-                  data += [datum("RunningBuilds", running, project), datum("QueuedBuilds", queued, project)]
-              data += [datum("RunningBuilds", total_running), datum("QueuedBuilds", total_queued)]
+                  running_by_fleet[fleet] += running
+                  queued_by_fleet[fleet] += queued
+                  dims = {"Fleet": fleet, "Project": project}
+                  data += [datum("RunningBuilds", running, dims), datum("QueuedBuilds", queued, dims)]
+              for fleet in FLEETS:
+                  dims = {"Fleet": fleet}
+                  data += [
+                      datum("RunningBuilds", running_by_fleet[fleet], dims),
+                      datum("QueuedBuilds", queued_by_fleet[fleet], dims),
+                  ]
               for i in range(0, len(data), 1000):
                   cloudwatch.put_metric_data(Namespace=NAMESPACE, MetricData=data[i : i + 1000])
 
@@ -339,17 +524,48 @@ Resources:
         {
           "widgets": [
             {
-              "type": "metric", "x": 0, "y": 0, "width": 24, "height": 6,
+              "type": "metric", "x": 0, "y": 0, "width": 8, "height": 6,
               "properties": {
-                "title": "Concurrent runner builds (all repositories)",
+                "title": "Linux fleet: concurrent builds",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", {"label": "Running"}],
-                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", {"label": "Queued"}]
+                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", "Fleet", "linux", {"label": "Running"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Queued"}]
                 ],
                 "annotations": {"horizontal": [
-                  {"label": "Fleet base capacity", "value": ${FleetBaseCapacity}},
-                  {"label": "Fleet max capacity", "value": ${FleetMaxCapacity}}
+                  {"label": "Base capacity", "value": ${LinuxFleetBaseCapacity}},
+                  {"label": "Max capacity (beyond this runs on demand)", "value": ${LinuxFleetMaxCapacity}}
+                ]},
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 8, "y": 0, "width": 8, "height": 6,
+              "properties": {
+                "title": "macOS fleet: concurrent builds",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", "Fleet", "macos", {"label": "Running"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "macos", {"label": "Queued"}]
+                ],
+                "annotations": {"horizontal": [
+                  {"label": "Capacity (beyond this queues)", "value": ${MacFleetCapacity}}
+                ]},
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 16, "y": 0, "width": 8, "height": 6,
+              "properties": {
+                "title": "Windows fleet: concurrent builds",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "RunningBuilds", "Fleet", "windows", {"label": "Running"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "windows", {"label": "Queued"}]
+                ],
+                "annotations": {"horizontal": [
+                  {"label": "Base capacity", "value": ${WindowsFleetBaseCapacity}},
+                  {"label": "Max capacity (beyond this runs on demand)", "value": ${WindowsFleetMaxCapacity}}
                 ]},
                 "yAxis": {"left": {"min": 0}}
               }
@@ -357,9 +573,9 @@ Resources:
             {
               "type": "metric", "x": 0, "y": 6, "width": 12, "height": 6,
               "properties": {
-                "title": "Running builds by repository",
+                "title": "Running builds by project",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
-                "metrics": [[{"expression": "SEARCH('{CryptoTools/CodeBuildRunners,Project} MetricName=\"RunningBuilds\"', 'Maximum', 60)", "id": "running"}]],
+                "metrics": [[{"expression": "SEARCH('{CryptoTools/CodeBuildRunners,Fleet,Project} MetricName=\"RunningBuilds\"', 'Maximum', 60)", "id": "running"}]],
                 "yAxis": {"left": {"min": 0}}
               }
             },
@@ -421,8 +637,14 @@ Resources:
         }
 
 Outputs:
-  FleetArn:
-    Value: !GetAtt Fleet.Arn
+  LinuxFleetArn:
+    Value: !GetAtt LinuxFleet.Arn
+  MacFleetArn:
+    Condition: MacFleet
+    Value: !GetAtt MacFleet.Arn
+  WindowsFleetArn:
+    Condition: WindowsFleet
+    Value: !GetAtt WindowsFleet.Arn
   RunnerServiceRoleArn:
     Value: !GetAtt RunnerServiceRole.Arn
   DashboardUrl:
