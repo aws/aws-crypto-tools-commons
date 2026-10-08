@@ -579,7 +579,13 @@ Resources:
           "periodOverride": "inherit",
           "widgets": [
             {
-              "type": "metric", "x": 0, "y": 0, "width": 24, "height": 6,
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
+              "properties": {
+                "markdown": "Metrics for the CodeBuild fleet that runs the Crypto Tools Linux GitHub Actions jobs. [Link to fleet](https://tiny.amazon.com/12cfzcrrm/IsenLink)"
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 2, "width": 24, "height": 6,
               "properties": {
                 "title": "Linux concurrent jobs",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -592,7 +598,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 6, "width": 24, "height": 6,
+              "type": "metric", "x": 0, "y": 8, "width": 24, "height": 6,
               "properties": {
                 "title": "Longest wait",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -603,7 +609,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 12, "width": 12, "height": 6,
+              "type": "metric", "x": 0, "y": 14, "width": 12, "height": 6,
               "properties": {
                 "title": "Linux CPU utilization (%)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -617,7 +623,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 12, "y": 12, "width": 12, "height": 6,
+              "type": "metric", "x": 12, "y": 14, "width": 12, "height": 6,
               "properties": {
                 "title": "Linux memory utilization (%)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -631,9 +637,15 @@ Resources:
               }
             },
             {
-              "type": "log", "x": 0, "y": 18, "width": 24, "height": 3,
+              "type": "text", "x": 0, "y": 20, "width": 24, "height": 3,
               "properties": {
-                "title": "Linux cost over the selected time range: actual vs. the cheapest number of reserved hosts",
+                "markdown": "A reserved host bills every minute, busy or idle. An on-demand job bills only while it runs, at a higher rate. At the default rates a reserved host costs 60% of on-demand, so it saves money only when it is busy more than 60% of the time.\n\n**Best hosts** is the reserved host count that would have made the selected range cheapest. **Best cost** is what the range would have cost with that count. **Savings** is Actual minus Best cost."
+              }
+            },
+            {
+              "type": "log", "x": 0, "y": 23, "width": 24, "height": 3,
+              "properties": {
+                "title": "Linux cost over the selected time range",
                 "region": "${AWS::Region}", "view": "table",
                 "query": "SOURCE '${UsageMetricsLogGroup}' | filter ispresent(reserved) | stats sum(actual) as actualSum, sum(cost) as bestSum by reserved | sort bestSum asc | limit 1 | fields floor(actualSum * 100 + 0.5) / 100 as `Actual ($)`, reserved as `Best hosts`, floor(bestSum * 100 + 0.5) / 100 as `Best cost ($)`, floor((actualSum - bestSum) * 100 + 0.5) / 100 as `Savings ($)` | display `Actual ($)`, `Best hosts`, `Best cost ($)`, `Savings ($)`"
               }
