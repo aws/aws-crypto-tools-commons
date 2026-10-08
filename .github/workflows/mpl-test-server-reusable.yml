@@ -107,8 +107,9 @@ env:
   # No daemon, so each server/Tests JVM the orchestrator forks inherits the
   # live step environment.
   GRADLE_OPTS: -Dorg.gradle.daemon=false
-  # The Python the python server's venv is built on. The venv links to it, so
-  # the prebuild and test jobs set up the same version, and its key carries it.
+  # The Python minor version the plan job resolves to an exact patch release.
+  # The python server's venv links to that release, so the prebuild and test
+  # jobs set up exactly it, and its key carries it.
   PYTHON_VERSION: "3.11"
   DAFNY_VERSION: "4.9.0"
 
@@ -120,6 +121,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     outputs:
       platform: ${{ steps.platform.outputs.platform }}
+      python_version: ${{ steps.python.outputs.python-version }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       mpl_root: ${{ steps.keys.outputs.mpl_root }}
@@ -276,7 +278,7 @@ jobs:
           # The venv (editable installs of the transpiled library and the
           # server, plus its stamp) and the transpiled library source.
           repo_key=$(echo "$GITHUB_REPOSITORY" | tr '/' '_')
-          emit python python "-dafny$DAFNY_VERSION-py$PYTHON_FULL_VERSION-$repo_key" \
+          emit python python "-dafny$DAFNY_VERSION-python$PYTHON_FULL_VERSION-$repo_key" \
             "mpl/test-server/build/launch/python/venv" \
             "$python_library"
           {
@@ -412,7 +414,7 @@ jobs:
         if: env.DAFNY_BUILD == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ needs.plan.outputs.python_version }}
 
       - name: Set up Go (Go server; aws-lc-sys native builds)
         if: startsWith(matrix.language, 'rust') || matrix.language == 'go'
@@ -610,7 +612,7 @@ jobs:
       - name: Set up Python (the prebuilt python server venv links to it)
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ needs.plan.outputs.python_version }}
 
       - name: Set up .NET (runs the prebuilt .NET server)
         uses: actions/setup-dotnet@v5
