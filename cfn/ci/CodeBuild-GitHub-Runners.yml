@@ -608,9 +608,9 @@ Resources:
             {
               "type": "log", "x": 0, "y": 18, "width": 24, "height": 3,
               "properties": {
-                "title": "Linux cost over the selected time range",
+                "title": "Linux cost over the selected time range: actual vs. the cheapest number of reserved hosts",
                 "region": "${AWS::Region}", "view": "table",
-                "query": "SOURCE '${UsageMetricsLogGroup}' | filter ispresent(reserved) | stats sum(actual) as actualSum, sum(cost) as bestSum by reserved | sort bestSum asc | limit 1 | fields floor(actualSum * 100 + 0.5) / 100 as `Actual cost ($)`, reserved as `Suggested reserved hosts`, floor(bestSum * 100 + 0.5) / 100 as `Cost with suggested hosts ($)`, floor((actualSum - bestSum) * 100 + 0.5) / 100 as `Savings ($)` | display `Actual cost ($)`, `Suggested reserved hosts`, `Cost with suggested hosts ($)`, `Savings ($)`"
+                "query": "SOURCE '${UsageMetricsLogGroup}' | filter ispresent(reserved) | stats sum(actual) as actualSum, sum(cost) as bestSum by reserved | sort bestSum asc | limit 1 | fields floor(actualSum * 100 + 0.5) / 100 as `Actual ($)`, reserved as `Best hosts`, floor(bestSum * 100 + 0.5) / 100 as `Best cost ($)`, floor((actualSum - bestSum) * 100 + 0.5) / 100 as `Savings ($)` | display `Actual ($)`, `Best hosts`, `Best cost ($)`, `Savings ($)`"
               }
             }
           ]
