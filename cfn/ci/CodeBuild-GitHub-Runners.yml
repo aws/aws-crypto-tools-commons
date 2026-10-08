@@ -61,6 +61,13 @@ Parameters:
   LinuxImage:
     Type: String
     Default: aws/codebuild/standard:7.0
+  LinuxPrivilegedMode:
+    Type: String
+    Description: >-
+      Run Linux builds in privileged mode, which starts a Docker daemon so jobs
+      can use Docker container actions, service containers, and docker run.
+    AllowedValues: ['true', 'false']
+    Default: 'true'
   LinuxFleetCapacity:
     Type: Number
     Description: Linux fleet instances. Builds beyond them run on demand.
@@ -220,7 +227,7 @@ Resources:
             Type: LINUX_CONTAINER
             ComputeType: !Ref LinuxComputeType
             Image: !Ref LinuxImage
-            PrivilegedMode: false
+            PrivilegedMode: !Ref LinuxPrivilegedMode
             Fleet:
               FleetArn: !GetAtt LinuxFleet.Arn
           LogsConfig:
