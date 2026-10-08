@@ -112,7 +112,9 @@ Parameters:
     Default: 1
 
   # USD per minute, used only for the dashboard's cost estimate. Defaults are
-  # the us-west-2 prices for the default compute types.
+  # the us-west-2 prices for the default compute types. The dashboard's
+  # suggested Linux reserved capacity is demand percentile
+  # 100 * (1 - LinuxReservedRate / LinuxOnDemandRate), hardcoded there as p40.
   LinuxReservedRate:
     Type: Number
     Default: 0.012
@@ -435,6 +437,8 @@ Resources:
           RECENT_BUILDS = 300
           # Phases before the workflow job starts running.
           WAITING_PHASES = {"SUBMITTED", "QUEUED", "PROVISIONING"}
+          # Reserved capacities the dashboard compares Linux cost across.
+          RESERVED_OPTIONS = range(0, 301, 5)
 
 
           def projects():
@@ -506,6 +510,18 @@ Resources:
                       datum("EstimatedCostUSD", cost, dims, "None"),
                   ]
               data.append(datum("EstimatedCostUSD", total_cost, {}, "None"))
+              demand = sum(totals["linux"].values())
+              rate = lambda key: float(os.environ[f"LINUX_{key}"])
+              data.append(datum("Demand", demand, {"Fleet": "linux"}))
+              data += [
+                  datum(
+                      "CostAtReserved",
+                      r * rate("RESERVED_RATE") + max(0, demand - r) * rate("ON_DEMAND_RATE"),
+                      {"Fleet": "linux", "Reserved": str(r)},
+                      "None",
+                  )
+                  for r in RESERVED_OPTIONS
+              ]
               for i in range(0, len(data), 1000):
                   cloudwatch.put_metric_data(Namespace=NAMESPACE, MetricData=data[i : i + 1000])
 
@@ -555,7 +571,7 @@ Resources:
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "linux", {"label": "Longest wait", "color": "#2ca02c"}]
                 ],
-                "yAxis": {"left": {"min": 0}}
+                "yAxis": {"left": {"min": 0, "showUnits": false}}
               }
             },
             {
@@ -583,15 +599,14 @@ Resources:
             {
               "type": "metric", "x": 0, "y": 18, "width": 24, "height": 4,
               "properties": {
-                "title": "Cost analysis",
+                "title": "Linux cost over the selected time range",
                 "region": "${AWS::Region}", "view": "singleValue", "period": 300,
                 "setPeriodToTimeRange": true,
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", {"label": "Actual cost ($)", "stat": "Sum"}],
-                  [{"expression": "FILL(m1,0) + FILL(m2,0)", "id": "total", "stat": "p95", "label": "Suggested reserved (p95)"}],
-                  [{"expression": "SUM(total) * (300/3600) * 0.068", "id": "projCost", "label": "Cost at p95 reserved ($)"}],
-                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"id": "m1", "visible": false}],
-                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"id": "m2", "visible": false}]
+                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "linux", {"label": "Actual cost ($)", "stat": "Sum"}],
+                  ["CryptoTools/CodeBuildRunners", "Demand", "Fleet", "linux", {"label": "Suggested reserved capacity", "stat": "p40"}],
+                  [{"expression": "SEARCH('{CryptoTools/CodeBuildRunners,Fleet,Reserved} MetricName=\"CostAtReserved\" Fleet=\"linux\"', 'Sum', 300)", "id": "costs", "visible": false}],
+                  [{"expression": "MIN(RUNNING_SUM(FILL(costs, 0)))", "id": "best", "label": "Cost with suggested reserved capacity ($)"}]
                 ]
               }
             }
