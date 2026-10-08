@@ -538,21 +538,20 @@ Resources:
               "type": "metric", "x": 0, "y": 0, "width": 24, "height": 6,
               "properties": {
                 "title": "Linux concurrent jobs",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"label": "On the fleet", "color": "#1f77b4"}],
                   ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"label": "On demand", "color": "#ff7f0e"}],
                   ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Waiting", "color": "#2ca02c"}]
                 ],
-                "annotations": {"horizontal": [{"label": "Fleet capacity", "value": ${LinuxFleetCapacity}}]},
                 "yAxis": {"left": {"min": 0}}
               }
             },
             {
               "type": "metric", "x": 0, "y": 6, "width": 24, "height": 6,
               "properties": {
-                "title": "Longest wait for a Linux runner",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60, "stat": "Maximum",
+                "title": "Longest wait",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
                 "metrics": [
                   ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "linux", {"label": "Longest wait", "color": "#2ca02c"}]
                 ],
@@ -562,12 +561,10 @@ Resources:
             {
               "type": "metric", "x": 0, "y": 12, "width": 12, "height": 6,
               "properties": {
-                "title": "Linux CPU utilization (%, on-demand jobs)",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60,
+                "title": "Linux CPU utilization (%)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
                 "metrics": [
-                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 60)", "id": "cpu", "visible": false}],
-                  [{"expression": "MAX(cpu)", "id": "cpumax", "label": "Busiest job", "color": "#1f77b4"}],
-                  [{"expression": "AVG(cpu)", "id": "cpuavg", "label": "Average job", "color": "#aec7e8"}]
+                  ["AWS/CodeBuild", "CPUUtilizedPercent", "ProjectName", "${ProjectPrefix}-linux", {"label": "Max CPU", "color": "#1f77b4"}]
                 ],
                 "yAxis": {"left": {"min": 0, "max": 100}}
               }
@@ -575,12 +572,10 @@ Resources:
             {
               "type": "metric", "x": 12, "y": 12, "width": 12, "height": 6,
               "properties": {
-                "title": "Linux memory utilization (%, on-demand jobs)",
-                "region": "${AWS::Region}", "view": "timeSeries", "period": 60,
+                "title": "Linux memory utilization (%)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
                 "metrics": [
-                  [{"expression": "SEARCH('{AWS/CodeBuild,BuildId,BuildNumber,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 60)", "id": "mem", "visible": false}],
-                  [{"expression": "MAX(mem)", "id": "memmax", "label": "Busiest job", "color": "#1f77b4"}],
-                  [{"expression": "AVG(mem)", "id": "memavg", "label": "Average job", "color": "#aec7e8"}]
+                  ["AWS/CodeBuild", "MemoryUtilizedPercent", "ProjectName", "${ProjectPrefix}-linux", {"label": "Max memory", "color": "#1f77b4"}]
                 ],
                 "yAxis": {"left": {"min": 0, "max": 100}}
               }
@@ -588,11 +583,15 @@ Resources:
             {
               "type": "metric", "x": 0, "y": 18, "width": 24, "height": 4,
               "properties": {
-                "title": "Estimated cost over the selected time range (USD)",
-                "region": "${AWS::Region}", "view": "singleValue", "stat": "Sum", "period": 60,
+                "title": "Cost analysis",
+                "region": "${AWS::Region}", "view": "singleValue", "period": 300,
                 "setPeriodToTimeRange": true,
                 "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", {"label": " "}]
+                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", {"label": "Actual cost ($)", "stat": "Sum"}],
+                  [{"expression": "FILL(m1,0) + FILL(m2,0)", "id": "total", "stat": "p95", "label": "Suggested reserved (p95)"}],
+                  [{"expression": "SUM(total) * (300/3600) * 0.068", "id": "projCost", "label": "Cost at p95 reserved ($)"}],
+                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"id": "m1", "visible": false}],
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"id": "m2", "visible": false}]
                 ]
               }
             }
