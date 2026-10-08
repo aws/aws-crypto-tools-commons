@@ -583,7 +583,10 @@ Resources:
                 "title": "Linux CPU utilization (%)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
                 "metrics": [
-                  ["AWS/CodeBuild", "CPUUtilizedPercent", "ProjectName", "${ProjectPrefix}-linux", {"label": "Max CPU", "color": "#1f77b4"}]
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Maximum', 300)", "id": "cpumax", "visible": false}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 300)", "id": "cpuavg", "visible": false}],
+                  [{"expression": "MAX(cpumax)", "label": "Busiest job", "color": "#1f77b4"}],
+                  [{"expression": "AVG(cpuavg)", "label": "Average job", "color": "#aec7e8"}]
                 ],
                 "yAxis": {"left": {"min": 0, "max": 100}}
               }
@@ -594,7 +597,10 @@ Resources:
                 "title": "Linux memory utilization (%)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
                 "metrics": [
-                  ["AWS/CodeBuild", "MemoryUtilizedPercent", "ProjectName", "${ProjectPrefix}-linux", {"label": "Max memory", "color": "#1f77b4"}]
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Maximum', 300)", "id": "memmax", "visible": false}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 300)", "id": "memavg", "visible": false}],
+                  [{"expression": "MAX(memmax)", "label": "Busiest job", "color": "#1f77b4"}],
+                  [{"expression": "AVG(memavg)", "label": "Average job", "color": "#aec7e8"}]
                 ],
                 "yAxis": {"left": {"min": 0, "max": 100}}
               }
