@@ -99,11 +99,7 @@ jobs:
           java-version: "21"
 
       - name: Set up the Rust toolchain
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          cargo --version
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Go
         # Only used to build the rust server's aws-lc-sys native code.
