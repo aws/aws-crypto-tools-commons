@@ -115,6 +115,13 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Select the .NET 8 SDK
+        # The CodeBuild image pins an older SDK in a global.json above the workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
       - name: Restore Gradle + cargo + NuGet caches
         uses: actions/cache/restore@v4
         id: caches

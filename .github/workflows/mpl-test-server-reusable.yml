@@ -141,6 +141,10 @@ jobs:
       paths_java: ${{ steps.keys.outputs.paths_java }}
       key_python: ${{ steps.keys.outputs.key_python }}
       paths_python: ${{ steps.keys.outputs.paths_python }}
+      # The exact Python the plan job resolved. The python output's key carries it,
+      # and the prebuilt venv links to that interpreter, so every job that builds
+      # or runs the venv must use this same version, not just the same minor.
+      python_version: ${{ steps.python.outputs.python-version }}
     steps:
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
@@ -377,7 +381,7 @@ jobs:
         if: env.LANGUAGE_REPOSITORY != ''
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
-            '*.egg-info/' '__pycache__/' 'test-server/mpl/go-v1-server/mpl-test-server' \
+            '*.egg-info/' '__pycache__/' '**/internaldafny/generated/' 'test-server/mpl/go-v1-server/mpl-test-server' \
             >> language-repo/.git/info/exclude
 
       # JDK 17 first (the MPL Java build and the smithy-dafny codegen), then
@@ -600,7 +604,7 @@ jobs:
         if: env.LANGUAGE_REPOSITORY != ''
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
-            '*.egg-info/' '__pycache__/' 'test-server/mpl/go-v1-server/mpl-test-server' \
+            '*.egg-info/' '__pycache__/' '**/internaldafny/generated/' 'test-server/mpl/go-v1-server/mpl-test-server' \
             >> language-repo/.git/info/exclude
 
       - name: Set up JDK 21 (Temurin) for the commons harness + Java server
