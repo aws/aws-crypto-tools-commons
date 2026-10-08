@@ -53,6 +53,12 @@ Parameters:
     Type: String
     Description: SNS topic notified by the alarms. Empty creates alarms with no action.
     Default: ''
+  DashboardSharingRoleName:
+    Type: String
+    Description: >-
+      Existing IAM role that shared CloudWatch dashboards assume to read this
+      account. The stack lets it query the cost table's log group. Empty skips.
+    Default: CloudWatchDashboards
 
   LinuxComputeType:
     Type: String
@@ -131,6 +137,7 @@ Conditions:
   MacFleet: !Equals [!Ref EnableMacFleet, 'true']
   MacFleetLarge: !Equals [!Ref MacComputeType, BUILD_GENERAL1_LARGE]
   WindowsFleet: !Equals [!Ref EnableWindowsFleet, 'true']
+  HasDashboardSharingRole: !Not [!Equals [!Ref DashboardSharingRoleName, '']]
 
 Resources:
   BuildLogGroup:
@@ -403,6 +410,23 @@ Resources:
     Properties:
       LogGroupName: !Sub /aws/lambda/${ProjectPrefix}-usage-metrics
       RetentionInDays: !Ref LogRetentionDays
+
+  UsageMetricsLogGroupDashboardAccess:
+    Type: AWS::IAM::RolePolicy
+    Condition: HasDashboardSharingRole
+    Properties:
+      RoleName: !Ref DashboardSharingRoleName
+      PolicyName: !Sub ${ProjectPrefix}-usage-metrics-logs
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:DescribeLogGroups
+              - logs:GetLogRecord
+              - logs:StartQuery
+              - logs:StopQuery
+            Resource: !GetAtt UsageMetricsLogGroup.Arn
 
   UsageMetricsFunction:
     Type: AWS::Lambda::Function
