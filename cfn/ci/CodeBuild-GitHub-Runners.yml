@@ -112,9 +112,7 @@ Parameters:
     Default: 1
 
   # USD per minute, used only for the dashboard's cost estimate. Defaults are
-  # the us-west-2 prices for the default compute types. The dashboard's
-  # suggested Linux reserved capacity is demand percentile
-  # 100 * (1 - LinuxReservedRate / LinuxOnDemandRate), hardcoded there as p40.
+  # the us-west-2 prices for the default compute types.
   LinuxReservedRate:
     Type: Number
     Default: 0.012
@@ -400,9 +398,17 @@ Resources:
                   StringEquals:
                     cloudwatch:namespace: CryptoTools/CodeBuildRunners
 
+  UsageMetricsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ProjectPrefix}-usage-metrics
+      RetentionInDays: !Ref LogRetentionDays
+
   UsageMetricsFunction:
     Type: AWS::Lambda::Function
     Properties:
+      LoggingConfig:
+        LogGroup: !Ref UsageMetricsLogGroup
       Runtime: python3.12
       Handler: index.handler
       Timeout: 50
@@ -422,6 +428,7 @@ Resources:
           WINDOWS_ON_DEMAND_RATE: !Ref WindowsOnDemandRate
       Code:
         ZipFile: |
+          import json
           import os
           from collections import Counter
           from datetime import datetime, timezone
@@ -438,7 +445,7 @@ Resources:
           # Phases before the workflow job starts running.
           WAITING_PHASES = {"SUBMITTED", "QUEUED", "PROVISIONING"}
           # Reserved capacities the dashboard compares Linux cost across.
-          RESERVED_OPTIONS = range(0, 301, 5)
+          RESERVED_OPTIONS = range(0, 301)
 
 
           def projects():
@@ -510,18 +517,14 @@ Resources:
                       datum("EstimatedCostUSD", cost, dims, "None"),
                   ]
               data.append(datum("EstimatedCostUSD", total_cost, {}, "None"))
+              # One log line per reserved capacity: the dashboard's Logs Insights
+              # query sums them to find the cheapest capacity for any time range.
               demand = sum(totals["linux"].values())
+              actual = minute_cost("linux", totals["linux"]["OnDemandBuilds"])
               rate = lambda key: float(os.environ[f"LINUX_{key}"])
-              data.append(datum("Demand", demand, {"Fleet": "linux"}))
-              data += [
-                  datum(
-                      "CostAtReserved",
-                      r * rate("RESERVED_RATE") + max(0, demand - r) * rate("ON_DEMAND_RATE"),
-                      {"Fleet": "linux", "Reserved": str(r)},
-                      "None",
-                  )
-                  for r in RESERVED_OPTIONS
-              ]
+              for r in RESERVED_OPTIONS:
+                  cost = r * rate("RESERVED_RATE") + max(0, demand - r) * rate("ON_DEMAND_RATE")
+                  print(json.dumps({"reserved": r, "cost": cost, "actual": actual}))
               for i in range(0, len(data), 1000):
                   cloudwatch.put_metric_data(Namespace=NAMESPACE, MetricData=data[i : i + 1000])
 
@@ -597,17 +600,11 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 18, "width": 24, "height": 4,
+              "type": "log", "x": 0, "y": 18, "width": 24, "height": 3,
               "properties": {
-                "title": "Linux cost over the selected time range",
-                "region": "${AWS::Region}", "view": "singleValue", "period": 300,
-                "setPeriodToTimeRange": true,
-                "metrics": [
-                  ["CryptoTools/CodeBuildRunners", "EstimatedCostUSD", "Fleet", "linux", {"label": "Actual cost ($)", "stat": "Sum"}],
-                  ["CryptoTools/CodeBuildRunners", "Demand", "Fleet", "linux", {"label": "Suggested reserved capacity", "stat": "p40"}],
-                  [{"expression": "SEARCH('{CryptoTools/CodeBuildRunners,Fleet,Reserved} MetricName=\"CostAtReserved\" Fleet=\"linux\"', 'Sum', 300)", "id": "costs", "visible": false}],
-                  [{"expression": "MIN(RUNNING_SUM(FILL(costs, 0)))", "id": "best", "label": "Cost with suggested reserved capacity ($)"}]
-                ]
+                "title": "Linux cost over the selected time range (USD)",
+                "region": "${AWS::Region}", "view": "table",
+                "query": "SOURCE '${UsageMetricsLogGroup}' | filter ispresent(reserved) | stats sum(actual) as actual_cost, sum(cost) as cost_with_suggested by reserved as suggested_reserved | sort cost_with_suggested asc | limit 1"
               }
             }
           ]
