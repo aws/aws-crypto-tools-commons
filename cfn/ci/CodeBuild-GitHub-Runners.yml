@@ -543,7 +543,8 @@ Resources:
               data.append(datum("EstimatedCostUSD", total_cost, {}, "None"))
               # One log line per reserved capacity: the dashboard's Logs Insights
               # query sums them to find the cheapest capacity for any time range.
-              demand = sum(totals["linux"].values())
+              # Queued builds are not billed, so only running builds count.
+              demand = totals["linux"]["FleetBuilds"] + totals["linux"]["OnDemandBuilds"]
               actual = minute_cost("linux", totals["linux"]["OnDemandBuilds"])
               rate = lambda key: float(os.environ[f"LINUX_{key}"])
               for r in RESERVED_OPTIONS:
