@@ -132,6 +132,10 @@ jobs:
       paths_java: ${{ steps.keys.outputs.paths_java }}
       key_python: ${{ steps.keys.outputs.key_python }}
       paths_python: ${{ steps.keys.outputs.paths_python }}
+      # The exact Python the plan job resolved. The python output's key carries it,
+      # and the prebuilt venv links to that interpreter, so every job that builds
+      # or runs the venv must use this same version, not just the same minor.
+      python_version: ${{ steps.python.outputs.python-version }}
     steps:
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
@@ -361,7 +365,7 @@ jobs:
         if: env.LANGUAGE_REPOSITORY != ''
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
-            '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
+            '*.egg-info/' '__pycache__/' '**/internaldafny/generated/' 'test-server/go-v1-server/primitives-test-server' \
             >> language-repo/.git/info/exclude
 
       # JDK 17 first (the MPL Java build and the smithy-dafny codegen), then
@@ -398,7 +402,7 @@ jobs:
         if: env.DAFNY_BUILD == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ needs.plan.outputs.python_version }}
 
       - name: Set up Go (Go server; aws-lc-sys native builds)
         if: startsWith(matrix.language, 'rust') || matrix.language == 'go'
@@ -568,7 +572,7 @@ jobs:
         if: env.LANGUAGE_REPOSITORY != ''
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.gradle/' \
-            '*.egg-info/' '__pycache__/' 'test-server/go-v1-server/primitives-test-server' \
+            '*.egg-info/' '__pycache__/' '**/internaldafny/generated/' 'test-server/go-v1-server/primitives-test-server' \
             >> language-repo/.git/info/exclude
 
       - name: Set up JDK 21 (Temurin) for the commons harness + Java server
@@ -580,7 +584,7 @@ jobs:
       - name: Set up Python (the prebuilt python server venv links to it)
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ needs.plan.outputs.python_version }}
 
       - name: Set up .NET (runs the prebuilt .NET server)
         uses: actions/setup-dotnet@v5
