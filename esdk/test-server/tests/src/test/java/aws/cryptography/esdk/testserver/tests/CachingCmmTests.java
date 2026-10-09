@@ -115,15 +115,15 @@ class CachingCmmTests {
             CreateClientInput request = CreateClientInput.builder().config(config).build();
             ESDKTestServerClient client = TestServerClients.forEndpoint(target.endpoint());
             String clientId = TestServerClients.withRetry(() -> client.createClient(request)).getClientId();
-            CachingClient caching = new CachingClient(client, clientId);
+            CachingClient created = new CachingClient(client, clientId);
             // A server that supports caching but not yet the test-only operations skips, visibly.
             try {
-                caching.callCounts();
+                created.callCounts();
             } catch (GenericServerError e) {
                 Assumptions.abort(target + " does not implement the test-only operations: "
                     + e.getMessage());
             }
-            return caching;
+            return created;
         }
 
         static CachingClient create(LanguageServerTarget target, Limits limits) {
