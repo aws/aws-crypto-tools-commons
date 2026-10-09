@@ -25,6 +25,9 @@ service ESDKTestServer {
         Decrypt
         DecryptStream
         GetCallCounts
+        EncryptConcurrently
+        DecryptConcurrently
+        AdvanceClock
     ]
     errors: [
         GenericServerError
@@ -42,6 +45,42 @@ service ESDKTestServer {
 operation CreateClient {
     input: CreateClientRequest
     output: CreateClientResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: encrypt every plaintext with the referenced client at the same time.
+/// The server starts all the encrypt calls before awaiting any of them,
+/// so they reach the client's caches concurrently.
+/// Results are in the same order as the plaintexts.
+operation EncryptConcurrently {
+    input: EncryptConcurrentlyRequest
+    output: EncryptConcurrentlyResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: decrypt every ciphertext with the referenced client at the same time,
+/// as EncryptConcurrently does for encrypt.
+operation DecryptConcurrently {
+    input: DecryptConcurrentlyRequest
+    output: DecryptConcurrentlyResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: move the clock of the referenced client's caches forward.
+/// Each client the server builds has its own clock, starting at the system time.
+/// Tests use this to expire cache entries without waiting.
+operation AdvanceClock {
+    input: AdvanceClockRequest
+    output: AdvanceClockResponse
     errors: [
         GenericServerError
         ESDKClientError
@@ -119,18 +158,8 @@ structure CreateClientRequest {
     @required
     config: ESDKClientConfig
 
-    /// Test-only behavior for the server to plug into the client it builds.
-    /// Customers never configure these.
-    testHooks: TestHooks
 }
 
-/// Test-only hooks a server plugs into the client it builds.
-structure TestHooks {
-    /// Delay, in milliseconds, before each call a Caching CMM makes to its underlying CMM.
-    /// A fast keyring finishes before a concurrent call arrives;
-    /// the delay makes concurrent cache misses overlap, so tests can see whether they share a request.
-    cachingCmmUnderlyingDelayMilliseconds: Integer
-}
 
 @output
 structure CreateClientResponse {
@@ -139,6 +168,59 @@ structure CreateClientResponse {
     @required
     clientId: ClientId
 }
+
+list BlobList {
+    member: Blob
+}
+
+@input
+structure EncryptConcurrentlyRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    plaintexts: BlobList
+
+    /// Optional encryption context, used for every plaintext.
+    encryptionContext: EncryptionContext
+
+    /// Optional algorithm suite override, used for every plaintext.
+    algorithmSuiteId: ESDKAlgorithmSuiteId
+}
+
+@output
+structure EncryptConcurrentlyResponse {
+    @required
+    ciphertexts: BlobList
+}
+
+@input
+structure DecryptConcurrentlyRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    ciphertexts: BlobList
+}
+
+@output
+structure DecryptConcurrentlyResponse {
+    @required
+    plaintexts: BlobList
+}
+
+@input
+structure AdvanceClockRequest {
+    @required
+    clientId: ClientId
+
+    /// How far to move the clock forward, in milliseconds.
+    @required
+    milliseconds: Long
+}
+
+@output
+structure AdvanceClockResponse {}
 
 @input
 structure GetCallCountsRequest {

@@ -14,31 +14,27 @@ import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.esdk.testserver.client.model.CachingCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
+import aws.cryptography.esdk.testserver.client.model.AdvanceClockInput;
+import aws.cryptography.esdk.testserver.client.model.DecryptConcurrentlyInput;
 import aws.cryptography.esdk.testserver.client.model.DecryptInput;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
+import aws.cryptography.esdk.testserver.client.model.EncryptConcurrentlyInput;
 import aws.cryptography.esdk.testserver.client.model.EncryptInput;
 import aws.cryptography.esdk.testserver.client.model.GetCallCountsInput;
 import aws.cryptography.esdk.testserver.client.model.GetCallCountsOutput;
 import aws.cryptography.esdk.testserver.client.model.Keyring;
 import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
-import aws.cryptography.esdk.testserver.client.model.TestHooks;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -56,7 +52,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  *   <li>{@code GetCallCounts}: how many times the caching CMM called the CMM it wraps.</li>
  * </ul>
  *
- * <p>The concurrency tests fire calls at one client at the same time. Every implementation must
+ * <p>Tests expire entries with {@code AdvanceClock}, which moves the clock of the client's caches,
+ * instead of waiting.
+ *
+ * <p>The concurrency tests ask the server to run many calls on one client at once
+ * ({@code EncryptConcurrently}, {@code DecryptConcurrently}), so the fan-out happens in the
+ * language under test. Every implementation must
  * keep each data key within its limits under concurrency. Sharing one request among concurrent
  * misses is checked separately and gated by the {@code caching-cmm-concurrent-misses-not-shared}
  * known bug.
@@ -72,29 +73,19 @@ class CachingCmmTests {
         0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x08, 0x19, 0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f, 0x00,
     };
     private static final int CONCURRENCY = 10;
-    /** Long enough that every concurrent call reaches the caching CMM before the first request returns. */
-    private static final int UNDERLYING_DELAY_MS = 200;
 
     static List<LanguageServerTarget> targets() {
         return LanguageServerRegistry.shared().targets();
     }
 
-    /**
-     * Usage limits for one caching CMM; null means the implementation's default.
-     * {@code delayMs} is the test-only delay before each call to the underlying CMM.
-     */
-    private record Limits(Long messages, Long bytes, int ttlSeconds, int delayMs) {
+    /** Usage limits for one caching CMM; null means the implementation's default. */
+    private record Limits(Long messages, Long bytes, int ttlSeconds) {
         static Limits messages(long messages) {
-            return new Limits(messages, null, 60, 0);
+            return new Limits(messages, null, 60);
         }
 
         static Limits bytes(long bytes) {
-            return new Limits(null, bytes, 60, 0);
-        }
-
-        /** The same limits, with concurrent calls made to overlap. */
-        Limits overlapping() {
-            return new Limits(messages, bytes, ttlSeconds, UNDERLYING_DELAY_MS);
+            return new Limits(null, bytes, 60);
         }
     }
 
@@ -119,13 +110,7 @@ class CachingCmmTests {
                 .commitmentPolicy(policy)
                 .cmm(CryptographicMaterialsManager.builder().caching(caching.build()).build())
                 .build();
-            CreateClientInput.Builder input = CreateClientInput.builder().config(config);
-            if (limits.delayMs() > 0) {
-                input.testHooks(TestHooks.builder()
-                    .cachingCmmUnderlyingDelayMilliseconds(limits.delayMs())
-                    .build());
-            }
-            CreateClientInput request = input.build();
+            CreateClientInput request = CreateClientInput.builder().config(config).build();
             ESDKTestServerClient client = TestServerClients.forEndpoint(target.endpoint());
             String clientId = TestServerClients.withRetry(() -> client.createClient(request)).getClientId();
             return new CachingClient(client, clientId);
@@ -157,6 +142,36 @@ class CachingCmmTests {
                 .ciphertext(ByteBuffer.wrap(ciphertext))
                 .build();
             return EsdkOps.toArray(TestServerClients.withRetry(() -> client.decrypt(request)).getPlaintext());
+        }
+
+        /** Encrypt every plaintext at the same time, inside the server. */
+        List<byte[]> encryptConcurrently(List<byte[]> plaintexts) {
+            EncryptConcurrentlyInput request = EncryptConcurrentlyInput.builder()
+                .clientId(clientId)
+                .plaintexts(plaintexts.stream().map(ByteBuffer::wrap).toList())
+                .algorithmSuiteId(SUITE)
+                .build();
+            return TestServerClients.withRetry(() -> client.encryptConcurrently(request))
+                .getCiphertexts().stream().map(EsdkOps::toArray).toList();
+        }
+
+        /** Decrypt every ciphertext at the same time, inside the server. */
+        List<byte[]> decryptConcurrently(List<byte[]> ciphertexts) {
+            DecryptConcurrentlyInput request = DecryptConcurrentlyInput.builder()
+                .clientId(clientId)
+                .ciphertexts(ciphertexts.stream().map(ByteBuffer::wrap).toList())
+                .build();
+            return TestServerClients.withRetry(() -> client.decryptConcurrently(request))
+                .getPlaintexts().stream().map(EsdkOps::toArray).toList();
+        }
+
+        /** Move the clock of this client's caches forward. */
+        void advanceClock(long milliseconds) {
+            AdvanceClockInput request = AdvanceClockInput.builder()
+                .clientId(clientId)
+                .milliseconds(milliseconds)
+                .build();
+            TestServerClients.withRetry(() -> client.advanceClock(request));
         }
 
         GetCallCountsOutput callCounts() {
@@ -208,27 +223,12 @@ class CachingCmmTests {
         return ciphertexts;
     }
 
-    /** Runs {@code count} calls at once, released together, and returns their results in order. */
-    private static <T> List<T> concurrently(int count, Callable<T> call) throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(count);
-        try {
-            CountDownLatch start = new CountDownLatch(1);
-            List<Future<T>> futures = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                futures.add(pool.submit(() -> {
-                    start.await();
-                    return call.call();
-                }));
-            }
-            start.countDown();
-            List<T> results = new ArrayList<>();
-            for (Future<T> future : futures) {
-                results.add(future.get(60, TimeUnit.SECONDS));
-            }
-            return results;
-        } finally {
-            pool.shutdownNow();
+    private static List<byte[]> plaintexts(int count, int length) {
+        List<byte[]> plaintexts = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            plaintexts.add(plaintext(length));
         }
+        return plaintexts;
     }
 
     // ---------------------------------------------------------------------------
@@ -291,18 +291,20 @@ class CachingCmmTests {
             target + ": each encryption context must reuse its own data key");
     }
 
-    /** A cached data key is not used after cacheLimitTtlSeconds. */
+    /** A cached data key is used until cacheLimitTtlSeconds, and not after. */
     @ParameterizedTest(name = "dataKeyExpiresAfterTtl {0}")
     @MethodSource("targets")
-    void dataKeyExpiresAfterTtl(LanguageServerTarget target) throws InterruptedException {
-        CachingClient client = CachingClient.create(target, new Limits(null, null, 1, 0));
+    void dataKeyExpiresAfterTtl(LanguageServerTarget target) {
+        CachingClient client = CachingClient.create(target, new Limits(null, null, 60));
 
         byte[] first = client.encrypt(plaintext(16));
-        Thread.sleep(1500);
+        client.advanceClock(59_000);
         byte[] second = client.encrypt(plaintext(16));
+        client.advanceClock(2_000);
+        byte[] third = client.encrypt(plaintext(16));
 
-        assertEquals(List.of(1, 1), messagesPerDataKey(List.of(first, second)),
-            target + ": a data key cached with a 1-second TTL must not be used 1.5 seconds later");
+        assertEquals(List.of(2, 1), messagesPerDataKey(List.of(first, second, third)),
+            target + ": a data key cached with a 60-second TTL is reused at 59 seconds and not at 61");
     }
 
     /** Materials for a suite with an identity KDF are never cached (caching-cmm.md#get-encryption-materials). */
@@ -361,10 +363,10 @@ class CachingCmmTests {
     /** Concurrent encrypts never use a data key for more than limitMessages messages. */
     @ParameterizedTest(name = "concurrentEncryptsStayWithinLimitMessages {0}")
     @MethodSource("targets")
-    void concurrentEncryptsStayWithinLimitMessages(LanguageServerTarget target) throws Exception {
-        CachingClient client = CachingClient.create(target, Limits.messages(5).overlapping());
+    void concurrentEncryptsStayWithinLimitMessages(LanguageServerTarget target) {
+        CachingClient client = CachingClient.create(target, Limits.messages(5));
 
-        List<byte[]> ciphertexts = concurrently(50, () -> client.encrypt(plaintext(16)));
+        List<byte[]> ciphertexts = client.encryptConcurrently(plaintexts(50, 16));
 
         for (int messages : messagesPerDataKey(ciphertexts)) {
             assertTrue(messages <= 5,
@@ -375,19 +377,19 @@ class CachingCmmTests {
     /** Concurrent encrypts of different sizes never use a data key for more than limitBytes bytes. */
     @ParameterizedTest(name = "concurrentEncryptsStayWithinLimitBytes {0}")
     @MethodSource("targets")
-    void concurrentEncryptsStayWithinLimitBytes(LanguageServerTarget target) throws Exception {
-        CachingClient client = CachingClient.create(target, Limits.bytes(10).overlapping());
+    void concurrentEncryptsStayWithinLimitBytes(LanguageServerTarget target) {
+        CachingClient client = CachingClient.create(target, Limits.bytes(10));
         int[] lengths = {6, 3, 1, 4, 4, 2, 9, 1, 1, 5, 3, 7};
-        AtomicInteger next = new AtomicInteger();
+        List<byte[]> plaintexts = new ArrayList<>();
+        for (int length : lengths) {
+            plaintexts.add(plaintext(length));
+        }
 
-        List<Map.Entry<String, Integer>> results = concurrently(lengths.length, () -> {
-            int length = lengths[next.getAndIncrement()];
-            return Map.entry(dataKeyOf(client.encrypt(plaintext(length))), length);
-        });
+        List<byte[]> ciphertexts = client.encryptConcurrently(plaintexts);
 
         Map<String, Integer> bytesPerDataKey = new LinkedHashMap<>();
-        for (Map.Entry<String, Integer> result : results) {
-            bytesPerDataKey.merge(result.getKey(), result.getValue(), Integer::sum);
+        for (int i = 0; i < lengths.length; i++) {
+            bytesPerDataKey.merge(dataKeyOf(ciphertexts.get(i)), lengths[i], Integer::sum);
         }
         for (int bytes : bytesPerDataKey.values()) {
             assertTrue(bytes <= 10,
@@ -401,10 +403,10 @@ class CachingCmmTests {
      */
     @ParameterizedTest(name = "concurrentEncryptsShareDataKeys {0}")
     @MethodSource("targets")
-    void concurrentEncryptsShareDataKeys(LanguageServerTarget target) throws Exception {
-        CachingClient client = CachingClient.create(target, Limits.messages(5).overlapping());
+    void concurrentEncryptsShareDataKeys(LanguageServerTarget target) {
+        CachingClient client = CachingClient.create(target, Limits.messages(5));
 
-        List<byte[]> ciphertexts = concurrently(CONCURRENCY, () -> client.encrypt(plaintext(16)));
+        List<byte[]> ciphertexts = client.encryptConcurrently(plaintexts(CONCURRENCY, 16));
 
         KnownBugGate.gateDeclared(NOT_SHARED_BUG, target, () -> {
             assertEquals(List.of(5, 5), messagesPerDataKey(ciphertexts),
@@ -417,12 +419,12 @@ class CachingCmmTests {
     /** After a warm entry runs out of uses, the remaining concurrent callers share one new data key. */
     @ParameterizedTest(name = "concurrentEncryptsAfterWarmEntryShareDataKeys {0}")
     @MethodSource("targets")
-    void concurrentEncryptsAfterWarmEntryShareDataKeys(LanguageServerTarget target) throws Exception {
-        CachingClient client = CachingClient.create(target, Limits.messages(5).overlapping());
+    void concurrentEncryptsAfterWarmEntryShareDataKeys(LanguageServerTarget target) {
+        CachingClient client = CachingClient.create(target, Limits.messages(5));
         byte[] warm = client.encrypt(plaintext(16));
 
         List<byte[]> ciphertexts = new ArrayList<>(List.of(warm));
-        ciphertexts.addAll(concurrently(CONCURRENCY, () -> client.encrypt(plaintext(16))));
+        ciphertexts.addAll(client.encryptConcurrently(plaintexts(CONCURRENCY, 16)));
 
         KnownBugGate.gateDeclared(NOT_SHARED_BUG, target, () -> {
             List<Integer> perDataKey = messagesPerDataKey(ciphertexts);
@@ -436,12 +438,13 @@ class CachingCmmTests {
     /** Concurrent decrypts of one message share one request for decryption materials. */
     @ParameterizedTest(name = "concurrentDecryptsShareOneRequest {0}")
     @MethodSource("targets")
-    void concurrentDecryptsShareOneRequest(LanguageServerTarget target) throws Exception {
-        CachingClient client = CachingClient.create(target, Limits.messages(5).overlapping());
+    void concurrentDecryptsShareOneRequest(LanguageServerTarget target) {
+        CachingClient client = CachingClient.create(target, Limits.messages(5));
         byte[] plaintext = plaintext(16);
         byte[] ciphertext = client.encrypt(plaintext);
 
-        List<byte[]> recovered = concurrently(CONCURRENCY, () -> client.decrypt(ciphertext));
+        List<byte[]> recovered = client.decryptConcurrently(
+            Collections.nCopies(CONCURRENCY, ciphertext));
 
         for (byte[] result : recovered) {
             assertArrayEquals(plaintext, result, target + ": round trip");
