@@ -425,8 +425,14 @@ Resources:
               - logs:DescribeLogGroups
               - logs:GetLogRecord
               - logs:StartQuery
-              - logs:StopQuery
             Resource: !GetAtt UsageMetricsLogGroup.Arn
+          # These take a query ID rather than a log group, so they cannot be
+          # scoped to one. The role only gets query IDs from StartQuery above.
+          - Effect: Allow
+            Action:
+              - logs:GetQueryResults
+              - logs:StopQuery
+            Resource: '*'
 
   UsageMetricsFunction:
     Type: AWS::Lambda::Function
