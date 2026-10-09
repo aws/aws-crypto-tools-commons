@@ -1,13 +1,12 @@
 # CodeBuild-hosted GitHub Actions runners for the Crypto Tools repositories.
 #
-# Creates one runner project per repository and OS (each project registers its
-# own repository webhook), reserved-capacity fleets for them, and a CloudWatch
-# dashboard of Linux runner usage.
+# Creates a reserved-capacity Linux fleet (and, when enabled, macOS and Windows
+# fleets), one runner project per repository and fleet (each project registers
+# its own repository webhook), and a CloudWatch dashboard of Linux runner usage.
 #
 # Each fleet has a fixed number of instances. The Linux and Windows fleets
 # overflow to on-demand compute; CodeBuild has no on-demand macOS compute, so
-# macOS jobs beyond the fleet's capacity queue. With LinuxFleetCapacity 0 there
-# is no Linux fleet and every Linux job runs on demand.
+# macOS jobs beyond the fleet's capacity queue.
 #
 # Prerequisite: a Secrets Manager secret, in the stack's region, holding a
 # GitHub personal access token (scopes repo, admin:repo_hook) of a user who is
@@ -77,11 +76,9 @@ Parameters:
     Default: 'true'
   LinuxFleetCapacity:
     Type: Number
-    Description: >-
-      Linux fleet instances. Builds beyond them run on demand. 0 creates no
-      fleet, so every Linux build runs on demand.
-    MinValue: 0
-    Default: 0
+    Description: Linux fleet instances. Builds beyond them run on demand.
+    MinValue: 1
+    Default: 2
 
   EnableMacFleet:
     Type: String
@@ -137,7 +134,6 @@ Parameters:
 
 Conditions:
   HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
-  LinuxFleet: !Not [!Equals [!Ref LinuxFleetCapacity, 0]]
   MacFleet: !Equals [!Ref EnableMacFleet, 'true']
   MacFleetLarge: !Equals [!Ref MacComputeType, BUILD_GENERAL1_LARGE]
   WindowsFleet: !Equals [!Ref EnableWindowsFleet, 'true']
@@ -182,7 +178,6 @@ Resources:
 
   LinuxFleet:
     Type: AWS::CodeBuild::Fleet
-    Condition: LinuxFleet
     Properties:
       Name: !Sub ${ProjectPrefix}-linux-fleet
       EnvironmentType: LINUX_CONTAINER
@@ -240,10 +235,8 @@ Resources:
             ComputeType: !Ref LinuxComputeType
             Image: !Ref LinuxImage
             PrivilegedMode: !Ref LinuxPrivilegedMode
-            Fleet: !If
-              - LinuxFleet
-              - FleetArn: !GetAtt LinuxFleet.Arn
-              - !Ref AWS::NoValue
+            Fleet:
+              FleetArn: !GetAtt LinuxFleet.Arn
           LogsConfig:
             CloudWatchLogs:
               Status: ENABLED
@@ -662,7 +655,6 @@ Resources:
 
 Outputs:
   LinuxFleetArn:
-    Condition: LinuxFleet
     Value: !GetAtt LinuxFleet.Arn
   MacFleetArn:
     Condition: MacFleet
