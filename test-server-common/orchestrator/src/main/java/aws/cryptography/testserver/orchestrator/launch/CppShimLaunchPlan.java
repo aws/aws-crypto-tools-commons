@@ -3,12 +3,14 @@ package aws.cryptography.testserver.orchestrator.launch;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The C++-shim {@code Language_Server} launch plan: builds the rpcv2Cbor server
@@ -32,7 +34,10 @@ import java.util.List;
  *       output. (The build natively compiles {@code aws-lc-sys}, which needs a
  *       Rust toolchain and Go on PATH.)</li>
  *   <li><b>Launch.</b> {@code <server>/target/release/esdk-cpp-test-server
- *       <port>} via the shared {@link SubprocessLauncher}.</li>
+ *       <port>} via the shared {@link SubprocessLauncher}, with the shim's
+ *       {@code target/release} first on the loader search path
+ *       ({@code LD_LIBRARY_PATH}, or {@code DYLD_LIBRARY_PATH} on macOS) so a
+ *       build restored into another workspace still finds the shim library.</li>
  * </ol>
  *
  * <p>Command construction is pure ({@code static} builders) so the exact
@@ -159,6 +164,12 @@ public final class CppShimLaunchPlan implements Launcher {
         //    shared probe/spawn/readiness/teardown.
         ProcessBuilder server = new ProcessBuilder(serverCommand(serverDir, entry.port(), serverBinaryName));
         server.directory(serverDir.toFile());
+        // The server's rpath to the shim library is the absolute build-time path,
+        // which does not exist when the build was restored from a prebuilt
+        // artifact into a different workspace; the loader would exit 127.
+        String libraryPathVariable = libraryPathVariable(System.getProperty("os.name"));
+        server.environment().put(libraryPathVariable, prependPath(shimLibrary.getParent(),
+            server.environment().get(libraryPathVariable)));
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
         return subprocessLauncher.launch(language, entry.port(), server);
@@ -177,6 +188,20 @@ public final class CppShimLaunchPlan implements Launcher {
     static List<String> serverCommand(Path serverDir, int port, String serverBinaryName) {
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         return List.of(binary.toString(), String.valueOf(port));
+    }
+
+    /** The dynamic loader's search-path variable: {@code DYLD_LIBRARY_PATH} on macOS, else {@code LD_LIBRARY_PATH}. */
+    static String libraryPathVariable(String osName) {
+        return osName != null && osName.toLowerCase(Locale.ROOT).contains("mac")
+            ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH";
+    }
+
+    /** {@code directory}, followed by {@code existing} when it is set. */
+    static String prependPath(Path directory, String existing) {
+        if (existing == null || existing.isBlank()) {
+            return directory.toString();
+        }
+        return directory + File.pathSeparator + existing;
     }
 
     /**
