@@ -24,6 +24,7 @@ service ESDKTestServer {
         EncryptStream
         Decrypt
         DecryptStream
+        GetCallCounts
     ]
     errors: [
         GenericServerError
@@ -41,6 +42,19 @@ service ESDKTestServer {
 operation CreateClient {
     input: CreateClientRequest
     output: CreateClientResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: report how many calls the referenced client's Caching CMMs have
+/// made to the CMMs they wrap, since the client was created.
+/// Tests use it to see whether the cache served a request or fetched new materials.
+/// Servers count these calls in their test server only; customers never see the counts.
+operation GetCallCounts {
+    input: GetCallCountsRequest
+    output: GetCallCountsResponse
     errors: [
         GenericServerError
         ESDKClientError
@@ -104,6 +118,18 @@ structure CreateClientRequest {
     /// faithful ESDK API layer (Requirement 2.1).
     @required
     config: ESDKClientConfig
+
+    /// Test-only behavior for the server to plug into the client it builds.
+    /// Customers never configure these.
+    testHooks: TestHooks
+}
+
+/// Test-only hooks a server plugs into the client it builds.
+structure TestHooks {
+    /// Delay, in milliseconds, before each call a Caching CMM makes to its underlying CMM.
+    /// A fast keyring finishes before a concurrent call arrives;
+    /// the delay makes concurrent cache misses overlap, so tests can see whether they share a request.
+    cachingCmmUnderlyingDelayMilliseconds: Integer
 }
 
 @output
@@ -112,6 +138,26 @@ structure CreateClientResponse {
     /// referencing exactly one registered ESDK_Client (Requirements 3.1, 3.2).
     @required
     clientId: ClientId
+}
+
+@input
+structure GetCallCountsRequest {
+    /// References the configured ESDK_Client whose counts to report.
+    @required
+    clientId: ClientId
+}
+
+@output
+structure GetCallCountsResponse {
+    /// Calls from the client's Caching CMMs to their underlying CMM's GetEncryptionMaterials.
+    /// Zero for a client with no Caching CMM.
+    @required
+    cachingCmmGetEncryptionMaterialsCalls: Long
+
+    /// Calls from the client's Caching CMMs to their underlying CMM's DecryptMaterials.
+    /// Zero for a client with no Caching CMM.
+    @required
+    cachingCmmDecryptMaterialsCalls: Long
 }
 
 @input
