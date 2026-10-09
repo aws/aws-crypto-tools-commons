@@ -585,13 +585,13 @@ Resources:
           "periodOverride": "inherit",
           "widgets": [
             {
-              "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 1,
               "properties": {
                 "markdown": "Metrics for the CodeBuild fleet that runs the Linux GitHub Actions jobs. [Link to fleet](https://tiny.amazon.com/12cfzcrrm/IsenLink)"
               }
             },
             {
-              "type": "metric", "x": 0, "y": 2, "width": 24, "height": 6,
+              "type": "metric", "x": 0, "y": 1, "width": 24, "height": 6,
               "properties": {
                 "title": "Linux concurrent jobs",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -604,7 +604,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 8, "width": 24, "height": 6,
+              "type": "metric", "x": 0, "y": 7, "width": 24, "height": 6,
               "properties": {
                 "title": "Longest wait",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -615,7 +615,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 0, "y": 14, "width": 12, "height": 6,
+              "type": "metric", "x": 0, "y": 13, "width": 12, "height": 6,
               "properties": {
                 "title": "Linux CPU utilization (%)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -629,7 +629,7 @@ Resources:
               }
             },
             {
-              "type": "metric", "x": 12, "y": 14, "width": 12, "height": 6,
+              "type": "metric", "x": 12, "y": 13, "width": 12, "height": 6,
               "properties": {
                 "title": "Linux memory utilization (%)",
                 "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
@@ -643,13 +643,13 @@ Resources:
               }
             },
             {
-              "type": "text", "x": 0, "y": 20, "width": 24, "height": 3,
+              "type": "text", "x": 0, "y": 22, "width": 24, "height": 4,
               "properties": {
                 "markdown": "CodeBuild reserved hosts bill every minute, even if they are idle. An on-demand job bills only while it runs, but is 67% more expensive. These metrics capture how many hosts should have been allocated in the selected time range to minimize costs.\n\nBest hosts is the reserved host count to minimize cost in the selected time period.\n\nBest cost is what using that count would have cost.\n\nSavings is Actual minus Best cost."
               }
             },
             {
-              "type": "log", "x": 0, "y": 23, "width": 24, "height": 3,
+              "type": "log", "x": 0, "y": 19, "width": 24, "height": 3,
               "properties": {
                 "title": "Linux cost over the selected time range",
                 "region": "${AWS::Region}", "view": "table",
