@@ -9,13 +9,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "branch": "kessplas/esdk-test-server",
+        "branch": "lucmcdon/test-server-testing-ops",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucmcdon/test-server-testing-ops",
         "path": "test-server/server"
       }
     },

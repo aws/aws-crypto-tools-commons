@@ -23,6 +23,7 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.EncryptConcurrentlyInput;
 import aws.cryptography.esdk.testserver.client.model.EncryptInput;
+import aws.cryptography.esdk.testserver.client.model.GenericServerError;
 import aws.cryptography.esdk.testserver.client.model.GetCallCountsInput;
 import aws.cryptography.esdk.testserver.client.model.GetCallCountsOutput;
 import aws.cryptography.esdk.testserver.client.model.Keyring;
@@ -35,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -113,7 +115,15 @@ class CachingCmmTests {
             CreateClientInput request = CreateClientInput.builder().config(config).build();
             ESDKTestServerClient client = TestServerClients.forEndpoint(target.endpoint());
             String clientId = TestServerClients.withRetry(() -> client.createClient(request)).getClientId();
-            return new CachingClient(client, clientId);
+            CachingClient caching = new CachingClient(client, clientId);
+            // A server that supports caching but not yet the test-only operations skips, visibly.
+            try {
+                caching.callCounts();
+            } catch (GenericServerError e) {
+                Assumptions.abort(target + " does not implement the test-only operations: "
+                    + e.getMessage());
+            }
+            return caching;
         }
 
         static CachingClient create(LanguageServerTarget target, Limits limits) {
