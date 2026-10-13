@@ -3,6 +3,7 @@ package aws.cryptography.testserver.orchestrator.launch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
@@ -71,5 +72,48 @@ class GoLaunchPlanTest {
 
     private static ConfigurationEntry goEntry() {
         return new ConfigurationEntry("go", 1, 8099, null, null, null, null);
+    }
+
+    @Test
+    @DisplayName("a smithy-dafny runtimes/go library transpiles its implementation and MPL dependencies, not its tests")
+    void goTranspileCommand() {
+        assertEquals(List.of("make", "_no_extern_pre_transpile", "transpile_dependencies_go",
+                "transpile_implementation_go", "_no_extern_post_transpile", "CORES=4"),
+            GoLaunchPlan.transpileCommand("make"));
+    }
+
+    @Test
+    @DisplayName("a smithy-dafny library without dafny on PATH is a BUILD failure before any make or go step")
+    void smithyDafnyLibraryRequiresDafny(@TempDir Path tempDir) throws Exception {
+        assumeFalse(DafnyProject.commandOnPath("dafny", System.getenv("PATH")), "dafny is on PATH");
+        String server = "esdk-test-servers/go";
+        String library = "AwsEncryptionSDK/runtimes/go";
+        DafnyLibraryFixture clone = DafnyLibraryFixture.create(tempDir, server, library, true);
+        GoLaunchPlan plan = new GoLaunchPlan(tempDir.resolve("work"), "esdk",
+            clone.tool(tempDir, "go").toString(), clone.tool(tempDir, "make").toString(),
+            new SubprocessLauncher(Duration.ofSeconds(1)));
+
+        ServerLaunchException ex = assertThrows(ServerLaunchException.class,
+            () -> plan.launch(goEntry(), clone.sources("go", server, library)));
+        assertEquals(ServerLaunchException.Category.BUILD, ex.category());
+        assertTrue(ex.getMessage().contains("requires Dafny " + GoLaunchPlan.REQUIRED_DAFNY_VERSION),
+            ex.getMessage());
+        assertEquals(List.of(), clone.toolCalls(), "nothing may run before the Dafny gate");
+    }
+
+    @Test
+    @DisplayName("a library that is not a smithy-dafny runtimes/go builds with go directly, without a transpile")
+    void plainLibraryIsNotTranspiled(@TempDir Path tempDir) throws Exception {
+        String server = "esdk-test-servers/go";
+        String library = "releases/go/encryption-sdk";
+        DafnyLibraryFixture clone = DafnyLibraryFixture.create(tempDir, server, library, false);
+        GoLaunchPlan plan = new GoLaunchPlan(tempDir.resolve("work"), "esdk",
+            clone.tool(tempDir, "go").toString(), clone.tool(tempDir, "make").toString(),
+            new SubprocessLauncher(Duration.ofSeconds(1)));
+
+        ServerLaunchException ex = assertThrows(ServerLaunchException.class,
+            () -> plan.launch(goEntry(), clone.sources("go", server, library)));
+        assertEquals(ServerLaunchException.Category.BUILD, ex.category());
+        assertEquals(List.of("go build -buildvcs=false -o esdk-test-server ."), clone.toolCalls());
     }
 }

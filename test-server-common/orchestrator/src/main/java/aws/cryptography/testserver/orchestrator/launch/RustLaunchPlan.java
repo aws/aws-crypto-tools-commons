@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The Rust {@code Language_Server} launch plan (Requirements 1.5, 2.1, 2.7):
@@ -23,6 +25,18 @@ import java.util.List;
  *       server's cargo path dependencies point at are present in the same clone.
  *       A missing component is a {@code RESOLVE} launch failure (Requirement
  *       2.5).</li>
+ *   <li><b>Transpile the library.</b> When the library component is a
+ *       smithy-dafny {@code runtimes/rust} directory ({@link DafnyProject}),
+ *       its Rust code is generated, not committed: in the clone root,
+ *       initialize each present Dafny submodule, then {@code make
+ *       polymorph_rust} and {@code make transpile_rust CORES=4} in the
+ *       library's project directory (e.g. {@code AwsEncryptionSDK/}), the steps
+ *       the repository's own Rust workflow runs. The code generator runs with
+ *       {@code JAVA_HOME} set to {@value #CODEGEN_JAVA_HOME_VARIABLE} when that
+ *       is set. Dafny {@value #REQUIRED_DAFNY_VERSION} must be on {@code PATH};
+ *       its absence is an eager {@code BUILD} failure. Any other library (a
+ *       hand-written crate such as aws-crypto-tools-rust's {@code esdk}) is
+ *       built directly.</li>
  *   <li><b>Build.</b> {@code cargo build --release} in the server directory. A
  *       non-zero build is a {@code BUILD} launch failure carrying the tool
  *       output. (The build fetches crates and natively compiles {@code
@@ -40,6 +54,15 @@ public final class RustLaunchPlan implements Launcher {
 
     /** The cargo executable (resolved from PATH). */
     static final String DEFAULT_CARGO = "cargo";
+
+    /** The make executable (resolved from PATH). */
+    static final String DEFAULT_MAKE = "make";
+
+    /** The Dafny version the Rust transpile uses (aws-encryption-sdk's library_rust_tests.yml). */
+    static final String REQUIRED_DAFNY_VERSION = "4.10.0";
+
+    /** Names the JDK the smithy-dafny code generator runs on, when it differs from the orchestrator's. */
+    static final String CODEGEN_JAVA_HOME_VARIABLE = "TESTSERVER_CODEGEN_JAVA_HOME";
 
     /** The release binary name cargo produces. */
     /**
@@ -59,6 +82,7 @@ public final class RustLaunchPlan implements Launcher {
 
     private final Path workDirectory;
     private final String cargo;
+    private final String make;
     private final SubprocessLauncher subprocessLauncher;
     private final String product;
 
@@ -83,6 +107,18 @@ public final class RustLaunchPlan implements Launcher {
      */
     public RustLaunchPlan(Path workDirectory, String product,
             String cargo, SubprocessLauncher subprocessLauncher) {
+        this(workDirectory, product, cargo, DEFAULT_MAKE, subprocessLauncher);
+    }
+
+    /**
+     * @param workDirectory      scratch directory owned by this plan
+     * @param product            the SDK product identifier
+     * @param cargo              the cargo executable
+     * @param make               the make executable (the Dafny transpile)
+     * @param subprocessLauncher the shared launch machinery
+     */
+    public RustLaunchPlan(Path workDirectory, String product,
+            String cargo, String make, SubprocessLauncher subprocessLauncher) {
         if (workDirectory == null) {
             throw new IllegalArgumentException("workDirectory is required");
         }
@@ -92,11 +128,15 @@ public final class RustLaunchPlan implements Launcher {
         if (cargo == null || cargo.isBlank()) {
             throw new IllegalArgumentException("cargo is required");
         }
+        if (make == null || make.isBlank()) {
+            throw new IllegalArgumentException("make is required");
+        }
         if (subprocessLauncher == null) {
             throw new IllegalArgumentException("subprocessLauncher is required");
         }
         this.workDirectory = workDirectory;
         this.cargo = cargo;
+        this.make = make;
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryName = product + "-test-server";
         this.product = product;
@@ -108,11 +148,13 @@ public final class RustLaunchPlan implements Launcher {
         String language = entry.language();
 
         // 1. Resolve the materialized server directory (Req 2.5). The library
-        //    crate is a cargo path dependency within the same clone, so only the
-        //    server component is resolved here.
+        //    crate is a cargo path dependency within the same clone; it is
+        //    resolved only to decide whether it must be transpiled first.
         MaterializedSources.Success resolved = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
         Path serverDir = resolved.directory();
+        Optional<Path> dafnyProject = sources.directoryOf(ComponentId.library(language))
+            .flatMap(DafnyProject::of);
 
         try {
             Files.createDirectories(workDirectory);
@@ -127,7 +169,10 @@ public final class RustLaunchPlan implements Launcher {
         BuildStamp stamp = new BuildStamp(serverDir, product);
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary))) {
-            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir);
+            if (dafnyProject.isPresent()) {
+                transpile(language, dafnyProject.get());
+            }
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, Map.of());
             stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
@@ -140,9 +185,47 @@ public final class RustLaunchPlan implements Launcher {
         return subprocessLauncher.launch(language, entry.port(), server);
     }
 
+    /**
+     * Generate and transpile the smithy-dafny library at {@code dafnyProjectDir}
+     * in place, serialized with any other Dafny build in the same clone.
+     */
+    private void transpile(String language, Path dafnyProjectDir) throws ServerLaunchException {
+        if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                "the " + language + " Language_Server build requires Dafny " + REQUIRED_DAFNY_VERSION
+                    + " on PATH ('dafny' was not found): the Rust library carries no committed"
+                    + " generated code and transpiles from Dafny before building");
+        }
+        Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
+        Map<String, String> codegenEnv = codegenEnvironment(System.getenv(CODEGEN_JAVA_HOME_VARIABLE));
+        synchronized (DafnyProject.lockFor(repoRoot)) {
+            for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, Map.of());
+            }
+            runBuildStep(language, "make polymorph_rust", polymorphCommand(make), dafnyProjectDir, codegenEnv);
+            runBuildStep(language, "make transpile_rust", transpileCommand(make), dafnyProjectDir, codegenEnv);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Pure command construction (unit-testable without a cargo build).
     // ------------------------------------------------------------------
+
+    /** {@code make polymorph_rust}: generates the library's Smithy Rust code. */
+    static List<String> polymorphCommand(String make) {
+        return List.of(make, "polymorph_rust");
+    }
+
+    /** {@code make transpile_rust CORES=4}: transpiles the library's Dafny to Rust. */
+    static List<String> transpileCommand(String make) {
+        return List.of(make, "transpile_rust", "CORES=4");
+    }
+
+    /** {@code JAVA_HOME} for the code generator, when {@code codegenJavaHome} is set. */
+    static Map<String, String> codegenEnvironment(String codegenJavaHome) {
+        return codegenJavaHome == null || codegenJavaHome.isBlank()
+            ? Map.of() : Map.of("JAVA_HOME", codegenJavaHome);
+    }
 
     /** {@code cargo build --release}. */
     static List<String> buildCommand(String cargo) {
@@ -181,17 +264,19 @@ public final class RustLaunchPlan implements Launcher {
     }
 
     /**
-     * Run the synchronous build to completion in {@code serverDir}. A build that
+     * Run the synchronous build to completion in {@code buildDir}, with
+     * {@code environment} added to the inherited one. A build that
      * cannot start, is interrupted, or exits non-zero is a {@code BUILD} launch
      * failure naming the step and carrying the tool output (Req 2.5).
      */
-    private void runBuildStep(String language, String step, List<String> command, Path serverDir)
-            throws ServerLaunchException {
+    private void runBuildStep(String language, String step, List<String> command, Path buildDir,
+            Map<String, String> environment) throws ServerLaunchException {
         Instant startedAt = Instant.now();
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
-            builder.directory(serverDir.toFile());
+            builder.directory(buildDir.toFile());
             builder.redirectErrorStream(true);
+            builder.environment().putAll(environment);
 
             Process process;
             try {

@@ -469,11 +469,23 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             >> language-repo/.git/info/exclude
 
+      - name: Set up JDK 17 (Temurin) for the smithy-dafny code generator
+        # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator.
+        if: matrix.language == 'rust-dafny'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Set up JDK 21 (Temurin) for the orchestrator
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Point the Rust code generator at JDK 17
+        if: matrix.language == 'rust-dafny'
+        run: echo "TESTSERVER_CODEGEN_JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator)
         uses: actions/cache/restore@v4
@@ -503,20 +515,26 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Set up .NET (.NET library transpile + build)
-        if: matrix.language == 'net'
+      - name: Set up .NET (the Dafny tool; .NET library build)
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             6.0.x
             8.0.x
 
-      - name: Install Dafny 4.9.0
-        if: matrix.language == 'net'
+      - name: Install Dafny (4.10.0 for the Rust transpile, 4.9.0 otherwise)
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
+        env:
+          DAFNY_VERSION: ${{ matrix.language == 'rust-dafny' && '4.10.0' || '4.9.0' }}
         run: |
           set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
+          dotnet tool install --global dafny --version "$DAFNY_VERSION"
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Install goimports (the Dafny Go backend formats its output with it)
+        if: matrix.language == 'go'
+        run: go install golang.org/x/tools/cmd/goimports@v0.36.0
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -569,14 +587,20 @@ jobs:
         working-directory: esdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
 
-      - name: Initialize the .NET submodules
-        # The transpile outputs restore into the submodule checkouts.
-        if: matrix.language == 'net'
+      - name: Initialize the Dafny submodules
+        # The .NET transpile outputs restore into the submodule checkouts.
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         run: |
           set -euo pipefail
           clone="$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}"
           git -C "$clone" submodule update --init --depth 1 libraries
           git -C "$clone" submodule update --init --recursive --depth 1 --jobs 8 mpl
+
+      - name: Install the smithy-dafny code generator dependencies (Rust codegen)
+        if: matrix.language == 'rust-dafny'
+        env:
+          JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
+        run: make -C "$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny" mvn_local_deploy_polymorph_dependencies
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
