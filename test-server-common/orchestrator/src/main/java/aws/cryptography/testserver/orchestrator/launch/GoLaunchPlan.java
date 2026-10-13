@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -31,10 +32,12 @@ import java.util.Optional;
  *       _no_extern_pre_transpile transpile_dependencies_go
  *       transpile_implementation_go _no_extern_post_transpile CORES=4} in the
  *       library's project directory, the repository's {@code transpile_go}
- *       without its tests. Dafny {@value #REQUIRED_DAFNY_VERSION} and
- *       {@code goimports} must be on {@code PATH}; a missing {@code dafny} is
- *       an eager {@code BUILD} failure. Any other library is built
- *       directly.</li>
+ *       without its tests, with {@code JAVA_HOME} set to
+ *       {@value DafnyProject#CODEGEN_JAVA_HOME_VARIABLE} when that is set
+ *       (the Makefile runs the smithy-dafny Gradle wrapper). Dafny
+ *       {@value #REQUIRED_DAFNY_VERSION} and {@code goimports} must be on
+ *       {@code PATH}; a missing {@code dafny} is an eager {@code BUILD}
+ *       failure. Any other library is built directly.</li>
  *   <li><b>Build.</b> {@code go build -buildvcs=false -o esdk-test-server .} in
  *       the server directory ({@code -buildvcs=false} because the materialized
  *       clone trips Go's git VCS stamping). A non-zero build is a {@code BUILD}
@@ -164,7 +167,7 @@ public final class GoLaunchPlan implements Launcher {
                 transpile(language, dafnyProject.get());
             }
             runBuildStep(language, "go build -buildvcs=false -o " + serverBinaryName + " .",
-                buildCommand(go, serverBinaryName), serverDir);
+                buildCommand(go, serverBinaryName), serverDir, Map.of());
             stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
@@ -189,12 +192,14 @@ public final class GoLaunchPlan implements Launcher {
                     + " are not committed and are transpiled before building");
         }
         Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
+        Map<String, String> codegenEnv = DafnyProject.codegenEnvironment(
+            System.getenv(DafnyProject.CODEGEN_JAVA_HOME_VARIABLE));
         synchronized (DafnyProject.lockFor(repoRoot)) {
             for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
-                runBuildStep(language, String.join(" ", submodule), submodule, repoRoot);
+                runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, Map.of());
             }
             runBuildStep(language, "make transpile (implementation + dependencies)",
-                transpileCommand(make), dafnyProjectDir);
+                transpileCommand(make), dafnyProjectDir, codegenEnv);
         }
     }
 
@@ -235,17 +240,19 @@ public final class GoLaunchPlan implements Launcher {
     }
 
     /**
-     * Run the synchronous build to completion in {@code buildDir}. A build that
+     * Run the synchronous build to completion in {@code buildDir}, with
+     * {@code environment} added to the inherited one. A build that
      * cannot start, is interrupted, or exits non-zero is a {@code BUILD} launch
      * failure naming the step and carrying the tool output (Req 2.5).
      */
-    private void runBuildStep(String language, String step, List<String> command, Path buildDir)
-            throws ServerLaunchException {
+    private void runBuildStep(String language, String step, List<String> command, Path buildDir,
+            Map<String, String> environment) throws ServerLaunchException {
         Instant startedAt = Instant.now();
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(buildDir.toFile());
             builder.redirectErrorStream(true);
+            builder.environment().putAll(environment);
 
             Process process;
             try {

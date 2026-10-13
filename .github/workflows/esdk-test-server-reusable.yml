@@ -469,9 +469,9 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             >> language-repo/.git/info/exclude
 
-      - name: Set up JDK 17 (Temurin) for the smithy-dafny code generator
+      - name: Set up JDK 17 (Temurin) for the smithy-dafny Gradle steps
         # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator.
-        if: matrix.language == 'rust-dafny'
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -483,8 +483,8 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Point the Rust code generator at JDK 17
-        if: matrix.language == 'rust-dafny'
+      - name: Point the smithy-dafny Gradle steps at JDK 17
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
         run: echo "TESTSERVER_CODEGEN_JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator)
@@ -601,6 +601,15 @@ jobs:
         env:
           JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
         run: make -C "$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny" mvn_local_deploy_polymorph_dependencies
+
+      - name: Download the smithy-dafny Gradle wrapper
+        # The Makefile captures this wrapper's stdout in a $(shell) call; on a
+        # cold runner its download progress would land in the dafny command line.
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        env:
+          JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
+        working-directory: ${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny/codegen
+        run: ./gradlew --version > /dev/null
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates

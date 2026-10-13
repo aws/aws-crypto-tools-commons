@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -21,6 +22,12 @@ final class DafnyProject {
 
     /** Submodules a smithy-dafny transpile reads, initialized when the repository has them. */
     static final List<String> SUBMODULES = List.of("libraries", "smithy-dafny", "mpl");
+
+    /**
+     * Names the JDK the smithy-dafny Makefile's Gradle steps run on (its
+     * Gradle 7.6 wrapper cannot run on the orchestrator's JDK 21).
+     */
+    static final String CODEGEN_JAVA_HOME_VARIABLE = "TESTSERVER_CODEGEN_JAVA_HOME";
 
     private static final ConcurrentMap<Path, Object> LOCKS = new ConcurrentHashMap<>();
 
@@ -65,6 +72,12 @@ final class DafnyProject {
             }
         }
         return commands;
+    }
+
+    /** {@code JAVA_HOME} for the smithy-dafny make steps, when {@code codegenJavaHome} is set. */
+    static Map<String, String> codegenEnvironment(String codegenJavaHome) {
+        return codegenJavaHome == null || codegenJavaHome.isBlank()
+            ? Map.of() : Map.of("JAVA_HOME", codegenJavaHome);
     }
 
     /** Whether an executable {@code command} is on {@code pathValue} (a PATH-format string). */

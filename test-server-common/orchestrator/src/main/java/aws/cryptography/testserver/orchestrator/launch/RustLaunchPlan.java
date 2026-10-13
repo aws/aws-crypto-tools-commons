@@ -32,7 +32,7 @@ import java.util.Optional;
  *       polymorph_rust} and {@code make transpile_rust CORES=4} in the
  *       library's project directory (e.g. {@code AwsEncryptionSDK/}), the steps
  *       the repository's own Rust workflow runs. The code generator runs with
- *       {@code JAVA_HOME} set to {@value #CODEGEN_JAVA_HOME_VARIABLE} when that
+ *       {@code JAVA_HOME} set to {@value DafnyProject#CODEGEN_JAVA_HOME_VARIABLE} when that
  *       is set. Dafny {@value #REQUIRED_DAFNY_VERSION} must be on {@code PATH};
  *       its absence is an eager {@code BUILD} failure. Any other library (a
  *       hand-written crate such as aws-crypto-tools-rust's {@code esdk}) is
@@ -60,9 +60,6 @@ public final class RustLaunchPlan implements Launcher {
 
     /** The Dafny version the Rust transpile uses (aws-encryption-sdk's library_rust_tests.yml). */
     static final String REQUIRED_DAFNY_VERSION = "4.10.0";
-
-    /** Names the JDK the smithy-dafny code generator runs on, when it differs from the orchestrator's. */
-    static final String CODEGEN_JAVA_HOME_VARIABLE = "TESTSERVER_CODEGEN_JAVA_HOME";
 
     /** The release binary name cargo produces. */
     /**
@@ -197,7 +194,8 @@ public final class RustLaunchPlan implements Launcher {
                     + " generated code and transpiles from Dafny before building");
         }
         Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
-        Map<String, String> codegenEnv = codegenEnvironment(System.getenv(CODEGEN_JAVA_HOME_VARIABLE));
+        Map<String, String> codegenEnv = DafnyProject.codegenEnvironment(
+            System.getenv(DafnyProject.CODEGEN_JAVA_HOME_VARIABLE));
         synchronized (DafnyProject.lockFor(repoRoot)) {
             for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
                 runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, Map.of());
@@ -219,12 +217,6 @@ public final class RustLaunchPlan implements Launcher {
     /** {@code make transpile_rust CORES=4}: transpiles the library's Dafny to Rust. */
     static List<String> transpileCommand(String make) {
         return List.of(make, "transpile_rust", "CORES=4");
-    }
-
-    /** {@code JAVA_HOME} for the code generator, when {@code codegenJavaHome} is set. */
-    static Map<String, String> codegenEnvironment(String codegenJavaHome) {
-        return codegenJavaHome == null || codegenJavaHome.isBlank()
-            ? Map.of() : Map.of("JAVA_HOME", codegenJavaHome);
     }
 
     /** {@code cargo build --release}. */

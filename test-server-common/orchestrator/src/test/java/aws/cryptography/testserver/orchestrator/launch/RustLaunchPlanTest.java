@@ -52,9 +52,9 @@ class RustLaunchPlanTest {
     @Test
     @DisplayName("the code generator gets JAVA_HOME only when the codegen JDK is set")
     void codegenJavaHome() {
-        assertEquals(Map.of(), RustLaunchPlan.codegenEnvironment(null));
-        assertEquals(Map.of(), RustLaunchPlan.codegenEnvironment(" "));
-        assertEquals(Map.of("JAVA_HOME", "/jdk17"), RustLaunchPlan.codegenEnvironment("/jdk17"));
+        assertEquals(Map.of(), DafnyProject.codegenEnvironment(null));
+        assertEquals(Map.of(), DafnyProject.codegenEnvironment(" "));
+        assertEquals(Map.of("JAVA_HOME", "/jdk17"), DafnyProject.codegenEnvironment("/jdk17"));
     }
 
     @Test
