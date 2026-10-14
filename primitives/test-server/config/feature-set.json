@@ -22,7 +22,12 @@
     "    model's KbkdfCtrHmac takes the full fixed input, so only the raw-derive",
     "    vectors (B.1-B.10) are ported.",
     "  - Constant-time comparison (Dafny ConstantTime.dfy): a property of one",
-    "    implementation's internals, not observable through the wire contract."
+    "    implementation's internals, not observable through the wire contract.",
+    "  - HKDF with an empty salt: implementations diverge. The Dafny primitives",
+    "    (WrappedHKDF.dfy) reject a present-but-empty salt and only accept an",
+    "    absent one; native Rust accepts an empty salt. The model's salt is",
+    "    required, so 'no salt' cannot be expressed, and RFC 5869 A.3 sends",
+    "    HashLen zero bytes instead (the RFC 5869 section 2.2 default, same output)."
   ],
   "product": "primitives",
   "features": [

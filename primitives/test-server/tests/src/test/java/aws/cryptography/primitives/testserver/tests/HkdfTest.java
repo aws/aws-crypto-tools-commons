@@ -54,10 +54,13 @@ public class HkdfTest {
                 + "d0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeef"
                 + "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
             "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c"),
-        // Empty salt and empty info.
+        // No salt and empty info. The model's salt is required, and the Dafny
+        // primitives reject a present-but-empty salt, so "no salt" is sent as
+        // RFC 5869 section 2.2's default: HashLen (32) zero bytes. HMAC zero-pads
+        // a short key, so this yields the same PRK and OKM as an empty salt.
         new Vector("RFC 5869 A.3",
             "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-            "",
+            "0000000000000000000000000000000000000000000000000000000000000000",
             "",
             "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d"));
 
