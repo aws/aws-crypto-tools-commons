@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
  * <p>"Dafny" is the AES-256 vector in the Dafny primitives' TestAES.dfy. The other
  * three are test cases 4, 10 and 16 of McGrew and Viega, "The Galois/Counter Mode
  * of Operation (GCM)": the same 60-byte plaintext, 20-byte AAD and 12-byte IV
- * under a 128-, 192- and 256-bit key, one per model algorithm.
+ * under a 128-, 192- and 256-bit key, one per model algorithm. The test cases
+ * are in the paper's appendix: https://eprint.iacr.org/2004/193
  */
 public class AesGcmKnownAnswerTest {
 
