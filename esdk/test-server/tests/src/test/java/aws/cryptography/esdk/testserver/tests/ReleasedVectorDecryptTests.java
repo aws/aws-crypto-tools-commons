@@ -1,9 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
 
-import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.FeatureDeclarations;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.TargetPair;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
@@ -39,6 +38,8 @@ import org.junit.jupiter.api.TestFactory;
  * through the legacy MasterKeyProvider interface), so decrypting them is the external oracle
  * that a self-referential cross-language round trip cannot be: it proves each runtime reads what
  * a real released implementation wrote, not merely what the other servers in this run wrote.
+ * CI also adds the decrypt corpora the ESDK Daily CI writes through today's Java and Python
+ * MasterKeyProvider APIs, so every runtime reads current MKP output too.
  *
  * <p>One provisioning, many decryptors: the corpora are downloaded and extracted once (a CI
  * step, or a local checkout) into a directory named by {@code ESDK_TESTSERVER_DECRYPT_VECTORS_DIR}
@@ -56,8 +57,8 @@ import org.junit.jupiter.api.TestFactory;
  *   <li>offline vectors only by default (every master key is a raw keyring); KMS-backed vectors
  *       need cross-account key access and are enabled with
  *       {@code -Desdk.testserver.releasedVectors.includeKms=true};</li>
- *   <li>capped per manifest ({@code -Desdk.testserver.releasedVectors.limitPerManifest}, default
- *       200, {@code 0} for the full corpus).</li>
+ *   <li>capped per manifest and target ({@code -Desdk.testserver.releasedVectors.limitPerManifest},
+ *       default 200, {@code 0} for the full corpus), counting only vectors the target supports.</li>
  * </ul>
  * A vector whose master keys do not map to a modeled keyring is skipped. Feature-gated on the
  * keyrings each vector uses.
@@ -103,41 +104,36 @@ class ReleasedVectorDecryptTests {
             JsonNode keys = normalizeKeys(MAPPER.readTree(corpus.resolve("keys.json").toFile()).get("keys"));
             String corpusName = corpus.getFileName().toString();
 
-            int emitted = 0;
+            List<Map.Entry<String, Selection>> selections = new ArrayList<>();
             for (Iterator<Map.Entry<String, JsonNode>> it = manifest.get("tests").fields();
                     it.hasNext(); ) {
-                if (cap > 0 && emitted >= cap) {
-                    break;
-                }
                 Map.Entry<String, JsonNode> entry = it.next();
-                JsonNode test = entry.getValue();
-                Selection selection = select(test, version, keys, includeKms);
-                if (selection == null) {
-                    continue;
+                Selection selection = select(entry.getValue(), version, keys, includeKms);
+                if (selection != null) {
+                    selections.add(Map.entry(entry.getKey(), selection));
                 }
-                emitted++;
+            }
 
-                ESDKClientConfig config = ESDKClientConfig.builder()
-                    .commitmentPolicy(DECRYPT_POLICY)
-                    .cmm(CryptographicMaterialsManager.builder()
-                        .defaultMember(DefaultCmmConfig.builder().keyring(selection.keyring).build())
-                        .build())
-                    .build();
-                Path ciphertextPath = corpus.resolve(selection.ciphertextRef);
-                Path plaintextPath = corpus.resolve(selection.plaintextRef);
-                String label = corpusName + "/" + entry.getKey();
-
-                for (LanguageServerTarget target : targets) {
+            // The cap counts only vectors a target can run, so vectors it would skip
+            // (e.g. raw-RSA on a server without it) do not use up its budget.
+            for (LanguageServerTarget target : targets) {
+                int emitted = 0;
+                int unsupported = 0;
+                for (Map.Entry<String, Selection> chosen : selections) {
+                    Selection selection = chosen.getValue();
+                    if (!runnableOn(selection, target)) {
+                        unsupported++;
+                        continue;
+                    }
+                    if (cap > 0 && emitted >= cap) {
+                        break;
+                    }
+                    emitted++;
+                    String label = corpusName + "/" + chosen.getKey();
+                    Path ciphertextPath = corpus.resolve(selection.ciphertextRef);
+                    Path plaintextPath = corpus.resolve(selection.plaintextRef);
+                    ESDKClientConfig config = decryptConfig(selection.keyring);
                     tests.add(dynamicTest(label + " " + target, () -> {
-                        FeatureGate.require(selection.features, new TargetPair(target, target));
-                        Set<String> unsupported =
-                            UNSUPPORTED_RSA_PADDINGS.getOrDefault(target.language(), Set.of());
-                        for (String padding : selection.rsaPaddings) {
-                            if (unsupported.contains(padding)) {
-                                Assumptions.abort(target.language() + " does not support raw-RSA "
-                                    + padding + " (" + label + ")");
-                            }
-                        }
                         byte[] ciphertext = Files.readAllBytes(ciphertextPath);
                         byte[] expected = Files.readAllBytes(plaintextPath);
                         byte[] recovered = EsdkOps.decrypt(target.endpoint(), config, ciphertext);
@@ -145,6 +141,12 @@ class ReleasedVectorDecryptTests {
                             "released vector " + label + " must decrypt to its known plaintext ("
                                 + target + ")");
                     }));
+                }
+                if (unsupported > 0) {
+                    String reason = unsupported + " " + corpusName + " vectors use keyrings or raw-RSA"
+                        + " paddings " + target + " does not support";
+                    tests.add(dynamicTest("skipped: " + reason,
+                        () -> Assumptions.abort(reason)));
                 }
             }
         }
@@ -155,6 +157,29 @@ class ReleasedVectorDecryptTests {
                     + "includeKms or limitPerManifest")));
         }
         return tests;
+    }
+
+    private static ESDKClientConfig decryptConfig(Keyring keyring) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(DECRYPT_POLICY)
+            .cmm(CryptographicMaterialsManager.builder()
+                .defaultMember(DefaultCmmConfig.builder().keyring(keyring).build())
+                .build())
+            .build();
+    }
+
+    /** Whether {@code target} declares every Feature and raw-RSA padding the vector needs. */
+    private static boolean runnableOn(Selection selection, LanguageServerTarget target) {
+        FeatureDeclarations declarations = FeatureDeclarations.shared();
+        for (String feature : selection.features) {
+            if (!declarations.isSupported(target.language(), target.majorVersion(),
+                    target.repo(), feature)) {
+                return false;
+            }
+        }
+        Set<String> unsupportedPaddings =
+            UNSUPPORTED_RSA_PADDINGS.getOrDefault(target.language(), Set.of());
+        return selection.rsaPaddings.stream().noneMatch(unsupportedPaddings::contains);
     }
 
     /** A vector chosen for replay: its keyring, the required Features, and its file refs. */
