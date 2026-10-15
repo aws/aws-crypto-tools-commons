@@ -1036,6 +1036,8 @@ jobs:
         # that fails to fetch is skipped, not fatal — the harness runs whatever
         # is present and skips when none is.
         shell: bash
+        env:
+          REPO_PAT: ${{ secrets.repo-pat }}
         run: |
           DIR="$RUNNER_TEMP/released-vectors"
           mkdir -p "$DIR"
@@ -1048,6 +1050,24 @@ jobs:
               echo "::warning::could not fetch $corpus decrypt vectors; skipping that corpus"
             fi
           done
+          # Messages the Java and Python MasterKeyProvider APIs write today, from the
+          # newest green aws-encryption-sdk Daily CI run. Too large to vendor
+          # (~9 MB of raw-AES ciphertexts each).
+          run=$(GH_TOKEN="$REPO_PAT" gh run list -R aws/aws-encryption-sdk --workflow daily_ci.yml \
+            --branch mainline --status success -L 1 --json databaseId,headSha \
+            --jq '.[0] | "\(.databaseId) \(.headSha)"') || run=""
+          if [ -n "$run" ]; then
+            read -r run_id sha <<<"$run"
+            for writer in java_mkp python_mkp; do
+              if ! GH_TOKEN="$REPO_PAT" gh run download "$run_id" -R aws/aws-encryption-sdk \
+                  -n "ubuntu-22.04_vector_artifact_${writer}_legacy_format_${sha}" \
+                  -D "$DIR/daily-${writer}"; then
+                echo "::warning::could not fetch the $writer decrypt vectors; skipping that corpus"
+              fi
+            done
+          else
+            echo "::warning::no green aws-encryption-sdk Daily CI run found; skipping the MKP corpora"
+          fi
           echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
 
       - name: Materialize the java, python, javascript, and c sources
