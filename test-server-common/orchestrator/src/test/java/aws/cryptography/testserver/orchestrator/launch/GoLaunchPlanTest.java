@@ -102,6 +102,24 @@ class GoLaunchPlanTest {
     }
 
     @Test
+    @DisplayName("a library whose stamp matches its committed inputs is not transpiled again, and needs no Dafny")
+    void currentTranspileIsSkipped(@TempDir Path tempDir) throws Exception {
+        String server = "esdk-test-servers/go";
+        String library = "AwsEncryptionSDK/runtimes/go";
+        DafnyLibraryFixture clone = DafnyLibraryFixture.create(tempDir, server, library, true);
+        clone.commit();
+        clone.markTranspiled("esdk-transpile-go", GoLaunchPlan.REQUIRED_DAFNY_VERSION,
+            GoLaunchPlan.TRANSPILED_FILE);
+        GoLaunchPlan plan = new GoLaunchPlan(tempDir.resolve("work"), "esdk",
+            clone.tool(tempDir, "go").toString(), clone.tool(tempDir, "make").toString(),
+            new SubprocessLauncher(Duration.ofSeconds(1)));
+
+        assertThrows(ServerLaunchException.class,
+            () -> plan.launch(goEntry(), clone.sources("go", server, library)));
+        assertEquals(List.of("go build -buildvcs=false -o esdk-test-server ."), clone.toolCalls());
+    }
+
+    @Test
     @DisplayName("a library that is not a smithy-dafny runtimes/go builds with go directly, without a transpile")
     void plainLibraryIsNotTranspiled(@TempDir Path tempDir) throws Exception {
         String server = "esdk-test-servers/go";

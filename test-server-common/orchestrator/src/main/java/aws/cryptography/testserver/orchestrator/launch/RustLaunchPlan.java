@@ -33,8 +33,12 @@ import java.util.Optional;
  *       library's project directory (e.g. {@code AwsEncryptionSDK/}), the steps
  *       the repository's own Rust workflow runs. The code generator runs with
  *       {@code JAVA_HOME} set to {@value DafnyProject#CODEGEN_JAVA_HOME_VARIABLE} when that
- *       is set. Dafny {@value #REQUIRED_DAFNY_VERSION} must be on {@code PATH};
- *       its absence is an eager {@code BUILD} failure. Any other library (a
+ *       is set. A stamp in the project directory records the transpile's
+ *       inputs (the Dafny project, shared Makefile, and submodules at
+ *       {@code HEAD}, plus the Dafny version), so an unchanged library is not
+ *       transpiled again. Otherwise Dafny {@value #REQUIRED_DAFNY_VERSION}
+ *       must be on {@code PATH}; its absence is an eager {@code BUILD}
+ *       failure. Any other library (a
  *       hand-written crate such as aws-crypto-tools-rust's {@code esdk}) is
  *       built directly.</li>
  *   <li><b>Build.</b> {@code cargo build --release} in the server directory. A
@@ -60,6 +64,9 @@ public final class RustLaunchPlan implements Launcher {
 
     /** The Dafny version the Rust transpile uses (aws-encryption-sdk's library_rust_tests.yml). */
     static final String REQUIRED_DAFNY_VERSION = "4.10.0";
+
+    /** A file the transpile writes, relative to the Dafny project. */
+    static final String TRANSPILED_FILE = "runtimes/rust/src/implementation_from_dafny.rs";
 
     /** The release binary name cargo produces. */
     /**
@@ -167,7 +174,7 @@ public final class RustLaunchPlan implements Launcher {
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary))) {
             if (dafnyProject.isPresent()) {
-                transpile(language, dafnyProject.get());
+                transpile(language, dafnyProject.get(), resolved.dirty());
             }
             runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, Map.of());
             stamp.write(language, resolved.commit(), resolved.dirty());
@@ -184,24 +191,33 @@ public final class RustLaunchPlan implements Launcher {
 
     /**
      * Generate and transpile the smithy-dafny library at {@code dafnyProjectDir}
-     * in place, serialized with any other Dafny build in the same clone.
+     * in place, unless its stamp shows these inputs are already transpiled;
+     * serialized with any other Dafny build in the same clone.
      */
-    private void transpile(String language, Path dafnyProjectDir) throws ServerLaunchException {
-        if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+    private void transpile(String language, Path dafnyProjectDir, Boolean dirty)
+            throws ServerLaunchException {
+        Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
+        String inputs = DafnyProject.transpileInputs(repoRoot, dafnyProjectDir, REQUIRED_DAFNY_VERSION);
+        BuildStamp stamp = new BuildStamp(dafnyProjectDir, product + "-transpile-rust");
+        boolean current = stamp.upToDate(inputs, dirty, List.of(dafnyProjectDir.resolve(TRANSPILED_FILE)));
+        if (!current && !DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
             throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
                 "the " + language + " Language_Server build requires Dafny " + REQUIRED_DAFNY_VERSION
                     + " on PATH ('dafny' was not found): the Rust library carries no committed"
                     + " generated code and transpiles from Dafny before building");
         }
-        Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
         Map<String, String> codegenEnv = DafnyProject.codegenEnvironment(
             System.getenv(DafnyProject.CODEGEN_JAVA_HOME_VARIABLE));
         synchronized (DafnyProject.lockFor(repoRoot)) {
+            // The server build reads the submodules (e.g. dafny_runtime) either way.
             for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
                 runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, Map.of());
             }
-            runBuildStep(language, "make polymorph_rust", polymorphCommand(make), dafnyProjectDir, codegenEnv);
-            runBuildStep(language, "make transpile_rust", transpileCommand(make), dafnyProjectDir, codegenEnv);
+            if (!current) {
+                runBuildStep(language, "make polymorph_rust", polymorphCommand(make), dafnyProjectDir, codegenEnv);
+                runBuildStep(language, "make transpile_rust", transpileCommand(make), dafnyProjectDir, codegenEnv);
+                stamp.write(language, inputs, dirty);
+            }
         }
     }
 

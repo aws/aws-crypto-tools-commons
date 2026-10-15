@@ -34,7 +34,9 @@ import java.util.Optional;
  *       library's project directory, the repository's {@code transpile_go}
  *       without its tests, with {@code JAVA_HOME} set to
  *       {@value DafnyProject#CODEGEN_JAVA_HOME_VARIABLE} when that is set
- *       (the Makefile runs the smithy-dafny Gradle wrapper). Dafny
+ *       (the Makefile runs the smithy-dafny Gradle wrapper). A stamp in the
+ *       project directory records the transpile's inputs, so an unchanged
+ *       library is not transpiled again. Otherwise Dafny
  *       {@value #REQUIRED_DAFNY_VERSION} and {@code goimports} must be on
  *       {@code PATH}; a missing {@code dafny} is an eager {@code BUILD}
  *       failure. Any other library is built directly.</li>
@@ -61,6 +63,9 @@ public final class GoLaunchPlan implements Launcher {
 
     /** The Dafny version the Go transpile uses (aws-encryption-sdk's project.properties). */
     static final String REQUIRED_DAFNY_VERSION = "4.9.0";
+
+    /** A file the transpile writes, relative to the Dafny project. */
+    static final String TRANSPILED_FILE = "runtimes/go/ImplementationFromDafny-go/ImplementationFromDafny-go.dtr";
 
     /**
      * The server binary name the {@code go build} produces at
@@ -164,7 +169,7 @@ public final class GoLaunchPlan implements Launcher {
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(),
                 List.of(serverDir.resolve(serverBinaryName)))) {
             if (dafnyProject.isPresent()) {
-                transpile(language, dafnyProject.get());
+                transpile(language, dafnyProject.get(), resolved.dirty());
             }
             runBuildStep(language, "go build -buildvcs=false -o " + serverBinaryName + " .",
                 buildCommand(go, serverBinaryName), serverDir, Map.of());
@@ -182,24 +187,33 @@ public final class GoLaunchPlan implements Launcher {
 
     /**
      * Transpile the smithy-dafny library at {@code dafnyProjectDir} and its MPL
-     * dependencies in place, serialized with any other Dafny build in the clone.
+     * dependencies in place, unless its stamp shows these inputs are already
+     * transpiled; serialized with any other Dafny build in the clone.
      */
-    private void transpile(String language, Path dafnyProjectDir) throws ServerLaunchException {
-        if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+    private void transpile(String language, Path dafnyProjectDir, Boolean dirty)
+            throws ServerLaunchException {
+        Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
+        String inputs = DafnyProject.transpileInputs(repoRoot, dafnyProjectDir, REQUIRED_DAFNY_VERSION);
+        BuildStamp stamp = new BuildStamp(dafnyProjectDir, product + "-transpile-go");
+        boolean current = stamp.upToDate(inputs, dirty, List.of(dafnyProjectDir.resolve(TRANSPILED_FILE)));
+        if (!current && !DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
             throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
                 "the " + language + " Language_Server build requires Dafny " + REQUIRED_DAFNY_VERSION
                     + " on PATH ('dafny' was not found): the Go library's Dafny-generated packages"
                     + " are not committed and are transpiled before building");
         }
-        Path repoRoot = DafnyProject.repositoryRoot(dafnyProjectDir);
         Map<String, String> codegenEnv = DafnyProject.codegenEnvironment(
             System.getenv(DafnyProject.CODEGEN_JAVA_HOME_VARIABLE));
         synchronized (DafnyProject.lockFor(repoRoot)) {
+            // The server's go.mod replaces resolve into the submodules either way.
             for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
                 runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, Map.of());
             }
-            runBuildStep(language, "make transpile (implementation + dependencies)",
-                transpileCommand(make), dafnyProjectDir, codegenEnv);
+            if (!current) {
+                runBuildStep(language, "make transpile (implementation + dependencies)",
+                    transpileCommand(make), dafnyProjectDir, codegenEnv);
+                stamp.write(language, inputs, dirty);
+            }
         }
     }
 

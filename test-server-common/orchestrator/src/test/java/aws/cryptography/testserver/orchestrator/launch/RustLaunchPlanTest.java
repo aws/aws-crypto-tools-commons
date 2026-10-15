@@ -77,6 +77,24 @@ class RustLaunchPlanTest {
     }
 
     @Test
+    @DisplayName("a library whose stamp matches its committed inputs is not transpiled again, and needs no Dafny")
+    void currentTranspileIsSkipped(@TempDir Path tempDir) throws Exception {
+        String library = "AwsEncryptionSDK/runtimes/rust";
+        DafnyLibraryFixture clone = DafnyLibraryFixture.create(tempDir, RUST_SERVER, library, true);
+        clone.commit();
+        clone.markTranspiled("esdk-transpile-rust", RustLaunchPlan.REQUIRED_DAFNY_VERSION,
+            RustLaunchPlan.TRANSPILED_FILE);
+        RustLaunchPlan plan = new RustLaunchPlan(tempDir.resolve("work"), "esdk",
+            clone.tool(tempDir, "cargo").toString(), clone.tool(tempDir, "make").toString(),
+            new SubprocessLauncher(Duration.ofSeconds(1)));
+
+        assertThrows(ServerLaunchException.class, () -> plan.launch(
+            new ConfigurationEntry("rust-dafny", 1, 8098, null, null, null, null),
+            clone.sources("rust-dafny", RUST_SERVER, library)));
+        assertEquals(List.of("cargo build --release"), clone.toolCalls());
+    }
+
+    @Test
     @DisplayName("a hand-written library crate builds with cargo directly, without a transpile")
     void handWrittenLibraryIsNotTranspiled(@TempDir Path tempDir) throws Exception {
         DafnyLibraryFixture clone = DafnyLibraryFixture.create(tempDir, "esdk-test-server", "esdk", false);
