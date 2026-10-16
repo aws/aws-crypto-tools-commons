@@ -8,6 +8,7 @@ import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkMultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.CachingCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.EcdhCurveSpec;
@@ -62,14 +63,8 @@ import java.util.Set;
  * pass, so AWS credentials (developer credentials locally, GitHub OIDC in CI)
  * must be present — there is no offline skip. Only {@link #offlineScenarios()} is
  * credential-free; it feeds the arbitrary-plaintext property tests, which stay
- * offline. The <strong>Caching CMM</strong> remains excluded from these round-trip
- * scenarios entirely:
- * the AWS Encryption SDK for Java 3.x + Material Providers Library 1.x expose no
- * MPL caching CMM over MPL keyrings offline (the legacy
- * {@code CachingCryptoMaterialsManager} only wraps a legacy
- * {@code CryptoMaterialsManager}/{@code MasterKeyProvider}, not an MPL
- * {@code IKeyring}), so a caching CMM cannot be constructed for these keyrings
- * without a spec/library decision.
+ * offline. The <strong>Caching CMM</strong> scenarios wrap a Default CMM over a Raw
+ * AES, Raw RSA, or AWS KMS keyring and require the {@code caching} Feature.
  */
 public final class EsdkClientConfigs {
 
@@ -489,7 +484,45 @@ public final class EsdkClientConfigs {
             new Scenario("rawEcdh(ephemeral->discovery)+default",
                 require(defaultCmm(rawEcdhEphemeralKeyring())), null, List.of(),
                 require(defaultCmm(rawEcdhDiscoveryKeyring())),
-                Set.of("MPL", "raw-ecdh")));
+                Set.of("MPL", "raw-ecdh")),
+
+            // Caching CMM over a Default CMM / Raw-AES keyring on both legs.
+            new Scenario("rawAes+caching",
+                require(cachingCmm(defaultCmm(rawAesKeyring()), null)), null, List.of(), null,
+                Set.of("MPL", "caching")),
+
+            // Caching CMM over a Default CMM / Raw-RSA keyring on both legs.
+            new Scenario("rawRsa+caching",
+                require(cachingCmm(defaultCmm(rawRsaKeyring()), null)), null, List.of(), null,
+                Set.of("MPL", "caching")));
+    }
+
+    /** Time-to-live of the Caching CMM's cached materials, in seconds. */
+    private static final int CACHE_TTL_SECONDS = 60;
+
+    /**
+     * A Caching CMM over {@code underlying} with a {@value #CACHE_TTL_SECONDS}s
+     * time-to-live, limited to {@code limitMessages} messages per data key when
+     * non-null.
+     */
+    static CryptographicMaterialsManager cachingCmm(CryptographicMaterialsManager underlying,
+                                                     Long limitMessages) {
+        CachingCmmConfig.Builder caching = CachingCmmConfig.builder()
+            .underlyingCMM(underlying)
+            .cacheLimitTtlSeconds(CACHE_TTL_SECONDS);
+        if (limitMessages != null) {
+            caching.limitMessages(limitMessages);
+        }
+        return CryptographicMaterialsManager.builder().caching(caching.build()).build();
+    }
+
+    /**
+     * @return a {@code REQUIRE_ENCRYPT_REQUIRE_DECRYPT} client whose Caching CMM
+     *     wraps a Default CMM / Raw-AES keyring, limited to {@code limitMessages}
+     *     messages per data key when non-null.
+     */
+    public static ESDKClientConfig rawAesCaching(Long limitMessages) {
+        return require(cachingCmm(defaultCmm(rawAesKeyring()), limitMessages));
     }
 
     private static Keyring rawEcdhKeyring(RawEcdhKeyAgreementScheme scheme) {
@@ -583,7 +616,12 @@ public final class EsdkClientConfigs {
                 require(defaultCmm(awsKmsKeyring(kms.symmetricKeyArn()))),
                 null,
                 List.of(),
-                require(defaultCmm(awsKmsDiscoveryKeyring()))));
+                require(defaultCmm(awsKmsDiscoveryKeyring()))),
+
+            // Caching CMM over a Default CMM / symmetric KMS keyring on both legs.
+            new Scenario("awsKms+caching",
+                require(cachingCmm(defaultCmm(awsKmsKeyring(kms.symmetricKeyArn())), null)),
+                null, List.of(), null, Set.of("MPL", "caching")));
     }
 
     private static Keyring awsKmsKeyring(String kmsKeyId) {
