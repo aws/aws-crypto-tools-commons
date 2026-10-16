@@ -213,6 +213,10 @@ jobs:
       key_net: ${{ steps.keys.outputs.key_net }}
       key_nettranspile: ${{ steps.keys.outputs.key_nettranspile }}
       paths_nettranspile: ${{ steps.keys.outputs.paths_nettranspile }}
+      key_rustdafnytranspile: ${{ steps.keys.outputs.key_rustdafnytranspile }}
+      paths_rustdafnytranspile: ${{ steps.keys.outputs.paths_rustdafnytranspile }}
+      key_gotranspile: ${{ steps.keys.outputs.key_gotranspile }}
+      paths_gotranspile: ${{ steps.keys.outputs.paths_gotranspile }}
       paths_net: ${{ steps.keys.outputs.paths_net }}
       key_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
       paths_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
@@ -247,7 +251,10 @@ jobs:
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
+          # Transpile outputs (restored or generated) inside the mpl submodule.
+          git -C language-repo config submodule.mpl.ignore untracked
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -363,6 +370,13 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \
             "$esdk/mpl/*/runtimes/net/ImplementationFromDafny*" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-build-stamp"
+          emit rustdafnytranspile rust-dafny "$transpile-dafny4.10.0" \
+            "$esdk/AwsEncryptionSDK/runtimes/rust/src" \
+            "$esdk/AwsEncryptionSDK/.esdk-transpile-rust-build-stamp"
+          emit gotranspile go "$transpile-dafny4.9.0" \
+            "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
+            "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
+            "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
           emit rustdafny rust-dafny "$esdk_tip" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
@@ -467,13 +481,28 @@ jobs:
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
+          # Transpile outputs (restored or generated) inside the mpl submodule.
+          git -C language-repo config submodule.mpl.ignore untracked
+
+      - name: Set up JDK 17 (Temurin) for the smithy-dafny Gradle steps
+        # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator.
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Set up JDK 21 (Temurin) for the orchestrator
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Point the smithy-dafny Gradle steps at JDK 17
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        run: echo "TESTSERVER_CODEGEN_JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator)
         uses: actions/cache/restore@v4
@@ -503,20 +532,26 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Set up .NET (.NET library transpile + build)
-        if: matrix.language == 'net'
+      - name: Set up .NET (the Dafny tool; .NET library build)
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             6.0.x
             8.0.x
 
-      - name: Install Dafny 4.9.0
-        if: matrix.language == 'net'
+      - name: Install Dafny (4.10.0 for the Rust transpile, 4.9.0 otherwise)
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
+        env:
+          DAFNY_VERSION: ${{ matrix.language == 'rust-dafny' && '4.10.0' || '4.9.0' }}
         run: |
           set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
+          dotnet tool install --global dafny --version "$DAFNY_VERSION"
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Install goimports (the Dafny Go backend formats its output with it)
+        if: matrix.language == 'go'
+        run: go install golang.org/x/tools/cmd/goimports@v0.36.0
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -569,14 +604,46 @@ jobs:
         working-directory: esdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
 
-      - name: Initialize the .NET submodules
-        # The transpile outputs restore into the submodule checkouts.
-        if: matrix.language == 'net'
+      - name: Initialize the Dafny submodules
+        # The .NET transpile outputs restore into the submodule checkouts.
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         run: |
           set -euo pipefail
           clone="$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}"
           git -C "$clone" submodule update --init --depth 1 libraries
           git -C "$clone" submodule update --init --recursive --depth 1 --jobs 8 mpl
+
+      - name: Restore the Rust transpile outputs
+        id: rustdafny-transpile
+        if: matrix.language == 'rust-dafny'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustdafnytranspile }}
+          key: ${{ needs.plan.outputs.key_rustdafnytranspile }}
+
+      - name: Restore the Go transpile outputs
+        id: go-transpile
+        if: matrix.language == 'go'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_gotranspile }}
+          key: ${{ needs.plan.outputs.key_gotranspile }}
+
+      - name: Install the smithy-dafny code generator dependencies (Rust codegen)
+        # Only polymorph_rust needs them, and it is skipped when the outputs restored.
+        if: matrix.language == 'rust-dafny' && steps.rustdafny-transpile.outputs.cache-hit != 'true'
+        env:
+          JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
+        run: make -C "$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny" mvn_local_deploy_polymorph_dependencies
+
+      - name: Download the smithy-dafny Gradle wrapper
+        # The Makefile captures this wrapper's stdout in a $(shell) call; on a
+        # cold runner its download progress would land in the dafny command line.
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        env:
+          JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
+        working-directory: ${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny/codegen
+        run: ./gradlew --version > /dev/null
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -630,6 +697,20 @@ jobs:
         with:
           path: ${{ needs.plan.outputs.paths_nettranspile }}
           key: ${{ needs.plan.outputs.key_nettranspile }}
+
+      - name: Save the Rust transpile outputs
+        if: matrix.language == 'rust-dafny' && steps.rustdafny-transpile.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustdafnytranspile }}
+          key: ${{ needs.plan.outputs.key_rustdafnytranspile }}
+
+      - name: Save the Go transpile outputs
+        if: matrix.language == 'go' && steps.go-transpile.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_gotranspile }}
+          key: ${{ needs.plan.outputs.key_gotranspile }}
 
       - name: Pack the ${{ matrix.language }} server
         run: |
@@ -719,7 +800,10 @@ jobs:
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
+          # Transpile outputs (restored or generated) inside the mpl submodule.
+          git -C language-repo config submodule.mpl.ignore untracked
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
