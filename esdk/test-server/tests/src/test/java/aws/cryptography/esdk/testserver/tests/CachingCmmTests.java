@@ -27,7 +27,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class CachingCmmTests {
 
-    private static final Set<String> FEATURES = Set.of("MPL", "caching");
+    private static final Set<String> FEATURES = Set.of("raw-aes", "caching");
 
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;

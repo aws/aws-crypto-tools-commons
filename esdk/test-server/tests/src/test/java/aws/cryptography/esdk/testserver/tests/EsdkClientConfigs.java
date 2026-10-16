@@ -64,7 +64,9 @@ import java.util.Set;
  * must be present — there is no offline skip. Only {@link #offlineScenarios()} is
  * credential-free; it feeds the arbitrary-plaintext property tests, which stay
  * offline. The <strong>Caching CMM</strong> scenarios wrap a Default CMM over a Raw
- * AES, Raw RSA, or AWS KMS keyring and require the {@code caching} Feature.
+ * AES, Raw RSA, or AWS KMS keyring and require the {@code caching} Feature and that
+ * keyring's Feature, not {@code MPL}: a caching CMM need not be an MPL one (the
+ * ESDK for Java's wraps master key providers).
  */
 public final class EsdkClientConfigs {
 
@@ -489,12 +491,12 @@ public final class EsdkClientConfigs {
             // Caching CMM over a Default CMM / Raw-AES keyring on both legs.
             new Scenario("rawAes+caching",
                 require(cachingCmm(defaultCmm(rawAesKeyring()), null)), null, List.of(), null,
-                Set.of("MPL", "caching")),
+                Set.of("raw-aes", "caching")),
 
             // Caching CMM over a Default CMM / Raw-RSA keyring on both legs.
             new Scenario("rawRsa+caching",
                 require(cachingCmm(defaultCmm(rawRsaKeyring()), null)), null, List.of(), null,
-                Set.of("MPL", "caching")));
+                Set.of("raw-rsa", "caching")));
     }
 
     /** Time-to-live of the Caching CMM's cached materials, in seconds. */
@@ -621,7 +623,7 @@ public final class EsdkClientConfigs {
             // Caching CMM over a Default CMM / symmetric KMS keyring on both legs.
             new Scenario("awsKms+caching",
                 require(cachingCmm(defaultCmm(awsKmsKeyring(kms.symmetricKeyArn())), null)),
-                null, List.of(), null, Set.of("MPL", "caching")));
+                null, List.of(), null, Set.of("aws-kms", "caching")));
     }
 
     private static Keyring awsKmsKeyring(String kmsKeyId) {
