@@ -119,23 +119,6 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
     });
   });
 
-  test('role policy grants ECDH key agreement on the vector ECC keys only', () => {
-    template.hasResourceProperties('AWS::IAM::Policy', {
-      PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({
-            Sid: 'EsdkTestServerEcdhVectorKeys',
-            Effect: 'Allow',
-            Action: ['kms:DeriveSharedSecret', 'kms:GetPublicKey', 'kms:DescribeKey'],
-            Resource: Match.arrayWith([
-              'arn:aws:kms:us-west-2:370957321024:key/eabdf483-6be2-4d2d-8ee4-8c2583d416e9',
-            ]),
-          }),
-        ]),
-      },
-    });
-  });
-
   test('emits the documented CfnOutputs', () => {
     const outputs = template.findOutputs('*');
     for (const name of ['symmetricKeyArn', 'mrkArn', 'mrk2Arn', 'rsaKeyArn', 'roleArn']) {

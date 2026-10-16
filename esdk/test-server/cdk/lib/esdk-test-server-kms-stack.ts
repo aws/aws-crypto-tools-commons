@@ -247,26 +247,6 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
       }),
     );
 
-    // The KMS-ECDH test vectors derive shared secrets with the shared
-    // test-vector-framework ECC key-agreement keys (a sender and a recipient key
-    // per curve). GetPublicKey lets a discovery keyring check the recipient key.
-    const ecdhVectorKeyArns = [
-      'arn:aws:kms:us-west-2:370957321024:key/eabdf483-6be2-4d2d-8ee4-8c2583d416e9',
-      'arn:aws:kms:us-west-2:370957321024:key/0265c8e9-5b6a-4055-8f70-63719e09fda5',
-      'arn:aws:kms:us-west-2:370957321024:key/7f35a704-f4fb-469d-98b1-62a1fa2cc44e',
-      'arn:aws:kms:us-west-2:370957321024:key/29f0bef9-1677-4e74-b67e-acefab1295ff',
-      'arn:aws:kms:us-west-2:370957321024:key/41b502e3-cc9d-442f-bd7b-d67faed0f22e',
-      'arn:aws:kms:us-west-2:370957321024:key/c45f1043-53bb-4f37-adc5-4d25d4a84f9d',
-    ];
-    ciRole.addToPolicy(
-      new iam.PolicyStatement({
-        sid: 'EsdkTestServerEcdhVectorKeys',
-        effect: iam.Effect.ALLOW,
-        actions: ['kms:DeriveSharedSecret', 'kms:GetPublicKey', 'kms:DescribeKey'],
-        resources: ecdhVectorKeyArns,
-      }),
-    );
-
     // The AWS KMS Hierarchical keyring reads its branch key from the shared
     // DynamoDB key store (KeyStoreDdbTable) and unwraps it with the branch key's
     // KMS key; both the encrypt and decrypt legs need GetItem on the table and
