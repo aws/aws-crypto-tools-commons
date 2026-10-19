@@ -124,6 +124,33 @@ class LaunchOnceAllReachablePropertyTest {
         }
     }
 
+    @Property(tries = 50)
+    void languagesAndStopAfterLaunchBuildOnlyTheSelectedServers(
+            @ForAll("validCommonsConfigurations") CommonsConfiguration set) throws IOException {
+        Path root = Files.createTempDirectory("p7-languages");
+        try {
+            RecordingLauncher launcher = new RecordingLauncher();
+            RecordingTestRunner runner = new RecordingTestRunner(launcher);
+            String selected = set.entries().get(set.entries().size() - 1).language();
+            TestServerOrchestrator orchestrator = new TestServerOrchestrator(set,
+                RunContext.commonsRun(root, INVOKING_REPOSITORY),
+                FakeMaterializer.succeedingUnder(root, set),
+                LauncherFactory.uniform(launcher), runner,
+                new DuplicateTestsDetector(), root,
+                set.entries().get(0).language())
+                .withLanguages(java.util.Set.of(selected))
+                .withStopAfter(TestServerOrchestrator.StopAfter.LAUNCH);
+
+            assertTrue(orchestrator.run().succeeded(), "a build-only run succeeds");
+            assertEquals(List.of(selected),
+                launcher.launches.stream().map(RecordingLauncher.Launch::language).toList(),
+                "only the selected language launches");
+            assertEquals(0, runner.invocationCount, "stopAfter=launch runs no Tests");
+        } finally {
+            deleteRecursively(root);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Generators
     // ------------------------------------------------------------------

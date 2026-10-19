@@ -64,6 +64,42 @@ class LanguageServerRegistryPropertyTest {
         }
     }
 
+    @Property(tries = 100)
+    void focusKeepsExactlyThePairsWithAFocusLeg(
+            @ForAll("targetLists") List<LanguageServerTarget> targets) {
+        String targetsProperty = targets.stream()
+            .map(t -> t.language() + ":" + t.majorVersion() + ":" + t.repo() + "=" + t.endpoint())
+            .collect(Collectors.joining(","));
+        String focus = targets.get(targets.size() - 1).language();
+
+        LanguageServerRegistry registry = LanguageServerRegistry.parse(targetsProperty, focus);
+
+        assertEquals(targets, registry.allTargets(), "allTargets keeps every configured target");
+        assertEquals(targets.stream().filter(t -> t.language().equals(focus)).toList(),
+            registry.targets(), "targets are the focus language's only");
+        assertEquals(focus, registry.primary().language(), "the primary is a focus target");
+        Set<TargetPair> expected = new HashSet<>();
+        for (LanguageServerTarget encrypt : targets) {
+            for (LanguageServerTarget decrypt : targets) {
+                if (encrypt.language().equals(focus) || decrypt.language().equals(focus)) {
+                    expected.add(new TargetPair(encrypt, decrypt));
+                }
+            }
+        }
+        assertEquals(expected, new HashSet<>(registry.pairs()),
+            "pairs are exactly those with the focus language on either leg");
+    }
+
+    @Property(tries = 20)
+    void focusOnAnUnconfiguredLanguageIsRejected(
+            @ForAll("targetLists") List<LanguageServerTarget> targets) {
+        String targetsProperty = targets.stream()
+            .map(t -> t.language() + ":" + t.majorVersion() + ":" + t.repo() + "=" + t.endpoint())
+            .collect(Collectors.joining(","));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> LanguageServerRegistry.parse(targetsProperty, "no-such-language"));
+    }
+
     @Provide
     Arbitrary<List<LanguageServerTarget>> targetLists() {
         Arbitrary<String> languageNames =

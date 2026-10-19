@@ -1,0 +1,11 @@
+{
+  "_comment": [
+    "MPL TestServer commons bug-list.json (design 'Bug Configuration'): the",
+    "authoritative ledger of known bugs across the MPL Language_Servers, a 'bugs'",
+    "object keyed by bug id, each { description, ticketId }. A server declares",
+    "the ids it currently exhibits in its own bug-config.json (a flat array);",
+    "every such id MUST be defined here. Empty: no known bugs."
+  ],
+  "product": "mpl",
+  "bugs": {}
+}

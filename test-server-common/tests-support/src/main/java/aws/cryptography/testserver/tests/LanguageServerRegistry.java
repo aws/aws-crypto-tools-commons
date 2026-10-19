@@ -3,9 +3,11 @@ package aws.cryptography.testserver.tests;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The set of Language_Server {@link LanguageServerTarget}s the {@code Tests} drive,
@@ -27,6 +29,12 @@ import java.util.Optional;
  * targets on the encrypt and decrypt legs, <em>including</em> same-target pairs
  * (e.g. {@code java-v3 -> java-v3}) for completeness. Meta (harness-plumbing)
  * Tests run against the {@link #primary()} configured target only.
+ * <p>An optional <b>focus</b> ({@code testserver.focus} system property or
+ * {@code TESTSERVER_FOCUS} environment variable, a comma-separated list of
+ * languages) narrows the Targets under test: {@link #targets()} and
+ * {@link #primary()} cover the focus languages only, and {@link #pairs()}
+ * keeps the pairs with a focus language on either leg. The other launched
+ * Targets stay available through {@link #allTargets()} as message producers.
  */
 public final class LanguageServerRegistry {
 
@@ -34,12 +42,32 @@ public final class LanguageServerRegistry {
     public static final String TARGETS_PROPERTY = "testserver.targets";
     public static final String TARGETS_ENV = "TESTSERVER_TARGETS";
 
+    /** Runtime-config key: comma-separated languages under test; empty tests every target. */
+    public static final String FOCUS_PROPERTY = "testserver.focus";
+    public static final String FOCUS_ENV = "TESTSERVER_FOCUS";
+
     private static volatile LanguageServerRegistry instance;
 
+    private final List<LanguageServerTarget> allTargets;
     private final List<LanguageServerTarget> targets;
+    private final Set<String> focus;
 
-    private LanguageServerRegistry(List<LanguageServerTarget> targets) {
-        this.targets = List.copyOf(targets);
+    private LanguageServerRegistry(List<LanguageServerTarget> allTargets, Set<String> focus) {
+        this.allTargets = List.copyOf(allTargets);
+        this.focus = Set.copyOf(focus);
+        if (this.focus.isEmpty()) {
+            this.targets = this.allTargets;
+        } else {
+            Set<String> launched = new LinkedHashSet<>();
+            this.allTargets.forEach(target -> launched.add(target.language()));
+            if (!launched.containsAll(this.focus)) {
+                throw new IllegalArgumentException("focus " + this.focus
+                    + " names a language with no configured target " + launched);
+            }
+            this.targets = this.allTargets.stream()
+                .filter(target -> this.focus.contains(target.language()))
+                .toList();
+        }
     }
 
     /**
@@ -73,7 +101,8 @@ public final class LanguageServerRegistry {
                 + "=java:3=http://127.0.0.1:8091,python:4=http://127.0.0.1:8092. "
                 + "Run the Tests through the orchestrated entry point (`make orchestrate`), "
                 + "which launches every configured Language_Server and supplies this property."));
-        return new LanguageServerRegistry(parseTargets(configured));
+        return new LanguageServerRegistry(parseTargets(configured),
+            parseFocus(configured(FOCUS_PROPERTY, FOCUS_ENV).orElse("")));
     }
 
     /**
@@ -85,19 +114,38 @@ public final class LanguageServerRegistry {
      * pairwise matrix through it).
      */
     public static LanguageServerRegistry parse(String raw) {
-        return new LanguageServerRegistry(parseTargets(raw));
+        return parse(raw, "");
+    }
+
+    /** {@link #parse(String)} with a raw {@code testserver.focus} value. */
+    public static LanguageServerRegistry parse(String raw, String focus) {
+        return new LanguageServerRegistry(parseTargets(raw), parseFocus(focus));
     }
 
     private static Optional<String> configuredTargets() {
-        String property = System.getProperty(TARGETS_PROPERTY);
-        if (property != null && !property.isBlank()) {
-            return Optional.of(property);
+        return configured(TARGETS_PROPERTY, TARGETS_ENV);
+    }
+
+    private static Optional<String> configured(String property, String env) {
+        String value = System.getProperty(property);
+        if (value != null && !value.isBlank()) {
+            return Optional.of(value);
         }
-        String env = System.getenv(TARGETS_ENV);
-        if (env != null && !env.isBlank()) {
-            return Optional.of(env);
+        value = System.getenv(env);
+        if (value != null && !value.isBlank()) {
+            return Optional.of(value);
         }
         return Optional.empty();
+    }
+
+    private static Set<String> parseFocus(String raw) {
+        Set<String> focus = new LinkedHashSet<>();
+        for (String language : raw == null ? new String[0] : raw.split(",")) {
+            if (!language.isBlank()) {
+                focus.add(language.trim());
+            }
+        }
+        return focus;
     }
 
     /**
@@ -144,9 +192,17 @@ public final class LanguageServerRegistry {
         return new ArrayList<>(byIdentity.values());
     }
 
-    /** @return all configured targets, in configuration order. */
+    /** @return the targets under test (the focus languages when set), in configuration order. */
     public List<LanguageServerTarget> targets() {
         return targets;
+    }
+
+    /**
+     * @return every configured target, focus or not, in configuration order —
+     *     the candidates for producing a message another target consumes.
+     */
+    public List<LanguageServerTarget> allTargets() {
+        return allTargets;
     }
 
     /**
@@ -166,13 +222,17 @@ public final class LanguageServerRegistry {
     /**
      * @return the full pairwise cross-language matrix: every {@code (encrypt,
      *     decrypt)} target pair, including same-target pairs. With a single target
-     *     this is one self-pair.
+     *     this is one self-pair. With a focus, only the pairs with a focus
+     *     language on either leg.
      */
     public List<TargetPair> pairs() {
-        List<TargetPair> pairs = new ArrayList<>(targets.size() * targets.size());
-        for (LanguageServerTarget encrypt : targets) {
-            for (LanguageServerTarget decrypt : targets) {
-                pairs.add(new TargetPair(encrypt, decrypt));
+        List<TargetPair> pairs = new ArrayList<>(allTargets.size() * allTargets.size());
+        for (LanguageServerTarget encrypt : allTargets) {
+            for (LanguageServerTarget decrypt : allTargets) {
+                if (focus.isEmpty() || focus.contains(encrypt.language())
+                        || focus.contains(decrypt.language())) {
+                    pairs.add(new TargetPair(encrypt, decrypt));
+                }
             }
         }
         return pairs;

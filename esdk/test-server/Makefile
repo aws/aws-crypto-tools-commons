@@ -203,9 +203,11 @@ orchestrate: check-java ## Run the complete cross-language Commons_Run (all serv
 	@#
 	@# TESTS scopes the JUnit run to a single class or wildcard when set
 	@# (e.g. `make orchestrate TESTS=MessageFormatTests`). Empty runs every test.
+	@# ORCHESTRATE_ARGS passes extra key=value tokens through, e.g.
+	@# `make orchestrate ORCHESTRATE_ARGS="languages=net stopAfter=launch"`.
 	@cd "$(ORCH_DIR)" && GRADLE_OPTS="-Dorg.gradle.daemon=false $$GRADLE_OPTS" ./gradlew --console=plain run \
 		-Dtestserver.root=$(MAKEFILE_DIR) \
-		$(if $(strip $(TESTS)),--args="tests=$(TESTS)")
+		$(if $(strip $(TESTS) $(ORCHESTRATE_ARGS)),--args="$(strip $(if $(strip $(TESTS)),tests=$(TESTS)) $(ORCHESTRATE_ARGS))")
 
 orchestrate-test: check-java ## Run the orchestrator's property + integration tests (pure pipeline logic, no AWS creds)
 	@echo "==> Running orchestrator tests (test-server-common/orchestrator/)"

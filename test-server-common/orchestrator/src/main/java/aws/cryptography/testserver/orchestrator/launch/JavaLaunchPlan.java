@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,6 +54,13 @@ import java.util.Optional;
  *       cause, before any Maven step runs. Any failing Maven step is a
  *       {@code BUILD} launch failure naming the step and carrying the tool
  *       output.</li>
+ *   <li><b>Transpile-and-publish, when the resolved library is a smithy-dafny
+ *       {@code runtimes/java} directory</b> ({@link DafnyProject}): in the
+ *       clone root, {@code git submodule update --init --recursive} each
+ *       present Dafny submodule, then {@code make build_java mvn_local_deploy}
+ *       in the library's project directory under the Maven {@code JAVA_HOME},
+ *       so the server resolves this build from {@code mavenLocal()}. Dafny
+ *       must be on {@code PATH}.</li>
  *   <li><b>Launch.</b> {@code ./gradlew runServer --args=<port>
  *       [-PesdkVersion=<stamped>] -PmodelDir=<commons model dir>} in the
  *       resolved server directory under a JDK 21+ {@code JAVA_HOME}
@@ -77,6 +85,13 @@ public final class JavaLaunchPlan implements Launcher {
 
     /** Maven from PATH, exactly as the Makefile's {@code build-live-esdk} invokes it. */
     static final String MVN = "mvn";
+
+    /**
+     * A Dafny library's stamp is {@code .java-library-build-stamp} in its
+     * smithy-dafny project directory, recording the library commit the local
+     * Maven install was built from.
+     */
+    static final String DAFNY_LIBRARY_STAMP = "java-library";
 
     private static final DateTimeFormatter STAMP_TIMESTAMP =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
@@ -178,20 +193,51 @@ public final class JavaLaunchPlan implements Launcher {
         //    detected by the absence of a pom.xml at the resolved library
         //    root. In that case the server relies on its own
         //    gradle.properties-default version and never sees -PesdkVersion.
+        //    A clean clone is stamped with its commit, and the install is
+        //    skipped when that version is already in the local repository.
         String stampedVersion = null;
-        if (Files.isRegularFile(libraryDir.resolve("pom.xml"))) {
-            stampedVersion = stampVersion(Instant.now());
+        Optional<Path> dafnyProject = DafnyProject.of(libraryDir);
+        if (dafnyProject.isPresent()) {
+            // Skipped when the stamp shows this library commit is already
+            // transpiled and published to the local Maven repository (a
+            // prebuilt install restored alongside its stamp).
+            MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
+                .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
+            BuildStamp stamp = new BuildStamp(dafnyProject.get(), DAFNY_LIBRARY_STAMP);
+            if (!stamp.upToDate(library.commit(), library.dirty(), List.of())) {
+                if (!DafnyProject.commandOnPath("dafny", System.getenv("PATH"))) {
+                    throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                        "the " + language + " Language_Server build requires Dafny on PATH ('dafny'"
+                            + " was not found): the Java library transpiles from Dafny before building");
+                }
+                Path repoRoot = DafnyProject.repositoryRoot(dafnyProject.get());
+                synchronized (DafnyProject.lockFor(repoRoot)) {
+                    for (List<String> submodule : DafnyProject.submoduleCommands(repoRoot)) {
+                        runBuildStep(language, String.join(" ", submodule), submodule, repoRoot, mavenJavaHome);
+                    }
+                    runBuildStep(language, "transpile + publish the library (make build_java mvn_local_deploy)",
+                        dafnyBuildCommand(), dafnyProject.get(), mavenJavaHome);
+                }
+                stamp.write(language, library.commit(), library.dirty());
+            }
+        } else if (Files.isRegularFile(libraryDir.resolve("pom.xml"))) {
+            MaterializedSources.Success library = sources.successOf(ComponentId.library(language))
+                .orElseThrow(() -> missingComponent(language, ComponentId.library(language)));
+            boolean clean = library.commit() != null && !Boolean.TRUE.equals(library.dirty());
+            stampedVersion = clean ? stampVersion(library.commit()) : stampVersion(Instant.now());
 
-            runBuildStep(language, "stamp the live version (mvn versions:set)",
-                versionsSetCommand(stampedVersion), libraryDir, mavenJavaHome);
-            try {
-                runBuildStep(language, "install the live library (mvn install)",
-                    installCommand(), libraryDir, mavenJavaHome);
-            } finally {
-                // Best-effort restore, exactly like the Makefile's
-                // `mvn versions:revert || true`: the resolved tree must never stay
-                // stamped, and a revert hiccup must not mask the install result.
-                revertBestEffort(libraryDir, mavenJavaHome);
+            if (!(clean && installedLocally(stampedVersion))) {
+                runBuildStep(language, "stamp the live version (mvn versions:set)",
+                    versionsSetCommand(stampedVersion), libraryDir, mavenJavaHome);
+                try {
+                    runBuildStep(language, "install the live library (mvn install)",
+                        installCommand(), libraryDir, mavenJavaHome);
+                } finally {
+                    // Best-effort restore, exactly like the Makefile's
+                    // `mvn versions:revert || true`: the resolved tree must never stay
+                    // stamped, and a revert hiccup must not mask the install result.
+                    revertBestEffort(libraryDir, mavenJavaHome);
+                }
             }
         }
 
@@ -226,6 +272,29 @@ public final class JavaLaunchPlan implements Launcher {
         return STAMP_PREFIX + STAMP_TIMESTAMP.format(instant);
     }
 
+    /** The version stamped onto a clean library clone: {@code 0.0.0-testserver-<commit>}. */
+    static String stampVersion(String commit) {
+        return STAMP_PREFIX + commit;
+    }
+
+    /**
+     * Whether {@code ~/.m2/repository} already holds an artifact installed at
+     * {@code version}. Stamped versions are unique to one library commit.
+     */
+    static boolean installedLocally(String version) {
+        Path repository = Path.of(System.getProperty("user.home"), ".m2", "repository");
+        if (!Files.isDirectory(repository)) {
+            return false;
+        }
+        try (var paths = Files.find(repository, 8,
+                (path, attributes) -> attributes.isDirectory()
+                    && path.getFileName().toString().equals(version))) {
+            return paths.findAny().isPresent();
+        } catch (IOException | java.io.UncheckedIOException e) {
+            return false;
+        }
+    }
+
     /**
      * {@code mvn -q -DnewVersion=<version> versions:set -DgenerateBackupPoms=true}
      * (the Makefile's stamp step; backup poms make {@code versions:revert}
@@ -250,6 +319,11 @@ public final class JavaLaunchPlan implements Launcher {
     /** {@code mvn -q versions:revert} (the Makefile's restore step). */
     static List<String> versionsRevertCommand() {
         return List.of(MVN, "-q", "versions:revert");
+    }
+
+    /** {@code make build_java mvn_local_deploy CORES=4} (the smithy-dafny project directory). */
+    static List<String> dafnyBuildCommand() {
+        return List.of("make", "build_java", "mvn_local_deploy", "CORES=4");
     }
 
     /**
@@ -305,6 +379,28 @@ public final class JavaLaunchPlan implements Launcher {
                 }
             }
         }
+        for (String version : versions) {
+            Optional<Path> candidate = setupJavaHome(version, System.getenv());
+            if (candidate.isPresent()) {
+                return candidate;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The JDK home actions/setup-java exports as {@code JAVA_HOME_<major>_X64}
+     * (or {@code _ARM64}) for {@code version} ({@code 1.8} reads major 8).
+     */
+    static Optional<Path> setupJavaHome(String version, Map<String, String> env) {
+        String major = version.startsWith("1.") ? version.substring(2) : version;
+        for (String arch : List.of("X64", "ARM64")) {
+            String home = env.get("JAVA_HOME_" + major + "_" + arch);
+            if (home != null && !home.isBlank()
+                    && Files.isExecutable(Path.of(home).resolve("bin").resolve("java"))) {
+                return Optional.of(Path.of(home));
+            }
+        }
         return Optional.empty();
     }
 
@@ -349,39 +445,44 @@ public final class JavaLaunchPlan implements Launcher {
      */
     private static void runBuildStep(String language, String step, List<String> command,
             Path directory, Optional<Path> javaHome) throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(directory.toFile());
-        javaHome.ifPresent(home -> builder.environment().put("JAVA_HOME", home.toString()));
-        builder.redirectErrorStream(true);
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(directory.toFile());
+            javaHome.ifPresent(home -> builder.environment().put("JAVA_HOME", home.toString()));
+            builder.redirectErrorStream(true);
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 

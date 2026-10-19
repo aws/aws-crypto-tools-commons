@@ -10,6 +10,8 @@ import aws.cryptography.esdk.testserver.client.model.AwsKmsMultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
+import aws.cryptography.esdk.testserver.client.model.EcdhCurveSpec;
+import aws.cryptography.esdk.testserver.client.model.EphemeralPrivateKeyToStaticPublicKeyConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
@@ -17,13 +19,18 @@ import aws.cryptography.esdk.testserver.client.model.Keyring;
 import aws.cryptography.esdk.testserver.client.model.KmsRsaEncryptionAlgorithm;
 import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
+import aws.cryptography.esdk.testserver.client.model.PublicKeyDiscoveryConfig;
 import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.RawEcdhKeyAgreementScheme;
+import aws.cryptography.esdk.testserver.client.model.RawEcdhKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.RawPrivateKeyToStaticPublicKeyConfig;
 import aws.cryptography.esdk.testserver.client.model.RawRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.RequiredEncryptionContextCmmConfig;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -103,6 +110,10 @@ public final class EsdkClientConfigs {
      * fails the actual unwrap.
      */
     private static final PemKeyPair RSA_KEY_PAIR_MISMATCHED = generateRsaPemKeyPair();
+
+    /** The sender's and recipient's static P-256 key pairs for the Raw-ECDH scenarios. */
+    private static final EcKeyPair ECDH_SENDER = generateEcKeyPair("secp256r1");
+    private static final EcKeyPair ECDH_RECIPIENT = generateEcKeyPair("secp256r1");
 
     private EsdkClientConfigs() {
     }
@@ -411,7 +422,7 @@ public final class EsdkClientConfigs {
 
     /**
      * @return the fully-offline, round-trip-compatible scenarios (no AWS access):
-     *     Raw-AES and Raw-RSA keyrings, multi-keyrings combining raw keyrings, the
+     *     Raw-AES, Raw-RSA, and Raw-ECDH keyrings, multi-keyrings combining raw keyrings, the
      *     Default and Required-Encryption-Context CMMs, and committing /
      *     non-committing / no-KDF algorithm-suite selection. Always contributed.
      */
@@ -459,7 +470,60 @@ public final class EsdkClientConfigs {
             new Scenario("rawAes+nonCommittingNoKdf",
                 forbid(defaultCmm(rawAesKeyring())),
                 ESDKAlgorithmSuiteId.ALG_AES_128_GCM_IV12_TAG16_NO_KDF,
-                List.of()));
+                List.of()),
+
+            // Raw-ECDH static sender key to the recipient's public key, the same
+            // keyring on both legs.
+            new Scenario("rawEcdh(static)+default",
+                require(defaultCmm(rawEcdhStaticKeyring())), null, List.of(), null,
+                Set.of("MPL", "raw-ecdh")),
+
+            // Raw-ECDH static on encrypt; the recipient decrypts by discovery.
+            new Scenario("rawEcdh(static->discovery)+default",
+                require(defaultCmm(rawEcdhStaticKeyring())), null, List.of(),
+                require(defaultCmm(rawEcdhDiscoveryKeyring())),
+                Set.of("MPL", "raw-ecdh")),
+
+            // Raw-ECDH ephemeral sender key on encrypt; the recipient decrypts by
+            // discovery.
+            new Scenario("rawEcdh(ephemeral->discovery)+default",
+                require(defaultCmm(rawEcdhEphemeralKeyring())), null, List.of(),
+                require(defaultCmm(rawEcdhDiscoveryKeyring())),
+                Set.of("MPL", "raw-ecdh")));
+    }
+
+    private static Keyring rawEcdhKeyring(RawEcdhKeyAgreementScheme scheme) {
+        return Keyring.builder()
+            .rawEcdh(RawEcdhKeyringConfig.builder()
+                .keyAgreementScheme(scheme)
+                .curveSpec(EcdhCurveSpec.ECC_NIST_P256)
+                .build())
+            .build();
+    }
+
+    private static Keyring rawEcdhStaticKeyring() {
+        return rawEcdhKeyring(RawEcdhKeyAgreementScheme.builder()
+            .rawPrivateKeyToStaticPublicKey(RawPrivateKeyToStaticPublicKeyConfig.builder()
+                .senderStaticPrivateKey(ByteBuffer.wrap(ECDH_SENDER.privatePem()))
+                .recipientPublicKey(ByteBuffer.wrap(ECDH_RECIPIENT.publicDer()))
+                .build())
+            .build());
+    }
+
+    private static Keyring rawEcdhEphemeralKeyring() {
+        return rawEcdhKeyring(RawEcdhKeyAgreementScheme.builder()
+            .ephemeralPrivateKeyToStaticPublicKey(EphemeralPrivateKeyToStaticPublicKeyConfig.builder()
+                .recipientPublicKey(ByteBuffer.wrap(ECDH_RECIPIENT.publicDer()))
+                .build())
+            .build());
+    }
+
+    private static Keyring rawEcdhDiscoveryKeyring() {
+        return rawEcdhKeyring(RawEcdhKeyAgreementScheme.builder()
+            .publicKeyDiscovery(PublicKeyDiscoveryConfig.builder()
+                .recipientStaticPrivateKey(ByteBuffer.wrap(ECDH_RECIPIENT.privatePem()))
+                .build())
+            .build());
     }
 
     // -----------------------------------------------------------------------
@@ -705,6 +769,22 @@ public final class EsdkClientConfigs {
             return new PemKeyPair(publicPem, privatePem);
         } catch (Exception e) {
             throw new IllegalStateException("failed to generate an offline RSA key pair", e);
+        }
+    }
+
+    /** An EC key pair: the PEM private key (PKCS#8) and the DER public key (X.509). */
+    private record EcKeyPair(byte[] privatePem, byte[] publicDer) {
+    }
+
+    private static EcKeyPair generateEcKeyPair(String curve) {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+            generator.initialize(new ECGenParameterSpec(curve));
+            KeyPair keyPair = generator.generateKeyPair();
+            return new EcKeyPair(pem("PRIVATE KEY", keyPair.getPrivate().getEncoded()),
+                keyPair.getPublic().getEncoded());
+        } catch (Exception e) {
+            throw new IllegalStateException("failed to generate an offline " + curve + " key pair", e);
         }
     }
 

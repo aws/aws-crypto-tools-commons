@@ -9,6 +9,7 @@ import aws.cryptography.testserver.orchestrator.config.CommonsConfigurationValid
 import aws.cryptography.testserver.orchestrator.config.ConfigurationValidation;
 import aws.cryptography.testserver.orchestrator.config.FeatureValidation;
 import aws.cryptography.testserver.orchestrator.launch.CloseResult;
+import aws.cryptography.testserver.orchestrator.launch.LaunchTimings;
 import aws.cryptography.testserver.orchestrator.launch.LaunchedServer;
 import aws.cryptography.testserver.orchestrator.launch.Launcher;
 import aws.cryptography.testserver.orchestrator.launch.LauncherFactory;
@@ -30,6 +31,7 @@ import aws.cryptography.testserver.orchestrator.source.RunContext;
 import aws.cryptography.testserver.orchestrator.source.SourceResolver;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -129,6 +131,10 @@ public final class TestServerOrchestrator {
     private final DuplicateTestsDetector duplicateDetector;
     private final Path testServerRoot;
     private final String referenceImplementation;
+    private Set<String> languages = Set.of();
+    private StopAfter stopAfter = StopAfter.NONE;
+    private Set<String> focus = Set.of();
+    private Set<String> overlayLanguages = Set.of();
     private final ResultReporter reporter;
 
     /**
@@ -198,6 +204,57 @@ public final class TestServerOrchestrator {
         return this;
     }
 
+    /**
+     * Apply the working-tree overlays only to {@code languages}; the overlaid
+     * repository's other languages clone from their configured coordinates.
+     * Empty applies them to every language.
+     *
+     * @return this orchestrator, for chaining
+     */
+    public TestServerOrchestrator withOverlayLanguages(Set<String> languages) {
+        this.overlayLanguages = languages == null ? Set.of() : Set.copyOf(languages);
+        return this;
+    }
+
+    /** Where a run stops early; {@link #NONE} runs the Tests. */
+    public enum StopAfter {
+        /** Run the whole pipeline, Tests included. */
+        NONE,
+        /** Stop once every source is materialized (clones only). */
+        MATERIALIZE,
+        /** Stop once every server has been built and reached, then tear down. */
+        LAUNCH
+    }
+
+    /**
+     * Restrict the run to {@code languages} (every other configured language
+     * is neither resolved, built, nor tested). Empty runs every language.
+     *
+     * @return this orchestrator, for chaining
+     */
+    public TestServerOrchestrator withLanguages(Set<String> languages) {
+        this.languages = languages == null ? Set.of() : Set.copyOf(languages);
+        return this;
+    }
+
+    /**
+     * Test only the pairs with one of {@code languages} on either leg. Every
+     * configured server still launches: the others are the counterparts.
+     * Empty tests every pair.
+     *
+     * @return this orchestrator, for chaining
+     */
+    public TestServerOrchestrator withFocus(Set<String> languages) {
+        this.focus = languages == null ? Set.of() : Set.copyOf(languages);
+        return this;
+    }
+
+    /** @return this orchestrator, stopping after {@code stopAfter}, for chaining */
+    public TestServerOrchestrator withStopAfter(StopAfter stopAfter) {
+        this.stopAfter = stopAfter == null ? StopAfter.NONE : stopAfter;
+        return this;
+    }
+
     /** Run with no Configuration_Overrides. */
     public Result run() {
         return run(List.of());
@@ -227,6 +284,9 @@ public final class TestServerOrchestrator {
                 }
             }
         }
+        if (outcome.stopped() != null) {
+            return outcome.stopped().withCleanupFailures(cleanupFailureLanguages);
+        }
         if (outcome.abort() != null) {
             // Cleanup failures are appended to the abort result — reported,
             // never masking the primary cause.
@@ -236,7 +296,7 @@ public final class TestServerOrchestrator {
         // coverage floor over the launched Target pairs and
         // the teardown cleanup failures.
         return reporter.report(
-            outcome.executions(), outcome.launchedLabels(), cleanupFailureLanguages);
+            outcome.executions(), outcome.launchedLabels(), cleanupFailureLanguages, focus);
     }
 
     // ------------------------------------------------------------------
@@ -245,14 +305,22 @@ public final class TestServerOrchestrator {
 
     /** The pipeline's outcome: an abort {@link Result}, or the run's executions. */
     private record PipelineOutcome(
-            Result abort, List<TestExecution> executions, List<String> launchedLabels) {
+            Result abort, Result stopped, List<TestExecution> executions,
+            List<String> launchedLabels) {
 
         static PipelineOutcome aborted(String cause) {
-            return new PipelineOutcome(Result.abort(cause), null, null);
+            return new PipelineOutcome(Result.abort(cause), null, null, null);
+        }
+
+        static PipelineOutcome stoppedAfter(StopAfter stage, List<ConfigurationEntry> entries) {
+            List<String> languages = entries.stream().map(ConfigurationEntry::language).toList();
+            return new PipelineOutcome(null, Result.success(
+                "stopped after " + stage.name().toLowerCase(java.util.Locale.ROOT)
+                    + " (no Tests run)", languages), null, null);
         }
 
         static PipelineOutcome completed(List<TestExecution> executions, List<String> labels) {
-            return new PipelineOutcome(null, executions, labels);
+            return new PipelineOutcome(null, null, executions, labels);
         }
     }
 
@@ -302,6 +370,23 @@ public final class TestServerOrchestrator {
         // The run-effective entries: each overridden language's entry replaced
         // by its Configuration_Override.
         List<ConfigurationEntry> effectiveEntries = effectiveEntries(overrides);
+        if (!languages.isEmpty()) {
+            Set<String> configured = new LinkedHashSet<>();
+            effectiveEntries.forEach(entry -> configured.add(entry.language()));
+            if (!configured.containsAll(languages)) {
+                return PipelineOutcome.aborted("languages " + languages
+                    + " must all be configured languages " + configured);
+            }
+            effectiveEntries = effectiveEntries.stream()
+                .filter(entry -> languages.contains(entry.language()))
+                .toList();
+        }
+        Set<String> launching = new LinkedHashSet<>();
+        effectiveEntries.forEach(entry -> launching.add(entry.language()));
+        if (!launching.containsAll(focus)) {
+            return PipelineOutcome.aborted("focus " + focus
+                + " must name languages this run launches " + launching);
+        }
         List<String> catalog = commonsConfiguration.features();
 
         // 1c. On-hand Feature_Declarations: the own
@@ -358,8 +443,16 @@ public final class TestServerOrchestrator {
         // materialization performs the git
         // and filesystem I/O, capturing failures as data. ----
         List<ResolvedComponentPlan> plans = resolver.resolve(
-            commonsConfiguration, context, overrides, workingTreeOverlays);
+            commonsConfiguration, context, overrides, workingTreeOverlays, overlayLanguages);
+        if (!languages.isEmpty()) {
+            plans = plans.stream()
+                .filter(plan -> plan.component().kind() == ComponentId.Kind.COMMONS
+                    || languages.contains(plan.component().language()))
+                .toList();
+        }
+        Instant materializeStartedAt = Instant.now();
         MaterializedSources sources = materializer.materialize(plans);
+        LaunchTimings.log("all", "source materialization (git)", materializeStartedAt);
 
         // ---- Stage 4 (emitted here so the record accompanies every
         // materialization outcome, failures included):
@@ -407,6 +500,9 @@ public final class TestServerOrchestrator {
                     .append(": ").append(failure.cause()).append(']');
             }
             return PipelineOutcome.aborted(message.toString());
+        }
+        if (stopAfter == StopAfter.MATERIALIZE) {
+            return PipelineOutcome.stoppedAfter(stopAfter, effectiveEntries);
         }
 
         // ---- Stage 3 (completed after materialization, before any launch):
@@ -468,13 +564,21 @@ public final class TestServerOrchestrator {
                         + entry.language() + "'");
             }
         }
+        Instant launchStageStartedAt = Instant.now();
         ExecutorService launchPool =
             Executors.newFixedThreadPool(Math.max(1, effectiveEntries.size()));
         List<Future<LaunchedServer>> launchFutures = new ArrayList<>();
         try {
             for (ConfigurationEntry entry : effectiveEntries) {
                 Launcher launcher = launcherFactory.launcherFor(entry.language()).orElseThrow();
-                launchFutures.add(launchPool.submit(() -> launcher.launch(entry, sources)));
+                launchFutures.add(launchPool.submit(() -> {
+                    Instant languageStartedAt = Instant.now();
+                    try {
+                        return launcher.launch(entry, sources);
+                    } finally {
+                        LaunchTimings.log(entry.language(), "TOTAL build + launch", languageStartedAt);
+                    }
+                }));
             }
         } finally {
             launchPool.shutdown();
@@ -501,6 +605,8 @@ public final class TestServerOrchestrator {
                 }
             }
         }
+        LaunchTimings.log("all", "launch stage (every server reachable)", launchStageStartedAt);
+        LaunchTimings.printSummary("Language_Server build + launch timings");
         if (launchError != null) {
             return PipelineOutcome.aborted(launchError.getMessage());
         }
@@ -522,16 +628,23 @@ public final class TestServerOrchestrator {
             }
         }
 
+        if (stopAfter == StopAfter.LAUNCH) {
+            return PipelineOutcome.stoppedAfter(stopAfter, effectiveEntries);
+        }
+
         // ---- Stage 6: run the Tests, pointed at the launched Targets via
         // runtime configuration only, with every
         // language's Feature_Declaration — inline, own working tree, and
         // cross-repo alike — flattened for the FeatureGate. ----
         TestRunInput input = testRunInput(effectiveEntries, launched, declarations);
         List<TestExecution> executions;
+        Instant testsStartedAt = Instant.now();
         try {
             executions = testRunner.run(input);
         } catch (MissingRuntimeConfigException e) {
             return PipelineOutcome.aborted(e.getMessage());
+        } finally {
+            LaunchTimings.log("all", "Tests run (gradle test)", testsStartedAt);
         }
         List<String> launchedLabels = input.targets().stream()
             .map(t -> t.language() + "-v" + t.majorVersion())

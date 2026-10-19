@@ -1,6 +1,7 @@
 package aws.cryptography.testserver.orchestrator.launch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,10 +10,14 @@ import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
 import aws.cryptography.testserver.orchestrator.source.ResolutionReason;
 import aws.cryptography.testserver.orchestrator.source.SourcePlan;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -155,6 +160,36 @@ class JavaLaunchPlanTest {
     // Fixtures.
     // ------------------------------------------------------------------
 
+    @Test
+    @DisplayName("a Dafny library whose stamp records its commit skips the transpile + publish")
+    void stampedDafnyLibrarySkipsTheTranspile(@TempDir Path tempDir) throws IOException {
+        Path project = Files.createDirectories(tempDir.resolve("repo/AwsCryptographyPrimitives"));
+        Path library = Files.createDirectories(project.resolve("runtimes/java"));
+        // Were the transpile to run, this target would leave a marker behind.
+        Files.writeString(project.resolve("Makefile"), "build_java:\n\ttouch transpiled\n");
+        String commit = "0123456789abcdef0123456789abcdef01234567";
+        Files.writeString(project.resolve("." + JavaLaunchPlan.DAFNY_LIBRARY_STAMP + "-build-stamp"), commit);
+        Path server = Files.createDirectories(tempDir.resolve("repo/test-server/java-v1-server"));
+        MaterializedSources sources = new MaterializedSources(List.of(
+            new MaterializedSources.Success(ComponentId.library("java"),
+                new SourcePlan.Clone("git@github.com:aws/mpl.git", "main", "AwsCryptographyPrimitives/runtimes/java"),
+                ResolutionReason.CONFIGURATION_ENTRY, library, commit, "main", null),
+            new MaterializedSources.Success(ComponentId.server("java"),
+                new SourcePlan.Clone("git@github.com:aws/mpl.git", "main", "test-server/java-v1-server"),
+                ResolutionReason.CONFIGURATION_ENTRY, server, commit, "main", null)));
+
+        // The server directory has no gradlew, so the launch itself fails;
+        // what matters is that it got past the library build without Dafny.
+        ServerLaunchException ex = assertThrows(ServerLaunchException.class,
+            () -> newPlan(tempDir.resolve("work")).launch(javaEntry(), sources));
+        assertFalse(ex.getMessage().contains("requires Dafny"), ex.getMessage());
+        assertFalse(Files.exists(project.resolve("transpiled")), "the transpile must not run");
+    }
+
+    // ------------------------------------------------------------------
+    // Fixtures.
+    // ------------------------------------------------------------------
+
     private static JavaLaunchPlan newPlan(Path workDir) {
         // A short readiness window keeps any accidental launch fast; the
         // RESOLVE paths under test abort before the launcher is ever reached.
@@ -184,5 +219,20 @@ class JavaLaunchPlanTest {
             ResolutionReason.CONFIGURATION_ENTRY,
             SERVER, "89abcdef0123456789abcdef0123456789abcdef",
             "kessplas/esdk-test-server", null);
+    }
+
+    @Test
+    @DisplayName("a JDK exported by actions/setup-java as JAVA_HOME_<major>_X64 is resolved, 1.8 reading major 8")
+    void setupJavaHome(@TempDir Path jdk) throws IOException {
+        Path javaBin = Files.createDirectories(jdk.resolve("bin")).resolve("java");
+        Files.writeString(javaBin, "");
+        javaBin.toFile().setExecutable(true);
+
+        assertEquals(Optional.of(jdk),
+            JavaLaunchPlan.setupJavaHome("17", Map.of("JAVA_HOME_17_X64", jdk.toString())));
+        assertEquals(Optional.of(jdk),
+            JavaLaunchPlan.setupJavaHome("1.8", Map.of("JAVA_HOME_8_ARM64", jdk.toString())));
+        assertEquals(Optional.empty(),
+            JavaLaunchPlan.setupJavaHome("11", Map.of("JAVA_HOME_17_X64", jdk.toString())));
     }
 }

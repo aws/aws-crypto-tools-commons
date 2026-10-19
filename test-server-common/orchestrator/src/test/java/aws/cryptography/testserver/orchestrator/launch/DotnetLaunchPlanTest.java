@@ -2,6 +2,7 @@ package aws.cryptography.testserver.orchestrator.launch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,20 +40,12 @@ class DotnetLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the transpile prerequisites init the libraries and mpl submodules, like the repo's net workflow")
-    void submodules() {
-        assertEquals(List.of("git", "submodule", "update", "--init", "libraries"),
-            DotnetLaunchPlan.submoduleLibrariesCommand());
-        assertEquals(List.of("git", "submodule", "update", "--init", "--recursive", "mpl"),
-            DotnetLaunchPlan.submoduleMplCommand());
-    }
-
-    @Test
-    @DisplayName("the library restores with make setup_net and transpiles with make transpile_net CORES=4")
+    @DisplayName("the library restores with make setup_net and transpiles its implementation and dependencies")
     void setupAndTranspile() {
         assertEquals(List.of("make", "setup_net"),
             DotnetLaunchPlan.setupCommand("make"));
-        assertEquals(List.of("make", "transpile_net", "CORES=4"),
+        assertEquals(List.of("make", "_with_extern_pre_transpile", "transpile_implementation_net",
+                "transpile_dependencies_net", "_with_extern_post_transpile", "CORES=4"),
             DotnetLaunchPlan.transpileCommand("make"));
     }
 
@@ -86,15 +79,15 @@ class DotnetLaunchPlanTest {
             PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
         String path = "/nonexistent" + File.pathSeparator + tempDir;
 
-        assertTrue(DotnetLaunchPlan.commandOnPath("dafny", path));
+        assertTrue(DafnyProject.commandOnPath("dafny", path));
     }
 
     @Test
     @DisplayName("a missing or empty PATH yields dafny-not-found")
     void dafnyAbsent(@TempDir Path tempDir) {
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", null));
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", ""));
-        assertFalse(DotnetLaunchPlan.commandOnPath("dafny", tempDir.toString()),
+        assertFalse(DafnyProject.commandOnPath("dafny", null));
+        assertFalse(DafnyProject.commandOnPath("dafny", ""));
+        assertFalse(DafnyProject.commandOnPath("dafny", tempDir.toString()),
             "a PATH entry without a dafny executable must not match");
     }
 
@@ -161,5 +154,41 @@ class DotnetLaunchPlanTest {
 
     private static ConfigurationEntry netEntry() {
         return new ConfigurationEntry("net", 5, 8097, null, null, null, null);
+    }
+
+    @Test
+    @DisplayName("the transpile inputs change with the Dafny sources, not with the test server")
+    void transpileInputsTrackOnlyTheTranspiledSources(@TempDir Path repo) throws Exception {
+        git(repo, "init", "-q");
+        Files.createDirectories(repo.resolve("AwsEncryptionSDK/dafny"));
+        Files.createDirectories(repo.resolve("esdk-test-servers/net"));
+        Files.writeString(repo.resolve("AwsEncryptionSDK/dafny/Index.dfy"), "module A {}");
+        Files.writeString(repo.resolve("SharedMakefileV2.mk"), "");
+        Files.writeString(repo.resolve("esdk-test-servers/net/Program.cs"), "// v1");
+        commitAll(repo);
+        String initial = DotnetLaunchPlan.transpileInputs(repo, repo.resolve("AwsEncryptionSDK"));
+
+        Files.writeString(repo.resolve("esdk-test-servers/net/Program.cs"), "// v2");
+        commitAll(repo);
+        assertEquals(initial, DotnetLaunchPlan.transpileInputs(repo, repo.resolve("AwsEncryptionSDK")));
+
+        Files.writeString(repo.resolve("AwsEncryptionSDK/dafny/Index.dfy"), "module B {}");
+        commitAll(repo);
+        assertNotEquals(initial, DotnetLaunchPlan.transpileInputs(repo, repo.resolve("AwsEncryptionSDK")));
+    }
+
+    private static void commitAll(Path repo) throws Exception {
+        git(repo, "add", "-A");
+        git(repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+            "commit", "-q", "-m", "c");
+    }
+
+    private static void git(Path repo, String... args) throws Exception {
+        List<String> command = new java.util.ArrayList<>(List.of("git"));
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command).directory(repo.toFile())
+            .redirectErrorStream(true).start();
+        process.getInputStream().readAllBytes();
+        assertEquals(0, process.waitFor(), "git " + String.join(" ", args));
     }
 }

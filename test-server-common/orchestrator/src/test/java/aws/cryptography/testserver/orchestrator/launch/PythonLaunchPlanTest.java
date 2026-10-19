@@ -72,12 +72,23 @@ class PythonLaunchPlanTest {
     }
 
     @Test
-    @DisplayName("the server runs as <venv python> -m esdk_test_server <port>, like run-python-server")
+    @DisplayName("a smithy-dafny library installs without the pinned MPL, its path dependencies bringing the sibling runtimes")
+    void dafnyPipInstallCommand() {
+        assertEquals(
+            List.of(VENV.resolve("bin").resolve("pip").toString(), "install", "--quiet",
+                "-e", LIBRARY.toString(),
+                PythonLaunchPlan.CBOR2_REQUIREMENT,
+                "-e", SERVER.toString()),
+            PythonLaunchPlan.dafnyPipInstallCommand(VENV, LIBRARY, SERVER));
+    }
+
+    @Test
+    @DisplayName("the server runs as <venv python> -m <module> <port>, like run-python-server")
     void serverCommand() {
         assertEquals(
             List.of(VENV.resolve("bin").resolve("python").toString(),
                 "-m", "esdk_test_server", "8092"),
-            PythonLaunchPlan.serverCommand(VENV, 8092));
+            PythonLaunchPlan.serverCommand(VENV, "esdk_test_server", 8092));
     }
 
     // ------------------------------------------------------------------
@@ -132,7 +143,7 @@ class PythonLaunchPlanTest {
     private static PythonLaunchPlan newPlan(Path workDir) {
         // A short readiness window keeps any accidental launch fast; the
         // RESOLVE paths under test abort before the launcher is ever reached.
-        return new PythonLaunchPlan(workDir, "python3",
+        return new PythonLaunchPlan(workDir, "esdk", "python3",
             new SubprocessLauncher(Duration.ofSeconds(1)));
     }
 

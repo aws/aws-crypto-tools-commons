@@ -3,11 +3,14 @@ package aws.cryptography.testserver.orchestrator.launch;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The C++-shim {@code Language_Server} launch plan: builds the rpcv2Cbor server
@@ -31,7 +34,10 @@ import java.util.List;
  *       output. (The build natively compiles {@code aws-lc-sys}, which needs a
  *       Rust toolchain and Go on PATH.)</li>
  *   <li><b>Launch.</b> {@code <server>/target/release/esdk-cpp-test-server
- *       <port>} via the shared {@link SubprocessLauncher}.</li>
+ *       <port>} via the shared {@link SubprocessLauncher}, with the shim's
+ *       {@code target/release} first on the loader search path
+ *       ({@code LD_LIBRARY_PATH}, or {@code DYLD_LIBRARY_PATH} on macOS) so a
+ *       build restored into another workspace still finds the shim library.</li>
  * </ol>
  *
  * <p>Command construction is pure ({@code static} builders) so the exact
@@ -67,6 +73,7 @@ public final class CppShimLaunchPlan implements Launcher {
     private final Path workDirectory;
     private final String cargo;
     private final SubprocessLauncher subprocessLauncher;
+    private final String product;
 
     /**
      * @param workDirectory scratch directory owned by this plan; hosts the
@@ -107,6 +114,7 @@ public final class CppShimLaunchPlan implements Launcher {
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryName = product + "-cpp-test-server";
         this.shimRelativePath = product + "/shims/aws-" + product + "-cpp";
+        this.product = product;
     }
 
     @Override
@@ -117,8 +125,9 @@ public final class CppShimLaunchPlan implements Launcher {
         // 1. Resolve the materialized server directory. The shim and the library
         //    crate are within the same clone, so only the server component is
         //    resolved here.
-        Path serverDir = sources.directoryOf(ComponentId.server(language))
+        MaterializedSources.Success resolved = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
+        Path serverDir = resolved.directory();
         Path shimDir = serverDir.getParent().resolve(shimRelativePath);
         if (!Files.isDirectory(shimDir)) {
             throw new ServerLaunchException(language, ServerLaunchException.Category.RESOLVE,
@@ -136,16 +145,31 @@ public final class CppShimLaunchPlan implements Launcher {
 
         // 2. Build the shim into its own target/ (CARGO_TARGET_DIR cleared) so the
         //    server's build script finds the cdylib where it looks for it.
-        runBuildStep(language, "cargo build --release (aws-esdk-cpp shim)",
-            buildCommand(cargo), shimDir, true);
+        //    Both builds are skipped when the stamp shows this commit's server
+        //    binary and the shim library it loads are already built.
+        BuildStamp stamp = new BuildStamp(serverDir, product);
+        Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
+        Path shimLibrary = shimDir.resolve(DEFAULT_TARGET_DIR).resolve("release")
+            .resolve(System.mapLibraryName("aws_" + product + "_cpp"));
+        if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary, shimLibrary))) {
+            runBuildStep(language, "cargo build --release (aws-esdk-cpp shim)",
+                buildCommand(cargo), shimDir, true);
 
-        // 3. Build the server.
-        runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
+            // 3. Build the server.
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
+            stamp.write(language, resolved.commit(), resolved.dirty());
+        }
 
         // 4. Launch: <server>/target/release/esdk-cpp-test-server <port> via the
         //    shared probe/spawn/readiness/teardown.
         ProcessBuilder server = new ProcessBuilder(serverCommand(serverDir, entry.port(), serverBinaryName));
         server.directory(serverDir.toFile());
+        // The server's rpath to the shim library is the absolute build-time path,
+        // which does not exist when the build was restored from a prebuilt
+        // artifact into a different workspace; the loader would exit 127.
+        String libraryPathVariable = libraryPathVariable(System.getProperty("os.name"));
+        server.environment().put(libraryPathVariable, prependPath(shimLibrary.getParent(),
+            server.environment().get(libraryPathVariable)));
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
         return subprocessLauncher.launch(language, entry.port(), server);
@@ -164,6 +188,20 @@ public final class CppShimLaunchPlan implements Launcher {
     static List<String> serverCommand(Path serverDir, int port, String serverBinaryName) {
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         return List.of(binary.toString(), String.valueOf(port));
+    }
+
+    /** The dynamic loader's search-path variable: {@code DYLD_LIBRARY_PATH} on macOS, else {@code LD_LIBRARY_PATH}. */
+    static String libraryPathVariable(String osName) {
+        return osName != null && osName.toLowerCase(Locale.ROOT).contains("mac")
+            ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH";
+    }
+
+    /** {@code directory}, followed by {@code existing} when it is set. */
+    static String prependPath(Path directory, String existing) {
+        if (existing == null || existing.isBlank()) {
+            return directory.toString();
+        }
+        return directory + File.pathSeparator + existing;
     }
 
     /**
@@ -199,41 +237,46 @@ public final class CppShimLaunchPlan implements Launcher {
      */
     private void runBuildStep(String language, String step, List<String> command, Path buildDir,
             boolean clearCargoTargetDir) throws ServerLaunchException {
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(buildDir.toFile());
-        builder.redirectErrorStream(true);
-        if (clearCargoTargetDir) {
-            builder.environment().remove("CARGO_TARGET_DIR");
-        }
-
-        Process process;
+        Instant startedAt = Instant.now();
         try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        }
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(buildDir.toFile());
+            builder.redirectErrorStream(true);
+            if (clearCargoTargetDir) {
+                builder.environment().remove("CARGO_TARGET_DIR");
+            }
 
-        String output;
-        int exitCode;
-        try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            exitCode = process.waitFor();
-        } catch (IOException e) {
-            process.destroyForcibly();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, e.getMessage()), e);
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command, "interrupted while waiting"), e);
-        }
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            }
 
-        if (exitCode != 0) {
-            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
-                buildFailureMessage(language, step, command,
-                    "exit code " + exitCode + "; output:\n" + tail(output)));
+            String output;
+            int exitCode;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                exitCode = process.waitFor();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, e.getMessage()), e);
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command, "interrupted while waiting"), e);
+            }
+
+            if (exitCode != 0) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    buildFailureMessage(language, step, command,
+                        "exit code " + exitCode + "; output:\n" + tail(output)));
+            }
+        } finally {
+            LaunchTimings.log(language, step, startedAt);
         }
     }
 
