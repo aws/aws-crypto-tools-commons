@@ -2,8 +2,9 @@
 # Resolves the refs a test-server run checks out, including any
 # Test-Server-Override lines in the pull request description.
 #
-#   Test-Server-Override: <owner>/<repo>#<number>
-#   Test-Server-Override: https://github.com/<owner>/<repo>/pull/<number>
+#   Test-Server-Override: <owner>/<repo>#<number>, https://github.com/<owner>/<repo>/pull/<number>
+#
+# A line takes a comma-separated list, and a description may have several lines.
 #
 # Each line runs that pull request's head in place of the repository's
 # configured branch, for this run only. A pull request may name any number of
@@ -38,12 +39,25 @@ resolve() {
     fi
   fi
 
-  local dep_commons="" branches="" line repo number remote sha heads branch
+  local dep_commons="" branches="" line repo number remote sha heads branch items
+  local refs=() item
   while IFS= read -r line; do
     line=${line%$'\r'}
-    [[ $line =~ ^[[:space:]]*[Tt]est-[Ss]erver-[Oo]verride:[[:space:]]*(https://github\.com/)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(#|/pull/)([0-9]+)[[:space:]]*$ ]] || continue
-    repo=${BASH_REMATCH[2]}
-    number=${BASH_REMATCH[4]}
+    [[ $line =~ ^[[:space:]]*[Tt]est-[Ss]erver-[Oo]verride:(.*)$ ]] || continue
+    IFS=, read -ra items <<< "${BASH_REMATCH[1]}"
+    for item in "${items[@]}"; do
+      item=$(xargs <<< "$item")
+      [ -n "$item" ] || continue
+      if ! [[ $item =~ ^(https://github\.com/)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(#|/pull/)([0-9]+)$ ]]; then
+        echo "::error::Test-Server-Override: '$item' is not <owner>/<repo>#<number> or a pull request URL."
+        exit 1
+      fi
+      refs+=("${BASH_REMATCH[2]} ${BASH_REMATCH[4]}")
+    done
+  done <<< "$body"
+
+  for item in ${refs[@]+"${refs[@]}"}; do
+    read -r repo number <<< "$item"
     remote="https://x-access-token:${REPO_PAT}@github.com/$repo.git"
     sha=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote "$remote" "refs/pull/$number/head" | cut -f1)
     if [ -z "$sha" ]; then
@@ -68,7 +82,7 @@ resolve() {
     fi
     echo "Test-Server-Override: $repo#$number -> $branch ($sha)"
     branches+="$repo $branch"$'\n'
-  done <<< "$body"
+  done
 
   local commons_ref language_repository language_ref
   if [ "$REPOSITORY" = "$COMMONS" ]; then
