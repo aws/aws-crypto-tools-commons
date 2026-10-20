@@ -2,9 +2,13 @@
 # Resolves the refs a test-server run checks out, including any
 # Test-Server-Override lines in the pull request description.
 #
+#   ```
 #   Test-Server-Override: <owner>/<repo>#<number>, https://github.com/<owner>/<repo>/pull/<number>
+#   ```
 #
-# A line takes a comma-separated list, and a description may have several lines.
+# Only lines in the description's last code block count, so examples earlier
+# in the description are ignored. A line takes a comma-separated list, and the
+# block may have several lines.
 #
 # Each line runs that pull request's head in place of the repository's
 # configured branch, for this run only. A pull request may name any number of
@@ -40,6 +44,11 @@ resolve() {
   fi
 
   local dep_commons="" branches="" line repo number remote sha heads branch items
+  # The lines of the last fenced code block.
+  body=$(awk '/^[[:space:]]*```/ { if (fenced) { last = block; fenced = 0 } else { block = ""; fenced = 1 } next }
+              fenced { block = block $0 "\n" }
+              END { printf "%s", last }' <<< "$body")
+
   local refs=() item
   while IFS= read -r line; do
     line=${line%$'\r'}
