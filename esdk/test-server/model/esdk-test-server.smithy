@@ -24,6 +24,10 @@ service ESDKTestServer {
         EncryptStream
         Decrypt
         DecryptStream
+        GetCallCounts
+        EncryptConcurrently
+        DecryptConcurrently
+        AdvanceClock
     ]
     errors: [
         GenericServerError
@@ -41,6 +45,55 @@ service ESDKTestServer {
 operation CreateClient {
     input: CreateClientRequest
     output: CreateClientResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: encrypt every plaintext with the referenced client at the same time.
+/// The server starts all the encrypt calls before awaiting any of them,
+/// so they reach the client's caches concurrently.
+/// Results are in the same order as the plaintexts.
+operation EncryptConcurrently {
+    input: EncryptConcurrentlyRequest
+    output: EncryptConcurrentlyResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: decrypt every ciphertext with the referenced client at the same time,
+/// as EncryptConcurrently does for encrypt.
+operation DecryptConcurrently {
+    input: DecryptConcurrentlyRequest
+    output: DecryptConcurrentlyResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: move the clock of the referenced client's caches forward.
+/// Each client the server builds has its own clock, starting at the system time.
+/// Tests use this to expire cache entries without waiting.
+operation AdvanceClock {
+    input: AdvanceClockRequest
+    output: AdvanceClockResponse
+    errors: [
+        GenericServerError
+        ESDKClientError
+    ]
+}
+
+/// Test-only: report how many calls the referenced client's Caching CMMs have
+/// made to the CMMs they wrap, since the client was created.
+/// Tests use it to see whether the cache served a request or fetched new materials.
+/// Servers count these calls in their test server only; customers never see the counts.
+operation GetCallCounts {
+    input: GetCallCountsRequest
+    output: GetCallCountsResponse
     errors: [
         GenericServerError
         ESDKClientError
@@ -104,7 +157,9 @@ structure CreateClientRequest {
     /// faithful ESDK API layer (Requirement 2.1).
     @required
     config: ESDKClientConfig
+
 }
+
 
 @output
 structure CreateClientResponse {
@@ -112,6 +167,79 @@ structure CreateClientResponse {
     /// referencing exactly one registered ESDK_Client (Requirements 3.1, 3.2).
     @required
     clientId: ClientId
+}
+
+list BlobList {
+    member: Blob
+}
+
+@input
+structure EncryptConcurrentlyRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    plaintexts: BlobList
+
+    /// Optional encryption context, used for every plaintext.
+    encryptionContext: EncryptionContext
+
+    /// Optional algorithm suite override, used for every plaintext.
+    algorithmSuiteId: ESDKAlgorithmSuiteId
+}
+
+@output
+structure EncryptConcurrentlyResponse {
+    @required
+    ciphertexts: BlobList
+}
+
+@input
+structure DecryptConcurrentlyRequest {
+    @required
+    clientId: ClientId
+
+    @required
+    ciphertexts: BlobList
+}
+
+@output
+structure DecryptConcurrentlyResponse {
+    @required
+    plaintexts: BlobList
+}
+
+@input
+structure AdvanceClockRequest {
+    @required
+    clientId: ClientId
+
+    /// How far to move the clock forward, in milliseconds.
+    @required
+    milliseconds: Long
+}
+
+@output
+structure AdvanceClockResponse {}
+
+@input
+structure GetCallCountsRequest {
+    /// References the configured ESDK_Client whose counts to report.
+    @required
+    clientId: ClientId
+}
+
+@output
+structure GetCallCountsResponse {
+    /// Calls from the client's Caching CMMs to their underlying CMM's GetEncryptionMaterials.
+    /// Zero for a client with no Caching CMM.
+    @required
+    cachingCmmGetEncryptionMaterialsCalls: Long
+
+    /// Calls from the client's Caching CMMs to their underlying CMM's DecryptMaterials.
+    /// Zero for a client with no Caching CMM.
+    @required
+    cachingCmmDecryptMaterialsCalls: Long
 }
 
 @input

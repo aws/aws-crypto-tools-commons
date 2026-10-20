@@ -9,13 +9,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "branch": "kessplas/esdk-test-server",
+        "branch": "lucmcdon/test-server-testing-ops",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucmcdon/test-server-testing-ops",
         "path": "test-server/server"
       }
     },
@@ -81,13 +81,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "branch": "kessplas/bug-config",
+        "branch": "lucmcdon/test-server-caching",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/test-server-caching",
         "path": "test-server"
       }
     },
