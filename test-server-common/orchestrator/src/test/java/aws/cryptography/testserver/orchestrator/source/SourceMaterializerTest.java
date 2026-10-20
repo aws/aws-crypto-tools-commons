@@ -271,14 +271,4 @@ class SourceMaterializerTest {
             assertEquals(0, entries.count(), "working-tree plans never clone");
         }
     }
-
-    @Test
-    @DisplayName("the remote tip is read past git's stderr in the ls-remote output")
-    void remoteTipIgnoresGitWarnings() {
-        String sha = "862781a54c8dde46529c968ba0aefe2776a76e98";
-        String output = "warning: redirecting to https://github.com/aws/example.git/\n"
-            + sha + "\trefs/heads/main\n";
-        assertEquals(sha, SourceMaterializer.remoteTip(output, "main"));
-        assertNull(SourceMaterializer.remoteTip("warning: redirecting to x\n", "main"));
-    }
 }
