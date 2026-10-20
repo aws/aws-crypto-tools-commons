@@ -527,6 +527,27 @@ public final class EsdkClientConfigs {
         return require(cachingCmm(defaultCmm(rawAesKeyring()), limitMessages));
     }
 
+    /**
+     * @return a client with {@code policy} whose Caching CMM wraps a Default CMM /
+     *     Raw-AES keyring and uses the server's materials cache named
+     *     {@code sharedCacheName}, under the cache partition {@code partitionId}.
+     *     Clients built from the same name and partition share cache entries.
+     */
+    public static ESDKClientConfig rawAesSharedCaching(ESDKCommitmentPolicy policy,
+                                                       String sharedCacheName, String partitionId) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(policy)
+            .cmm(CryptographicMaterialsManager.builder()
+                .caching(CachingCmmConfig.builder()
+                    .underlyingCMM(defaultCmm(rawAesKeyring()))
+                    .cacheLimitTtlSeconds(CACHE_TTL_SECONDS)
+                    .sharedCacheName(sharedCacheName)
+                    .partitionId(partitionId)
+                    .build())
+                .build())
+            .build();
+    }
+
     private static Keyring rawEcdhKeyring(RawEcdhKeyAgreementScheme scheme) {
         return Keyring.builder()
             .rawEcdh(RawEcdhKeyringConfig.builder()

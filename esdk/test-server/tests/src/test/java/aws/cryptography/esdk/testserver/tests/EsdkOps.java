@@ -72,16 +72,19 @@ final class EsdkOps {
     /**
      * Encrypt {@code plaintext} on {@code endpoint} with the existing client
      * {@code clientId} (so successive calls share that client's materials manager),
-     * under the given algorithm suite; return the ciphertext bytes.
+     * under the given algorithm suite, or the client default when {@code null};
+     * return the ciphertext bytes.
      */
     static byte[] encryptWithClient(URI endpoint, String clientId, byte[] plaintext,
                                     ESDKAlgorithmSuiteId suite) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        EncryptInput request = EncryptInput.builder()
+        EncryptInput.Builder input = EncryptInput.builder()
             .clientId(clientId)
-            .plaintext(ByteBuffer.wrap(plaintext))
-            .algorithmSuiteId(suite)
-            .build();
+            .plaintext(ByteBuffer.wrap(plaintext));
+        if (suite != null) {
+            input.algorithmSuiteId(suite);
+        }
+        EncryptInput request = input.build();
         return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
     }
 
