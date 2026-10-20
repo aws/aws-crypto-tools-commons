@@ -202,6 +202,7 @@ jobs:
       commons_ref: ${{ steps.refs.outputs.commons_ref }}
       language_repository: ${{ steps.refs.outputs.language_repository }}
       language_ref: ${{ steps.refs.outputs.language_ref }}
+      language_branches: ${{ steps.refs.outputs.language_branches }}
     steps:
       - name: Check out the resolve script
         uses: actions/checkout@v4
@@ -222,7 +223,7 @@ jobs:
           INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
           GH_TOKEN: ${{ github.token }}
           REPO_PAT: ${{ secrets.repo-pat }}
-        run: .github/scripts/resolve-test-server-refs.sh
+        run: .github/scripts/resolve-test-server-refs.sh resolve
 
   plan:
     name: find servers to prebuild
@@ -265,6 +266,11 @@ jobs:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Depends-On repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
@@ -496,6 +502,11 @@ jobs:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Depends-On repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
@@ -816,6 +827,11 @@ jobs:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Depends-On repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
