@@ -45,13 +45,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "esdk/move-test-servers",
+        "branch": "main",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "esdk/move-test-servers",
+        "ref": "main",
         "path": "esdk/test-server"
       }
     },
@@ -63,13 +63,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "esdk/move-test-servers",
+        "branch": "main",
         "path": "esdk/shims/aws-esdk-cpp"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "esdk/move-test-servers",
+        "ref": "main",
         "path": "esdk/shims/aws-esdk-cpp/test-server"
       }
     },
