@@ -22,6 +22,7 @@
 #     Environment:
 #       REPOSITORY, SHA        github.repository, github.sha
 #       PR_NUMBER, EVENT_BODY  the pull request's number and description, if any
+#       HEAD_REF               github.head_ref
 #       INPUT_COMMONS_REF, INPUT_LANGUAGE_REPOSITORY, INPUT_LANGUAGE_REF
 #       GH_TOKEN               reads this repository's pull request
 #       REPO_PAT               reads the private repositories' refs
@@ -82,9 +83,13 @@ resolve() {
       dep_commons=$sha
       continue
     fi
-    # The servers clone by branch name, so take the branch at the head commit.
-    heads=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "$remote")
-    branch=$(awk -v s="$sha" '$1 == s { sub("refs/heads/", "", $2); print $2; exit }' <<< "$heads")
+    # The servers clone by branch name. A token that cannot read pull requests
+    # falls back to the branch at the head commit.
+    branch=$(GH_TOKEN=$REPO_PAT gh api "repos/$repo/pulls/$number" --jq 'select(.head.repo.full_name == .base.repo.full_name) | .head.ref' 2>/dev/null) || branch=""
+    if [ -z "$branch" ]; then
+      heads=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "$remote")
+      branch=$(awk -v s="$sha" '$1 == s { sub("refs/heads/", "", $2); print $2; exit }' <<< "$heads")
+    fi
     if [ -z "$branch" ]; then
       echo "::error::Test-Server-Override: $repo#$number: no branch in $repo is at its head commit $sha (pull requests from forks are not supported)."
       exit 1
@@ -92,6 +97,13 @@ resolve() {
     echo "Test-Server-Override: $repo#$number -> $branch ($sha)"
     branches+="$repo $branch"$'\n'
   done
+
+  # The pull request's own repository runs every server it hosts from the
+  # pull request's branch, not only the ones built from the checkout.
+  if [ "$REPOSITORY" != "$COMMONS" ] && [ -n "${HEAD_REF:-}" ] &&
+     [ -n "$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "https://x-access-token:${REPO_PAT}@github.com/$REPOSITORY.git" "$HEAD_REF")" ]; then
+    branches+="$REPOSITORY $HEAD_REF"$'\n'
+  fi
 
   local commons_ref language_repository language_ref
   if [ "$REPOSITORY" = "$COMMONS" ]; then

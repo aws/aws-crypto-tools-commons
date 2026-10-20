@@ -215,6 +215,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           SHA: ${{ github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
           EVENT_BODY: ${{ github.event.pull_request.body }}
           INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
           INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
