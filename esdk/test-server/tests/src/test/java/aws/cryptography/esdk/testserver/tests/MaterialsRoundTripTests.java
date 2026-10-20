@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import aws.cryptography.esdk.testserver.tests.EsdkClientConfigs.Scenario;
@@ -67,9 +71,9 @@ class MaterialsRoundTripTests {
         return casesOver(LanguageServerRegistry.shared().pairs());
     }
 
-    private static List<Arguments> casesOver(List<EndpointPair> pairs) {
+    private static List<Arguments> casesOver(List<TargetPair> pairs) {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : pairs) {
+        for (TargetPair pair : pairs) {
             for (Scenario scenario : EsdkClientConfigs.scenarios()) {
                 cases.add(Arguments.of(pair, scenario));
             }
@@ -116,7 +120,7 @@ class MaterialsRoundTripTests {
      */
     @ParameterizedTest(name = "blob[{1}] {0}")
     @MethodSource("blobCases")
-    void blobRoundTrip(EndpointPair pair, Scenario scenario) {
+    void blobRoundTrip(TargetPair pair, Scenario scenario) {
         // Gate on the scenario's required Feature(s) — MPL for the raw/KMS keyring
         // scenarios, hierarchical for the hierarchical scenario. A combination
         // language declaring any required Feature unsupported skips visibly, before
@@ -144,7 +148,7 @@ class MaterialsRoundTripTests {
      */
     @ParameterizedTest(name = "stream[{1}] {0}")
     @MethodSource("streamCases")
-    void streamRoundTrip(EndpointPair pair, Scenario scenario) {
+    void streamRoundTrip(TargetPair pair, Scenario scenario) {
         // Requires the streaming Feature in addition to the scenario's keyring
         // Feature(s); any combination language declaring any of them unsupported
         // skips visibly, before any Language_Server operation (Requirements 9.1, 9.5).

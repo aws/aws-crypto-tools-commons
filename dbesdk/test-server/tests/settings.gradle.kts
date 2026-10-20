@@ -32,12 +32,11 @@ includeBuild("../client-java") {
     }
 }
 
-// The DB-ESDK TestServer test-support (FeatureGate, KnownBugGate, TargetPair,
-// LanguageServerTarget/Registry, TestServerClientCache, etc.). Copied into this
-// test server (dbesdk/test-server/tests-support) so DB-ESDK does not depend on
-// the shared ../../../test-server/ tree; the DB-ESDK-specific wrappers
-// (DbeTestServerClients) live in this Tests module.
-includeBuild("../tests-support") {
+// The shared TestServer test-support (FeatureGate, KnownBugGate, TargetPair,
+// LanguageServerTarget/Registry, TestServerClientCache, etc.), consumed from the
+// top-level test-server-common/ tree. The DB-ESDK-specific wrappers (DbeTestServerClients)
+// live in this Tests module.
+includeBuild("../../../test-server-common/tests-support") {
     dependencySubstitution {
         substitute(module("aws.cryptography.testserver:commons-test-server-tests-support"))
             .using(project(":"))

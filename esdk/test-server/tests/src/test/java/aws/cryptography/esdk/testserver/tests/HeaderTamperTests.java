@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -84,7 +88,7 @@ class HeaderTamperTests {
 
     static List<Arguments> cases() {
         List<Arguments> cases = new ArrayList<>();
-        for (EndpointPair pair : LanguageServerRegistry.shared().pairs()) {
+        for (TargetPair pair : LanguageServerRegistry.shared().pairs()) {
             for (Layout layout : LAYOUTS) {
                 cases.add(Arguments.of(pair, layout));
             }
@@ -97,7 +101,7 @@ class HeaderTamperTests {
      * a visible skip when they share none. Resolved before producing a message; header and footer
      * tampering are keyring-independent, so the pair runs once, under this keyring.
      */
-    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+    private static ConformanceKeyring keyringFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -107,7 +111,7 @@ class HeaderTamperTests {
     }
 
     /** Encrypt one message for {@code layout} on the pair's encrypt endpoint under {@code config}. */
-    private static byte[] encrypt(EndpointPair pair, ESDKClientConfig config, Layout layout) {
+    private static byte[] encrypt(TargetPair pair, ESDKClientConfig config, Layout layout) {
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT,
             Map.of(), layout.suite(), null);
         // Sanity: the layout's expected version byte is what the server produced.
@@ -121,7 +125,7 @@ class HeaderTamperTests {
     /** HDR-011: an unsupported version byte is rejected. */
     @ParameterizedTest(name = "versionByteRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsUnsupportedVersionByte(EndpointPair pair, Layout layout) {
+    void decryptRejectsUnsupportedVersionByte(TargetPair pair, Layout layout) {
         ESDKClientConfig config = keyringFor(pair).config(layout.policy());
         byte[] ciphertext = encrypt(pair, config, layout);
         assertBaselineDecrypts(pair, config, layout, ciphertext);
@@ -137,7 +141,7 @@ class HeaderTamperTests {
     /** HDR-013: an unknown algorithm-suite id is rejected. */
     @ParameterizedTest(name = "suiteIdRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsUnknownSuiteId(EndpointPair pair, Layout layout) {
+    void decryptRejectsUnknownSuiteId(TargetPair pair, Layout layout) {
         ESDKClientConfig config = keyringFor(pair).config(layout.policy());
         byte[] ciphertext = encrypt(pair, config, layout);
         byte[] tampered = ciphertext.clone();
@@ -152,7 +156,7 @@ class HeaderTamperTests {
     /** TAMPER-001: flipping an authenticated header byte (a message-id byte) is rejected. */
     @ParameterizedTest(name = "headerByteTamperRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTamperedHeaderByte(EndpointPair pair, Layout layout) {
+    void decryptRejectsTamperedHeaderByte(TargetPair pair, Layout layout) {
         ESDKClientConfig config = keyringFor(pair).config(layout.policy());
         byte[] ciphertext = encrypt(pair, config, layout);
         byte[] tampered = ciphertext.clone();
@@ -169,7 +173,7 @@ class HeaderTamperTests {
      */
     @ParameterizedTest(name = "finalByteTamperRejected[{1}] {0}")
     @MethodSource("cases")
-    void decryptRejectsTamperedFinalByte(EndpointPair pair, Layout layout) {
+    void decryptRejectsTamperedFinalByte(TargetPair pair, Layout layout) {
         ESDKClientConfig config = keyringFor(pair).config(layout.policy());
         byte[] ciphertext = encrypt(pair, config, layout);
         byte[] tampered = ciphertext.clone();
@@ -182,7 +186,7 @@ class HeaderTamperTests {
     }
 
     private static void assertBaselineDecrypts(
-            EndpointPair pair, ESDKClientConfig config, Layout layout, byte[] ciphertext) {
+            TargetPair pair, ESDKClientConfig config, Layout layout, byte[] ciphertext) {
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
             "baseline: the untampered message must decrypt (" + pair + ", " + layout + ")");
     }

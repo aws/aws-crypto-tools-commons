@@ -1,0 +1,52 @@
+# Primitives TestServer CI for aws-crypto-tools-commons. The run itself lives
+# in primitives-test-server-reusable.yml, which language repositories call too.
+name: Primitives TestServer
+
+on:
+  pull_request:
+    paths:
+      - "primitives/test-server/**"
+      - "test-server-common/**"
+      - ".github/workflows/primitives-test-server.yml"
+      - ".github/workflows/primitives-test-server-reusable.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "primitives/test-server/**"
+      - "test-server-common/**"
+      - ".github/workflows/primitives-test-server.yml"
+      - ".github/workflows/primitives-test-server-reusable.yml"
+  # Nightly on main: rebuilds any server whose branch tip moved and saves it
+  # to main's caches, which every pull request can restore.
+  schedule:
+    - cron: "37 7 * * *"
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: Comma-separated languages under test; empty runs the full matrix.
+        type: string
+        default: ""
+      language-repository:
+        description: owner/name of a language repository to test from source.
+        type: string
+        default: ""
+      language-ref:
+        description: The language-repository ref to test.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  primitives:
+    name: TestServer
+    uses: ./.github/workflows/primitives-test-server-reusable.yml
+    with:
+      focus: ${{ inputs.focus || '' }}
+      language-repository: ${{ inputs.language-repository || '' }}
+      language-ref: ${{ inputs.language-ref || '' }}
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}

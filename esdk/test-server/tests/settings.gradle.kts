@@ -8,9 +8,9 @@
 // ("included") build rather than regenerating any client here.
 //
 // The Tests are endpoint-only: every Language_Server is located exclusively
-// through the `esdk.testserver.targets` runtime configuration supplied by the
-// orchestrator (Requirement 10.2). No Language_Server build is included here,
-// so relocating a server requires zero changes to this module.
+// through the `testserver.targets` runtime configuration supplied by the
+// shared orchestrator (Requirement 10.2). No Language_Server build is included
+// here, so relocating a server requires zero changes to this module.
 //
 // Explicit dependency substitution maps stable coordinates to the root project
 // of the included build regardless of whether that build declares a group, so
@@ -28,6 +28,17 @@ rootProject.name = "esdk-test-server-tests"
 includeBuild("../client-java") {
     dependencySubstitution {
         substitute(module("aws.cryptography.esdk.testserver:esdk-test-server-client-java"))
+            .using(project(":"))
+    }
+}
+
+// The shared TestServer test-support (FeatureGate, KnownBugGate, TargetPair,
+// LanguageServerTarget/Registry, TestServerClientCache, etc.), consumed from the
+// top-level test-server-common/ tree. The ESDK-specific wrapper (TestServerClients)
+// lives in this Tests module.
+includeBuild("../../../test-server-common/tests-support") {
+    dependencySubstitution {
+        substitute(module("aws.cryptography.testserver:commons-test-server-tests-support"))
             .using(project(":"))
     }
 }

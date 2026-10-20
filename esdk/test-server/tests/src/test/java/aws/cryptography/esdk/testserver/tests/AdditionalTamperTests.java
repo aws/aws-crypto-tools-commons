@@ -1,5 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -66,7 +71,7 @@ class AdditionalTamperTests {
 
     private static final long FRAME_LENGTH = 512L;
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -75,7 +80,7 @@ class AdditionalTamperTests {
      * a visible skip when they share none. Resolved before producing a message; the tamper cases
      * span two commitment policies, so each selects its policy via {@code keyring.config}.
      */
-    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+    private static ConformanceKeyring keyringFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -91,7 +96,7 @@ class AdditionalTamperTests {
         b[offset + 3] = (byte) value;
     }
 
-    private static void assertRejected(EndpointPair pair, ESDKClientConfig config, byte[] tampered,
+    private static void assertRejected(TargetPair pair, ESDKClientConfig config, byte[] tampered,
                                        String what) {
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, tampered),
@@ -101,7 +106,7 @@ class AdditionalTamperTests {
     /** TAMPER-005: a final-frame content length exceeding the frame length is rejected. */
     @ParameterizedTest(name = "finalFrameContentLengthOverflowRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsOverlongFinalFrameContentLength(EndpointPair pair) {
+    void decryptRejectsOverlongFinalFrameContentLength(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V2_POLICY);
         // Short plaintext (< frame length) => a single final frame carrying a content-length field.
@@ -120,7 +125,7 @@ class AdditionalTamperTests {
     /** FOOT-004: a signed message with its footer signature bytes dropped is rejected. */
     @ParameterizedTest(name = "truncatedFooterRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsTruncatedFooter(EndpointPair pair) {
+    void decryptRejectsTruncatedFooter(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V1_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
@@ -143,7 +148,7 @@ class AdditionalTamperTests {
      */
     @ParameterizedTest(name = "signatureTrailingGarbageRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsSignatureWithTrailingGarbage(EndpointPair pair) {
+    void decryptRejectsSignatureWithTrailingGarbage(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V1_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
@@ -159,7 +164,7 @@ class AdditionalTamperTests {
         tampered[message.footerOffset] = (byte) (inflatedLength >>> 8);
         tampered[message.footerOffset + 1] = (byte) inflatedLength;
 
-        KnownBugGate.gate("decrypt-accepts-signature-trailing-garbage",
+        KnownBugGate.gateDeclared("decrypt-accepts-signature-trailing-garbage",
             pair.decryptTarget(),
             () -> assertRejected(pair, config, tampered,
                 "a footer whose signature field is the valid signature plus trailing garbage"));
@@ -168,7 +173,7 @@ class AdditionalTamperTests {
     /** HDR-012: an unsupported V1 type byte is rejected. */
     @ParameterizedTest(name = "v1InvalidTypeRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsInvalidV1Type(EndpointPair pair) {
+    void decryptRejectsInvalidV1Type(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V1_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
@@ -181,7 +186,7 @@ class AdditionalTamperTests {
     /** HDR-016: a V1 IV-length field that disagrees with the suite is rejected. */
     @ParameterizedTest(name = "v1IvLengthMismatchRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsV1IvLengthMismatch(EndpointPair pair) {
+    void decryptRejectsV1IvLengthMismatch(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V1_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
@@ -196,7 +201,7 @@ class AdditionalTamperTests {
     /** HDR-018: a V1 header carrying a committing (V2) algorithm-suite id is rejected. */
     @ParameterizedTest(name = "v1WithCommittingSuiteIdRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsV1HeaderWithCommittingSuiteId(EndpointPair pair) {
+    void decryptRejectsV1HeaderWithCommittingSuiteId(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V1_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
@@ -212,7 +217,7 @@ class AdditionalTamperTests {
     /** HDR-017: a framed header whose frame length is 0 (only valid for non-framed) is rejected. */
     @ParameterizedTest(name = "framedZeroFrameLengthRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsFramedHeaderWithZeroFrameLength(EndpointPair pair) {
+    void decryptRejectsFramedHeaderWithZeroFrameLength(TargetPair pair) {
         ConformanceKeyring keyring = keyringFor(pair);
         ESDKClientConfig config = keyring.config(V2_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),

@@ -1,5 +1,11 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,7 +63,7 @@ class EncryptionContextFormatTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -74,7 +80,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "emptyEcZeroLength {0}")
     @MethodSource("targets")
     void emptyEncryptionContextSerializesToZeroLength(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new TargetPair(target, target));
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
         assertEquals(0, message.aadLength,
@@ -88,7 +94,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "ecKeysCanonicallyOrdered {0}")
     @MethodSource("targets")
     void encryptionContextKeysAreCanonicallyOrdered(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new TargetPair(target, target));
         // Insert keys out of order; the wire form must sort them.
         Map<String, String> ec = new java.util.LinkedHashMap<>();
         ec.put("zebra", "1");
@@ -127,7 +133,7 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "ecKeysSortedByUtf8Bytes {0}")
     @MethodSource("targets")
     void encryptionContextKeysSortByUtf8BytesNotUtf16(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new TargetPair(target, target));
         String bmpKey = "\uff61";                 // U+FF61,  UTF-8 EF BD A1
         String astralKey = "\ud800\udc00";        // U+10000, UTF-8 F0 90 80 80
         Map<String, String> ec = new java.util.LinkedHashMap<>();
@@ -150,9 +156,9 @@ class EncryptionContextFormatTests {
     @ParameterizedTest(name = "emptyEcValueRoundTrips {0}")
     @MethodSource("targets")
     void emptyEncryptionContextValueSerializesAndRoundTrips(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new EndpointPair(target, target));
+        ESDKClientConfig config = configFor(new TargetPair(target, target));
         Map<String, String> ec = Map.of("empty-value-key", "");
-        KnownBugGate.gate("encrypt-rejects-empty-encryption-context-value", target, () -> {
+        KnownBugGate.gateDeclared("encrypt-rejects-empty-encryption-context-value", target, () -> {
             byte[] ciphertext = assertDoesNotThrow(
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, SUITE, null),
                 target + ": encrypt with an empty encryption-context value must be accepted");

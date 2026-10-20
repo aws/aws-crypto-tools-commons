@@ -8,9 +8,8 @@
 #   client-java/   the generated Java Test_Client   (root: dbesdk-test-server-client-java)
 #   tests/         the single Java Tests suite       (root: dbesdk-test-server-tests)
 #
-# The Orchestrator core lives at ./orchestrator/ (a self-contained copy owned by
-# this test server, so DB-ESDK does not depend on the shared ../../test-server/
-# tree) and runs against this SDK's data when invoked with
+# The Orchestrator core lives in the shared ../../test-server-common/orchestrator/ tree
+# and runs against this SDK's data when invoked with
 # `-Dtestserver.root=$(MAKEFILE_DIR)` (see `make orchestrate` below). Its
 # runtime scratch — materialized clones, launch dirs, resolution record —
 # lives under this Makefile's sibling `build/` directory, gitignored.
@@ -55,7 +54,7 @@ MAKEFILE_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 MODEL_DIR  := $(MAKEFILE_DIR)/model
 CLIENT_DIR := $(MAKEFILE_DIR)/client-java
 TESTS_DIR  := $(MAKEFILE_DIR)/tests
-ORCH_DIR   := $(MAKEFILE_DIR)/orchestrator
+ORCH_DIR   := $(abspath $(MAKEFILE_DIR)/../../test-server-common/orchestrator)
 CDK_DIR    := $(MAKEFILE_DIR)/cdk
 
 # ----------------------------------------------------------------------------
@@ -213,7 +212,7 @@ build-tests: check-java ## Build the Tests suite (tests, skips tests)
 # present (e.g. run `creds`); export DBESDK_TESTSERVER_KMS_* to point at a
 # non-default key set.
 orchestrate: check-java ## Run the complete cross-language Commons_Run (all servers, full matrix); needs AWS creds
-	@echo "==> Running the TestServer orchestrator (dbesdk/test-server/orchestrator/, product=dbesdk) — complete cross-language run"
+	@echo "==> Running the TestServer orchestrator (test-server-common/orchestrator/, product=dbesdk) — complete cross-language run"
 	@echo "    Launches every configured Language_Server on its port, runs the Tests over the"
 	@echo "    full pairwise matrix, prints the Resolution_Record, and reports one fail-open Result."
 	@echo "    The KMS keyring scenarios are REQUIRED: valid AWS credentials must be present"
