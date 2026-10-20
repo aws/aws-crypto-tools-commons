@@ -29,17 +29,24 @@ name: DB-ESDK TestServer
 on:
   workflow_call:
     inputs:
-      commons_ref:
+      commons-ref:
         description: >-
           The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
           — the tests, model, orchestrator, and config. Leave empty to use the
           commit that triggered the run.
         type: string
         default: ""
-      dbe_ref:
+      dbe-repository:
         description: >-
-          The aws-database-encryption-sdk-dynamodb ref whose language servers to
-          test. Leave empty to clone each server at the ref pinned in
+          owner/name of the DB-ESDK repository whose servers to test from its
+          checkout instead of their configured branch. Defaults to the calling
+          repository when that is not aws-crypto-tools-commons.
+        type: string
+        default: ""
+      dbe-ref:
+        description: >-
+          The dbe-repository ref whose servers to test. Defaults to the calling
+          commit; empty on a commons run clones each server at the ref pinned in
           config/server-config.json.
         type: string
         default: ""
@@ -57,7 +64,7 @@ on:
           language.
         type: string
         default: ""
-      save_caches:
+      save-caches:
         description: >-
           Save the dependency caches from this run. They are saved from the
           default branch (push and schedule) by default; every other ref only
@@ -75,12 +82,15 @@ permissions:
   id-token: write
 
 env:
-  DBE_REF: ${{ inputs.dbe_ref }}
+  # The DB-ESDK repository whose checkout replaces its servers' configured
+  # branch. Defaults to the calling repository when that is not commons, so a
+  # caller tests its own code instead of the configured branch.
+  DBE_REPOSITORY: ${{ inputs.dbe-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
   LANGUAGES: ${{ inputs.languages }}
   # Dependency caches are written only from the default branch, so every
   # branch restores the same warm set and pull requests never churn the cache
   # store.
-  SAVE_CACHES: ${{ inputs.save_caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   CARGO_INCREMENTAL: "0"
 
 jobs:
@@ -105,14 +115,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ inputs.commons_ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
+          ref: ${{ inputs.commons-ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
 
-      - name: Check out aws-database-encryption-sdk-dynamodb at the requested server ref
-        if: env.DBE_REF != ''
+      - name: Check out the DB-ESDK repository under test
+        if: env.DBE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
-          repository: aws/aws-database-encryption-sdk-dynamodb
-          ref: ${{ inputs.dbe_ref }}
+          repository: ${{ env.DBE_REPOSITORY }}
+          ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
           path: .dbe-product-repo
 
       - name: Rewrite the DBE repo SSH URL to public HTTPS
@@ -139,10 +149,10 @@ jobs:
           repo_of() {
             local url; url=$(field "$1" url); url=$(basename "${url%.git}"); echo "${url##*:}"
           }
-          # The dbe_ref checkout is a working tree, not a clone.
+          # The DB-ESDK checkout is a working tree, not a clone.
           own=""
-          if [ -n "$DBE_REF" ]; then
-            own=aws-database-encryption-sdk-dynamodb
+          if [ -n "$DBE_REPOSITORY" ]; then
+            own=$(basename "$DBE_REPOSITORY")
             echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/.dbe-product-repo" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
@@ -252,14 +262,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ inputs.commons_ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
+          ref: ${{ inputs.commons-ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
 
-      - name: Check out aws-database-encryption-sdk-dynamodb at the requested server ref
-        if: env.DBE_REF != ''
+      - name: Check out the DB-ESDK repository under test
+        if: env.DBE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
-          repository: aws/aws-database-encryption-sdk-dynamodb
-          ref: ${{ inputs.dbe_ref }}
+          repository: ${{ env.DBE_REPOSITORY }}
+          ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
           path: .dbe-product-repo
 
       - name: Set up JDK 21 (Temurin) for the orchestrator
@@ -410,16 +420,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ inputs.commons_ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
+          ref: ${{ inputs.commons-ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
 
-      - name: Checkout aws-database-encryption-sdk-dynamodb at the requested server ref
-        # Only when dbe_ref is set: check out that commit's servers so make
-        # orchestrate tests them directly instead of cloning them.
-        if: env.DBE_REF != ''
+      - name: Check out the DB-ESDK repository under test
+        # Only when a DB-ESDK checkout applies: check out that commit's servers
+        # so make orchestrate tests them directly instead of cloning them.
+        if: env.DBE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
-          repository: aws/aws-database-encryption-sdk-dynamodb
-          ref: ${{ inputs.dbe_ref }}
+          repository: ${{ env.DBE_REPOSITORY }}
+          ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
           path: .dbe-product-repo
 
       - name: Set up JDK 21 (Temurin)
@@ -479,7 +489,7 @@ jobs:
           smithy --version
 
       - name: Rewrite the DBE repo SSH URL to public HTTPS
-        # When servers are cloned (dbe_ref unset), config/server-config.json gives
+        # When servers are cloned (dbe-ref unset), config/server-config.json gives
         # their source as SSH URLs. CI runners have no SSH keys, so rewrite SSH to
         # public HTTPS for the job. Not needed locally, where SSH keys are present.
         run: |
@@ -489,10 +499,10 @@ jobs:
 
       - name: Restore the materialized java clone
         # The clone carries the java server's Gradle outputs, so Gradle finds the
-        # server up to date for the same commit. A dbe_ref run builds from its
+        # server up to date for the same commit. A dbe-ref run builds from its
         # checkout instead of a clone.
         id: sources-java
-        if: env.DBE_REF == ''
+        if: env.DBE_REPOSITORY == ''
         uses: actions/cache/restore@v4
         with:
           path: ${{ needs.plan.outputs.dir_java }}
@@ -537,7 +547,7 @@ jobs:
       - name: Save the materialized java clone
         # Saved before the heavy servers are fetched into the same clone, so the
         # entry holds only the sources and the java build.
-        if: env.DBE_REF == '' && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
+        if: env.DBE_REPOSITORY == '' && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ needs.plan.outputs.dir_java }}
@@ -631,7 +641,7 @@ jobs:
           # The name SubprocessLauncher reads.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
-        # $OVERLAY already carries the dbe_ref working-tree overlay (and is empty
+        # $OVERLAY already carries the dbe-ref working-tree overlay (and is empty
         # otherwise, in which case each server is cloned per server-config.json),
         # so it is the single source of the overlay — passing DBESDK_DBE_REPO too
         # would duplicate the workingTreeOverlay token.

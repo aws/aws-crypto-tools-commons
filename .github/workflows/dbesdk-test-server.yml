@@ -33,7 +33,7 @@ on:
         default: ""
   workflow_call:
     inputs:
-      commons_ref:
+      commons-ref:
         description: >-
           The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
           — the tests, model, orchestrator, and config. Leave empty to use the
@@ -41,10 +41,18 @@ on:
         type: string
         required: false
         default: ""
-      dbe_ref:
+      dbe-repository:
         description: >-
-          The aws-database-encryption-sdk-dynamodb ref whose language servers to
-          test. Leave empty to clone each server at the ref pinned in
+          owner/name of the DB-ESDK repository whose servers to test from its
+          checkout instead of their configured branch. Defaults to the calling
+          repository when that is not aws-crypto-tools-commons.
+        type: string
+        required: false
+        default: ""
+      dbe-ref:
+        description: >-
+          The dbe-repository ref whose servers to test. Defaults to the calling
+          commit; empty on a commons run clones each server at the ref pinned in
           config/server-config.json.
         type: string
         required: false
@@ -62,5 +70,6 @@ jobs:
     with:
       focus: ${{ inputs.focus || '' }}
       languages: ${{ inputs.languages || '' }}
-      commons_ref: ${{ inputs.commons_ref || '' }}
-      dbe_ref: ${{ inputs.dbe_ref || '' }}
+      commons-ref: ${{ inputs.commons-ref || '' }}
+      dbe-repository: ${{ inputs.dbe-repository || '' }}
+      dbe-ref: ${{ inputs.dbe-ref || '' }}
