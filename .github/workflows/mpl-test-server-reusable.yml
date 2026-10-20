@@ -105,10 +105,8 @@ env:
   DAFNY_VERSION: "4.9.0"
 
 jobs:
-  # Resolves each prebuilt server's key and lists the servers with no prebuilt
-  # output, so the prebuild job builds only those.
-  # Resolves the refs every job checks out, including any Depends-On lines
-  # in the pull request description (.github/scripts/resolve-test-server-refs.sh).
+  # Resolves the refs every job checks out, including any Test-Server-Override
+  # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
   resolve:
     name: resolve refs
     runs-on: ubuntu-latest
@@ -139,6 +137,8 @@ jobs:
           REPO_PAT: ${{ secrets.repo-pat }}
         run: .github/scripts/resolve-test-server-refs.sh resolve
 
+  # Resolves each prebuilt server's key and lists the servers with no prebuilt
+  # output, so the prebuild job builds only those.
   plan:
     name: find servers to prebuild
     runs-on: ubuntu-latest
@@ -177,7 +177,7 @@ jobs:
           ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
-      - name: Point Depends-On repositories at their pull request branches
+      - name: Point Test-Server-Override repositories at their pull request branches
         env:
           LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
         run: .github/scripts/resolve-test-server-refs.sh apply
@@ -387,7 +387,7 @@ jobs:
           ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
-      - name: Point Depends-On repositories at their pull request branches
+      - name: Point Test-Server-Override repositories at their pull request branches
         env:
           LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
         run: .github/scripts/resolve-test-server-refs.sh apply
@@ -603,7 +603,7 @@ jobs:
           ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
-      - name: Point Depends-On repositories at their pull request branches
+      - name: Point Test-Server-Override repositories at their pull request branches
         env:
           LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
         run: .github/scripts/resolve-test-server-refs.sh apply

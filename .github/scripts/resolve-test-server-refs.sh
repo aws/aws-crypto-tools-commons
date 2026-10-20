@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Resolves the refs a test-server run checks out, including any Depends-On
-# lines in the pull request description.
+# Resolves the refs a test-server run checks out, including any
+# Test-Server-Override lines in the pull request description.
 #
-#   Depends-On: <owner>/<repo>#<number>
-#   Depends-On: https://github.com/<owner>/<repo>/pull/<number>
+#   Test-Server-Override: <owner>/<repo>#<number>
+#   Test-Server-Override: https://github.com/<owner>/<repo>/pull/<number>
 #
-# A commons pull request may name any number of language-repository pull
-# requests; a language-repository pull request may name a commons pull
-# request. Explicit workflow inputs win over Depends-On lines.
+# Each line runs that pull request's head in place of the repository's
+# configured branch, for this run only. A pull request may name any number of
+# repositories. Its own repository always runs from its checkout. Explicit
+# workflow inputs win over override lines.
 #
 # Usage:
 #   resolve-test-server-refs.sh resolve
@@ -40,32 +41,32 @@ resolve() {
   local dep_commons="" branches="" line repo number remote sha heads branch
   while IFS= read -r line; do
     line=${line%$'\r'}
-    [[ $line =~ ^[[:space:]]*[Dd]epends-[Oo]n:[[:space:]]*(https://github\.com/)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(#|/pull/)([0-9]+)[[:space:]]*$ ]] || continue
+    [[ $line =~ ^[[:space:]]*[Tt]est-[Ss]erver-[Oo]verride:[[:space:]]*(https://github\.com/)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(#|/pull/)([0-9]+)[[:space:]]*$ ]] || continue
     repo=${BASH_REMATCH[2]}
     number=${BASH_REMATCH[4]}
     remote="https://x-access-token:${REPO_PAT}@github.com/$repo.git"
     sha=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote "$remote" "refs/pull/$number/head" | cut -f1)
     if [ -z "$sha" ]; then
-      echo "::error::Depends-On: $repo#$number has no head commit, or the token cannot read $repo."
+      echo "::error::Test-Server-Override: $repo#$number has no head commit, or the token cannot read $repo."
       exit 1
     fi
-    if [ "$repo" = "$COMMONS" ]; then
-      echo "Depends-On: $repo#$number -> $sha"
-      dep_commons=$sha
+    if [ "$repo" = "$REPOSITORY" ]; then
+      echo "Test-Server-Override: $repo#$number ignored: $repo runs from this pull request's checkout."
       continue
     fi
-    if [ "$REPOSITORY" != "$COMMONS" ]; then
-      echo "::error::Depends-On: $repo#$number: a language repository's run can only depend on $COMMONS."
-      exit 1
+    if [ "$repo" = "$COMMONS" ]; then
+      echo "Test-Server-Override: $repo#$number -> $sha"
+      dep_commons=$sha
+      continue
     fi
     # The servers clone by branch name, so take the branch at the head commit.
     heads=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "$remote")
     branch=$(awk -v s="$sha" '$1 == s { sub("refs/heads/", "", $2); print $2; exit }' <<< "$heads")
     if [ -z "$branch" ]; then
-      echo "::error::Depends-On: $repo#$number: no branch in $repo is at its head commit $sha (pull requests from forks are not supported)."
+      echo "::error::Test-Server-Override: $repo#$number: no branch in $repo is at its head commit $sha (pull requests from forks are not supported)."
       exit 1
     fi
-    echo "Depends-On: $repo#$number -> $branch ($sha)"
+    echo "Test-Server-Override: $repo#$number -> $branch ($sha)"
     branches+="$repo $branch"$'\n'
   done <<< "$body"
 
