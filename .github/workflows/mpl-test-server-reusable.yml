@@ -90,6 +90,8 @@ permissions:
   actions: read
 
 env:
+  # The language repository whose checkout replaces its configured branch.
+  LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
   CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
   # Dependency caches are written only from the default branch, so every
   # branch restores the same warm set and pull requests never churn the cache
@@ -105,47 +107,11 @@ env:
   DAFNY_VERSION: "4.9.0"
 
 jobs:
-  # Resolves the refs every job checks out, including any Test-Server-Override
-  # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
-  resolve:
-    name: resolve refs
-    runs-on: ubuntu-latest
-    outputs:
-      commons_ref: ${{ steps.refs.outputs.commons_ref }}
-      language_repository: ${{ steps.refs.outputs.language_repository }}
-      language_ref: ${{ steps.refs.outputs.language_ref }}
-      language_branches: ${{ steps.refs.outputs.language_branches }}
-    steps:
-      - name: Check out the resolve script
-        uses: actions/checkout@v4
-        with:
-          repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
-          sparse-checkout: .github/scripts
-      - name: Resolve refs
-        id: refs
-        env:
-          REPOSITORY: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_REF: ${{ github.head_ref }}
-          EVENT_BODY: ${{ github.event.pull_request.body }}
-          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
-          INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
-          INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
-          GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
-        run: .github/scripts/resolve-test-server-refs.sh resolve
-
   # Resolves each prebuilt server's key and lists the servers with no prebuilt
   # output, so the prebuild job builds only those.
   plan:
     name: find servers to prebuild
     runs-on: ubuntu-latest
-    needs: resolve
-    env:
-      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
@@ -175,20 +141,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ needs.resolve.outputs.commons_ref }}
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
-
-      - name: Point Test-Server-Override repositories at their pull request branches
-        env:
-          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
-        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ needs.resolve.outputs.language_ref }}
+          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
@@ -357,7 +318,7 @@ jobs:
   # Builds each missing server on its own runner, in parallel, and publishes
   # its output; the test job fetches it and runs it there.
   prebuild:
-    needs: [resolve, plan]
+    needs: plan
     if: needs.plan.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
@@ -365,7 +326,6 @@ jobs:
       matrix:
         language: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
-      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       # smithy-dafny sets `LANG=<language>` as a make variable on
       # transpile_dependencies_<language>, and make exports it to the
       # dependency transpiles, so Dafny (.NET) starts with LANG=java or
@@ -385,20 +345,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ needs.resolve.outputs.commons_ref }}
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
-
-      - name: Point Test-Server-Override repositories at their pull request branches
-        env:
-          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
-        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ needs.resolve.outputs.language_ref }}
+          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
@@ -591,30 +546,24 @@ jobs:
   # waits for their outputs just before the run.
   mpl-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: [resolve, plan]
+    needs: plan
     runs-on: ubuntu-latest
     env:
-      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
     steps:
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ needs.resolve.outputs.commons_ref }}
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
-
-      - name: Point Test-Server-Override repositories at their pull request branches
-        env:
-          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
-        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ needs.resolve.outputs.language_ref }}
+          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 

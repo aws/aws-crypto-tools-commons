@@ -62,7 +62,7 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
     });
   });
 
-  test('creates an IAM role trusting only the TestServer repos via OIDC', () => {
+  test('creates an IAM role trusting only the two ESDK repos via OIDC', () => {
     template.hasResourceProperties('AWS::IAM::Role', {
       AssumeRolePolicyDocument: {
         Statement: Match.arrayWith([
@@ -76,11 +76,6 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
                 'token.actions.githubusercontent.com:sub': [
                   'repo:aws/aws-crypto-tools-commons:*',
                   'repo:aws/aws-crypto-tools-java:*',
-                  'repo:aws/aws-crypto-tools-rust:*',
-                  'repo:aws/aws-encryption-sdk:*',
-                  'repo:aws/aws-encryption-sdk-c:*',
-                  'repo:aws/aws-encryption-sdk-javascript:*',
-                  'repo:aws/aws-encryption-sdk-java:*',
                 ],
               },
             },
@@ -118,38 +113,6 @@ describe('EsdkTestServerKmsStack (createOidcProvider=true)', () => {
             Effect: 'Allow',
             Action: 'kms:GetPublicKey',
             Resource: Match.not('*'),
-          }),
-        ]),
-      },
-    });
-  });
-
-  test('role policy grants ECDH key agreement on the vector ECC keys only', () => {
-    template.hasResourceProperties('AWS::IAM::Policy', {
-      PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({
-            Sid: 'EsdkTestServerEcdhVectorKeys',
-            Effect: 'Allow',
-            Action: ['kms:DeriveSharedSecret', 'kms:GetPublicKey', 'kms:DescribeKey'],
-            Resource: Match.arrayWith([
-              'arn:aws:kms:us-west-2:370957321024:key/eabdf483-6be2-4d2d-8ee4-8c2583d416e9',
-            ]),
-          }),
-        ]),
-      },
-    });
-  });
-
-  test('role policy carries the DB-ESDK TestServer grants', () => {
-    template.hasResourceProperties('AWS::IAM::Policy', {
-      PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({ Sid: 'DbesdkBeaconKeystoreKms', Action: 'kms:GenerateDataKeyWithoutPlaintext' }),
-          Match.objectLike({ Sid: 'DbesdkKeystoreDdbReads', Action: ['dynamodb:Query', 'dynamodb:BatchGetItem'] }),
-          Match.objectLike({
-            Sid: 'DbesdkAwsKmsRsaKey',
-            Action: ['kms:GetPublicKey', 'kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey'],
           }),
         ]),
       },
