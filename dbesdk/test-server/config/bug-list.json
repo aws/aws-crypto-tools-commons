@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "DB-ESDK TestServer commons bug-list.json (design 'Bug Configuration'): the",
+    "authoritative ledger of known bugs across the DB-ESDK Language_Servers. Per",
+    "the design's updated schema it is a 'bugs' object keyed by bug id, each",
+    "{ description, ticketId }. A server declares the ids it currently exhibits in",
+    "its own bug-config.json (a flat array); every such id MUST be defined here."
+  ],
+  "product": "dbesdk",
+  "bugs": {
+    "footer-ecdsa-signature-length-spec-96-implementation-103": {
+      "description": "The implementation emits a 103-byte ECDSA footer signature (StructuredEncryption Footer.dfy SignatureSize := 103), while the DB-ESDK structured-encryption footer specification (footer.md) requires a 96-byte signature after the Recipient Tags.",
+      "ticketId": null
+    },
+    "java-deep-nesting-request-validation-overflow": {
+      "description": "The java-v3 Language_Server cannot serve an item nested past ~16 levels: smithy-java 1.4.0 overflows a fixed-size path array while validating the recursive AttributeValue request shape (java.lang.ArrayIndexOutOfBoundsException in software.amazon.smithy.java.core.schema.Validator$ShapeValidator.pushPath), surfacing as a framework InternalFailureException before the handler runs. This masks the DB-ESDK MAX_STRUCTURE_DEPTH (32) accept/reject boundary on java-v3 at a depth well below the product limit; net-v4 and rust-v1 enforce the depth-32 guard cleanly. A smithy-java upgrade that fixes the validator will let java-v3 reach the product guard and must retire this entry.",
+      "ticketId": null
+    },
+    "java-3-8-1-missing-expression-length-guard": {
+      "description": "The java-v3 Language_Server pins the published aws-database-encryption-sdk-dynamodb 3.8.1 (released 2025-04-02), which predates the MAX_EXPRESSION_LENGTH (4096) guard added to QueryInputForBeacons/ScanInputForBeacons in commit 0b21d4b0 (2026-06-25). So java-v3 does NOT reject a Query KeyConditionExpression or Scan FilterExpression over 4096 characters: the over-length expression bypasses the (absent) guard and reaches the DDB expression parser, which passes it through or intermittently overflows the stack (a GenericServerError StackOverflowError on the scan path) — in neither case the modeled length rejection. net-v4 and rust-v1 build from current source and reject deterministically with 'exceeds maximum length of 4096 characters.'. Bumping the java-v3 pinned version past 0b21d4b0 will retire this entry.",
+      "ticketId": null
+    }
+  }
+}

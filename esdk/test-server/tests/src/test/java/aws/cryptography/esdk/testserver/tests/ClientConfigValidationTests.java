@@ -1,5 +1,11 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
@@ -75,8 +81,8 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "zeroMaxEdksRejected {0}")
     @MethodSource("targets")
     void createClientRejectsZeroMaxEncryptedDataKeys(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        KnownBugGate.gate("create-client-accepts-zero-max-encrypted-data-keys", target,
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
+        KnownBugGate.gateDeclared("create-client-accepts-zero-max-encrypted-data-keys", target,
             () -> assertCreateRejected(target,
                 config(rawAes(new byte[32], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), 0L),
                 "a maxEncryptedDataKeys of 0"));
@@ -86,8 +92,8 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "wrongAesKeyLengthRejected {0}")
     @MethodSource("targets")
     void createClientRejectsMismatchedAesWrappingKeyLength(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
-        KnownBugGate.gate("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", target,
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
+        KnownBugGate.gateDeclared("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", target,
             () -> assertCreateRejected(target,
                 config(rawAes(new byte[16], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), null),
                 "a 16-byte wrapping key for a 256-bit AES wrapping suite"));
@@ -97,7 +103,7 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "emptyKmsKeyIdRejected {0}")
     @MethodSource("targets")
     void createClientRejectsEmptyKmsKeyId(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("aws-kms"), new TargetPair(target, target));
         Keyring kms = Keyring.builder()
             .awsKms(AwsKmsKeyringConfig.builder().kmsKeyId("").build())
             .build();
@@ -108,7 +114,7 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "emptyDiscoveryPartitionRejected {0}")
     @MethodSource("targets")
     void createClientRejectsEmptyDiscoveryPartition(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-discovery"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("aws-kms-discovery"), new TargetPair(target, target));
         Keyring discovery = Keyring.builder()
             .awsKmsDiscovery(AwsKmsDiscoveryKeyringConfig.builder()
                 .discoveryFilter(DiscoveryFilter.builder()
@@ -125,7 +131,7 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "emptyMrkKeyIdRejected {0}")
     @MethodSource("targets")
     void createClientRejectsEmptyMrkKeyId(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-mrk"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("aws-kms-mrk"), new TargetPair(target, target));
         Keyring mrk = Keyring.builder()
             .awsKmsMrk(aws.cryptography.esdk.testserver.client.model.AwsKmsMrkKeyringConfig.builder()
                 .kmsKeyId("")
@@ -138,7 +144,7 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "emptyMultiKeyringRejected {0}")
     @MethodSource("targets")
     void createClientRejectsEmptyMultiKeyring(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("multi"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("multi"), new TargetPair(target, target));
         Keyring emptyMulti = Keyring.builder()
             .multi(aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig.builder()
                 .childKeyrings(List.of())
@@ -152,7 +158,7 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "rawRsaNoKeysRejected {0}")
     @MethodSource("targets")
     void createClientRejectsRawRsaWithNoKeys(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-rsa"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("raw-rsa"), new TargetPair(target, target));
         Keyring keyring = Keyring.builder()
             .rawRsa(aws.cryptography.esdk.testserver.client.model.RawRsaKeyringConfig.builder()
                 .keyNamespace("esdk-test-server")
@@ -168,7 +174,7 @@ class ClientConfigValidationTests {
     @ParameterizedTest(name = "reservedNamespaceRejected {0}")
     @MethodSource("targets")
     void createClientRejectsReservedNamespace(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new EndpointPair(target, target));
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
         Keyring keyring = Keyring.builder()
             .rawAes(RawAesKeyringConfig.builder()
                 .keyNamespace("aws-kms")
@@ -177,8 +183,8 @@ class ClientConfigValidationTests {
                 .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
                 .build())
             .build();
-        KnownBugGate.gate("create-client-accepts-reserved-aws-kms-namespace", target,
-            () -> KnownBugGate.gate("raw-aes-reserved-namespace-rejected-as-esdk-error", target,
+        KnownBugGate.gateDeclared("create-client-accepts-reserved-aws-kms-namespace", target,
+            () -> KnownBugGate.gateDeclared("raw-aes-reserved-namespace-rejected-as-esdk-error", target,
                 () -> assertCreateRejected(target, config(keyring, null),
                     "a Raw-AES keyring in the reserved 'aws-kms' key namespace")));
     }

@@ -1,5 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.TargetPair;
+
 import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
 import aws.cryptography.esdk.testserver.client.model.CreateClientInput;
 import aws.cryptography.esdk.testserver.client.model.DecryptInput;
@@ -28,7 +30,7 @@ public final class BlobRoundTrip {
      * Encrypt {@code plaintext} against the pair's encrypt endpoint and decrypt the
      * ciphertext against its decrypt endpoint, returning the recovered plaintext.
      */
-    public static byte[] run(EndpointPair pair, byte[] plaintext) {
+    public static byte[] run(TargetPair pair, byte[] plaintext) {
         ESDKTestServerClient encryptClient = TestServerClients.forEndpoint(pair.encryptEndpoint());
         ESDKTestServerClient decryptClient = TestServerClients.forEndpoint(pair.decryptEndpoint());
 
@@ -60,7 +62,7 @@ public final class BlobRoundTrip {
 
     /**
      * Broadened blob round-trip (Task 14.3): the same single body as {@link
-     * #run(EndpointPair, byte[])}, but driven by an offline {@link Scenario}
+     * #run(TargetPair, byte[])}, but driven by an offline {@link Scenario}
      * (arbitrary supported keyring/CMM/algorithm-suite combination) and an
      * encryption context. The scenario's {@code config} builds the encrypt client
      * and {@link Scenario#decryptConfigOrDefault()} builds the decrypt client
@@ -73,7 +75,7 @@ public final class BlobRoundTrip {
      * keys); the scenario's optional algorithm-suite override is applied on encrypt
      * only (decrypt derives the suite from the message header).
      */
-    public static byte[] run(EndpointPair pair, byte[] plaintext, Scenario scenario,
+    public static byte[] run(TargetPair pair, byte[] plaintext, Scenario scenario,
                              Map<String, String> encryptionContext) {
         ESDKTestServerClient encryptClient = TestServerClients.forEndpoint(pair.encryptEndpoint());
         ESDKTestServerClient decryptClient = TestServerClients.forEndpoint(pair.decryptEndpoint());

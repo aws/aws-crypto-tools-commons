@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,11 +58,11 @@ class VerificationKeyContextTests {
     private static final ESDKAlgorithmSuiteId NON_SIGNING_SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
-    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+    private static ConformanceKeyring keyringFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -90,7 +94,7 @@ class VerificationKeyContextTests {
      * verification key is absent) is rejected. */
     @ParameterizedTest(name = "signedMissingVerificationKeyRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsSignedSuiteMissingVerificationKey(EndpointPair pair) {
+    void decryptRejectsSignedSuiteMissingVerificationKey(TargetPair pair) {
         ESDKClientConfig config = keyringFor(pair).config(SIGNING_POLICY);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(),
             SIGNING_SUITE, null);
@@ -112,7 +116,7 @@ class VerificationKeyContextTests {
      * (a caller key renamed to it) is rejected. */
     @ParameterizedTest(name = "unsignedStrayVerificationKeyRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsUnsignedSuiteWithStrayVerificationKey(EndpointPair pair) {
+    void decryptRejectsUnsignedSuiteWithStrayVerificationKey(TargetPair pair) {
         ESDKClientConfig config = keyringFor(pair).config(NON_SIGNING_POLICY);
         assertEquals(PUBLIC_KEY.length, STRAY_PLACEHOLDER_KEY.length(),
             "the placeholder EC key must match aws-crypto-public-key's byte length for an in-place rename");

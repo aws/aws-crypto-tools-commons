@@ -1,0 +1,13 @@
+{
+    "version": "1.0",
+    "plugins": {
+        "java-codegen": {
+            "service": "aws.cryptography.dbesdk.testserver#DBESDKTestServer",
+            "namespace": "aws.cryptography.dbesdk.testserver.client",
+            "protocol": "smithy.protocols#rpcv2Cbor",
+            "modes": [
+                "client"
+            ]
+        }
+    }
+}

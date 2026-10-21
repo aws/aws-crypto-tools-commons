@@ -9,13 +9,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "branch": "kessplas/esdk-test-server",
+        "branch": "master",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "master",
         "path": "test-server/server"
       }
     },
@@ -33,7 +33,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "kessplas/esdk-test-server",
         "path": "test-server"
       }
     },
@@ -45,13 +45,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "kessplas/bug-config",
+        "branch": "main",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "main",
         "path": "esdk-test-server"
       }
     },
@@ -69,7 +69,7 @@
       "serverLocation": {
         "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec-cpp",
+        "ref": "kessplas/bug-config-cpp",
         "path": "esdk-cpp-test-server"
       }
     },
@@ -87,7 +87,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "kessplas/bug-config",
         "path": "test-server"
       }
     },
@@ -105,7 +105,7 @@
       "serverLocation": {
         "repository": "aws-encryption-sdk-c",
         "url": "https://github.com/aws/aws-encryption-sdk-c",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "kessplas/bug-config",
         "path": "test-server"
       }
     },
@@ -117,13 +117,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "kessplas/bug-config",
+        "branch": "lucmcdon/esdk-test-servers",
         "path": "AwsEncryptionSDK/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "lucmcdon/esdk-test-servers",
         "path": "esdk-test-servers/net"
       }
     },
@@ -135,13 +135,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "kessplas/bug-config",
-        "path": "releases/rust/esdk"
+        "branch": "lucmcdon/esdk-test-servers",
+        "path": "AwsEncryptionSDK/runtimes/rust"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "lucmcdon/esdk-test-servers",
         "path": "esdk-test-servers/rust"
       }
     },
@@ -153,13 +153,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "kessplas/bug-config",
-        "path": "releases/go/encryption-sdk"
+        "branch": "lucmcdon/esdk-test-servers",
+        "path": "AwsEncryptionSDK/runtimes/go"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "lucmcdon/feature-default-cmm-reproduced-ec",
+        "ref": "lucmcdon/esdk-test-servers",
         "path": "esdk-test-servers/go"
       }
     }

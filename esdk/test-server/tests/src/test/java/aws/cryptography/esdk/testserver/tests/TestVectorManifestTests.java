@@ -1,9 +1,14 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import aws.cryptography.esdk.testserver.client.model.AesWrappingAlg;
+import aws.cryptography.esdk.testserver.client.model.AwsKmsEcdhKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsHierarchicalKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.AwsKmsMrkDiscoveryKeyringConfig;
@@ -15,11 +20,20 @@ import aws.cryptography.esdk.testserver.client.model.DiscoveryFilter;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
+import aws.cryptography.esdk.testserver.client.model.EcdhCurveSpec;
+import aws.cryptography.esdk.testserver.client.model.EphemeralPrivateKeyToStaticPublicKeyConfig;
 import aws.cryptography.esdk.testserver.client.model.Keyring;
+import aws.cryptography.esdk.testserver.client.model.KmsEcdhKeyAgreementScheme;
+import aws.cryptography.esdk.testserver.client.model.KmsPrivateKeyToStaticPublicKeyConfig;
+import aws.cryptography.esdk.testserver.client.model.KmsPublicKeyDiscoveryConfig;
 import aws.cryptography.esdk.testserver.client.model.KmsRsaEncryptionAlgorithm;
 import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.PaddingScheme;
+import aws.cryptography.esdk.testserver.client.model.PublicKeyDiscoveryConfig;
 import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.RawEcdhKeyAgreementScheme;
+import aws.cryptography.esdk.testserver.client.model.RawEcdhKeyringConfig;
+import aws.cryptography.esdk.testserver.client.model.RawPrivateKeyToStaticPublicKeyConfig;
 import aws.cryptography.esdk.testserver.client.model.RawRsaKeyringConfig;
 import aws.cryptography.esdk.testserver.client.model.RequiredEncryptionContextCmmConfig;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -50,8 +64,8 @@ import org.junit.jupiter.api.TestFactory;
  * server's own {@code Encrypt}/{@code Decrypt} operations do the work, so no per-language
  * vector runner is needed. Only vectors whose encrypt AND decrypt key descriptions map to a
  * modeled keyring or CMM (Raw-AES, Raw-RSA, AWS-KMS, KMS-MRK, KMS-MRK-discovery, KMS-RSA,
- * hierarchical, multi-keyring, and the Required-Encryption-Context CMM) are emitted; the
- * rest (the ECDH families) are skipped and surfaced as skipped tests (see
+ * hierarchical, Raw-ECDH, KMS-ECDH, multi-keyring, and the Required-Encryption-Context
+ * CMM) are emitted; any other vector is skipped and surfaced as a skipped test (see
  * {@link #manifestRoundTrips()}).
  */
 class TestVectorManifestTests {
@@ -72,7 +86,7 @@ class TestVectorManifestTests {
         Map.entry("0478", ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY),
         Map.entry("0578", ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384));
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -127,11 +141,17 @@ class TestVectorManifestTests {
             Set<PaddingScheme> vectorPaddings = new LinkedHashSet<>();
             vectorPaddings.addAll(paddingsFor(scenario.get("encryptKeyDescription")));
             vectorPaddings.addAll(paddingsFor(scenario.get("decryptKeyDescription")));
+            // The shared padding gate takes scheme NAMES (opaque strings); the
+            // vector carries modeled PaddingScheme values, so map to their names.
+            Set<String> vectorPaddingNames = new LinkedHashSet<>();
+            for (PaddingScheme scheme : vectorPaddings) {
+                vectorPaddingNames.add(scheme.getValue());
+            }
 
-            for (EndpointPair pair : pairs()) {
+            for (TargetPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
                     FeatureGate.require(vectorFeatures, pair);
-                    FeatureGate.requireRawRsaPaddings(vectorPaddings, pair);
+                    FeatureGate.requireRawRsaPaddings(vectorPaddingNames, pair);
                     byte[] ciphertext = EsdkOps.encrypt(
                         pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
                     byte[] recovered =
@@ -216,6 +236,8 @@ class TestVectorManifestTests {
             case "aws-kms-mrk-aware-discovery" -> into.add("aws-kms-mrk-discovery");
             case "aws-kms-rsa" -> into.add("aws-kms-rsa");
             case "aws-kms-hierarchy" -> into.add("hierarchical");
+            case "raw-ecdh" -> into.add("raw-ecdh");
+            case "aws-kms-ecdh" -> into.add("aws-kms-ecdh");
             case "multi-keyring" -> {
                 into.add("multi");
                 collectFeatures(desc.get("generator"), into);
@@ -317,6 +339,12 @@ class TestVectorManifestTests {
         }
         if ("multi-keyring".equals(type)) {
             return multiKeyringFor(desc, keys);
+        }
+        if ("raw-ecdh".equals(type)) {
+            return rawEcdhKeyringFor(desc, keys);
+        }
+        if ("aws-kms-ecdh".equals(type)) {
+            return kmsEcdhKeyringFor(desc, keys);
         }
         if ("aws-kms-hierarchy".equals(type)) {
             // The manifest names a branch key from the vector authors' key store; for a round
@@ -431,6 +459,125 @@ class TestVectorManifestTests {
             rsa.publicKey(ByteBuffer.wrap(material.getBytes(StandardCharsets.UTF_8)));
         }
         return Keyring.builder().awsKmsRsa(rsa.build()).build();
+    }
+
+    /** The manifest's {@code ecc-curve} names (raw and KMS key sets) to the modeled curve. */
+    private static final Map<String, EcdhCurveSpec> ECC_CURVES = Map.of(
+        "ecc-256", EcdhCurveSpec.ECC_NIST_P256,
+        "ecc-384", EcdhCurveSpec.ECC_NIST_P384,
+        "ecc-521", EcdhCurveSpec.ECC_NIST_P521,
+        "us-west-2-256-ecc", EcdhCurveSpec.ECC_NIST_P256,
+        "us-west-2-384-ecc", EcdhCurveSpec.ECC_NIST_P384,
+        "us-west-2-521-ecc", EcdhCurveSpec.ECC_NIST_P521);
+
+    /**
+     * A Raw-ECDH keyring, built as the test-vector framework builds it: {@code static} from
+     * the sender key's private and recipient-public material, {@code ephemeral} and
+     * {@code discovery} from the recipient key's public and private material respectively.
+     */
+    private static Keyring rawEcdhKeyringFor(JsonNode desc, JsonNode keys) {
+        EcdhCurveSpec curve = ECC_CURVES.get(text(desc, "ecc-curve"));
+        String schema = text(desc, "schema");
+        if (curve == null || schema == null) {
+            return null;
+        }
+        RawEcdhKeyAgreementScheme scheme;
+        switch (schema) {
+            case "static" -> {
+                JsonNode sender = keys.get(text(desc, "sender"));
+                if (sender == null) {
+                    return null;
+                }
+                scheme = RawEcdhKeyAgreementScheme.builder()
+                    .rawPrivateKeyToStaticPublicKey(RawPrivateKeyToStaticPublicKeyConfig.builder()
+                        .senderStaticPrivateKey(utf8(text(sender, "sender-material")))
+                        .recipientPublicKey(base64(text(sender, "recipient-material-public-key")))
+                        .build())
+                    .build();
+            }
+            case "ephemeral" -> {
+                JsonNode recipient = keys.get(text(desc, "recipient"));
+                if (recipient == null) {
+                    return null;
+                }
+                scheme = RawEcdhKeyAgreementScheme.builder()
+                    .ephemeralPrivateKeyToStaticPublicKey(EphemeralPrivateKeyToStaticPublicKeyConfig.builder()
+                        .recipientPublicKey(base64(text(recipient, "recipient-material-public-key")))
+                        .build())
+                    .build();
+            }
+            case "discovery" -> {
+                JsonNode recipient = keys.get(text(desc, "recipient"));
+                if (recipient == null) {
+                    return null;
+                }
+                scheme = RawEcdhKeyAgreementScheme.builder()
+                    .publicKeyDiscovery(PublicKeyDiscoveryConfig.builder()
+                        .recipientStaticPrivateKey(utf8(text(recipient, "recipient-material")))
+                        .build())
+                    .build();
+            }
+            default -> {
+                return null;
+            }
+        }
+        return Keyring.builder()
+            .rawEcdh(RawEcdhKeyringConfig.builder().keyAgreementScheme(scheme).curveSpec(curve).build())
+            .build();
+    }
+
+    /**
+     * A KMS-ECDH keyring, built as the test-vector framework builds it: {@code static} from
+     * the sender key's KMS key and both public keys, {@code discovery} from the recipient
+     * key's KMS key.
+     */
+    private static Keyring kmsEcdhKeyringFor(JsonNode desc, JsonNode keys) {
+        EcdhCurveSpec curve = ECC_CURVES.get(text(desc, "ecc-curve"));
+        String schema = text(desc, "schema");
+        if (curve == null || schema == null) {
+            return null;
+        }
+        KmsEcdhKeyAgreementScheme scheme;
+        switch (schema) {
+            case "static" -> {
+                JsonNode sender = keys.get(text(desc, "sender"));
+                if (sender == null) {
+                    return null;
+                }
+                scheme = KmsEcdhKeyAgreementScheme.builder()
+                    .kmsPrivateKeyToStaticPublicKey(KmsPrivateKeyToStaticPublicKeyConfig.builder()
+                        .senderKmsIdentifier(text(sender, "sender-material"))
+                        .senderPublicKey(base64(text(sender, "sender-material-public-key")))
+                        .recipientPublicKey(base64(text(sender, "recipient-material-public-key")))
+                        .build())
+                    .build();
+            }
+            case "discovery" -> {
+                JsonNode recipient = keys.get(text(desc, "recipient"));
+                if (recipient == null) {
+                    return null;
+                }
+                scheme = KmsEcdhKeyAgreementScheme.builder()
+                    .kmsPublicKeyDiscovery(KmsPublicKeyDiscoveryConfig.builder()
+                        .recipientKmsIdentifier(text(recipient, "recipient-material"))
+                        .build())
+                    .build();
+            }
+            default -> {
+                return null;
+            }
+        }
+        return Keyring.builder()
+            .awsKmsEcdh(AwsKmsEcdhKeyringConfig.builder().keyAgreementScheme(scheme).curveSpec(curve).build())
+            .build();
+    }
+
+    private static ByteBuffer utf8(String value) {
+        return ByteBuffer.wrap(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static ByteBuffer base64(String value) {
+        return ByteBuffer.wrap(Base64.getDecoder().decode(value));
     }
 
     private static Keyring multiKeyringFor(JsonNode desc, JsonNode keys) {

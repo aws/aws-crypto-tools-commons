@@ -1,5 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -55,7 +60,7 @@ class MaxEncryptedDataKeysTests {
     @ParameterizedTest(name = "encryptEnforcesMaxEdks {0}")
     @MethodSource("targets")
     void encryptEnforcesMaxEncryptedDataKeys(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, new EndpointPair(target, target));
+        FeatureGate.require(FEATURES, new TargetPair(target, target));
         // Cap of 2 permits the two EDKs.
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(),
             EsdkClientConfigs.rawAesMultiWithMaxEdks(2), PLAINTEXT);
@@ -79,9 +84,9 @@ class MaxEncryptedDataKeysTests {
     @MethodSource("decryptSide")
     void decryptEnforcesMaxEncryptedDataKeys(ReferencePair pair) {
         FeatureGate.require(FEATURES,
-            new EndpointPair(pair.encryptTarget(), pair.encryptTarget()));
+            new TargetPair(pair.encryptTarget(), pair.encryptTarget()));
         FeatureGate.require(DECRYPTOR_FEATURES,
-            new EndpointPair(pair.decryptTarget(), pair.decryptTarget()));
+            new TargetPair(pair.decryptTarget(), pair.decryptTarget()));
         // Encrypt a two-EDK message with no cap.
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAesMulti(), PLAINTEXT);
 

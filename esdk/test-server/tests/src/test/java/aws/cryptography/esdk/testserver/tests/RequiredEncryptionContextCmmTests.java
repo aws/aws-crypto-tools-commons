@@ -1,5 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -51,7 +56,7 @@ class RequiredEncryptionContextCmmTests {
 
     private static final Set<String> FEATURES = Set.of("required-encryption-context", "raw-aes");
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -64,7 +69,7 @@ class RequiredEncryptionContextCmmTests {
     }
 
     /** Encrypt with the required-EC CMM and the full context (required keys dropped from the header). */
-    private static byte[] encrypt(EndpointPair pair) {
+    private static byte[] encrypt(TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
         return EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT, FULL_CONTEXT, null, null);
     }
@@ -72,7 +77,7 @@ class RequiredEncryptionContextCmmTests {
     /** CMM-007: reproducing the required context exactly on decrypt round-trips. */
     @ParameterizedTest(name = "reproducedRequiredEcDecrypts {0}")
     @MethodSource("pairs")
-    void decryptSucceedsWhenRequiredContextReproduced(EndpointPair pair) {
+    void decryptSucceedsWhenRequiredContextReproduced(TargetPair pair) {
         byte[] ciphertext = encrypt(pair);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, FULL_CONTEXT);
         assertArrayEquals(PLAINTEXT, recovered,
@@ -90,9 +95,9 @@ class RequiredEncryptionContextCmmTests {
     @MethodSource("decryptSide")
     void decryptSucceedsWithDefaultCmmWhenRequiredContextReproduced(ReferencePair pair) {
         FeatureGate.require(FEATURES,
-            new EndpointPair(pair.encryptTarget(), pair.encryptTarget()));
+            new TargetPair(pair.encryptTarget(), pair.encryptTarget()));
         FeatureGate.require(Set.of("raw-aes", "default-cmm-reproduced-encryption-context"),
-            new EndpointPair(pair.decryptTarget(), pair.decryptTarget()));
+            new TargetPair(pair.decryptTarget(), pair.decryptTarget()));
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT,
             FULL_CONTEXT, null, null);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(),
@@ -112,7 +117,7 @@ class RequiredEncryptionContextCmmTests {
      */
     @ParameterizedTest(name = "requiredKeysExcludedFromHeaderAad {0}")
     @MethodSource("pairs")
-    void requiredKeysAreExcludedFromTheSerializedHeader(EndpointPair pair) {
+    void requiredKeysAreExcludedFromTheSerializedHeader(TargetPair pair) {
         FeatureGate.require(Set.of("required-encryption-context", "raw-aes"), pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAesRequiredEc(List.of("purpose"));
         Map<String, String> context = Map.of("purpose", "test", "shared", "value");
@@ -158,7 +163,7 @@ class RequiredEncryptionContextCmmTests {
     @ParameterizedTest(name = "missingReproducedEcRejected {0}")
     @MethodSource("decryptSide")
     void decryptFailsWhenNoContextReproduced(ReferencePair pair) {
-        byte[] ciphertext = encrypt(pair.asEndpointPair());
+        byte[] ciphertext = encrypt(pair.asTargetPair());
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext),
             "decrypt without reproducing the required encryption context must fail (" + pair + ")");
@@ -168,7 +173,7 @@ class RequiredEncryptionContextCmmTests {
     @ParameterizedTest(name = "partialReproducedEcRejected {0}")
     @MethodSource("decryptSide")
     void decryptFailsWhenRequiredKeyMissing(ReferencePair pair) {
-        byte[] ciphertext = encrypt(pair.asEndpointPair());
+        byte[] ciphertext = encrypt(pair.asTargetPair());
         Map<String, String> partial = Map.of("purpose", "test");  // missing "tenant"
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, partial),
@@ -179,7 +184,7 @@ class RequiredEncryptionContextCmmTests {
     @ParameterizedTest(name = "wrongReproducedEcValueRejected {0}")
     @MethodSource("decryptSide")
     void decryptFailsWhenRequiredValueWrong(ReferencePair pair) {
-        byte[] ciphertext = encrypt(pair.asEndpointPair());
+        byte[] ciphertext = encrypt(pair.asTargetPair());
         Map<String, String> wrong = Map.of("purpose", "test", "tenant", "WRONG");
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, wrong),
@@ -197,9 +202,9 @@ class RequiredEncryptionContextCmmTests {
     @MethodSource("decryptSide")
     void decryptFailsWhenExtraKeyReproduced(ReferencePair pair) {
         FeatureGate.require(FEATURES,
-            new EndpointPair(pair.encryptTarget(), pair.encryptTarget()));
+            new TargetPair(pair.encryptTarget(), pair.encryptTarget()));
         FeatureGate.require(Set.of("raw-aes", "default-cmm-reproduced-encryption-context"),
-            new EndpointPair(pair.decryptTarget(), pair.decryptTarget()));
+            new TargetPair(pair.decryptTarget(), pair.decryptTarget()));
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config(), PLAINTEXT,
             FULL_CONTEXT, null, null);
         Map<String, String> superset =
@@ -224,7 +229,7 @@ class RequiredEncryptionContextCmmTests {
     @MethodSource("targets")
     void encryptRejectsReservedKeyAsRequiredEcKey(LanguageServerTarget target) {
         FeatureGate.require(Set.of("required-encryption-context", "raw-aes"),
-            new EndpointPair(target, target));
+            new TargetPair(target, target));
         ESDKClientConfig config = EsdkClientConfigs.rawAesRequiredEc(List.of("aws-crypto-public-key"));
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, null),

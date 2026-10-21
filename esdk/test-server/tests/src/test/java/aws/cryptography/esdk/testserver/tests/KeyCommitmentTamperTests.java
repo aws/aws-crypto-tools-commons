@@ -1,5 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,7 +47,7 @@ class KeyCommitmentTamperTests {
     private static final ESDKAlgorithmSuiteId SUITE =
         ESDKAlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
 
-    static List<EndpointPair> pairs() {
+    static List<TargetPair> pairs() {
         return LanguageServerRegistry.shared().pairs();
     }
 
@@ -51,7 +55,7 @@ class KeyCommitmentTamperTests {
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
      */
-    private static ESDKClientConfig configFor(EndpointPair pair) {
+    private static ESDKClientConfig configFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -74,7 +78,7 @@ class KeyCommitmentTamperTests {
     /** Flipping a byte of the stored 32-byte commitment value makes decrypt fail. */
     @ParameterizedTest(name = "commitmentValueTamperRejected {0}")
     @MethodSource("pairs")
-    void decryptRejectsTamperedCommitmentValue(EndpointPair pair) {
+    void decryptRejectsTamperedCommitmentValue(TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, Map.of(), SUITE,
             null);

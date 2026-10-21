@@ -1,0 +1,75 @@
+# DB-ESDK TestServer CI for aws-crypto-tools-commons. The run itself lives in
+# dbesdk-test-server-reusable.yml.
+name: DB-ESDK TestServer
+
+on:
+  pull_request:
+    paths:
+      - "dbesdk/test-server/**"
+      - "test-server-common/**"
+      - ".github/workflows/dbesdk-test-server.yml"
+      - ".github/workflows/dbesdk-test-server-reusable.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "dbesdk/test-server/**"
+      - "test-server-common/**"
+      - ".github/workflows/dbesdk-test-server.yml"
+      - ".github/workflows/dbesdk-test-server-reusable.yml"
+  # Nightly on main: rebuilds any server whose branch tip moved and publishes
+  # it, so every pull request finds it prebuilt.
+  schedule:
+    - cron: "41 7 * * *"
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: Comma-separated languages under test; empty runs the full matrix.
+        type: string
+        default: ""
+      languages:
+        description: Comma-separated languages to launch; empty launches every language.
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      commons-ref:
+        description: >-
+          The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
+          — the tests, model, orchestrator, and config. Leave empty to use the
+          commit that triggered the run.
+        type: string
+        required: false
+        default: ""
+      dbe-repository:
+        description: >-
+          owner/name of the DB-ESDK repository whose servers to test from its
+          checkout instead of their configured branch. Defaults to the calling
+          repository when that is not aws-crypto-tools-commons.
+        type: string
+        required: false
+        default: ""
+      dbe-ref:
+        description: >-
+          The dbe-repository ref whose servers to test. Defaults to the calling
+          commit; empty on a commons run clones each server at the ref pinned in
+          config/server-config.json.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  dbesdk:
+    name: TestServer
+    uses: ./.github/workflows/dbesdk-test-server-reusable.yml
+    with:
+      focus: ${{ inputs.focus || '' }}
+      languages: ${{ inputs.languages || '' }}
+      commons-ref: ${{ inputs.commons-ref || '' }}
+      dbe-repository: ${{ inputs.dbe-repository || '' }}
+      dbe-ref: ${{ inputs.dbe-ref || '' }}

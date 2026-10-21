@@ -30,6 +30,11 @@ dependencies {
     // the Tests use.
     testImplementation("aws.cryptography.esdk.testserver:esdk-test-server-client-java")
 
+    // --- Shared TestServer test-support -------------------------------------
+    // Feature/known-bug gates, endpoint registry, generic TestServerClientCache.
+    // The ESDK-local TestServerClients wraps it with the ESDK client type.
+    testImplementation("aws.cryptography.testserver:commons-test-server-tests-support")
+
     // --- Client runtime: rpcv2Cbor protocol + JDK HTTP transport ------------
     // client-java exposes these as `implementation`, so declare them here for
     // compile access to the client builder, protocol, and transport types.
@@ -56,12 +61,16 @@ tasks.withType<Test>().configureEach {
         // jqwik registers its own JUnit Platform engine; include it explicitly.
         includeEngines("jqwik", "junit-jupiter")
     }
-    // Surface which runtime endpoint configuration was used (helpful when the
-    // orchestrator later points the Tests at remote Language_Servers).
+    // Surface which runtime endpoint configuration was used. Both namespaces
+    // are passed through: testserver.* is the shared orchestrator-emitted
+    // boundary (targets/features/featureCatalog/rawRsaPaddingSchemes/knownBugs/
+    // referenceImplementation), and esdk.testserver.* carries the ESDK-only
+    // per-SDK properties (the KMS key ARNs KmsRuntimeConfig reads) the shared
+    // orchestrator does not touch.
     systemProperties(
         System.getProperties()
             .stringPropertyNames()
-            .filter { it.startsWith("esdk.testserver.") }
+            .filter { it.startsWith("testserver.") || it.startsWith("esdk.testserver.") }
             .associateWith { System.getProperty(it) }
     )
     testLogging {

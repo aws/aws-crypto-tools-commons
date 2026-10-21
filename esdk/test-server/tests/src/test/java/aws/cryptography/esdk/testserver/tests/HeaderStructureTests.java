@@ -1,5 +1,11 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.TargetPair;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -75,7 +81,7 @@ class HeaderStructureTests {
      * visible skip when it supports neither. Header structure is keyring-independent, so the target
      * runs once, under this keyring.
      */
-    private static ConformanceKeyring keyringFor(EndpointPair pair) {
+    private static ConformanceKeyring keyringFor(TargetPair pair) {
         Optional<ConformanceKeyring> negotiated = ConformanceKeyring.negotiate(pair);
         Assumptions.assumeTrue(negotiated.isPresent(),
             "no keyring shared by both endpoints of " + pair);
@@ -87,7 +93,7 @@ class HeaderStructureTests {
     @ParameterizedTest(name = "headerFields[{1}] {0}")
     @MethodSource("cases")
     void headerParsesToExpectedFields(LanguageServerTarget target, Expected expected) {
-        ESDKClientConfig config = keyringFor(new EndpointPair(target, target)).config(expected.policy());
+        ESDKClientConfig config = keyringFor(new TargetPair(target, target)).config(expected.policy());
         byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(),
             expected.suite(), null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
@@ -102,7 +108,7 @@ class HeaderStructureTests {
             target + " " + expected + ": the header must declare at least one EDK");
         assertEquals(0x02, ciphertext[message.contentTypeOffset] & 0xFF,
             target + " " + expected + ": content type must be framed (0x02)");
-        KnownBugGate.gate("default-frame-length-262144", target,
+        KnownBugGate.gateDeclared("default-frame-length-262144", target,
             () -> assertEquals(4096L, message.frameLength,
                 target + " " + expected + ": default frame length must be 4096"));
     }

@@ -1,0 +1,644 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  GoConcurrency50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoConcurrency50MB
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP50Latency
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  GoConcurrencyP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoConcurrencyP95
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrencyP95Latency
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  GoConcurrencyP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoConcurrencyP99
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP99Latency
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  GoDataSize52MBP50Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoDataSize52MB-P50Latency
+      FilterPattern: '{ $.metadata.language = "go" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: Go52MBP50Latency
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  GoDataSize52MBP95Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoDataSize52MB-P95Latency
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: 'Go52MBP95Latency '
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  GoDataSize52MBP99Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoDataSize52MB-P99Latency
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: 'Go52MBP99Latency '
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  GoMemoryEfficiencyRatio:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoMemoryEfficiencyRatio
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "memory"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: EffiencyRation
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  GoMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: GoMemoryUsage50MB
+      FilterPattern: '{ $.result.language = "go" && $.result.test_name = "memory"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: PeakMemory
+        MetricNamespace: GoPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  JavaConcurrencyAvgLatency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: JavaConcurrencyAvgLatency
+      FilterPattern: '{ $.metadata.language = "java" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: AvgLatency
+        MetricNamespace: JavaPerformanceBenchmarks
+        MetricValue: $.result.avg_latency_ms
+        Unit: Milliseconds
+  JavaThroughputP50Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: JavaThroughputP50Latency
+      FilterPattern: '{ $.metadata.language = "java" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P50ThroughputLatency
+        MetricNamespace: JavaPerformanceBenchmarks
+        MetricValue: $.result.p50_latency_ms
+        Unit: Milliseconds
+  JavaThroughputP95Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: JavaThroughputP95Latency
+      FilterPattern: '{ $.metadata.language = "java" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P95ThroughputLatency
+        MetricNamespace: JavaPerformanceBenchmarks
+        MetricValue: $.result.p95_latency_ms
+        Unit: Milliseconds
+  JavaThroughputP99Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: JavaThroughputP99Latency
+      FilterPattern: '{ $.metadata.language = "java" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P99ThroughputLatency
+        MetricNamespace: JavaPerformanceBenchmarks
+        MetricValue: $.result.p99_latency_ms
+        Unit: Milliseconds
+  LanguageMemoryEfficiencyRatio:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: LanguageMemoryEfficiencyRatio
+      FilterPattern: '{ $.metadata.language = "java" && $.result.test_name = "memory"}'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: EffiencyRatio
+        MetricNamespace: JavaPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  LanguageMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: LanguageMemoryUsage50MB
+      FilterPattern: '{ $.metadata.language = "java" && $.result.test_name = "memory"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: PeakMemory
+        MetricNamespace: JavaPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  NativeRustCppHierarchicalConcurrency50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalConcurrency50MBP50
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalConcurrentP50Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustCppHierarchicalConcurrency50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalConcurrency50MBP95
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalConcurrentP95Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustCppHierarchicalConcurrency50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalConcurrency50MBP99
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalConcurrentP99Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustCppHierarchicalMemoryEfficiency50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalMemoryEfficiency50MB
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalMemoryEfficiencyRatio
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  NativeRustCppHierarchicalMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalMemoryUsage50MB
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalPeakMemoryUsage
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  NativeRustCppHierarchicalThroughput50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalThroughput50MBP50
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalThroughputP50Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustCppHierarchicalThroughput50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalThroughput50MBP95
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalThroughputP95Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustCppHierarchicalThroughput50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustCppHierarchicalThroughput50MBP99
+      FilterPattern: '{ $.result.language = "rust-cpp" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalThroughputP99Latency
+        MetricNamespace: RustCppPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustHierarchicalConcurrency50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalConcurrency50MBP50
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalConcurrentP50Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustHierarchicalConcurrency50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalConcurrency50MBP95
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalConcurrentP95Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustHierarchicalConcurrency50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalConcurrency50MBP99
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "concurrent" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalConcurrentP99Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NativeRustHierarchicalMemoryEfficiency50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalMemoryEfficiency50MB
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalMemoryEfficiencyRatio
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  NativeRustHierarchicalMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalMemoryUsage50MB
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "memory" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalPeakMemoryUsage
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  NativeRustHierarchicalThroughput50MBP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalThroughput50MBP50
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalThroughputP50Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  NativeRustHierarchicalThroughput50MBP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalThroughput50MBP95
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalThroughputP95Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  NativeRustHierarchicalThroughput50MBP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NativeRustHierarchicalThroughput50MBP99
+      FilterPattern: '{ $.result.language = "rust" && $.metadata.keyring = "hierarchical"
+        && $.result.test_name = "throughput" && $.result.data_size = 52428800 }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: HierarchicalThroughputP99Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  NetConcurrencyP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetConcurrencyP50
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP50Latency
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.p50_latency_ms
+        Unit: Milliseconds
+  NetConcurrencyP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetConcurrencyP95
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP95Latency
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.p95_latency_ms
+        Unit: None
+  NetConcurrencyP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetConcurrencyP99
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP99Latency
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.p99_latency_ms
+        Unit: Milliseconds
+  NetMemoryEfficiencyRatio:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetMemoryEfficiencyRatio
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "memory"}'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: EfficiencyRatio
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  NetMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetMemoryUsage50MB
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "memory"}'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: PeakMemory
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  NetThroughputP50Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetThroughputP50Latency
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P50ThroughputLatency
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.p50_latency_ms
+        Unit: Milliseconds
+  NetThroughputP95Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetThroughputP95Latency
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P95ThroughputLatency
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.p95_latency_ms
+        Unit: Milliseconds
+  NetThroughputP99Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: NetThroughputP99Latency
+      FilterPattern: '{ $.metadata.language = "net" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P99ThroughputLatency
+        MetricNamespace: NetPerformanceBenchmarks
+        MetricValue: $.result.p99_latency_ms
+        Unit: None
+  PythonConcurrencyP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonConcurrencyP50
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP50Latency
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  PythonConcurrencyP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonConcurrencyP95
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP95Latency
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  PythonConcurrencyP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonConcurrencyP99
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "concurrent"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP99Latency
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  PythonMemoryEfficiencyRatio:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonMemoryEfficiencyRatio
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "memory"}'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: EfficiencyRatio
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  PythonMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonMemoryUsage50MB
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "memory"}'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: PeakMemory
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  PythonThroughputP50Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonThroughputP50Latency
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P50ThroughputLatency
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  PythonThroughputP95Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonThroughputP95Latency
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P95ThroughputLatency
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  PythonThroughputP99Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: PythonThroughputP99Latency
+      FilterPattern: '{ $.metadata.language = "python" && $.result.test_name = "throughput"
+        }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P99ThroughputLatency
+        MetricNamespace: PythonPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  RustConcurrencyP50:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustConcurrencyP50
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "concurrent"
+        && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP50Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  RustConcurrencyP95:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustConcurrencyP95
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "concurrent"
+        && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: ConcurrentP95Latency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  RustConcurrencyP99:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustConcurrencyP99
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "concurrent"
+        && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: RustConcurrencyP99
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+  RustMemoryEfficiencyRatio:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustMemoryEfficiencyRatio
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "memory" && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: EfficiencyRatio
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.memory_efficiency_ratio
+        Unit: None
+  RustMemoryUsage50MB:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustMemoryUsage50MB
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "memory" && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: PeakMemory
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.peak_memory_mb
+        Unit: Megabytes
+  RustThroughputP50Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustThroughputP50Latency
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "throughput"
+        && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P50ThroughputLatency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p50_latency
+        Unit: Milliseconds
+  RustThroughputP95Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustThroughputP95Latency
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "throughput"
+        && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P95ThroughputLatency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p95_latency
+        Unit: Milliseconds
+  RustThroughputP99Latency:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterName: RustThroughputP99Latency
+      FilterPattern: '{ $.metadata.language = "rust" && $.result.test_name = "throughput"
+        && $.metadata.keyring NOT EXISTS }'
+      LogGroupName: aws-esdk-performance-benchmarks
+      MetricTransformations:
+      - MetricName: P99ThroughputLatency
+        MetricNamespace: RustPerformanceBenchmarks
+        MetricValue: $.result.p99_latency
+        Unit: Milliseconds
+

@@ -1,0 +1,20 @@
+# Makefile scratch dir (log / temp files created by make targets)
+/.make-tmp/
+
+# jqwik's local failure-sample database (developer-local, not shared)
+**/.jqwik-database
+
+# Eclipse-style compiled-classes output dir (any Gradle module's `bin/`).
+# Gradle itself writes to `build/` (already ignored per-module below); `bin/`
+# only appears when a JDT/Eclipse build has run over the tree.
+**/bin/
+
+# Local-only reference material (e.g. the S3EC Python workflows kept for
+# hand-implemented non-Java language servers). Never committed; do not delete.
+/temp-s3ec-py-example/
+
+# The shared orchestrator writes per-SDK runtime scratch under
+# <sdk>/test-server/build/ (materialized language-server clones, launch-plan
+# working dirs, resolution-record.json). Long-lived cache, reused across runs;
+# not a Gradle output — no gradle project builds here.
+/build/
