@@ -136,7 +136,7 @@
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
         "branch": "lucmcdon/esdk-test-servers",
-        "path": "releases/rust/esdk"
+        "path": "AwsEncryptionSDK/runtimes/rust"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
@@ -154,7 +154,7 @@
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
         "branch": "lucmcdon/esdk-test-servers",
-        "path": "releases/go/encryption-sdk"
+        "path": "AwsEncryptionSDK/runtimes/go"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
