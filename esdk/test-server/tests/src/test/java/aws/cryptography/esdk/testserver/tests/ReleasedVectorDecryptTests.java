@@ -6,11 +6,13 @@ import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import aws.cryptography.esdk.testserver.client.model.CryptographicMaterialsManager;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
+import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.Keyring;
 import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
@@ -22,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -55,8 +56,10 @@ import org.junit.jupiter.api.TestFactory;
  * <p>Selection (the corpora are ~25k vectors; the RPC matrix cannot run every one on every
  * language):
  * <ul>
- *   <li>positive vectors only: a negative vector's rejection is keyed on a decryption-method the
- *       model does not carry, so it is skipped rather than mis-asserted;</li>
+ *   <li>positive vectors must decrypt to their plaintext; negative vectors (bit flips,
+ *       truncations) must be rejected with a modeled error. A negative vector that names a
+ *       {@code decryption-method} the model does not carry ({@code streaming-unsigned-only}) is
+ *       skipped;</li>
  *   <li>offline vectors only by default (every master key is a raw keyring); KMS-backed vectors
  *       need cross-account key access and are enabled with
  *       {@code -Desdk.testserver.releasedVectors.includeKms=true};</li>
@@ -64,7 +67,8 @@ import org.junit.jupiter.api.TestFactory;
  *       caps each manifest at the first N vectors the target supports.</li>
  * </ul>
  * A vector whose master keys do not map to a modeled keyring is skipped. Feature-gated on the
- * keyrings each vector uses.
+ * keyrings each vector uses. A positive vector with several master keys runs on a server without
+ * the multi-keyring under the last master key that server supports.
  */
 class ReleasedVectorDecryptTests {
 
@@ -114,13 +118,23 @@ class ReleasedVectorDecryptTests {
             String corpusName = corpus.getFileName().toString();
 
             List<Map.Entry<String, Selection>> selections = new ArrayList<>();
+            int unmodeledMethod = 0;
             for (Iterator<Map.Entry<String, JsonNode>> it = manifest.get("tests").fields();
                     it.hasNext(); ) {
                 Map.Entry<String, JsonNode> entry = it.next();
+                if (entry.getValue().has("decryption-method")) {
+                    unmodeledMethod++;
+                    continue;
+                }
                 Selection selection = select(entry.getValue(), version, keys, includeKms);
                 if (selection != null) {
                     selections.add(Map.entry(entry.getKey(), selection));
                 }
+            }
+            if (unmodeledMethod > 0) {
+                String reason = unmodeledMethod + " " + corpusName
+                    + " vectors use a decryption-method the model does not carry";
+                tests.add(dynamicTest("skipped: " + reason, () -> Assumptions.abort(reason)));
             }
 
             // The cap counts only vectors a target can run, so vectors it would skip
@@ -134,11 +148,12 @@ class ReleasedVectorDecryptTests {
                 int rsaLimited = 0;
                 for (Map.Entry<String, Selection> chosen : selections) {
                     Selection selection = chosen.getValue();
-                    if (!runnableOn(selection, target)) {
+                    Keyring keyring = keyringOn(selection, target);
+                    if (keyring == null) {
                         unsupported++;
                         continue;
                     }
-                    if (slowRsa && selection.features.contains("raw-rsa")) {
+                    if (slowRsa && selection.masterKeys.stream().anyMatch(key -> "raw-rsa".equals(key.feature))) {
                         if (rsaEmitted >= SLOW_RSA_LIMIT) {
                             rsaLimited++;
                             continue;
@@ -151,14 +166,23 @@ class ReleasedVectorDecryptTests {
                     emitted++;
                     String label = corpusName + "/" + chosen.getKey();
                     Path ciphertextPath = corpus.resolve(selection.ciphertextRef);
+                    ESDKClientConfig config = decryptConfig(keyring);
+                    if (selection.plaintextRef == null) {
+                        tests.add(dynamicTest(label + " " + target, () -> {
+                            byte[] ciphertext = Files.readAllBytes(ciphertextPath);
+                            String clientId = clientFor(target, config);
+                            assertThrows(ESDKClientError.class,
+                                () -> EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext),
+                                "negative released vector " + label + " must be rejected ("
+                                    + target + ")");
+                        }));
+                        continue;
+                    }
                     Path plaintextPath = corpus.resolve(selection.plaintextRef);
-                    ESDKClientConfig config = decryptConfig(selection.keyring);
                     tests.add(dynamicTest(label + " " + target, () -> {
                         byte[] ciphertext = Files.readAllBytes(ciphertextPath);
                         byte[] expected = Files.readAllBytes(plaintextPath);
-                        // Thousands of vectors share a few keyrings; one client per keyring per server.
-                        String clientId = CLIENTS.computeIfAbsent(Map.entry(target.endpoint(), config),
-                            key -> EsdkOps.createClient(key.getKey(), key.getValue()));
+                        String clientId = clientFor(target, config);
                         byte[] recovered = EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext);
                         assertArrayEquals(expected, recovered,
                             "released vector " + label + " must decrypt to its known plaintext ("
@@ -187,6 +211,12 @@ class ReleasedVectorDecryptTests {
         return tests;
     }
 
+    /** Thousands of vectors share a few keyrings; one client per keyring per server. */
+    private static String clientFor(LanguageServerTarget target, ESDKClientConfig config) {
+        return CLIENTS.computeIfAbsent(Map.entry(target.endpoint(), config),
+            key -> EsdkOps.createClient(key.getKey(), key.getValue()));
+    }
+
     private static ESDKClientConfig decryptConfig(Keyring keyring) {
         return ESDKClientConfig.builder()
             .commitmentPolicy(DECRYPT_POLICY)
@@ -196,53 +226,88 @@ class ReleasedVectorDecryptTests {
             .build();
     }
 
-    /** Whether {@code target} declares every Feature and raw-RSA padding the vector needs. */
-    private static boolean runnableOn(Selection selection, LanguageServerTarget target) {
-        FeatureDeclarations declarations = FeatureDeclarations.shared();
-        for (String feature : selection.features) {
-            if (!declarations.isSupported(target.language(), target.majorVersion(),
-                    target.repo(), feature)) {
-                return false;
+    /**
+     * The keyring {@code target} decrypts a vector with, or {@code null} if it supports none: every
+     * master key (as a multi-keyring when there are several) when the target supports all of them,
+     * otherwise, for a positive vector, the last single master key it supports.
+     */
+    private static Keyring keyringOn(Selection selection, LanguageServerTarget target) {
+        List<MasterKey> masterKeys = selection.masterKeys;
+        boolean all = masterKeys.stream().allMatch(key -> supports(target, key))
+            && (masterKeys.size() == 1 || supports(target, "multi"));
+        if (all) {
+            if (masterKeys.size() == 1) {
+                return masterKeys.get(0).keyring;
+            }
+            List<Keyring> children = masterKeys.stream().map(MasterKey::keyring).toList();
+            return Keyring.builder()
+                .multi(MultiKeyringConfig.builder().childKeyrings(children).build()).build();
+        }
+        if (selection.plaintextRef == null) {
+            return null;
+        }
+        for (int i = masterKeys.size() - 1; i >= 0; i--) {
+            if (supports(target, masterKeys.get(i))) {
+                return masterKeys.get(i).keyring;
             }
         }
-        Set<String> unsupportedPaddings =
-            UNSUPPORTED_RSA_PADDINGS.getOrDefault(target.language(), Set.of());
-        return selection.rsaPaddings.stream().noneMatch(unsupportedPaddings::contains);
+        return null;
     }
 
-    /** A vector chosen for replay: its keyring, the required Features, and its file refs. */
-    private record Selection(Keyring keyring, Set<String> features, Set<String> rsaPaddings,
-                             String ciphertextRef, String plaintextRef) {
+    private static boolean supports(LanguageServerTarget target, MasterKey key) {
+        return supports(target, key.feature)
+            && (key.rsaPadding == null || !UNSUPPORTED_RSA_PADDINGS
+                .getOrDefault(target.language(), Set.of()).contains(key.rsaPadding));
+    }
+
+    private static boolean supports(LanguageServerTarget target, String feature) {
+        return FeatureDeclarations.shared().isSupported(
+            target.language(), target.majorVersion(), target.repo(), feature);
+    }
+
+    /** A master key's keyring, the Feature it needs, and its raw-RSA padding label (or null). */
+    private record MasterKey(Keyring keyring, String feature, String rsaPadding) {
+    }
+
+    /** A vector chosen for replay; {@code plaintextRef} is {@code null} for a negative vector. */
+    private record Selection(List<MasterKey> masterKeys, String ciphertextRef, String plaintextRef) {
     }
 
     /**
      * Decide whether a manifest test is replayable under the current switches and, if so, resolve
-     * its keyring, features and file references; {@code null} means skip it.
+     * its master keys and file references; {@code null} means skip it.
      */
     private static Selection select(JsonNode test, int version, JsonNode keys, boolean includeKms) {
         String plaintextRef;
         if (version <= 1) {
             plaintextRef = fileRef(test.get("plaintext"));  // v1: positive only, plaintext inline
+            if (plaintextRef == null) {
+                return null;
+            }
         } else {
             JsonNode result = test.get("result");
-            if (result == null || !result.has("output")) {
-                return null;  // negative vector: its rejection is keyed on decryption-method, not modeled here
+            if (result != null && result.has("output")) {
+                plaintextRef = fileRef(result.get("output").get("plaintext"));
+                if (plaintextRef == null) {
+                    return null;
+                }
+            } else if (result != null && result.has("error")) {
+                plaintextRef = null;
+            } else {
+                return null;
             }
-            plaintextRef = fileRef(result.get("output").get("plaintext"));
         }
         String ciphertextRef = fileRef(test.get("ciphertext"));
-        if (plaintextRef == null || ciphertextRef == null) {
+        if (ciphertextRef == null) {
             return null;
         }
 
-        JsonNode masterKeys = test.get("master-keys");
-        if (masterKeys == null || masterKeys.isEmpty()) {
+        JsonNode masterKeysNode = test.get("master-keys");
+        if (masterKeysNode == null || masterKeysNode.isEmpty()) {
             return null;
         }
-        Set<String> features = new LinkedHashSet<>();
-        Set<String> rsaPaddings = new LinkedHashSet<>();
-        List<Keyring> keyrings = new ArrayList<>();
-        for (JsonNode masterKey : masterKeys) {
+        List<MasterKey> masterKeys = new ArrayList<>();
+        for (JsonNode masterKey : masterKeysNode) {
             if (!includeKms && !"raw".equals(masterKey.path("type").asText())) {
                 return null;
             }
@@ -250,22 +315,9 @@ class ReleasedVectorDecryptTests {
             if (keyring == null) {
                 return null;
             }
-            keyrings.add(keyring);
-            features.add(featureFor(masterKey));
-            String padding = rsaPaddingLabel(masterKey);
-            if (padding != null) {
-                rsaPaddings.add(padding);
-            }
+            masterKeys.add(new MasterKey(keyring, featureFor(masterKey), rsaPaddingLabel(masterKey)));
         }
-
-        Keyring keyring;
-        if (keyrings.size() == 1) {
-            keyring = keyrings.get(0);
-        } else {
-            keyring = Keyring.builder().multi(MultiKeyringConfig.builder().childKeyrings(keyrings).build()).build();
-            features.add("multi");
-        }
-        return new Selection(keyring, features, rsaPaddings, ciphertextRef, plaintextRef);
+        return new Selection(masterKeys, ciphertextRef, plaintextRef);
     }
 
     /** The {@code algorithm:hash} label for a raw-RSA master key, or {@code null} if not raw-RSA. */

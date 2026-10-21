@@ -1,7 +1,9 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.FeatureDeclarations;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -49,6 +51,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -67,6 +70,11 @@ import org.junit.jupiter.api.TestFactory;
  * hierarchical, Raw-ECDH, KMS-ECDH, multi-keyring, and the Required-Encryption-Context
  * CMM) are emitted; any other vector is skipped and surfaced as a skipped test (see
  * {@link #manifestRoundTrips()}).
+ *
+ * <p>Each leg is gated on its own server. A decryptor without the multi-keyring or the
+ * Required-Encryption-Context CMM still decrypts those vectors: with the multi-keyring's last
+ * child it supports, or with the CMM's underlying keyring and the reproduced encryption
+ * context ({@link #decryptDescFor}).
  */
 class TestVectorManifestTests {
 
@@ -123,41 +131,31 @@ class TestVectorManifestTests {
                 plaintexts.getOrDefault(text(scenario, "plaintext"), 32));
             ESDKClientConfig encConfig = configFor(
                 cmmFor(scenario.get("encryptKeyDescription"), keys), committing);
-            ESDKClientConfig decConfig = configFor(
-                cmmFor(scenario.get("decryptKeyDescription"), keys), committing);
+            JsonNode decryptDesc = scenario.get("decryptKeyDescription");
             Map<String, String> reproducedEc =
                 toStringMap(scenario.get("reproduced-encryption-context"));
-            // The Feature(s) this vector's keyrings require (encrypt and decrypt
-            // legs). A combination whose encrypt or decrypt language declares any
-            // of them unsupported is skipped visibly, rather than driven into a
-            // Language_Server that does not wire the keyring (Requirements 9.1, 9.5).
-            Set<String> vectorFeatures = new LinkedHashSet<>();
-            vectorFeatures.addAll(featuresFor(scenario.get("encryptKeyDescription")));
-            vectorFeatures.addAll(featuresFor(scenario.get("decryptKeyDescription")));
-            // The raw-RSA padding scheme(s) the vector's keyrings use. A
-            // combination whose encrypt or decrypt language declares a
-            // rawRsaPaddingSchemes capability excluding any of them is skipped
-            // visibly, mirroring the Feature gate.
-            Set<PaddingScheme> vectorPaddings = new LinkedHashSet<>();
-            vectorPaddings.addAll(paddingsFor(scenario.get("encryptKeyDescription")));
-            vectorPaddings.addAll(paddingsFor(scenario.get("decryptKeyDescription")));
-            // The shared padding gate takes scheme NAMES (opaque strings); the
-            // vector carries modeled PaddingScheme values, so map to their names.
-            Set<String> vectorPaddingNames = new LinkedHashSet<>();
-            for (PaddingScheme scheme : vectorPaddings) {
-                vectorPaddingNames.add(scheme.getValue());
-            }
+            // Each leg is gated on the Feature(s) and raw-RSA padding(s) its own keyring
+            // uses, so a server that does not wire a keyring is skipped visibly rather than
+            // driven into it (Requirements 9.1, 9.5).
+            JsonNode encryptDesc = scenario.get("encryptKeyDescription");
+            Set<String> encFeatures = featuresFor(encryptDesc);
+            Set<String> encPaddings = paddingNames(encryptDesc);
 
             for (TargetPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
-                    FeatureGate.require(vectorFeatures, pair);
-                    FeatureGate.requireRawRsaPaddings(vectorPaddingNames, pair);
+                    FeatureGate.require(encFeatures, pair.encryptTarget());
+                    FeatureGate.requireRawRsaPaddings(encPaddings, pair.encryptTarget());
+                    JsonNode decDesc = decryptDescFor(decryptDesc, pair.decryptTarget());
+                    FeatureGate.require(featuresFor(decDesc), pair.decryptTarget());
+                    FeatureGate.requireRawRsaPaddings(paddingNames(decDesc), pair.decryptTarget());
+                    ESDKClientConfig decConfig = configFor(cmmFor(decDesc, keys), committing);
                     byte[] ciphertext = EsdkOps.encrypt(
                         pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
                     byte[] recovered =
                         EsdkOps.decrypt(pair.decryptEndpoint(), decConfig, ciphertext, reproducedEc);
                     assertArrayEquals(plaintext, recovered,
-                        "manifest vector " + label + " must round-trip (" + pair + ")");
+                        "manifest vector " + label + " must round-trip (" + pair
+                            + ", decrypt keyring " + descLabel(decDesc) + ")");
                 }));
             }
         }
@@ -254,6 +252,61 @@ class TestVectorManifestTests {
                 // Unmapped types are dropped by skipReason before the gate runs.
             }
         }
+    }
+
+    /**
+     * The decrypt description {@code target} runs for a vector: the manifest's own when the
+     * target supports every Feature it uses, otherwise the narrowest description that decrypts
+     * the same message on that target. A multi-keyring narrows to its last child the target
+     * supports (so the decryptor walks past EDKs it cannot unwrap); a Required-Encryption-Context
+     * CMM narrows to its underlying keyring, which the Default CMM runs with the reproduced
+     * encryption context. Returns the manifest's description unchanged when nothing narrower
+     * applies, so the Feature gate reports the skip.
+     */
+    static JsonNode decryptDescFor(JsonNode desc, LanguageServerTarget target) {
+        JsonNode narrowed = narrow(desc, feature -> FeatureDeclarations.shared().isSupported(
+            target.language(), target.majorVersion(), target.repo(), feature));
+        return narrowed == null ? desc : narrowed;
+    }
+
+    private static JsonNode narrow(JsonNode desc, Predicate<String> supported) {
+        if (desc == null) {
+            return null;
+        }
+        if (featuresFor(desc).stream().allMatch(supported)) {
+            return desc;
+        }
+        String type = text(desc, "type");
+        if ("multi-keyring".equals(type)) {
+            List<JsonNode> children = new ArrayList<>();
+            if (desc.hasNonNull("generator")) {
+                children.add(desc.get("generator"));
+            }
+            JsonNode childKeyrings = desc.get("childKeyrings");
+            if (childKeyrings != null) {
+                childKeyrings.forEach(children::add);
+            }
+            for (int i = children.size() - 1; i >= 0; i--) {
+                JsonNode child = narrow(children.get(i), supported);
+                if (child != null) {
+                    return child;
+                }
+            }
+            return null;
+        }
+        if ("required-encryption-context-cmm".equals(type)) {
+            return narrow(desc.get("underlying"), supported);
+        }
+        return null;
+    }
+
+    /** The raw-RSA padding scheme names a description uses, for {@link FeatureGate#requireRawRsaPaddings}. */
+    private static Set<String> paddingNames(JsonNode desc) {
+        Set<String> names = new LinkedHashSet<>();
+        for (PaddingScheme scheme : paddingsFor(desc)) {
+            names.add(scheme.getValue());
+        }
+        return names;
     }
 
     /**
