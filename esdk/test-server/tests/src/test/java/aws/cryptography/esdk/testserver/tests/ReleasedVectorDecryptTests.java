@@ -57,8 +57,8 @@ import org.junit.jupiter.api.TestFactory;
  *   <li>offline vectors only by default (every master key is a raw keyring); KMS-backed vectors
  *       need cross-account key access and are enabled with
  *       {@code -Desdk.testserver.releasedVectors.includeKms=true};</li>
- *   <li>capped per manifest and target ({@code -Desdk.testserver.releasedVectors.limitPerManifest},
- *       default 200, {@code 0} for the full corpus), counting only vectors the target supports.</li>
+ *   <li>every vector by default; {@code -Desdk.testserver.releasedVectors.limitPerManifest=N}
+ *       caps each manifest at the first N vectors the target supports.</li>
  * </ul>
  * A vector whose master keys do not map to a modeled keyring is skipped. Feature-gated on the
  * keyrings each vector uses.
@@ -89,7 +89,7 @@ class ReleasedVectorDecryptTests {
                     + " to a directory of extracted awses-decrypt corpora")));
         }
 
-        int cap = intProperty("esdk.testserver.releasedVectors.limitPerManifest", 200);
+        int cap = intProperty("esdk.testserver.releasedVectors.limitPerManifest", 0);
         boolean includeKms = boolProperty("esdk.testserver.releasedVectors.includeKms");
         List<LanguageServerTarget> targets = LanguageServerRegistry.shared().targets();
 
