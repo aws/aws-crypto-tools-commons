@@ -230,9 +230,13 @@ class ReleasedVectorDecryptTests {
             }
         }
 
-        Keyring keyring = keyrings.size() == 1
-            ? keyrings.get(0)
-            : Keyring.builder().multi(MultiKeyringConfig.builder().childKeyrings(keyrings).build()).build();
+        Keyring keyring;
+        if (keyrings.size() == 1) {
+            keyring = keyrings.get(0);
+        } else {
+            keyring = Keyring.builder().multi(MultiKeyringConfig.builder().childKeyrings(keyrings).build()).build();
+            features.add("multi");
+        }
         return new Selection(keyring, features, rsaPaddings, ciphertextRef, plaintextRef);
     }
 
