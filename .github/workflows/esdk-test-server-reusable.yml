@@ -423,16 +423,16 @@ jobs:
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
           emit rust rust "$(tip rust)" \
-            "$rust/esdk-test-server/target/release/esdk-test-server" \
-            "$rust/esdk-test-server/.esdk-build-stamp"
+            "$rust/esdk/test-server/target/release/esdk-test-server" \
+            "$rust/esdk/test-server/.esdk-build-stamp"
           emit rustcpp rust-cpp "$(tip rust-cpp)" \
-            "$rustcpp/esdk-cpp-test-server/target/release/esdk-cpp-test-server" \
+            "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
-            "$rustcpp/esdk-cpp-test-server/.esdk-build-stamp"
+            "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
           ws() { local name="$1"; shift; { echo "ws_$name<<EOF"; printf '%s -> target\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"; }
-          ws rust "$rust/esdk-test-server"
-          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk-cpp-test-server"
+          ws rust "$rust/esdk/test-server"
+          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk/shims/aws-esdk-cpp/test-server"
           ws rustdafny "$esdk/esdk-test-servers/rust"
           echo "go_dir=$esdk/esdk-test-servers/go" >> "$GITHUB_OUTPUT"
           for language in java python javascript c; do
