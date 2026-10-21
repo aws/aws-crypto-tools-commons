@@ -88,6 +88,16 @@ final class EsdkOps {
         return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
     }
 
+    /** Decrypt {@code ciphertext} on {@code endpoint} with an existing client; return the plaintext bytes. */
+    static byte[] decryptWithClient(URI endpoint, String clientId, byte[] ciphertext) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        DecryptInput request = DecryptInput.builder()
+            .clientId(clientId)
+            .ciphertext(ByteBuffer.wrap(ciphertext))
+            .build();
+        return toArray(TestServerClients.withRetry(() -> client.decrypt(request)).getPlaintext());
+    }
+
     /** Decrypt {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */
     static byte[] decrypt(URI endpoint, ESDKClientConfig config, byte[] ciphertext) {
         return decrypt(endpoint, config, ciphertext, Map.of());

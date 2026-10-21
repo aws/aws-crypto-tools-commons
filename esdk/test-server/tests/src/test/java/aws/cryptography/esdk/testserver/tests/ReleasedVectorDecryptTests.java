@@ -16,6 +16,7 @@ import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
@@ -79,6 +81,8 @@ class ReleasedVectorDecryptTests {
     // rather than counted as failures.
     private static final Map<String, Set<String>> UNSUPPORTED_RSA_PADDINGS = Map.of(
         "c", Set.of("oaep-mgf1:sha384", "oaep-mgf1:sha512"));
+
+    private static final Map<Map.Entry<URI, ESDKClientConfig>, String> CLIENTS = new ConcurrentHashMap<>();
 
     @TestFactory
     List<DynamicTest> releasedVectorsDecrypt() throws Exception {
@@ -136,7 +140,10 @@ class ReleasedVectorDecryptTests {
                     tests.add(dynamicTest(label + " " + target, () -> {
                         byte[] ciphertext = Files.readAllBytes(ciphertextPath);
                         byte[] expected = Files.readAllBytes(plaintextPath);
-                        byte[] recovered = EsdkOps.decrypt(target.endpoint(), config, ciphertext);
+                        // Thousands of vectors share a few keyrings; one client per keyring per server.
+                        String clientId = CLIENTS.computeIfAbsent(Map.entry(target.endpoint(), config),
+                            key -> EsdkOps.createClient(key.getKey(), key.getValue()));
+                        byte[] recovered = EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext);
                         assertArrayEquals(expected, recovered,
                             "released vector " + label + " must decrypt to its known plaintext ("
                                 + target + ")");
