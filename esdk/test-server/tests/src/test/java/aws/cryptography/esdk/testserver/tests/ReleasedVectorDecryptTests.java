@@ -1,6 +1,7 @@
 package aws.cryptography.esdk.testserver.tests;
 
 import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.KnownBugDeclarations;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 
@@ -84,6 +85,10 @@ class ReleasedVectorDecryptTests {
 
     private static final Map<Map.Entry<URI, ESDKClientConfig>, String> CLIENTS = new ConcurrentHashMap<>();
 
+    /** A server declaring this bug decrypts only {@link #SLOW_RSA_LIMIT} raw RSA vectors per vector set. */
+    private static final String SLOW_RSA_BUG = "raw-rsa-decrypt-reparses-private-key";
+    private static final int SLOW_RSA_LIMIT = 5;
+
     @TestFactory
     List<DynamicTest> releasedVectorsDecrypt() throws Exception {
         Path root = resolveRoot();
@@ -123,11 +128,22 @@ class ReleasedVectorDecryptTests {
             for (LanguageServerTarget target : targets) {
                 int emitted = 0;
                 int unsupported = 0;
+                boolean slowRsa = KnownBugDeclarations.shared().exhibits(
+                    target.language(), target.majorVersion(), target.repo(), SLOW_RSA_BUG);
+                int rsaEmitted = 0;
+                int rsaLimited = 0;
                 for (Map.Entry<String, Selection> chosen : selections) {
                     Selection selection = chosen.getValue();
                     if (!runnableOn(selection, target)) {
                         unsupported++;
                         continue;
+                    }
+                    if (slowRsa && selection.features.contains("raw-rsa")) {
+                        if (rsaEmitted >= SLOW_RSA_LIMIT) {
+                            rsaLimited++;
+                            continue;
+                        }
+                        rsaEmitted++;
                     }
                     if (cap > 0 && emitted >= cap) {
                         break;
@@ -148,6 +164,11 @@ class ReleasedVectorDecryptTests {
                             "released vector " + label + " must decrypt to its known plaintext ("
                                 + target + ")");
                     }));
+                }
+                if (rsaLimited > 0) {
+                    String reason = "KNOWN BUG " + SLOW_RSA_BUG + ": " + rsaLimited + " " + corpusName
+                        + " raw RSA vectors not run on " + target;
+                    tests.add(dynamicTest("skipped: " + reason, () -> Assumptions.abort(reason)));
                 }
                 if (unsupported > 0) {
                     String reason = unsupported + " " + corpusName + " vectors use keyrings or raw-RSA"
