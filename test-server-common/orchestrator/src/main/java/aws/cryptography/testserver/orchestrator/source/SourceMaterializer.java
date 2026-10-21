@@ -212,15 +212,28 @@ public final class SourceMaterializer implements Materializer {
         if (remote.failed()) {
             return null;
         }
-        String tip = remote.output().strip();
-        int end = tip.indexOf('\t');
-        if (end > 0) {
-            tip = tip.substring(0, end);
-        }
-        if (tip.isEmpty() || !tip.equals(head.output().trim())) {
+        String tip = remoteTip(remote.output(), key.ref());
+        if (tip == null || !tip.equals(head.output().trim())) {
             return null;
         }
         return CloneResult.success(target, tip);
+    }
+
+    /**
+     * The commit {@code git ls-remote <url> refs/heads/<ref>} reports for
+     * {@code ref}, or {@code null} if no line names it. The output also holds
+     * git's stderr (e.g. {@code warning: redirecting to ...}), so only the
+     * {@code <sha>\trefs/heads/<ref>} line is read.
+     */
+    static String remoteTip(String lsRemoteOutput, String ref) {
+        String wanted = "refs/heads/" + ref;
+        for (String line : lsRemoteOutput.split("\\R")) {
+            int tab = line.indexOf('\t');
+            if (tab > 0 && line.substring(tab + 1).strip().equals(wanted)) {
+                return line.substring(0, tab).strip();
+            }
+        }
+        return null;
     }
 
     private MaterializedSources.Outcome cloneOutcome(

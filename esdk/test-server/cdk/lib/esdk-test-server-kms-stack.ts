@@ -51,6 +51,11 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
   private static readonly TRUSTED_REPOS = [
     'aws/aws-crypto-tools-commons',
     'aws/aws-crypto-tools-java',
+    'aws/aws-crypto-tools-rust',
+    'aws/aws-encryption-sdk',
+    'aws/aws-encryption-sdk-c',
+    'aws/aws-encryption-sdk-javascript',
+    'aws/aws-encryption-sdk-java',
   ];
 
   constructor(scope: Construct, id: string, props: EsdkTestServerKmsStackProps = {}) {
@@ -159,9 +164,8 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
           `arn:${this.partition}:iam::${this.account}:oidc-provider/${EsdkTestServerKmsStack.GITHUB_OIDC_URL}`,
         );
 
-    // Trust policy: restrict to the two ESDK repos on any branch/ref
-    // (repo:aws/aws-crypto-tools-commons:* and repo:aws/aws-crypto-tools-java:*),
-    // and require the sts.amazonaws.com audience.
+    // Trust policy: restrict to the TestServer repos (TRUSTED_REPOS) on any
+    // branch/ref, and require the sts.amazonaws.com audience.
     const subs = EsdkTestServerKmsStack.TRUSTED_REPOS.map((repo) => `repo:${repo}:*`);
     const principal = new iam.OpenIdConnectPrincipal(oidcProvider, {
       StringEquals: {
@@ -267,6 +271,54 @@ export class EsdkTestServerKmsStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ['kms:Decrypt'],
         resources: ['arn:aws:kms:us-west-2:370957321024:key/9d989aa2-2f9c-438c-a745-cc57d3ad0126'],
+      }),
+    );
+
+    // The KMS-ECDH test vectors derive shared secrets with the shared
+    // test-vector-framework ECC key-agreement keys (a sender and a recipient key
+    // per curve). GetPublicKey lets a discovery keyring check the recipient key.
+    const ecdhVectorKeyArns = [
+      'arn:aws:kms:us-west-2:370957321024:key/eabdf483-6be2-4d2d-8ee4-8c2583d416e9',
+      'arn:aws:kms:us-west-2:370957321024:key/0265c8e9-5b6a-4055-8f70-63719e09fda5',
+      'arn:aws:kms:us-west-2:370957321024:key/7f35a704-f4fb-469d-98b1-62a1fa2cc44e',
+      'arn:aws:kms:us-west-2:370957321024:key/29f0bef9-1677-4e74-b67e-acefab1295ff',
+      'arn:aws:kms:us-west-2:370957321024:key/41b502e3-cc9d-442f-bd7b-d67faed0f22e',
+      'arn:aws:kms:us-west-2:370957321024:key/c45f1043-53bb-4f37-adc5-4d25d4a84f9d',
+    ];
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EsdkTestServerEcdhVectorKeys',
+        effect: iam.Effect.ALLOW,
+        actions: ['kms:DeriveSharedSecret', 'kms:GetPublicKey', 'kms:DescribeKey'],
+        resources: ecdhVectorKeyArns,
+      }),
+    );
+
+    // The DB-ESDK TestServer shares this role. Its beacon key store creates
+    // beacon keys (GenerateDataKeyWithoutPlaintext) and queries the shared key
+    // store table, and its AWS KMS RSA keyring uses its own RSA key.
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'DbesdkBeaconKeystoreKms',
+        effect: iam.Effect.ALLOW,
+        actions: ['kms:GenerateDataKeyWithoutPlaintext'],
+        resources: ['arn:aws:kms:us-west-2:370957321024:key/9d989aa2-2f9c-438c-a745-cc57d3ad0126'],
+      }),
+    );
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'DbesdkKeystoreDdbReads',
+        effect: iam.Effect.ALLOW,
+        actions: ['dynamodb:Query', 'dynamodb:BatchGetItem'],
+        resources: ['arn:aws:dynamodb:us-west-2:370957321024:table/KeyStoreDdbTable'],
+      }),
+    );
+    ciRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'DbesdkAwsKmsRsaKey',
+        effect: iam.Effect.ALLOW,
+        actions: ['kms:GetPublicKey', 'kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey'],
+        resources: ['arn:aws:kms:us-west-2:370957321024:key/624eeb76-f04e-41e5-a66b-359ff89862a3'],
       }),
     );
 
