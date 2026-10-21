@@ -117,13 +117,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "kessplas/bug-config",
+        "branch": "kessplas/servers-from-source",
         "path": "AwsEncryptionSDK/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "kessplas/bug-config",
+        "ref": "kessplas/servers-from-source",
         "path": "esdk-test-servers/net"
       }
     },
@@ -135,13 +135,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "kessplas/bug-config",
-        "path": "releases/rust/esdk"
+        "branch": "kessplas/servers-from-source",
+        "path": "AwsEncryptionSDK/runtimes/rust"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "kessplas/bug-config",
+        "ref": "kessplas/servers-from-source",
         "path": "esdk-test-servers/rust"
       }
     },
@@ -153,13 +153,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "kessplas/bug-config",
-        "path": "releases/go/encryption-sdk"
+        "branch": "kessplas/servers-from-source",
+        "path": "AwsEncryptionSDK/runtimes/go"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "kessplas/bug-config",
+        "ref": "kessplas/servers-from-source",
         "path": "esdk-test-servers/go"
       }
     }

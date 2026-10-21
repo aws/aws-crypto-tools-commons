@@ -1,10 +1,13 @@
 package aws.cryptography.testserver.orchestrator.launch;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -21,6 +24,16 @@ final class DafnyProject {
 
     /** Submodules a smithy-dafny transpile reads, initialized when the repository has them. */
     static final List<String> SUBMODULES = List.of("libraries", "smithy-dafny", "mpl");
+
+    /** Repository paths, besides the Dafny project, whose content determines the transpile output. */
+    static final List<String> TRANSPILE_SHARED_INPUTS =
+        List.of("SharedMakefileV2.mk", "libraries", "smithy-dafny", "mpl");
+
+    /**
+     * Names the JDK the smithy-dafny Makefile's Gradle steps run on (its
+     * Gradle 7.6 wrapper cannot run on the orchestrator's JDK 21).
+     */
+    static final String CODEGEN_JAVA_HOME_VARIABLE = "TESTSERVER_CODEGEN_JAVA_HOME";
 
     private static final ConcurrentMap<Path, Object> LOCKS = new ConcurrentHashMap<>();
 
@@ -65,6 +78,37 @@ final class DafnyProject {
             }
         }
         return commands;
+    }
+
+    /**
+     * The transpile inputs as recorded in the clone's {@code HEAD}: the tree,
+     * submodule, and blob ids of the Dafny project and
+     * {@link #TRANSPILE_SHARED_INPUTS}, plus the Dafny version. {@code null}
+     * (never up to date) when git cannot list them.
+     */
+    static String transpileInputs(Path repoRoot, Path dafnyProjectDir, String dafnyVersion) {
+        List<String> command = new ArrayList<>(List.of("git", "ls-tree", "HEAD",
+            repoRoot.relativize(dafnyProjectDir).toString()));
+        command.addAll(TRANSPILE_SHARED_INPUTS);
+        try {
+            Process process = new ProcessBuilder(command).directory(repoRoot.toFile())
+                .redirectErrorStream(true).start();
+            String output = new String(process.getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8).trim();
+            return process.waitFor() == 0 && !output.isEmpty()
+                ? "dafny " + dafnyVersion + "\n" + output : null;
+        } catch (IOException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    /** {@code JAVA_HOME} for the smithy-dafny make steps, when {@code codegenJavaHome} is set. */
+    static Map<String, String> codegenEnvironment(String codegenJavaHome) {
+        return codegenJavaHome == null || codegenJavaHome.isBlank()
+            ? Map.of() : Map.of("JAVA_HOME", codegenJavaHome);
     }
 
     /** Whether an executable {@code command} is on {@code pathValue} (a PATH-format string). */
