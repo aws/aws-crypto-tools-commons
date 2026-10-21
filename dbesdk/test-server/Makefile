@@ -1,7 +1,7 @@
 # ============================================================================
 # DB-ESDK TestServer — developer convenience Makefile
 # ----------------------------------------------------------------------------
-# The DB-ESDK TestServer is split into SEPARATE Gradle builds (not a composite
+# The DB-ESDK TestServer is split into SEPARATE Gradle builds (not one combined
 # build), each with its own wrapper:
 #
 #   model/         the single Smithy model (validated with the smithy CLI)
@@ -77,8 +77,8 @@ DBESDK_TESTSERVER_KMS_REGION ?= us-west-2
 # Local aws-database-encryption-sdk-dynamodb checkout — the source of ALL the
 # per-language Language_Servers (test-server/<lang>-v<major>-server/).
 # ----------------------------------------------------------------------------
-# The servers now live in the DB-ESDK product repo (S3EC-style), while the test
-# cases + shared harness stay here in commons. `make orchestrate` passes this as
+# The servers now live in the DB-ESDK product repo, while the test
+# cases and shared test code stay here in commons. `make orchestrate` passes this as
 # a single workingTreeOverlay (keyed by the product repo name) to the
 # orchestrator, so every server component resolves to the local working tree
 # instead of a git clone. Default: ../../../../dbesdk/aws-database-encryption-sdk-dynamodb.
@@ -92,11 +92,16 @@ DBESDK_DBE_REPO ?= $(abspath $(MAKEFILE_DIR)/../../../../dbesdk/aws-database-enc
 # is resolved (git clone) from config/server-config.json's Server_Location.
 DBE_OVERLAY := $(if $(wildcard $(DBESDK_DBE_REPO)),workingTreeOverlay.aws-database-encryption-sdk-dynamodb=$(DBESDK_DBE_REPO))
 
-# Combined orchestrator program args: the overlay (if any) plus a TESTS scope
-# (if set). When BOTH are empty this is empty, and the recipe omits the gradle
-# --args flag entirely — gradle rejects an empty --args="" — matching a plain
-# Commons_Run that clones from config, exactly like the ESDK harness.
-ORCH_ARGS := $(strip $(DBE_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)))
+# Combined orchestrator program args: the overlay (if any), a TESTS scope (if
+# set), and any extra key=value tokens passed in ORCHESTRATE_ARGS. When ALL are
+# empty this is empty, and the recipe omits the gradle --args flag entirely —
+# gradle rejects an empty --args="" — matching a plain Commons_Run that clones
+# from config.
+#
+# ORCHESTRATE_ARGS forwards the orchestrator's focus-mode tokens through make,
+# e.g. `make orchestrate ORCHESTRATE_ARGS="languages=rust stopAfter=launch"` to
+# build/launch one server, or `focus=net` to run only the pairs touching net.
+ORCH_ARGS := $(strip $(DBE_OVERLAY) $(if $(strip $(TESTS)),tests=$(TESTS)) $(ORCHESTRATE_ARGS))
 
 # Whether `deploy-kms-cdk` should CREATE the GitHub OIDC provider or import the
 # existing one. An AWS account may hold only one OIDC provider per URL
@@ -144,7 +149,7 @@ endif
 
 # ----------------------------------------------------------------------------
 help: ## Show this help
-	@echo "ESDK TestServer — make targets"
+	@echo "DB-ESDK TestServer — make targets"
 	@echo ""
 	@echo "Targets:"
 	@grep -E '^[a-zA-Z0-9_ -]+:.*## ' "$(lastword $(MAKEFILE_LIST))" \
@@ -220,7 +225,7 @@ orchestrate: check-java ## Run the complete cross-language Commons_Run (all serv
 	@# GRADLE_OPTS=-Dorg.gradle.daemon=false so no daemon captures a stale,
 	@# credential-free environment: every Gradle invocation — and every
 	@# server/Tests JVM the orchestrator forks — inherits the live shell env
-	@# with the current AWS_* creds. Mirrors the ESDK CI workflow.
+	@# with the current AWS_* creds.
 	@#
 	@# -Dtestserver.root=$(MAKEFILE_DIR) points the orchestrator at
 	@# this SDK's config/tests tree (dbesdk/test-server/) instead of its own
@@ -235,6 +240,8 @@ orchestrate: check-java ## Run the complete cross-language Commons_Run (all serv
 	@#
 	@# TESTS scopes the JUnit run to a single class or wildcard when set
 	@# (e.g. `make orchestrate TESTS=TamperTest`). Empty runs every test.
+	@# ORCHESTRATE_ARGS passes extra key=value tokens through, e.g.
+	@# `make orchestrate ORCHESTRATE_ARGS="languages=rust stopAfter=launch"`.
 	@cd "$(ORCH_DIR)" && GRADLE_OPTS="-Dorg.gradle.daemon=false $$GRADLE_OPTS" ./gradlew --console=plain run \
 		-Dtestserver.root=$(MAKEFILE_DIR) \
 		$(if $(ORCH_ARGS),--args="$(ORCH_ARGS)")
