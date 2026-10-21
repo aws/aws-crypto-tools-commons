@@ -794,11 +794,20 @@ jobs:
   # overlap the heavy builds, and it waits for their outputs just before
   # the run.
   esdk-test-server:
-    name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
+    name: ${{ matrix.shard != 'main' && format('decrypt {0} vectors', matrix.shard) || inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: [resolve, plan]
     runs-on: ubuntu-latest
+    # `main` runs every Test except the released-vector decrypts; each other
+    # shard runs only ReleasedVectorDecryptTests over one vector set, on its
+    # own runner, so the slow Python decrypts do not serialize behind the rest.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [main, python-1.3.5, python-1.3.7, python-1.3.8, python-2.0.0, python-2.2.0, python-2.3.0, daily-mkp]
 
     env:
+      # Only the main shard saves caches, so shards do not race on the same keys.
+      SAVE_CACHES: ${{ matrix.shard == 'main' && (inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) }}
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
       # Default AWS region for the whole job so every step (and every JVM the
@@ -1164,6 +1173,7 @@ jobs:
         run: make validate
 
       - name: Fetch released decrypt test-vector corpora
+        if: matrix.shard != 'main'
         # One download of the awslabs/aws-encryption-sdk-test-vectors
         # awses-decrypt corpora, extracted under $RUNNER_TEMP; every
         # Language_Server then replays them (ReleasedVectorDecryptTests). The
@@ -1173,11 +1183,14 @@ jobs:
         shell: bash
         env:
           REPO_PAT: ${{ secrets.repo-pat }}
+          SHARD: ${{ matrix.shard }}
         run: |
           DIR="$RUNNER_TEMP/released-vectors"
           mkdir -p "$DIR"
           base="https://github.com/awslabs/aws-encryption-sdk-test-vectors/raw/master/vectors/awses-decrypt"
-          for corpus in python-1.3.5 python-1.3.7 python-1.3.8 python-2.0.0 python-2.2.0 python-2.3.0; do
+          corpora=""
+          [ "$SHARD" = daily-mkp ] || corpora="$SHARD"
+          for corpus in $corpora; do
             if curl -fsSL --retry 3 -o "$DIR/$corpus.zip" "$base/$corpus.zip"; then
               mkdir -p "$DIR/$corpus"
               unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus" && rm -f "$DIR/$corpus.zip"
@@ -1188,6 +1201,10 @@ jobs:
           # Messages the Java and Python MasterKeyProvider APIs write today, from the
           # newest green aws-encryption-sdk Daily CI run. Too large to vendor
           # (~9 MB of raw-AES ciphertexts each).
+          if [ "$SHARD" != daily-mkp ]; then
+            echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
+            exit 0
+          fi
           run=$(GH_TOKEN="$REPO_PAT" gh run list -R aws/aws-encryption-sdk --workflow daily_ci.yml \
             --branch mainline --status success -L 1 --json databaseId,headSha \
             --jq '.[0] | "\(.databaseId) \(.headSha)"') || run=""
@@ -1416,6 +1433,7 @@ jobs:
           # default 180s starves it out — 900s absorbs the contention.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
+          TESTS: ${{ matrix.shard != 'main' && 'aws.cryptography.esdk.testserver.tests.ReleasedVectorDecryptTests' || '' }}
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
           ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
@@ -1437,7 +1455,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: esdk-test-server-reports
+          name: ${{ matrix.shard == 'main' && 'esdk-test-server-reports' || format('esdk-test-server-reports-{0}', matrix.shard) }}
           path: |
             esdk/test-server/build/resolution-record.json
             esdk/test-server/build/launch/*/*.log
