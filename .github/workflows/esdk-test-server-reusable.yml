@@ -1433,7 +1433,6 @@ jobs:
           # default 180s starves it out — 900s absorbs the contention.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
-          # The Makefile passes TESTS to the orchestrator as its tests= filter.
           TESTS: ${{ matrix.shard != 'main' && 'aws.cryptography.esdk.testserver.tests.ReleasedVectorDecryptTests' || '' }}
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
