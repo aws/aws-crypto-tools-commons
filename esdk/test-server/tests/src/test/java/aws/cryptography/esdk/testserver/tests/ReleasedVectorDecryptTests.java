@@ -19,7 +19,6 @@ import aws.cryptography.esdk.testserver.client.model.MultiKeyringConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -28,7 +27,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
@@ -86,8 +84,6 @@ class ReleasedVectorDecryptTests {
     // rather than counted as failures.
     private static final Map<String, Set<String>> UNSUPPORTED_RSA_PADDINGS = Map.of(
         "c", Set.of("oaep-mgf1:sha384", "oaep-mgf1:sha512"));
-
-    private static final Map<Map.Entry<URI, ESDKClientConfig>, String> CLIENTS = new ConcurrentHashMap<>();
 
     /** A server declaring this bug decrypts only {@link #SLOW_RSA_LIMIT} raw RSA vectors per vector set. */
     private static final String SLOW_RSA_BUG = "raw-rsa-decrypt-reparses-private-key";
@@ -170,7 +166,7 @@ class ReleasedVectorDecryptTests {
                     if (selection.plaintextRef == null) {
                         tests.add(dynamicTest(label + " " + target, () -> {
                             byte[] ciphertext = Files.readAllBytes(ciphertextPath);
-                            String clientId = clientFor(target, config);
+                            String clientId = EsdkOps.sharedClient(target.endpoint(), config);
                             assertThrows(ESDKClientError.class,
                                 () -> EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext),
                                 "negative released vector " + label + " must be rejected ("
@@ -182,7 +178,8 @@ class ReleasedVectorDecryptTests {
                     tests.add(dynamicTest(label + " " + target, () -> {
                         byte[] ciphertext = Files.readAllBytes(ciphertextPath);
                         byte[] expected = Files.readAllBytes(plaintextPath);
-                        String clientId = clientFor(target, config);
+                        // Thousands of vectors share a few keyrings; one client per keyring per server.
+                        String clientId = EsdkOps.sharedClient(target.endpoint(), config);
                         byte[] recovered = EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext);
                         assertArrayEquals(expected, recovered,
                             "released vector " + label + " must decrypt to its known plaintext ("
@@ -211,12 +208,6 @@ class ReleasedVectorDecryptTests {
         return tests;
     }
 
-    /** Thousands of vectors share a few keyrings; one client per keyring per server. */
-    private static String clientFor(LanguageServerTarget target, ESDKClientConfig config) {
-        return CLIENTS.computeIfAbsent(Map.entry(target.endpoint(), config),
-            key -> EsdkOps.createClient(key.getKey(), key.getValue()));
-    }
-
     private static ESDKClientConfig decryptConfig(Keyring keyring) {
         return ESDKClientConfig.builder()
             .commitmentPolicy(DECRYPT_POLICY)
@@ -229,7 +220,8 @@ class ReleasedVectorDecryptTests {
     /**
      * The keyring {@code target} decrypts a vector with, or {@code null} if it supports none: every
      * master key (as a multi-keyring when there are several) when the target supports all of them,
-     * otherwise, for a positive vector, the last single master key it supports.
+     * otherwise, for a positive vector, the last single master key it supports that can decrypt
+     * (not an encrypt-only public key).
      */
     private static Keyring keyringOn(Selection selection, LanguageServerTarget target) {
         List<MasterKey> masterKeys = selection.masterKeys;
@@ -247,7 +239,7 @@ class ReleasedVectorDecryptTests {
             return null;
         }
         for (int i = masterKeys.size() - 1; i >= 0; i--) {
-            if (supports(target, masterKeys.get(i))) {
+            if (masterKeys.get(i).decrypts && supports(target, masterKeys.get(i))) {
                 return masterKeys.get(i).keyring;
             }
         }
@@ -265,8 +257,11 @@ class ReleasedVectorDecryptTests {
             target.language(), target.majorVersion(), target.repo(), feature);
     }
 
-    /** A master key's keyring, the Feature it needs, and its raw-RSA padding label (or null). */
-    private record MasterKey(Keyring keyring, String feature, String rsaPadding) {
+    /**
+     * A master key's keyring, the Feature it needs, its raw-RSA padding label (or null), and
+     * whether its key can decrypt ({@code keys.json} {@code decrypt}).
+     */
+    private record MasterKey(Keyring keyring, String feature, String rsaPadding, boolean decrypts) {
     }
 
     /** A vector chosen for replay; {@code plaintextRef} is {@code null} for a negative vector. */
@@ -315,7 +310,9 @@ class ReleasedVectorDecryptTests {
             if (keyring == null) {
                 return null;
             }
-            masterKeys.add(new MasterKey(keyring, featureFor(masterKey), rsaPaddingLabel(masterKey)));
+            boolean decrypts = keys.path(masterKey.path("key").asText()).path("decrypt").asBoolean(true);
+            masterKeys.add(new MasterKey(keyring, featureFor(masterKey), rsaPaddingLabel(masterKey),
+                decrypts));
         }
         return new Selection(masterKeys, ciphertextRef, plaintextRef);
     }

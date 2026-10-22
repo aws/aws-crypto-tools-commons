@@ -12,6 +12,7 @@ import aws.cryptography.esdk.testserver.client.model.EncryptStreamInput;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Shared single-leg {@code Encrypt}/{@code Decrypt} helpers over the one generated
@@ -30,7 +31,20 @@ import java.util.Map;
  */
 final class EsdkOps {
 
+    /** Client ids from {@link #sharedClient}, one per (endpoint, config). */
+    private static final Map<Map.Entry<URI, ESDKClientConfig>, String> SHARED_CLIENTS =
+        new ConcurrentHashMap<>();
+
     private EsdkOps() {
+    }
+
+    /**
+     * The id of one client per (endpoint, config), created on first use and reused after. Only
+     * for clients with no state across calls (no caching CMM), since every caller shares it.
+     */
+    static String sharedClient(URI endpoint, ESDKClientConfig config) {
+        return SHARED_CLIENTS.computeIfAbsent(Map.entry(endpoint, config),
+            key -> createClient(key.getKey(), key.getValue()));
     }
 
     /** {@code CreateClient(config)} on {@code endpoint}, returning the client id. */
@@ -88,13 +102,50 @@ final class EsdkOps {
         return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
     }
 
+    /**
+     * Encrypt {@code plaintext} on {@code endpoint} with the existing client {@code clientId},
+     * applying the optional encryption context, algorithm suite and frame length; return the
+     * ciphertext bytes.
+     */
+    static byte[] encryptWithClient(URI endpoint, String clientId, byte[] plaintext,
+                                    Map<String, String> encryptionContext, ESDKAlgorithmSuiteId suite,
+                                    Long frameLength) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        EncryptInput.Builder input = EncryptInput.builder()
+            .clientId(clientId)
+            .plaintext(ByteBuffer.wrap(plaintext));
+        if (encryptionContext != null && !encryptionContext.isEmpty()) {
+            input.encryptionContext(encryptionContext);
+        }
+        if (suite != null) {
+            input.algorithmSuiteId(suite);
+        }
+        if (frameLength != null) {
+            input.frameLength(frameLength);
+        }
+        EncryptInput request = input.build();
+        return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
+    }
+
     /** Decrypt {@code ciphertext} on {@code endpoint} with an existing client; return the plaintext bytes. */
     static byte[] decryptWithClient(URI endpoint, String clientId, byte[] ciphertext) {
+        return decryptWithClient(endpoint, clientId, ciphertext, Map.of());
+    }
+
+    /**
+     * Decrypt {@code ciphertext} on {@code endpoint} with an existing client, supplying the
+     * optional reproduced encryption context; return the plaintext bytes.
+     */
+    static byte[] decryptWithClient(URI endpoint, String clientId, byte[] ciphertext,
+                                    Map<String, String> encryptionContext) {
         ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
-        DecryptInput request = DecryptInput.builder()
+        DecryptInput.Builder input = DecryptInput.builder()
             .clientId(clientId)
-            .ciphertext(ByteBuffer.wrap(ciphertext))
-            .build();
+            .ciphertext(ByteBuffer.wrap(ciphertext));
+        if (encryptionContext != null && !encryptionContext.isEmpty()) {
+            input.encryptionContext(encryptionContext);
+        }
+        DecryptInput request = input.build();
         return toArray(TestServerClients.withRetry(() -> client.decrypt(request)).getPlaintext());
     }
 

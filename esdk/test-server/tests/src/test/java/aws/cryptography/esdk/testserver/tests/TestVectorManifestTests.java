@@ -2,6 +2,7 @@ package aws.cryptography.esdk.testserver.tests;
 
 import aws.cryptography.testserver.tests.FeatureDeclarations;
 import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
@@ -21,6 +22,7 @@ import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.DiscoveryFilter;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
+import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.EcdhCurveSpec;
 import aws.cryptography.esdk.testserver.client.model.EphemeralPrivateKeyToStaticPublicKeyConfig;
@@ -51,10 +53,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Drives the AWS Crypto Tools test-vector-framework encrypt manifest (V5) through the
@@ -141,6 +148,9 @@ class TestVectorManifestTests {
             Set<String> encFeatures = featuresFor(encryptDesc);
             Set<String> encPaddings = paddingNames(encryptDesc);
 
+            // One message per encryptor, decrypted by every decryptor, as the Daily CI does
+            // with each writer's manifest.
+            Map<LanguageServerTarget, FutureTask<byte[]>> ciphertexts = new ConcurrentHashMap<>();
             for (TargetPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
                     FeatureGate.require(encFeatures, pair.encryptTarget());
@@ -149,17 +159,51 @@ class TestVectorManifestTests {
                     FeatureGate.require(featuresFor(decDesc), pair.decryptTarget());
                     FeatureGate.requireRawRsaPaddings(paddingNames(decDesc), pair.decryptTarget());
                     ESDKClientConfig decConfig = configFor(cmmFor(decDesc, keys), committing);
-                    byte[] ciphertext = EsdkOps.encrypt(
-                        pair.encryptEndpoint(), encConfig, plaintext, ec, suite, frame);
-                    byte[] recovered =
-                        EsdkOps.decrypt(pair.decryptEndpoint(), decConfig, ciphertext, reproducedEc);
-                    assertArrayEquals(plaintext, recovered,
-                        "manifest vector " + label + " must round-trip (" + pair
-                            + ", decrypt keyring " + descLabel(decDesc) + ")");
+                    byte[] ciphertext = once(ciphertexts, pair.encryptTarget(), () -> EsdkOps.encryptWithClient(
+                        pair.encryptEndpoint(), EsdkOps.sharedClient(pair.encryptEndpoint(), encConfig),
+                        plaintext, ec, suite, frame));
+                    Executable roundTrip = () -> {
+                        byte[] recovered;
+                        try {
+                            recovered = EsdkOps.decryptWithClient(pair.decryptEndpoint(),
+                                EsdkOps.sharedClient(pair.decryptEndpoint(), decConfig), ciphertext,
+                                reproducedEc);
+                        } catch (ESDKClientError e) {
+                            throw new AssertionError("decrypt failed: " + e.getMessage(), e);
+                        }
+                        assertArrayEquals(plaintext, recovered,
+                            "manifest vector " + label + " must round-trip (" + pair
+                                + ", decrypt keyring " + descLabel(decDesc) + ")");
+                    };
+                    if (isRequiredEc(decryptDesc) && !isRequiredEc(decDesc)) {
+                        // The reproduced context carries the required keys the header omits.
+                        KnownBugGate.gateDeclared(REPRODUCED_ONLY_EC_BUG, pair.decryptTarget(), roundTrip);
+                    } else {
+                        roundTrip.execute();
+                    }
                 }));
             }
         }
         return tests;
+    }
+
+    private static final String REPRODUCED_ONLY_EC_BUG =
+        "default-cmm-ignores-reproduced-only-encryption-context";
+
+    private static boolean isRequiredEc(JsonNode desc) {
+        return "required-encryption-context-cmm".equals(text(desc, "type"));
+    }
+
+    /** Run {@code task} the first time {@code key} is asked for; later callers get its result. */
+    private static byte[] once(Map<LanguageServerTarget, FutureTask<byte[]>> results,
+                               LanguageServerTarget key, Callable<byte[]> task) throws Throwable {
+        FutureTask<byte[]> result = results.computeIfAbsent(key, k -> new FutureTask<>(task));
+        result.run();
+        try {
+            return result.get();
+        } catch (ExecutionException e) {
+            throw e.getCause();
+        }
     }
 
     /**
