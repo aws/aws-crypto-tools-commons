@@ -1442,7 +1442,16 @@ jobs:
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
           ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+        run: |
+          # The build steps above launch some servers to check they start; one that
+          # outlives its step holds its port, and the run below would talk to it.
+          for port in $(seq 8091 8099); do
+            if fuser -n tcp "$port" > /dev/null 2>&1; then
+              echo "::warning::port $port still in use before the run: $(ss -ltnpH "sport = :$port")"
+              fuser -k -n tcp "$port" > /dev/null 2>&1 || true
+            fi
+          done
+          make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
 
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
