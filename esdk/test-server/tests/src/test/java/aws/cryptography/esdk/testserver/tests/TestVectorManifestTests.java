@@ -41,6 +41,7 @@ import aws.cryptography.esdk.testserver.client.model.RequiredEncryptionContextCm
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -156,10 +157,10 @@ class TestVectorManifestTests {
                     ESDKClientConfig decConfig = configFor(cmmFor(decDesc, keys), committing);
                     byte[] ciphertext = EsdkOps.await(ciphertexts.computeIfAbsent(pair.encryptTarget(),
                         target -> EsdkOps.shared(() -> EsdkOps.encryptWithClient(pair.encryptEndpoint(),
-                            EsdkOps.sharedClient(pair.encryptEndpoint(), encConfig), plaintext, ec, suite,
+                            clientFor(pair.encryptEndpoint(), encConfig, encryptDesc), plaintext, ec, suite,
                             frame))));
                     byte[] recovered = EsdkOps.decryptWithClient(pair.decryptEndpoint(),
-                        EsdkOps.sharedClient(pair.decryptEndpoint(), decConfig), ciphertext, reproducedEc);
+                        clientFor(pair.decryptEndpoint(), decConfig, decDesc), ciphertext, reproducedEc);
                     assertArrayEquals(plaintext, recovered,
                         "manifest vector " + label + " must round-trip (" + pair
                             + ", decrypt keyring " + descLabel(decDesc) + ")");
@@ -167,6 +168,21 @@ class TestVectorManifestTests {
             }
         }
         return tests;
+    }
+
+    /** Features of keyrings that make no network calls. */
+    private static final Set<String> OFFLINE_FEATURES =
+        Set.of("raw-aes", "raw-rsa", "raw-ecdh", "multi", "required-encryption-context");
+
+    /**
+     * A shared client when {@code desc}'s keyrings make no network calls, otherwise a new one:
+     * a server may hold a client's lock across a KMS or DynamoDB call, so concurrent requests on
+     * one such client can wait on each other.
+     */
+    private static String clientFor(URI endpoint, ESDKClientConfig config, JsonNode desc) {
+        return OFFLINE_FEATURES.containsAll(featuresFor(desc))
+            ? EsdkOps.sharedClient(endpoint, config)
+            : EsdkOps.createClient(endpoint, config);
     }
 
     /**
