@@ -77,7 +77,9 @@ tasks.withType<Test>().configureEach {
             .associateWith { System.getProperty(it) }
     )
     testLogging {
-        events("passed", "skipped", "failed")
+        // Results come from the JUnit XML; logging every passed and skipped test
+        // (~300k) costs the Gradle daemon a core.
+        events("failed")
         showStandardStreams = true
     }
 }
