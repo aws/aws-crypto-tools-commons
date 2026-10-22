@@ -150,8 +150,9 @@ class ReleasedVectorDecryptTests {
                     if (selection.plaintextRef == null) {
                         tests.add(dynamicTest(label + " " + target, () -> {
                             byte[] ciphertext = Files.readAllBytes(ciphertextPath);
+                            String clientId = EsdkOps.sharedClient(target.endpoint(), config);
                             assertThrows(ESDKClientError.class,
-                                () -> EsdkOps.decrypt(target.endpoint(), config, ciphertext),
+                                () -> EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext),
                                 "negative released vector " + label + " must be rejected ("
                                     + target + ")");
                         }));
@@ -161,7 +162,9 @@ class ReleasedVectorDecryptTests {
                     tests.add(dynamicTest(label + " " + target, () -> {
                         byte[] ciphertext = Files.readAllBytes(ciphertextPath);
                         byte[] expected = Files.readAllBytes(plaintextPath);
-                        byte[] recovered = EsdkOps.decrypt(target.endpoint(), config, ciphertext);
+                        // Thousands of vectors share a few keyrings; one client per keyring per server.
+                        String clientId = EsdkOps.sharedClient(target.endpoint(), config);
+                        byte[] recovered = EsdkOps.decryptWithClient(target.endpoint(), clientId, ciphertext);
                         assertArrayEquals(expected, recovered,
                             "released vector " + label + " must decrypt to its known plaintext ("
                                 + target + ")");
@@ -196,7 +199,8 @@ class ReleasedVectorDecryptTests {
     /**
      * The keyring {@code target} decrypts a vector with, or {@code null} if it supports none: every
      * master key (as a multi-keyring when there are several) when the target supports all of them,
-     * otherwise, for a positive vector, the last single master key it supports.
+     * otherwise, for a positive vector, the last single master key it supports that can decrypt
+     * (not an encrypt-only public key).
      */
     private static Keyring keyringOn(Selection selection, LanguageServerTarget target) {
         List<MasterKey> masterKeys = selection.masterKeys;
@@ -214,7 +218,7 @@ class ReleasedVectorDecryptTests {
             return null;
         }
         for (int i = masterKeys.size() - 1; i >= 0; i--) {
-            if (supports(target, masterKeys.get(i))) {
+            if (masterKeys.get(i).decrypts && supports(target, masterKeys.get(i))) {
                 return masterKeys.get(i).keyring;
             }
         }
@@ -232,8 +236,11 @@ class ReleasedVectorDecryptTests {
             target.language(), target.majorVersion(), target.repo(), feature);
     }
 
-    /** A master key's keyring, the Feature it needs, and its raw-RSA padding label (or null). */
-    private record MasterKey(Keyring keyring, String feature, String rsaPadding) {
+    /**
+     * A master key's keyring, the Feature it needs, its raw-RSA padding label (or null), and
+     * whether its key can decrypt ({@code keys.json} {@code decrypt}).
+     */
+    private record MasterKey(Keyring keyring, String feature, String rsaPadding, boolean decrypts) {
     }
 
     /** A vector chosen for replay; {@code plaintextRef} is {@code null} for a negative vector. */
@@ -282,7 +289,9 @@ class ReleasedVectorDecryptTests {
             if (keyring == null) {
                 return null;
             }
-            masterKeys.add(new MasterKey(keyring, featureFor(masterKey), rsaPaddingLabel(masterKey)));
+            boolean decrypts = keys.path(masterKey.path("key").asText()).path("decrypt").asBoolean(true);
+            masterKeys.add(new MasterKey(keyring, featureFor(masterKey), rsaPaddingLabel(masterKey),
+                decrypts));
         }
         return new Selection(masterKeys, ciphertextRef, plaintextRef);
     }
