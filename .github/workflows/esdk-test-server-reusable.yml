@@ -1435,6 +1435,9 @@ jobs:
           # nine servers building concurrently on a 2-core hosted runner the
           # default 180s starves it out — 900s absorbs the contention.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          # The .NET server allocates heavily per request; the default workstation
+          # GC collects on one thread and keeps the server near one core.
+          DOTNET_gcServer: "1"
           FOCUS: ${{ inputs.focus }}
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
