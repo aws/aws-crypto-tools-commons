@@ -51,10 +51,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
@@ -147,7 +145,7 @@ class TestVectorManifestTests {
 
             // One message per encryptor, decrypted by every decryptor, as the Daily CI does
             // with each writer's manifest.
-            Map<LanguageServerTarget, FutureTask<byte[]>> ciphertexts = new ConcurrentHashMap<>();
+            Map<LanguageServerTarget, CompletableFuture<byte[]>> ciphertexts = new ConcurrentHashMap<>();
             for (TargetPair pair : pairs()) {
                 tests.add(dynamicTest(label + " " + pair, () -> {
                     FeatureGate.require(encFeatures, pair.encryptTarget());
@@ -156,9 +154,10 @@ class TestVectorManifestTests {
                     FeatureGate.require(featuresFor(decDesc), pair.decryptTarget());
                     FeatureGate.requireRawRsaPaddings(paddingNames(decDesc), pair.decryptTarget());
                     ESDKClientConfig decConfig = configFor(cmmFor(decDesc, keys), committing);
-                    byte[] ciphertext = once(ciphertexts, pair.encryptTarget(), () -> EsdkOps.encryptWithClient(
-                        pair.encryptEndpoint(), EsdkOps.sharedClient(pair.encryptEndpoint(), encConfig),
-                        plaintext, ec, suite, frame));
+                    byte[] ciphertext = EsdkOps.await(ciphertexts.computeIfAbsent(pair.encryptTarget(),
+                        target -> EsdkOps.shared(() -> EsdkOps.encryptWithClient(pair.encryptEndpoint(),
+                            EsdkOps.sharedClient(pair.encryptEndpoint(), encConfig), plaintext, ec, suite,
+                            frame))));
                     byte[] recovered = EsdkOps.decryptWithClient(pair.decryptEndpoint(),
                         EsdkOps.sharedClient(pair.decryptEndpoint(), decConfig), ciphertext, reproducedEc);
                     assertArrayEquals(plaintext, recovered,
@@ -168,18 +167,6 @@ class TestVectorManifestTests {
             }
         }
         return tests;
-    }
-
-    /** Run {@code task} the first time {@code key} is asked for; later callers get its result. */
-    private static byte[] once(Map<LanguageServerTarget, FutureTask<byte[]>> results,
-                               LanguageServerTarget key, Callable<byte[]> task) throws Throwable {
-        FutureTask<byte[]> result = results.computeIfAbsent(key, k -> new FutureTask<>(task));
-        result.run();
-        try {
-            return result.get();
-        } catch (ExecutionException e) {
-            throw e.getCause();
-        }
     }
 
     /**
