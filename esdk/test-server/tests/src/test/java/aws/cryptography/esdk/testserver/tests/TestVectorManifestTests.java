@@ -2,6 +2,7 @@ package aws.cryptography.esdk.testserver.tests;
 
 import aws.cryptography.testserver.tests.FeatureDeclarations;
 import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
@@ -21,6 +22,7 @@ import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.DiscoveryFilter;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
+import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.EcdhCurveSpec;
 import aws.cryptography.esdk.testserver.client.model.EphemeralPrivateKeyToStaticPublicKeyConfig;
@@ -58,6 +60,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Drives the AWS Crypto Tools test-vector-framework encrypt manifest (V5) through the
@@ -159,15 +162,36 @@ class TestVectorManifestTests {
                         target -> EsdkOps.shared(() -> EsdkOps.encryptWithClient(pair.encryptEndpoint(),
                             clientFor(pair.encryptEndpoint(), encConfig, encryptDesc), plaintext, ec, suite,
                             frame))));
-                    byte[] recovered = EsdkOps.decryptWithClient(pair.decryptEndpoint(),
-                        clientFor(pair.decryptEndpoint(), decConfig, decDesc), ciphertext, reproducedEc);
-                    assertArrayEquals(plaintext, recovered,
-                        "manifest vector " + label + " must round-trip (" + pair
-                            + ", decrypt keyring " + descLabel(decDesc) + ")");
+                    Executable roundTrip = () -> {
+                        byte[] recovered;
+                        try {
+                            recovered = EsdkOps.decryptWithClient(pair.decryptEndpoint(),
+                                clientFor(pair.decryptEndpoint(), decConfig, decDesc), ciphertext,
+                                reproducedEc);
+                        } catch (ESDKClientError e) {
+                            throw new AssertionError("decrypt failed: " + e.getMessage(), e);
+                        }
+                        assertArrayEquals(plaintext, recovered,
+                            "manifest vector " + label + " must round-trip (" + pair
+                                + ", decrypt keyring " + descLabel(decDesc) + ")");
+                    };
+                    if (isRequiredEc(decryptDesc) && !isRequiredEc(decDesc)) {
+                        // The reproduced context carries the required keys the header omits.
+                        KnownBugGate.gateDeclared(REPRODUCED_ONLY_EC_BUG, pair.decryptTarget(), roundTrip);
+                    } else {
+                        roundTrip.execute();
+                    }
                 }));
             }
         }
         return tests;
+    }
+
+    private static final String REPRODUCED_ONLY_EC_BUG =
+        "default-cmm-ignores-reproduced-only-encryption-context";
+
+    private static boolean isRequiredEc(JsonNode desc) {
+        return "required-encryption-context-cmm".equals(text(desc, "type"));
     }
 
     /** Features of keyrings that make no network calls. */
