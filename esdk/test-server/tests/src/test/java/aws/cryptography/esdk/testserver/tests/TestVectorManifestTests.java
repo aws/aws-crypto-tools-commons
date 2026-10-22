@@ -192,6 +192,8 @@ class TestVectorManifestTests {
 
     private static boolean isRequiredEc(JsonNode desc) {
         return "required-encryption-context-cmm".equals(text(desc, "type"));
+    }
+
     /** Features of keyrings that make no network calls. */
     private static final Set<String> OFFLINE_FEATURES =
         Set.of("raw-aes", "raw-rsa", "raw-ecdh", "multi", "required-encryption-context");
