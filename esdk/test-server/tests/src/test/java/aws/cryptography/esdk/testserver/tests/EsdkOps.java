@@ -12,7 +12,12 @@ import aws.cryptography.esdk.testserver.client.model.EncryptStreamInput;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 /**
  * Shared single-leg {@code Encrypt}/{@code Decrypt} helpers over the one generated
@@ -32,8 +37,19 @@ import java.util.concurrent.ConcurrentHashMap;
 final class EsdkOps {
 
     /** Client ids from {@link #sharedClient}, one per (endpoint, config). */
-    private static final Map<Map.Entry<URI, ESDKClientConfig>, String> SHARED_CLIENTS =
+    private static final Map<Map.Entry<URI, ESDKClientConfig>, CompletableFuture<String>> SHARED_CLIENTS =
         new ConcurrentHashMap<>();
+
+    /**
+     * Runs the RPCs whose results several tests wait on. A JUnit worker that blocks on a result
+     * can be handed another test that waits on the same result, so the result must be computed
+     * on a thread outside JUnit's pool or the worker can end up waiting on itself.
+     */
+    private static final ExecutorService SHARED_RPCS = Executors.newCachedThreadPool(task -> {
+        Thread thread = new Thread(task, "esdk-shared-rpc");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private EsdkOps() {
     }
@@ -43,8 +59,25 @@ final class EsdkOps {
      * for clients with no state across calls (no caching CMM), since every caller shares it.
      */
     static String sharedClient(URI endpoint, ESDKClientConfig config) {
-        return SHARED_CLIENTS.computeIfAbsent(Map.entry(endpoint, config),
-            key -> createClient(key.getKey(), key.getValue()));
+        return await(SHARED_CLIENTS.computeIfAbsent(Map.entry(endpoint, config),
+            key -> shared(() -> createClient(key.getKey(), key.getValue()))));
+    }
+
+    /** Start {@code rpc} on the shared-RPC pool; {@link #await} its result. */
+    static <T> CompletableFuture<T> shared(Supplier<T> rpc) {
+        return CompletableFuture.supplyAsync(rpc, SHARED_RPCS);
+    }
+
+    /** The result of a {@link #shared} RPC, rethrowing the RPC's own exception. */
+    static <T> T await(CompletableFuture<T> result) {
+        try {
+            return result.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            throw e;
+        }
     }
 
     /** {@code CreateClient(config)} on {@code endpoint}, returning the client id. */
