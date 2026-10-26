@@ -7,6 +7,7 @@ import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
+import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
@@ -98,6 +99,35 @@ public class HandleAndErrorContractTest {
             client.onEncrypt(OnEncryptInput.builder()
                 .keyringId(cmmId)
                 .materials(materials)
+                .build()));
+    }
+
+    @ParameterizedTest(name = "unknown key store handle is a GenericServerError {0}")
+    @MethodSource("targets")
+    void unknownKeyStoreHandle(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("hierarchical"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+
+        assertThrows(GenericServerError.class, () ->
+            client.createAwsKmsHierarchicalKeyring(CreateAwsKmsHierarchicalKeyringInput.builder()
+                .keyStoreId(UNKNOWN_ID)
+                .branchKeyId("handle-contract-branch-key")
+                .ttlSeconds(600L)
+                .build()));
+    }
+
+    @ParameterizedTest(name = "keyring handle used as a key store handle is a GenericServerError {0}")
+    @MethodSource("targets")
+    void keyringHandleUsedAsKeyStore(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes", "hierarchical"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+        String keyringId = rawAesKeyring(client);
+
+        assertThrows(GenericServerError.class, () ->
+            client.createAwsKmsHierarchicalKeyring(CreateAwsKmsHierarchicalKeyringInput.builder()
+                .keyStoreId(keyringId)
+                .branchKeyId("handle-contract-branch-key")
+                .ttlSeconds(600L)
                 .build()));
     }
 
