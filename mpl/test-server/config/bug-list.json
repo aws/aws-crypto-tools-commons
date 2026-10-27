@@ -4,8 +4,13 @@
     "authoritative ledger of known bugs across the MPL Language_Servers, a 'bugs'",
     "object keyed by bug id, each { description, ticketId }. A server declares",
     "the ids it currently exhibits in its own bug-config.json (a flat array);",
-    "every such id MUST be defined here. Empty: no known bugs."
+    "every such id MUST be defined here."
   ],
   "product": "mpl",
-  "bugs": {}
+  "bugs": {
+    "forbid-default-suite-no-kdf": {
+      "description": "GetEncryptionMaterials under ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT with no suite requested defaults to ALG_AES_256_GCM_IV12_TAG16_NO_KDF instead of ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384",
+      "ticketId": null
+    }
+  }
 }

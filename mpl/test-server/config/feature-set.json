@@ -17,10 +17,6 @@
     "    the reproducedEncryptionContext half of that set is ported.",
     "  - Missing-plaintext-data-key vectors (AllDefaultCmm.dfy): they need a static",
     "    keyring that returns a fixed or absent data key; the model has none.",
-    "  - The ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT default suite: commitment-policy.md",
-    "    says ALG_AES_256_GCM_IV12_TAG16_NO_KDF; native Rust returns it, the Dafny",
-    "    MPL returns ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384. Not asserted",
-    "    until that divergence is resolved.",
     "  - AWS KMS hierarchical keyring and branch key store: not yet modeled."
   ],
   "product": "mpl",
