@@ -292,8 +292,14 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
-          # Transpile outputs (restored or generated) inside the mpl submodule.
-          git -C language-repo config submodule.mpl.ignore untracked
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -528,8 +534,14 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
-          # Transpile outputs (restored or generated) inside the mpl submodule.
-          git -C language-repo config submodule.mpl.ignore untracked
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Set up JDK 17 (Temurin) for the smithy-dafny Gradle steps
         # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator.
@@ -853,8 +865,14 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
-          # Transpile outputs (restored or generated) inside the mpl submodule.
-          git -C language-repo config submodule.mpl.ignore untracked
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
