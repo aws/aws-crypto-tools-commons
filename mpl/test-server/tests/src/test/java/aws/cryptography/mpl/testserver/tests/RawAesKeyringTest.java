@@ -206,7 +206,7 @@ public class RawAesKeyringTest {
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[raw-aes] no EDKs rejected {0}")
+    @ParameterizedTest(name = "[raw-aes] no EDKs supplied, fails {0}")
     @MethodSource("targets")
     void onDecryptWithNoEdksFails(LanguageServerTarget target) {
         FeatureGate.require(Set.of("raw-aes"), target);
