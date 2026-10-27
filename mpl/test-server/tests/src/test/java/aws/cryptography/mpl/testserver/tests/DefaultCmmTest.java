@@ -21,7 +21,6 @@ import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
@@ -152,9 +151,16 @@ public class DefaultCmmTest {
     // Commitment policy
     // -----------------------------------------------------------------------
 
-    /** The two REQUIRE_ENCRYPT policies' default suite, 05 78. */
+    /**
+     * Each policy's default ESDK suite: 03 78 for FORBID_ENCRYPT_ALLOW_DECRYPT,
+     * 05 78 for the two REQUIRE_ENCRYPT policies. commitment-policy.md still
+     * says ALG_AES_256_GCM_IV12_TAG16_NO_KDF for FORBID_ENCRYPT_ALLOW_DECRYPT;
+     * that text is out of date.
+     */
     static Stream<Arguments> defaultSuites() {
         return targets().stream().flatMap(target -> Stream.of(
+            Arguments.of(CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT,
+                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384, target),
             Arguments.of(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_ALLOW_DECRYPT,
                 AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, target),
             Arguments.of(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT,
@@ -170,24 +176,6 @@ public class DefaultCmmTest {
         GetEncryptionMaterialsOutput encrypted = encrypt(
             MplTestServerClients.forEndpoint(target.endpoint()), ROOT_EC, policy, null);
         assertEquals(expected.getValue(), encrypted.getAlgorithmSuiteId().getValue());
-    }
-
-    /**
-     * ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT defaults to
-     * ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384, as the Dafny MPL
-     * (Defaults.dfy) returns. commitment-policy.md still says
-     * ALG_AES_256_GCM_IV12_TAG16_NO_KDF; that text is out of date.
-     */
-    @ParameterizedTest(name = "[default-cmm] ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT default suite {0}")
-    @MethodSource("targets")
-    void forbidEncryptAllowDecryptDefaultSuite(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(target.endpoint()), ROOT_EC,
-            CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT, null);
-        KnownBugGate.gateDeclared("forbid-default-suite-no-kdf", target, () -> assertEquals(
-            AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384.getValue(),
-            encrypted.getAlgorithmSuiteId().getValue()));
     }
 
     static Stream<Arguments> encryptRejections() {
