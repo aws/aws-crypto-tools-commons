@@ -49,7 +49,7 @@ public class DefaultCmmTest {
     private static final Map<String, String> ROOT_EC = Map.of("a", "a", "b", "b");
 
     /** A committing, non-signing suite, so the context gains no public key. */
-    private static final AlgorithmSuiteId REPRODUCED_EC_SUITE =
+    private static final AlgorithmSuiteId COMMIT_NO_SIGNING_SUITE =
         AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
 
     // -----------------------------------------------------------------------
@@ -252,10 +252,10 @@ public class DefaultCmmTest {
     @MethodSource("reproducedSubsets")
     void reproducedSubsetAccepted(Map<String, String> reproduced, TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
-        CommitmentPolicy policy = compatiblePolicy(REPRODUCED_EC_SUITE);
+        CommitmentPolicy policy = compatiblePolicy(COMMIT_NO_SIGNING_SUITE);
         GetEncryptionMaterialsOutput encrypted = encrypt(
             MplTestServerClients.forEndpoint(pair.encryptEndpoint()), ROOT_EC, policy,
-            REPRODUCED_EC_SUITE);
+            COMMIT_NO_SIGNING_SUITE);
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
         String cmmId = createCmm(dec);
 
@@ -290,10 +290,10 @@ public class DefaultCmmTest {
     @MethodSource("reproducedMismatches")
     void reproducedMismatchRejected(Map<String, String> reproduced, TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
-        CommitmentPolicy policy = compatiblePolicy(REPRODUCED_EC_SUITE);
+        CommitmentPolicy policy = compatiblePolicy(COMMIT_NO_SIGNING_SUITE);
         GetEncryptionMaterialsOutput encrypted = encrypt(
             MplTestServerClients.forEndpoint(pair.encryptEndpoint()), ROOT_EC, policy,
-            REPRODUCED_EC_SUITE);
+            COMMIT_NO_SIGNING_SUITE);
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
         String cmmId = createCmm(dec);
 
