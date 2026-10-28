@@ -10,7 +10,6 @@ import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
 import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
-import aws.cryptography.mpl.testserver.client.model.Duration;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.GenericServerError;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsInput;
@@ -113,7 +112,7 @@ public class HandleAndErrorContractTest {
             client.createAwsKmsHierarchicalKeyring(CreateAwsKmsHierarchicalKeyringInput.builder()
                 .keyStoreId(UNKNOWN_ID)
                 .branchKeyId("handle-contract-branch-key")
-                .ttl(Duration.builder().seconds(600L).nanos(0).build())
+                .ttlSeconds(600)
                 .build()));
     }
 
