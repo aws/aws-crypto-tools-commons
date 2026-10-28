@@ -226,10 +226,9 @@ structure CreateKeyStoreClientRequest {
     @required
     logicalKeyStoreName: String
 
-    /// ARN of the KMS key that wraps the branch keys (the key store's
-    /// kmsKeyArn KMS configuration).
+    /// How the key store chooses the KMS key that unwraps a branch key.
     @required
-    kmsKeyArn: String
+    kmsConfiguration: KmsConfiguration
 
     /// Region of the key store's KMS client.
     @required
@@ -238,6 +237,31 @@ structure CreateKeyStoreClientRequest {
     /// Region of the key store's DynamoDB client.
     @required
     ddbClientRegion: String
+}
+
+/// Mirrors the key store's KMSConfiguration.
+union KmsConfiguration {
+    /// Use only this KMS key. An MRK ARN is treated as single-region: a branch
+    /// key whose record names another region's replica is rejected.
+    kmsKeyArn: String
+
+    /// Use only this KMS key, matching a record that names any replica of the
+    /// same multi-Region key.
+    kmsMRKeyArn: String
+
+    /// Use the KMS key ARN each branch key record names.
+    discovery: Discovery
+
+    /// Use the KMS key ARN each branch key record names, with an MRK ARN's
+    /// region replaced by the given region.
+    mrDiscovery: MRDiscovery
+}
+
+structure Discovery {}
+
+structure MRDiscovery {
+    @required
+    region: String
 }
 
 @output

@@ -12,11 +12,14 @@ import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyr
 import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterialsCacheInput;
 import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
+import aws.cryptography.mpl.testserver.client.model.Discovery;
 import aws.cryptography.mpl.testserver.client.model.EncryptedDataKey;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
 import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterialsInput;
+import aws.cryptography.mpl.testserver.client.model.KmsConfiguration;
 import aws.cryptography.mpl.testserver.client.model.MPLClientError;
+import aws.cryptography.mpl.testserver.client.model.MRDiscovery;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
 import aws.cryptography.mpl.testserver.client.model.StaticBranchKeyIdSupplier;
@@ -54,7 +57,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * server process, so sharing it across servers is not a thing a test can ask.
  *
  * <p>These tests are online. Every server needs AWS credentials with DynamoDB
- * GetItem on the branch key store table and KMS Decrypt on its KMS key.
+ * GetItem on the branch key store table, and KMS Decrypt on KMS_KEY_ARN, the
+ * postal horn branch key's KMS key, and the us-east-1 and us-west-2 replicas
+ * of MRK_ID.
  */
 public class AwsKmsHierarchicalKeyringTest {
 
@@ -73,6 +78,26 @@ public class AwsKmsHierarchicalKeyringTest {
     /** BRANCH_KEY_ID's active version, as the native Rust MPL's integ tests also assert. */
     private static final String BRANCH_KEY_ACTIVE_VERSION = "caf0c508-e64d-4b6c-bffe-381cbc546c02";
     private static final String BRANCH_KEY_ID_WITH_EC = "4bb57643-07c1-419e-92ad-0df0df149d7c";
+
+    /**
+     * Fixtures.dfy postalHornBranchKeyId: its record names a KMS key other than
+     * KMS_KEY_ARN, so only a Discovery key store can serve it.
+     */
+    private static final String POSTAL_HORN_BRANCH_KEY_ID = "682dfba7-4c35-491d-8d6a-5a9c56194061";
+    private static final String POSTAL_HORN_BRANCH_KEY_ACTIVE_VERSION =
+        "6b7a8ef4-8c1c-4f63-b196-a6ef7e496e50";
+
+    /**
+     * Fixtures.dfy MRK fixtures (account 658956600833): EastBranchKey's record
+     * names the us-east-1 replica of MRK_ID, WestBranchKey's the us-west-2
+     * replica. ap-south-2 has no replica.
+     */
+    private static final String MRK_ID = "mrk-80bd8ecdcd4342aebd84b7dc9da498a7";
+    private static final String MRK_ARN_EAST = "arn:aws:kms:us-east-1:658956600833:key/" + MRK_ID;
+    private static final String MRK_ARN_WEST = "arn:aws:kms:us-west-2:658956600833:key/" + MRK_ID;
+    private static final String MRK_ARN_AP = "arn:aws:kms:ap-south-2:658956600833:key/" + MRK_ID;
+    private static final String EAST_BRANCH_KEY = "MyEastBranch2";
+    private static final String WEST_BRANCH_KEY = "MyWestBranch2";
 
     /** TestBranchKeyIdSupplier's mapping: branchKey=caseA and branchKey=caseB. */
     private static final String SUPPLIER_EC_KEY = "branchKey";
@@ -322,6 +347,114 @@ public class AwsKmsHierarchicalKeyringTest {
     }
 
     // -----------------------------------------------------------------------
+    // Key store KMS configuration (TestDiscoveryGetKeys.dfy, TestGetKeys.dfy
+    // TestGetActiveMrkKey)
+    //
+    // The Dafny tests call the key store directly. Here the keyring drives it:
+    // OnEncrypt reads the active branch key and OnDecrypt reads the version the
+    // EDK names, so each configuration is exercised on both key store reads.
+    // -----------------------------------------------------------------------
+
+    /** A key store configuration, its KMS client region, and a branch key it can serve. */
+    record KeyStoreCase(String name, KmsConfiguration kmsConfiguration, String kmsRegion,
+            String branchKeyId) {
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    static List<KeyStoreCase> servingCases() {
+        return List.of(
+            // TestDiscoveryGetKeys: one Discovery key store serves branch keys
+            // under two different KMS keys.
+            new KeyStoreCase("discovery, " + BRANCH_KEY_ID, discovery(), KEY_STORE_REGION, BRANCH_KEY_ID),
+            new KeyStoreCase("discovery, postal horn", discovery(), KEY_STORE_REGION,
+                POSTAL_HORN_BRANCH_KEY_ID),
+            // TestGetKeysForMrk: MRDiscovery rewrites the record's us-east-1 ARN
+            // into us-west-2, reaching the replica.
+            new KeyStoreCase("mrDiscovery us-west-2, east branch key", mrDiscovery(KEY_STORE_REGION),
+                KEY_STORE_REGION, EAST_BRANCH_KEY),
+            // TestGetActiveMrkKey: every configuration works when regions match.
+            new KeyStoreCase("kmsKeyArn west, west branch key", kmsKeyArn(MRK_ARN_WEST),
+                "us-west-2", WEST_BRANCH_KEY),
+            new KeyStoreCase("kmsKeyArn east, east branch key", kmsKeyArn(MRK_ARN_EAST),
+                "us-east-1", EAST_BRANCH_KEY),
+            new KeyStoreCase("kmsMRKeyArn west, west branch key", kmsMRKeyArn(MRK_ARN_WEST),
+                "us-west-2", WEST_BRANCH_KEY),
+            new KeyStoreCase("kmsMRKeyArn east, east branch key", kmsMRKeyArn(MRK_ARN_EAST),
+                "us-east-1", EAST_BRANCH_KEY),
+            // ... and an MRK configuration also serves the other region's record.
+            new KeyStoreCase("kmsMRKeyArn west, east branch key", kmsMRKeyArn(MRK_ARN_WEST),
+                "us-west-2", EAST_BRANCH_KEY),
+            new KeyStoreCase("kmsMRKeyArn east, west branch key", kmsMRKeyArn(MRK_ARN_EAST),
+                "us-east-1", WEST_BRANCH_KEY));
+    }
+
+    static List<KeyStoreCase> rejectingCases() {
+        return List.of(
+            // A key store pinned to KMS_KEY_ARN rejects a record naming another key.
+            new KeyStoreCase("kmsKeyArn, postal horn", kmsKeyArn(KMS_KEY_ARN), KEY_STORE_REGION,
+                POSTAL_HORN_BRANCH_KEY_ID),
+            // TestGetKeysForMrk: plain Discovery passes the us-east-1 ARN to a
+            // us-west-2 client.
+            new KeyStoreCase("discovery, east branch key", discovery(), KEY_STORE_REGION,
+                EAST_BRANCH_KEY),
+            // TestGetActiveMrkKey: a single-region configuration rejects the
+            // other replica's record.
+            new KeyStoreCase("kmsKeyArn west, east branch key", kmsKeyArn(MRK_ARN_WEST),
+                "us-west-2", EAST_BRANCH_KEY),
+            new KeyStoreCase("kmsKeyArn east, west branch key", kmsKeyArn(MRK_ARN_EAST),
+                "us-east-1", WEST_BRANCH_KEY),
+            // ... and an MRK configuration in a region with no replica fails.
+            new KeyStoreCase("kmsMRKeyArn ap-south-2, west branch key", kmsMRKeyArn(MRK_ARN_AP),
+                "ap-south-2", WEST_BRANCH_KEY));
+    }
+
+    static Stream<Arguments> servingCasesByPair() {
+        return servingCases().stream()
+            .flatMap(c -> pairs().stream().map(pair -> Arguments.of(c, pair)));
+    }
+
+    static Stream<Arguments> rejectingCasesByTarget() {
+        return rejectingCases().stream()
+            .flatMap(c -> targets().stream().map(target -> Arguments.of(c, target)));
+    }
+
+    @ParameterizedTest(name = "[hierarchical] key store {0} round trip {1}")
+    @MethodSource("servingCasesByPair")
+    void keyStoreConfigurationServesBranchKey(KeyStoreCase keyStoreCase, TargetPair pair) {
+        FeatureGate.require(Set.of("hierarchical"), pair);
+        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
+        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+
+        EncryptionMaterials encrypted = onEncrypt(enc, keyStoreCaseKeyring(enc, keyStoreCase),
+            initializeEncryption(enc, EC));
+
+        assertEquals(1, encrypted.getEncryptedDataKeys().size());
+        EncryptedDataKey edk = encrypted.getEncryptedDataKeys().get(0);
+        assertHierarchyEdk(edk, keyStoreCase.branchKeyId());
+        if (keyStoreCase.branchKeyId().equals(POSTAL_HORN_BRANCH_KEY_ID)) {
+            assertArrayEquals(uuidBytes(POSTAL_HORN_BRANCH_KEY_ACTIVE_VERSION), versionBytes(edk),
+                "the EDK carries the branch key's active version");
+        }
+
+        DecryptionMaterials decrypted = onDecrypt(dec, keyStoreCaseKeyring(dec, keyStoreCase),
+            initializeDecryption(dec, EC), encrypted.getEncryptedDataKeys());
+
+        assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
+    }
+
+    @ParameterizedTest(name = "[hierarchical] key store {0} rejects the branch key {1}")
+    @MethodSource("rejectingCasesByTarget")
+    void keyStoreConfigurationRejectsBranchKey(KeyStoreCase keyStoreCase, LanguageServerTarget target) {
+        FeatureGate.require(Set.of("hierarchical"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+
+        assertOnEncryptFails(client, keyStoreCaseKeyring(client, keyStoreCase));
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
@@ -386,11 +519,16 @@ public class AwsKmsHierarchicalKeyringTest {
     }
 
     private static String keyStore(MPLTestServerClient client, String kmsRegion, String logicalName) {
+        return keyStore(client, kmsKeyArn(KMS_KEY_ARN), kmsRegion, logicalName);
+    }
+
+    private static String keyStore(MPLTestServerClient client, KmsConfiguration kmsConfiguration,
+            String kmsRegion, String logicalName) {
         return MplTestServerClients.withRetry(() -> client.createKeyStoreClient(
             CreateKeyStoreClientInput.builder()
                 .ddbTableName(KEY_STORE_TABLE_NAME)
                 .logicalKeyStoreName(logicalName)
-                .kmsKeyArn(KMS_KEY_ARN)
+                .kmsConfiguration(kmsConfiguration)
                 .kmsClientRegion(kmsRegion)
                 .ddbClientRegion(KEY_STORE_REGION)
                 .build())).getKeyStoreId();
@@ -401,6 +539,33 @@ public class AwsKmsHierarchicalKeyringTest {
             CreateCryptographicMaterialsCacheInput.builder()
                 .entryCapacity(100)
                 .build())).getCacheId();
+    }
+
+    private static KmsConfiguration kmsKeyArn(String arn) {
+        return KmsConfiguration.builder().kmsKeyArn(arn).build();
+    }
+
+    private static KmsConfiguration kmsMRKeyArn(String arn) {
+        return KmsConfiguration.builder().kmsMRKeyArn(arn).build();
+    }
+
+    private static KmsConfiguration discovery() {
+        return KmsConfiguration.builder().discovery(Discovery.builder().build()).build();
+    }
+
+    private static KmsConfiguration mrDiscovery(String region) {
+        return KmsConfiguration.builder()
+            .mrDiscovery(MRDiscovery.builder().region(region).build())
+            .build();
+    }
+
+    private static String keyStoreCaseKeyring(MPLTestServerClient client, KeyStoreCase keyStoreCase) {
+        String keyStoreId = keyStore(client, keyStoreCase.kmsConfiguration(), keyStoreCase.kmsRegion(),
+            LOGICAL_KEY_STORE_NAME);
+        return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+            .keyStoreId(keyStoreId)
+            .branchKeyId(keyStoreCase.branchKeyId())
+            .ttlSeconds(TTL_SECONDS));
     }
 
     private static String branchKeyKeyring(MPLTestServerClient client) {

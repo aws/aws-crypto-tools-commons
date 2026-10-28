@@ -18,7 +18,6 @@
     "    GetActiveBranchKey, GetBranchKeyVersion, GetBeaconKey, GetKeyStoreInfo):",
     "    the hierarchical keyring tests read pre-provisioned branch keys; the key",
     "    store's own operations are not modeled.",
-    "  - Discovery and MRK key store KMS configurations: only kmsKeyArn is modeled.",
     "  - Materials cache types other than Default, and the keyring's own cache",
     "    configuration: a keyring uses either its default cache or a Shared",
     "    Default cache passed by handle."
