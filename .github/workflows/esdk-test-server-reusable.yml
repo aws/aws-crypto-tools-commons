@@ -189,8 +189,6 @@ permissions:
   id-token: write
 
 env:
-  # The language repository whose checkout replaces its configured branch.
-  LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
   CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
   # Dependency caches (cargo, Gradle/Maven, npm, pip, NuGet, Go, C)
   # are written only from the default branch, so every branch restores the
@@ -199,11 +197,47 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  # Resolves the refs every job checks out, including any Test-Server-Override
+  # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
+  resolve:
+    name: resolve refs
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      commons_ref: ${{ steps.refs.outputs.commons_ref }}
+      language_repository: ${{ steps.refs.outputs.language_repository }}
+      language_ref: ${{ steps.refs.outputs.language_ref }}
+      language_branches: ${{ steps.refs.outputs.language_branches }}
+    steps:
+      - name: Check out the resolve script
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+          sparse-checkout: .github/scripts
+      - name: Resolve refs
+        id: refs
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          EVENT_BODY: ${{ github.event.pull_request.body }}
+          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
+          INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
+          INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+        run: .github/scripts/resolve-test-server-refs.sh resolve
+
   # Resolves each heavy server's key and lists the servers with no prebuilt
   # binary, so the prebuild job compiles only those.
   plan:
     name: find servers to prebuild
     runs-on: ${{ inputs.runner }}
+    needs: resolve
+    env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
     outputs:
       platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -220,6 +254,10 @@ jobs:
       key_net: ${{ steps.keys.outputs.key_net }}
       key_nettranspile: ${{ steps.keys.outputs.key_nettranspile }}
       paths_nettranspile: ${{ steps.keys.outputs.paths_nettranspile }}
+      key_rustdafnytranspile: ${{ steps.keys.outputs.key_rustdafnytranspile }}
+      paths_rustdafnytranspile: ${{ steps.keys.outputs.paths_rustdafnytranspile }}
+      key_gotranspile: ${{ steps.keys.outputs.key_gotranspile }}
+      paths_gotranspile: ${{ steps.keys.outputs.paths_gotranspile }}
       paths_net: ${{ steps.keys.outputs.paths_net }}
       key_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
       paths_rustdafny: ${{ steps.keys.outputs.paths_rustdafny }}
@@ -234,15 +272,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
@@ -254,7 +297,16 @@ jobs:
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -378,6 +430,13 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/net/ImplementationFromDafny*" \
             "$esdk/mpl/*/runtimes/net/ImplementationFromDafny*" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-build-stamp"
+          emit rustdafnytranspile rust-dafny "$transpile-dafny4.10.0" \
+            "$esdk/AwsEncryptionSDK/runtimes/rust/src" \
+            "$esdk/AwsEncryptionSDK/.esdk-transpile-rust-build-stamp"
+          emit gotranspile go "$transpile-dafny4.9.0" \
+            "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
+            "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
+            "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
           emit rustdafny rust-dafny "$esdk_tip" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
@@ -385,16 +444,16 @@ jobs:
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
           emit rust rust "$(tip rust)" \
-            "$rust/esdk-test-server/target/release/esdk-test-server" \
-            "$rust/esdk-test-server/.esdk-build-stamp"
+            "$rust/esdk/test-server/target/release/esdk-test-server" \
+            "$rust/esdk/test-server/.esdk-build-stamp"
           emit rustcpp rust-cpp "$(tip rust-cpp)" \
-            "$rustcpp/esdk-cpp-test-server/target/release/esdk-cpp-test-server" \
+            "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
-            "$rustcpp/esdk-cpp-test-server/.esdk-build-stamp"
+            "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
           ws() { local name="$1"; shift; { echo "ws_$name<<EOF"; printf '%s -> target\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"; }
-          ws rust "$rust/esdk-test-server"
-          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk-cpp-test-server"
+          ws rust "$rust/esdk/test-server"
+          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk/shims/aws-esdk-cpp/test-server"
           ws rustdafny "$esdk/esdk-test-servers/rust"
           echo "go_dir=$esdk/esdk-test-servers/go" >> "$GITHUB_OUTPUT"
           for language in java python javascript c; do
@@ -442,7 +501,7 @@ jobs:
   # Compiles each missing heavy server on its own runner, in parallel, and
   # caches its binary; the test job restores it and runs it there.
   prebuild:
-    needs: plan
+    needs: [resolve, plan]
     if: needs.plan.outputs.matrix != '[]'
     runs-on: ${{ inputs.runner }}
     strategy:
@@ -450,6 +509,7 @@ jobs:
       matrix:
         language: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       GRADLE_OPTS: -Dorg.gradle.daemon=false
@@ -462,15 +522,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
@@ -482,13 +547,34 @@ jobs:
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
+
+      - name: Set up JDK 17 (Temurin) for the smithy-dafny Gradle steps
+        # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator.
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Set up JDK 21 (Temurin) for the orchestrator
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Point the smithy-dafny Gradle steps at JDK 17
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        run: echo "TESTSERVER_CODEGEN_JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator)
         uses: actions/cache/restore@v4
@@ -515,8 +601,8 @@ jobs:
         if: startsWith(matrix.language, 'rust')
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Set up .NET (.NET library transpile + build)
-        if: matrix.language == 'net'
+      - name: Set up .NET (the Dafny tool; .NET library build)
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
@@ -527,18 +613,24 @@ jobs:
         # The highest installed SDK is not always the one dotnet resolves on
         # every runner image, so pin the 8.0 feature band for everything under
         # the runner workspace.
-        if: matrix.language == 'net'
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         run: |
           set -euo pipefail
           printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
           dotnet --version
 
-      - name: Install Dafny 4.9.0
-        if: matrix.language == 'net'
+      - name: Install Dafny (4.10.0 for the Rust transpile, 4.9.0 otherwise)
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
+        env:
+          DAFNY_VERSION: ${{ matrix.language == 'rust-dafny' && '4.10.0' || '4.9.0' }}
         run: |
           set -euo pipefail
-          dotnet tool install --global dafny --version 4.9.0
+          dotnet tool install --global dafny --version "$DAFNY_VERSION"
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Install goimports (the Dafny Go backend formats its output with it)
+        if: matrix.language == 'go'
+        run: go install golang.org/x/tools/cmd/goimports@v0.36.0
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -591,14 +683,46 @@ jobs:
         working-directory: esdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
-      - name: Initialize the .NET submodules
-        # The transpile outputs restore into the submodule checkouts.
-        if: matrix.language == 'net'
+      - name: Initialize the Dafny submodules
+        # The .NET transpile outputs restore into the submodule checkouts.
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
         run: |
           set -euo pipefail
           clone="$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}"
           git -C "$clone" submodule update --init --depth 1 libraries
           git -C "$clone" submodule update --init --recursive --depth 1 --jobs 8 mpl
+
+      - name: Restore the Rust transpile outputs
+        id: rustdafny-transpile
+        if: matrix.language == 'rust-dafny'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustdafnytranspile }}
+          key: ${{ needs.plan.outputs.key_rustdafnytranspile }}
+
+      - name: Restore the Go transpile outputs
+        id: go-transpile
+        if: matrix.language == 'go'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_gotranspile }}
+          key: ${{ needs.plan.outputs.key_gotranspile }}
+
+      - name: Install the smithy-dafny code generator dependencies (Rust codegen)
+        # Only polymorph_rust needs them, and it is skipped when the outputs restored.
+        if: matrix.language == 'rust-dafny' && steps.rustdafny-transpile.outputs.cache-hit != 'true'
+        env:
+          JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
+        run: make -C "$GITHUB_WORKSPACE/${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny" mvn_local_deploy_polymorph_dependencies
+
+      - name: Download the smithy-dafny Gradle wrapper
+        # The Makefile captures this wrapper's stdout in a $(shell) call; on a
+        # cold runner its download progress would land in the dafny command line.
+        if: contains(fromJSON('["rust-dafny","go"]'), matrix.language)
+        env:
+          JAVA_HOME: ${{ env.TESTSERVER_CODEGEN_JAVA_HOME }}
+        working-directory: ${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny/codegen
+        run: ./gradlew --version > /dev/null
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -654,6 +778,20 @@ jobs:
           path: ${{ needs.plan.outputs.paths_nettranspile }}
           key: ${{ needs.plan.outputs.key_nettranspile }}
 
+      - name: Save the Rust transpile outputs
+        if: matrix.language == 'rust-dafny' && steps.rustdafny-transpile.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_rustdafnytranspile }}
+          key: ${{ needs.plan.outputs.key_rustdafnytranspile }}
+
+      - name: Save the Go transpile outputs
+        if: matrix.language == 'go' && steps.go-transpile.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.paths_gotranspile }}
+          key: ${{ needs.plan.outputs.key_gotranspile }}
+
       - name: Pack the ${{ matrix.language }} server
         run: |
           set -euo pipefail
@@ -692,10 +830,11 @@ jobs:
   # the run.
   esdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: plan
+    needs: [resolve, plan]
     runs-on: ${{ inputs.runner }}
 
     env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
       # Default AWS region for the whole job so every step (and every JVM the
       # orchestrator forks) has a region. Overridable via the KMS region
@@ -722,15 +861,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          ref: ${{ needs.resolve.outputs.commons_ref }}
           token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
           token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
@@ -742,7 +886,16 @@ jobs:
         run: |
           printf '%s\n' '.*-build-stamp' 'target/' 'bin/' 'obj/' 'build/' '.build/' \
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
+            'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
