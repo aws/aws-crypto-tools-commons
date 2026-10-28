@@ -312,8 +312,7 @@ structure CreateAwsKmsHierarchicalKeyringRequest {
 
     /// How long fetched branch key materials stay in the cache.
     @required
-    @range(min: 1)
-    ttlSeconds: Long
+    ttl: Duration
 
     /// Handle of a previously-registered cache, used as the keyring's Shared
     /// cache. When absent the keyring creates its own default cache.
@@ -596,6 +595,18 @@ structure DecryptMaterialsResponse {
 // ===========================================================================
 // Shared shapes
 // ===========================================================================
+
+/// A span of time: seconds plus a sub-second nanosecond part. A server whose
+/// MPL takes whole seconds MUST answer a non-zero nanos with GenericServerError.
+structure Duration {
+    @required
+    @range(min: 0)
+    seconds: Long
+
+    @required
+    @range(min: 0, max: 999999999)
+    nanos: Integer
+}
 
 /// A single encrypted data key.
 structure EncryptedDataKey {

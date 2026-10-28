@@ -13,6 +13,7 @@ import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterials
 import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.Discovery;
+import aws.cryptography.mpl.testserver.client.model.Duration;
 import aws.cryptography.mpl.testserver.client.model.EncryptedDataKey;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
@@ -107,7 +108,7 @@ public class AwsKmsHierarchicalKeyringTest {
         Map.of(CASE_A, BRANCH_KEY_ID, CASE_B, BRANCH_KEY_ID_WITH_EC);
 
     /** 600 seconds, as the Dafny tests use. */
-    private static final long TTL_SECONDS = 600L;
+    private static final Duration TTL = Duration.builder().seconds(600L).nanos(0).build();
 
     /** The Dafny tests' TEST_ESDK_ALG_SUITE_ID: non-signing, 32-byte data key. */
     private static final AlgorithmSuiteId SUITE =
@@ -268,7 +269,7 @@ public class AwsKmsHierarchicalKeyringTest {
                 .keyStoreId(keyStoreId)
                 .branchKeyId(BRANCH_KEY_ID)
                 .branchKeyIdSupplier(supplier())
-                .ttlSeconds(TTL_SECONDS)
+                .ttl(TTL)
                 .build()));
     }
 
@@ -282,7 +283,7 @@ public class AwsKmsHierarchicalKeyringTest {
         assertThrows(MPLClientError.class, () -> client.createAwsKmsHierarchicalKeyring(
             CreateAwsKmsHierarchicalKeyringInput.builder()
                 .keyStoreId(keyStoreId)
-                .ttlSeconds(TTL_SECONDS)
+                .ttl(TTL)
                 .build()));
     }
 
@@ -565,7 +566,7 @@ public class AwsKmsHierarchicalKeyringTest {
         return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
             .keyStoreId(keyStoreId)
             .branchKeyId(keyStoreCase.branchKeyId())
-            .ttlSeconds(TTL_SECONDS));
+            .ttl(TTL));
     }
 
     private static String branchKeyKeyring(MPLTestServerClient client) {
@@ -573,7 +574,7 @@ public class AwsKmsHierarchicalKeyringTest {
         return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
             .keyStoreId(keyStoreId)
             .branchKeyId(BRANCH_KEY_ID)
-            .ttlSeconds(TTL_SECONDS));
+            .ttl(TTL));
     }
 
     private static String supplierKeyring(MPLTestServerClient client) {
@@ -581,7 +582,7 @@ public class AwsKmsHierarchicalKeyringTest {
         return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
             .keyStoreId(keyStoreId)
             .branchKeyIdSupplier(supplier())
-            .ttlSeconds(TTL_SECONDS));
+            .ttl(TTL));
     }
 
     /** @param partitionId the partition, or null to let the MPL generate one. */
@@ -591,7 +592,7 @@ public class AwsKmsHierarchicalKeyringTest {
         CreateAwsKmsHierarchicalKeyringInput.Builder builder = CreateAwsKmsHierarchicalKeyringInput.builder()
             .keyStoreId(keyStoreId)
             .branchKeyId(BRANCH_KEY_ID)
-            .ttlSeconds(TTL_SECONDS)
+            .ttl(TTL)
             .cacheId(cacheId);
         return createKeyring(client, partitionId == null ? builder : builder.partitionId(partitionId));
     }
