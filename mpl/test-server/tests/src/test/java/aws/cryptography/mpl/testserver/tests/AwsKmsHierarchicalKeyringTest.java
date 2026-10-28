@@ -58,7 +58,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  * <p>These tests are online. Every server needs AWS credentials with DynamoDB
  * GetItem on the branch key store table, and KMS Decrypt on KMS_KEY_ARN, the
- * postal horn branch key's KMS key, and the us-east-1 and us-west-2 replicas
+ * DISCOVERY_BRANCH_KEY_ID's KMS key, and the us-east-1 and us-west-2 replicas
  * of MRK_ID.
  */
 public class AwsKmsHierarchicalKeyringTest {
@@ -83,8 +83,8 @@ public class AwsKmsHierarchicalKeyringTest {
      * Fixtures.dfy postalHornBranchKeyId: its record names a KMS key other than
      * KMS_KEY_ARN, so only a Discovery key store can serve it.
      */
-    private static final String POSTAL_HORN_BRANCH_KEY_ID = "682dfba7-4c35-491d-8d6a-5a9c56194061";
-    private static final String POSTAL_HORN_BRANCH_KEY_ACTIVE_VERSION =
+    private static final String DISCOVERY_BRANCH_KEY_ID = "682dfba7-4c35-491d-8d6a-5a9c56194061";
+    private static final String DISCOVERY_BRANCH_KEY_ACTIVE_VERSION =
         "6b7a8ef4-8c1c-4f63-b196-a6ef7e496e50";
 
     /**
@@ -369,8 +369,8 @@ public class AwsKmsHierarchicalKeyringTest {
             // TestDiscoveryGetKeys: one Discovery key store serves branch keys
             // under two different KMS keys.
             new KeyStoreCase("discovery, " + BRANCH_KEY_ID, discovery(), KEY_STORE_REGION, BRANCH_KEY_ID),
-            new KeyStoreCase("discovery, postal horn", discovery(), KEY_STORE_REGION,
-                POSTAL_HORN_BRANCH_KEY_ID),
+            new KeyStoreCase("discovery, discovery branch key", discovery(), KEY_STORE_REGION,
+                DISCOVERY_BRANCH_KEY_ID),
             // TestGetKeysForMrk: MRDiscovery rewrites the record's us-east-1 ARN
             // into us-west-2, reaching the replica.
             new KeyStoreCase("mrDiscovery us-west-2, east branch key", mrDiscovery(KEY_STORE_REGION),
@@ -394,8 +394,8 @@ public class AwsKmsHierarchicalKeyringTest {
     static List<KeyStoreCase> rejectingCases() {
         return List.of(
             // A key store pinned to KMS_KEY_ARN rejects a record naming another key.
-            new KeyStoreCase("kmsKeyArn, postal horn", kmsKeyArn(KMS_KEY_ARN), KEY_STORE_REGION,
-                POSTAL_HORN_BRANCH_KEY_ID),
+            new KeyStoreCase("kmsKeyArn, discovery branch key", kmsKeyArn(KMS_KEY_ARN), KEY_STORE_REGION,
+                DISCOVERY_BRANCH_KEY_ID),
             // TestGetKeysForMrk: plain Discovery passes the us-east-1 ARN to a
             // us-west-2 client.
             new KeyStoreCase("discovery, east branch key", discovery(), KEY_STORE_REGION,
@@ -434,8 +434,8 @@ public class AwsKmsHierarchicalKeyringTest {
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
         EncryptedDataKey edk = encrypted.getEncryptedDataKeys().get(0);
         assertHierarchyEdk(edk, keyStoreCase.branchKeyId());
-        if (keyStoreCase.branchKeyId().equals(POSTAL_HORN_BRANCH_KEY_ID)) {
-            assertArrayEquals(uuidBytes(POSTAL_HORN_BRANCH_KEY_ACTIVE_VERSION), versionBytes(edk),
+        if (keyStoreCase.branchKeyId().equals(DISCOVERY_BRANCH_KEY_ID)) {
+            assertArrayEquals(uuidBytes(DISCOVERY_BRANCH_KEY_ACTIVE_VERSION), versionBytes(edk),
                 "the EDK carries the branch key's active version");
         }
 
