@@ -39,6 +39,8 @@ on:
 permissions:
   contents: read
   actions: read
+  # The reusable workflow's test job assumes an AWS role through GitHub OIDC.
+  id-token: write
 
 jobs:
   mpl:

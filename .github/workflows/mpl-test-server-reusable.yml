@@ -9,8 +9,17 @@
 # The java, net, and python servers build on the MPL's own source: each
 # transpiles AwsCryptographicMaterialProviders and its dependencies from Dafny
 # (smithy-dafny, Dafny 4.9.0) and builds that runtime. The go and rust-dafny servers build on
-# the MPL's committed generated code (releases/). The Tests are offline: no AWS
-# credentials are needed.
+# the MPL's committed generated code (releases/). The hierarchical keyring
+# Tests read branch keys from DynamoDB and unwrap them with KMS, so the test
+# job assumes an AWS role (see AWS CREDENTIALS); every other Test is offline.
+#
+# AWS CREDENTIALS: only the `mpl-test-server` job assumes a role, through
+# GitHub OIDC, so the calling workflow must grant `id-token: write`. The role
+# defaults to the one the MPL repository's CI uses,
+# GitHub-CI-MPL-Dafny-Role-us-west-2; a caller sets the MPL_TEST_SERVER_ROLE_ARN
+# repository variable to use another. A role the caller cannot assume leaves
+# the run without credentials rather than failing it: the offline Tests still
+# run, and the hierarchical keyring Tests fail on their first AWS call.
 #
 # JOBS: `plan` keys every server on its commit and lists the ones with no
 # prebuilt output; `prebuild` builds only
@@ -593,9 +602,15 @@ jobs:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: [resolve, plan]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      # GitHub OIDC, for the AWS credentials step.
+      id-token: write
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
+      MPL_TEST_SERVER_ROLE_ARN: ${{ vars.MPL_TEST_SERVER_ROLE_ARN || 'arn:aws:iam::370957321024:role/GitHub-CI-MPL-Dafny-Role-us-west-2' }}
     steps:
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
@@ -764,6 +779,17 @@ jobs:
             echo "::error::prebuilt servers not restored:$missing"
             exit 1
           fi
+
+      - name: Assume the AWS role for the hierarchical keyring Tests
+        # continue-on-error: a caller whose repository the role does not trust
+        # still runs the offline Tests; the hierarchical keyring Tests then
+        # fail on their first AWS call.
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.MPL_TEST_SERVER_ROLE_ARN }}
+          role-session-name: MPLTestServer
+          aws-region: us-west-2
 
       - name: Run the test suite (make orchestrate)
         # Launches every configured server (every library build skipped by its
