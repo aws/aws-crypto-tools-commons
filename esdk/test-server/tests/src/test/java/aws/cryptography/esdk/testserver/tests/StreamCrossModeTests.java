@@ -83,12 +83,14 @@ class StreamCrossModeTests {
             null, frameLength);
         assertArrayEquals(plaintext, EsdkOps.decrypt(pair.decryptEndpoint(), config, streamed),
             pair + ": one-shot decrypt of a multi-frame streamed-encrypted message must be exact");
-        assertArrayEquals(plaintext, EsdkOps.decryptStream(pair.decryptEndpoint(), config, streamed),
+        SignedStreamDecryptGate.decryptStream(pair, streamed, plaintext,
+            () -> EsdkOps.decryptStream(pair.decryptEndpoint(), config, streamed),
             pair + ": streamed decrypt of a multi-frame streamed-encrypted message must be exact");
 
         byte[] oneShot = EsdkOps.encrypt(pair.encryptEndpoint(), config, plaintext, Map.of(),
             null, frameLength);
-        assertArrayEquals(plaintext, EsdkOps.decryptStream(pair.decryptEndpoint(), config, oneShot),
+        SignedStreamDecryptGate.decryptStream(pair, oneShot, plaintext,
+            () -> EsdkOps.decryptStream(pair.decryptEndpoint(), config, oneShot),
             pair + ": streamed decrypt of a multi-frame one-shot message must be exact");
     }
 }

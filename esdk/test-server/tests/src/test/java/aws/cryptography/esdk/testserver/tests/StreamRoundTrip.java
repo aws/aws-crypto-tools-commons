@@ -79,11 +79,10 @@ public final class StreamRoundTrip {
             .clientId(decryptClientId)
             .ciphertext(ciphertext)
             .build();
-        ByteBuffer recovered =
-            TestServerClients.withRetry(() -> decryptClient.decryptStream(decryptRequest))
-                .getPlaintext();
-
-        return toArray(recovered);
+        return SignedStreamDecryptGate.decryptStream(pair, toArray(ciphertext), plaintext,
+            () -> toArray(TestServerClients.withRetry(() -> decryptClient.decryptStream(decryptRequest))
+                .getPlaintext()),
+            "decryptStream(encryptStream(plaintext)) must equal the original plaintext (" + pair + ")");
     }
 
     /**
@@ -138,11 +137,11 @@ public final class StreamRoundTrip {
             decryptInput.encryptionContext(encryptionContext);
         }
         DecryptStreamInput decryptRequest = decryptInput.build();
-        ByteBuffer recovered =
-            TestServerClients.withRetry(() -> decryptClient.decryptStream(decryptRequest))
-                .getPlaintext();
-
-        return toArray(recovered);
+        return SignedStreamDecryptGate.decryptStream(pair, toArray(ciphertext), plaintext,
+            () -> toArray(TestServerClients.withRetry(() -> decryptClient.decryptStream(decryptRequest))
+                .getPlaintext()),
+            "decryptStream(encryptStream(plaintext)) must equal the original plaintext (" + pair
+                + ", scenario: " + scenario.label() + ")");
     }
 
     private static byte[] toArray(ByteBuffer buffer) {

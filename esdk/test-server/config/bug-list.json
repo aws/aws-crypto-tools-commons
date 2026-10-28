@@ -68,6 +68,10 @@
     "default-cmm-ignores-reproduced-only-encryption-context": {
       "description": "the default CMM does not add reproduced encryption context pairs that are missing from the message header to the decryption materials (cmm-interface.md#decrypt-materials), so it cannot decrypt a message a required encryption context CMM wrote without that CMM",
       "ticketId": null
+    },
+    "stream-decrypt-rejects-multi-frame-signed-message": {
+      "description": "streamed decrypt rejects a multi-frame message with a signing algorithm suite instead of releasing its regular frames, and provides no option to enable it (decrypt.md#decrypt-the-message-body)",
+      "ticketId": null
     }
   }
 }
