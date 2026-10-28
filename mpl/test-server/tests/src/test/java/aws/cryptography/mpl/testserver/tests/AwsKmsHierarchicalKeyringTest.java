@@ -147,7 +147,7 @@ public class AwsKmsHierarchicalKeyringTest {
         MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
 
-        EncryptionMaterials encrypted = onEncrypt(enc, branchKeyKeyring(enc), initializeEncryption(enc, EC));
+        EncryptionMaterials encrypted = onEncrypt(enc, hierarchyKeyring(enc), initializeEncryption(enc, EC));
 
         assertEquals(DATA_KEY_LENGTH, bytes(encrypted.getPlaintextDataKey()).length);
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
@@ -156,7 +156,7 @@ public class AwsKmsHierarchicalKeyringTest {
         assertArrayEquals(uuidBytes(BRANCH_KEY_ACTIVE_VERSION), versionBytes(edk),
             "the EDK carries the branch key's active version");
 
-        DecryptionMaterials decrypted = onDecrypt(dec, branchKeyKeyring(dec),
+        DecryptionMaterials decrypted = onDecrypt(dec, hierarchyKeyring(dec),
             initializeDecryption(dec, EC), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
@@ -177,14 +177,14 @@ public class AwsKmsHierarchicalKeyringTest {
         EncryptionMaterials withKey = initializeEncryption(enc, EC).toBuilder()
             .plaintextDataKey(ByteBuffer.wrap(zeroedKey))
             .build();
-        EncryptionMaterials encrypted = onEncrypt(enc, branchKeyKeyring(enc), withKey);
+        EncryptionMaterials encrypted = onEncrypt(enc, hierarchyKeyring(enc), withKey);
 
         assertArrayEquals(zeroedKey, bytes(encrypted.getPlaintextDataKey()),
             "wrapping an existing data key must not replace it");
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
         assertHierarchyEdk(encrypted.getEncryptedDataKeys().get(0), BRANCH_KEY_ID);
 
-        DecryptionMaterials decrypted = onDecrypt(dec, branchKeyKeyring(dec),
+        DecryptionMaterials decrypted = onDecrypt(dec, hierarchyKeyring(dec),
             initializeDecryption(dec, EC), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(zeroedKey, bytes(decrypted.getPlaintextDataKey()));
@@ -568,7 +568,7 @@ public class AwsKmsHierarchicalKeyringTest {
             .ttlSeconds(TTL_SECONDS));
     }
 
-    private static String branchKeyKeyring(MPLTestServerClient client) {
+    private static String hierarchyKeyring(MPLTestServerClient client) {
         String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
         return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
             .keyStoreId(keyStoreId)
