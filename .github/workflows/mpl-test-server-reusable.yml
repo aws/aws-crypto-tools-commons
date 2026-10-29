@@ -15,8 +15,9 @@
 # JOBS: `plan` keys every server on its commit and lists the ones with no
 # prebuilt output; `prebuild` builds only
 # those, one runner each, and publishes each output as an artifact named by its
-# key; `mpl-test-server` does its setup in parallel with `prebuild`,
-# waits for it, fetches every output into its clone, and runs the Tests. The
+# key; `mpl-test-server` starts once `prebuild` has finished (or was skipped
+# because nothing needed building), fetches every output into its clone, and
+# runs the Tests. The
 # build stamps make every fetched server launch without rebuilding, so the
 # test job needs neither Dafny nor the Rust, Go, or smithy-dafny toolchains.
 # Each Dafny transpile runs alone on its own runner.
@@ -587,11 +588,17 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
 
-  # Starts alongside the prebuild job; its setup overlaps the builds, and it
-  # waits for their outputs just before the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   mpl-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: [resolve, plan]
+    needs: [resolve, plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.resolve.result == 'success'
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
     runs-on: ubuntu-latest
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
@@ -687,32 +694,6 @@ jobs:
         # stamp then skips its build.
         working-directory: mpl/test-server
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
-
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 3600))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = "done" ] && break
-              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
 
       - name: Fetch the prebuilt servers into their clones
         env:
