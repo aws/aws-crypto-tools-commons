@@ -36,10 +36,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       against the header: the exact context recovers the plaintext, a mismatched
  *       value is rejected
  *       ({@code spec/client-apis/decrypt.md#get-the-decryption-materials}). Runs over
- *       the cross-language pairwise matrix. The EC-023 superset rejection and the
- *       EC-022 subset acceptance assert only the decryptor's Default-CMM reproduced
- *       encryption context handling, so they run decrypt-side
- *       ({@link ReferenceImplementation#decryptSide}) gated on
+ *       the cross-language pairwise matrix. The superset, subset, and unrelated-key
+ *       tests decrypt with Raw-AES, so the decryptor is gated on
  *       {@code default-cmm-reproduced-encryption-context}.</li>
  * </ul>
  *
@@ -64,16 +62,11 @@ class EncryptionContextBehaviorTests {
         return LanguageServerRegistry.shared().pairs();
     }
 
-    /** The producer leg needs only Raw-AES; the reproduced-EC capability gates per decryptor. */
-    static List<ReferencePair> decryptSide() {
-        return ReferenceImplementation.decryptSide(Set.of("raw-aes"));
-    }
-
     /**
-     * Gate a decrypt-side row: the reference produces a plain Raw-AES message; the decryptor
-     * additionally needs its Default CMM to accept reproduced encryption context on decrypt.
+     * The encryptor makes a plain Raw-AES message.
+     * The decryptor also needs its Default CMM to accept reproduced encryption context.
      */
-    private static void requireReproducedEcRow(ReferencePair pair) {
+    private static void requireReproducedEcRow(TargetPair pair) {
         FeatureGate.require(Set.of("raw-aes"),
             new TargetPair(pair.encryptTarget(), pair.encryptTarget()));
         FeatureGate.require(Set.of("raw-aes", "default-cmm-reproduced-encryption-context"),
@@ -147,11 +140,11 @@ class EncryptionContextBehaviorTests {
      * header's — an extra pair the message was not encrypted with. The Default CMM appends the
      * reproduced-only pair to the decryption materials, so the keyring unwraps under a context
      * the wrapping never bound and the data-key unwrap fails. Dafny parity
-     * (TestReproducedEncryptionContext.TestEncryptionContextOnDecryptFailure). Decrypt-side.
+     * (TestReproducedEncryptionContext.TestEncryptionContextOnDecryptFailure). Cross-language matrix.
      */
     @ParameterizedTest(name = "reproducedEcSupersetRejected {0}")
-    @MethodSource("decryptSide")
-    void decryptRejectsSupersetReproducedContext(ReferencePair pair) {
+    @MethodSource("pairs")
+    void decryptRejectsSupersetReproducedContext(TargetPair pair) {
         requireReproducedEcRow(pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         Map<String, String> ec = Map.of("purpose", "test");
@@ -166,13 +159,11 @@ class EncryptionContextBehaviorTests {
     /**
      * EC-022: a message that stored all encryption context in the header decrypts when a strict
      * subset of that context is reproduced — every reproduced pair matches the header, so the
-     * materials keep the full header context and the unwrap succeeds. Dafny parity
-     * (TestRequiredEncryptionContext.TestRemoveOnDecryptIsBackwardsCompatibleHappyCase, minus the
-     * required-EC CMM). Decrypt-side.
+     * materials keep the full header context and the unwrap succeeds. Cross-language matrix.
      */
     @ParameterizedTest(name = "reproducedEcSubsetDecrypts {0}")
-    @MethodSource("decryptSide")
-    void decryptSucceedsWithSubsetReproducedContext(ReferencePair pair) {
+    @MethodSource("pairs")
+    void decryptSucceedsWithSubsetReproducedContext(TargetPair pair) {
         requireReproducedEcRow(pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
@@ -182,6 +173,24 @@ class EncryptionContextBehaviorTests {
         assertArrayEquals(PLAINTEXT, recovered,
             "decrypt reproducing a strict subset of the header's encryption context must recover "
                 + "the plaintext (" + pair + ")");
+    }
+
+    /**
+     * Decrypt fails when the reproduced context holds only a key that the message does not have.
+     * Dafny parity (TestRequiredEncryptionContext.TestDifferentECOnDecryptFailure). Cross-language matrix.
+     */
+    @ParameterizedTest(name = "reproducedEcUnrelatedKeyRejected {0}")
+    @MethodSource("pairs")
+    void decryptRejectsUnrelatedReproducedContext(TargetPair pair) {
+        requireReproducedEcRow(pair);
+        ESDKClientConfig config = EsdkClientConfigs.rawAes();
+        Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
+        Map<String, String> unrelated = Map.of("region", "us-west-2");
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, unrelated),
+            "decrypt reproducing only a key that the message does not have must be rejected "
+                + "as an ESDKClientError (" + pair + ")");
     }
 
     /**
