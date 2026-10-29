@@ -10,9 +10,9 @@
 #   prebuild compiles only those servers, one per runner, and saves each built
 #            binary as a workflow artifact named after its source commit.
 #   dbesdk-test-server
-#            runs at the same time as prebuild: it does its own setup and builds
-#            the fast java server, then waits for prebuild, downloads each
-#            pre-built binary into its source tree, and runs the tests. A small
+#            runs once prebuild has finished (or was skipped because nothing
+#            needed building): it does its own setup, builds the fast java
+#            server, downloads each pre-built binary into its source tree, and runs the tests. A small
 #            build-stamp file saved beside each binary lets a downloaded server
 #            start without being recompiled.
 #
@@ -394,11 +394,16 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
 
-  # Starts alongside the prebuild job; its setup and the java build overlap the
-  # heavy builds, and it waits for their outputs just before the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   dbesdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: plan
+    needs: [plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
     runs-on: ubuntu-latest
 
     env:
@@ -552,32 +557,6 @@ jobs:
         with:
           path: ${{ needs.plan.outputs.dir_java }}
           key: ${{ runner.os }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
-
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 2700))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = "done" ] && break
-              if [ "$state" = "failed" ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
 
       - name: Materialize the sources (clones only)
         # The prebuilt outputs restore into these clones; each server's build

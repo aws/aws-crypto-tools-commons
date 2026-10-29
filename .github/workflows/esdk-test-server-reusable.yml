@@ -28,9 +28,9 @@
 # JOBS: `plan` keys each heavy server (net, rust, rust-cpp, rust-dafny, go)
 # on its commit and lists the ones with no prebuilt binary; `prebuild`
 # compiles only those, one runner each, and publishes each binary as an
-# artifact named by its key; `esdk-test-server` does its setup and the light
-# server builds in parallel with `prebuild`, waits for it, fetches every
-# heavy binary into its clones, and runs the Tests. The build stamps make
+# artifact named by its key; `esdk-test-server` starts once `prebuild` has
+# finished (or was skipped because nothing needed building), builds the light
+# servers, fetches every heavy binary into its clones, and runs the Tests. The build stamps make
 # every fetched server launch without rebuilding.
 #
 # Prebuilt binaries are artifacts, found by name in the calling repository and
@@ -802,12 +802,17 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
 
-  # Starts alongside the prebuild job; its setup and the light server builds
-  # overlap the heavy builds, and it waits for their outputs just before
-  # the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   esdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: [resolve, plan]
+    needs: [resolve, plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.resolve.result == 'success'
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
     runs-on: ubuntu-latest
 
     env:
@@ -1303,32 +1308,6 @@ jobs:
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
         run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=launch"
-
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 2700))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = done ] && break
-              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
 
       - name: Materialize the sources (clones only)
         # The prebuilt outputs restore into these clones; each server's build
