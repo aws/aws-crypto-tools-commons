@@ -299,6 +299,8 @@ jobs:
       - name: Set up the Rust toolchain
         if: matrix.language == 'rust'
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
       - name: Set up Go (aws-lc-sys native build)
         if: matrix.language == 'rust'
@@ -466,6 +468,8 @@ jobs:
 
       - name: Set up the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
       - name: Set up Go
         # Only used to build the rust server's aws-lc-sys native code.
