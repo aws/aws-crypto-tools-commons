@@ -68,6 +68,7 @@ jobs:
     name: TestServer
     uses: ./.github/workflows/dbesdk-test-server-reusable.yml
     with:
+      runner: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
       focus: ${{ inputs.focus || '' }}
       languages: ${{ inputs.languages || '' }}
       commons-ref: ${{ inputs.commons-ref || '' }}

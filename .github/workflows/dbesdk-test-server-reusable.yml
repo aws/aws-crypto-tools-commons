@@ -71,6 +71,12 @@ on:
           restores them.
         type: boolean
         default: false
+      runner:
+        description: >-
+          Runner label for every job. Callers on CodeBuild-hosted runners pass
+          codebuild-<project>-<run_id>-<run_attempt>.
+        type: string
+        default: ubuntu-latest
 
 # Callers must grant these.
 permissions:
@@ -98,8 +104,9 @@ jobs:
   # binary, so the prebuild job compiles only those.
   plan:
     name: find servers to prebuild
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       net_dir: ${{ steps.keys.outputs.net_dir }}
@@ -133,12 +140,20 @@ jobs:
           git config --global \
             url."https://github.com/".insteadOf "git@github.com:"
 
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's branch tip; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>) at the server's
         # serverLocation.path.
         id: keys
+        env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
         run: |
           set -euo pipefail
           config=dbesdk/test-server/config/server-config.json
@@ -153,7 +168,8 @@ jobs:
           own=""
           if [ -n "$DBE_REPOSITORY" ]; then
             own=$(basename "$DBE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/.dbe-product-repo" >> "$GITHUB_OUTPUT"
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/.dbe-product-repo" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
           from_checkout() {
@@ -183,7 +199,7 @@ jobs:
             local name="$1" language="$2" key="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           net=$(server net); rust=$(server rust)
@@ -245,7 +261,7 @@ jobs:
   prebuild:
     needs: plan
     if: needs.plan.outputs.matrix != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -280,10 +296,7 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: matrix.language == 'rust'
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Go (aws-lc-sys native build)
         if: matrix.language == 'rust'
@@ -298,6 +311,16 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: matrix.language == 'net'
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Rewrite the DBE repo SSH URL to public HTTPS
         # config/server-config.json gives the servers' source as SSH URLs and
@@ -315,19 +338,19 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-dbesdk-gradle-v1-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'dbesdk/test-server/*/build.gradle.kts',
               'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-dbesdk-gradle-v1-
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-
 
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
         working-directory: dbesdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and the workspace's Cargo.lock; our own crates
@@ -336,6 +359,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: dbesdk-${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ needs.plan.outputs.ws_rust }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -345,15 +369,15 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-dbesdk-nuget-
+            ${{ needs.plan.outputs.platform }}-dbesdk-nuget-
 
       - name: Build the ${{ matrix.language }} server and check it starts
         working-directory: dbesdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Pack the ${{ matrix.language }} server
         run: |
@@ -380,7 +404,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-dbesdk-gradle-v1-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'dbesdk/test-server/*/build.gradle.kts',
@@ -392,14 +416,14 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
 
   # Starts alongside the prebuild job; its setup and the java build overlap the
   # heavy builds, and it waits for their outputs just before the run.
   dbesdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
 
     env:
       OVERLAY: ${{ needs.plan.outputs.overlay }}
@@ -439,11 +463,7 @@ jobs:
           java-version: "21"
 
       - name: Set up the Rust toolchain
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          cargo --version
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Go
         # Only used to build the rust server's aws-lc-sys native code.
@@ -459,6 +479,15 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
       - name: Restore the Gradle caches (orchestrator + Java server)
         id: gradle-cache
         uses: actions/cache/restore@v4
@@ -467,14 +496,14 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-dbesdk-gradle-v1-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'dbesdk/test-server/*/build.gradle.kts',
               'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-dbesdk-gradle-v1-
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-
 
       - name: Install Smithy CLI
         # Needed by `make validate`; pinned official release.
@@ -506,7 +535,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ needs.plan.outputs.dir_java }}
-          key: ${{ runner.os }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
 
       - name: Configure AWS credentials via OIDC
         # Don't fail here; the next step reports a clear reason. The common case is a
@@ -542,7 +571,7 @@ jobs:
         working-directory: dbesdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=java stopAfter=launch"
 
       - name: Save the materialized java clone
         # Saved before the heavy servers are fetched into the same clone, so the
@@ -551,7 +580,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ needs.plan.outputs.dir_java }}
-          key: ${{ runner.os }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
 
       - name: Wait for the prebuilt servers
         # Each server the plan found missing is published by its prebuild job;
@@ -583,7 +612,7 @@ jobs:
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
         working-directory: dbesdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
       - name: Fetch the prebuilt servers into their clones
         env:
@@ -646,7 +675,7 @@ jobs:
         # so it is the single source of the overlay — passing DBESDK_DBE_REPO too
         # would duplicate the workingTreeOverlay token.
         run: |
-          make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${LANGUAGES:+languages=$LANGUAGES} ${FOCUS:+focus=$FOCUS}"
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${LANGUAGES:+languages=$LANGUAGES} ${FOCUS:+focus=$FOCUS}"
 
       - name: Publish test results to the run summary
         if: always()
@@ -678,7 +707,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-dbesdk-gradle-v1-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'dbesdk/test-server/*/build.gradle.kts',
