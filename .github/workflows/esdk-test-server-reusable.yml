@@ -165,6 +165,14 @@ on:
           restores them.
         type: boolean
         default: false
+      runner:
+        description: >-
+          Runner label for every job. Defaults to this repo's CodeBuild runner.
+          Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label, because a CodeBuild
+          project only picks up jobs from the repo it is connected to.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
     secrets:
       repo-pat:
         description: >-
@@ -195,7 +203,7 @@ jobs:
   # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
   resolve:
     name: resolve refs
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     outputs:
       commons_ref: ${{ steps.refs.outputs.commons_ref }}
       language_repository: ${{ steps.refs.outputs.language_repository }}
@@ -228,11 +236,12 @@ jobs:
   # binary, so the prebuild job compiles only those.
   plan:
     name: find servers to prebuild
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     needs: resolve
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       esdk_dir: ${{ steps.keys.outputs.esdk_dir }}
@@ -347,12 +356,19 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's branch tip; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>).
         id: keys
         env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -368,7 +384,8 @@ jobs:
           own=""
           if [ -n "$LANGUAGE_REPOSITORY" ]; then
             own=$(basename "$LANGUAGE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
           from_checkout() {
@@ -397,7 +414,7 @@ jobs:
             local name="$1" language="$2" key="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
@@ -488,7 +505,7 @@ jobs:
   prebuild:
     needs: [resolve, plan]
     if: needs.plan.outputs.matrix != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -567,14 +584,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-v2-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-v2-
+            ${{ needs.plan.outputs.platform }}-gradle-v2-
 
       - name: Set up Go (Go server; aws-lc-sys native builds)
         if: matrix.language != 'net'
@@ -584,10 +601,7 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up .NET (the Dafny tool; .NET library build)
         if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
@@ -596,6 +610,16 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Install Dafny (4.10.0 for the Rust transpile, 4.9.0 otherwise)
         if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
@@ -659,7 +683,7 @@ jobs:
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
         working-directory: esdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
       - name: Initialize the Dafny submodules
         # The .NET transpile outputs restore into the submodule checkouts.
@@ -709,6 +733,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -720,9 +745,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ needs.plan.outputs.platform }}-go-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -730,9 +755,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
+            ${{ needs.plan.outputs.platform }}-nuget-
 
       - name: Restore the .NET transpile outputs
         id: net-transpile
@@ -746,7 +771,7 @@ jobs:
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Save the .NET transpile outputs
         if: matrix.language == 'net' && steps.net-transpile.outputs.cache-hit != 'true'
@@ -793,14 +818,14 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
 
   # Starts alongside the prebuild job; its setup and the light server builds
   # overlap the heavy builds, and it waits for their outputs just before
@@ -808,7 +833,7 @@ jobs:
   esdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: [resolve, plan]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
 
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
@@ -913,6 +938,14 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
       - name: Set up .NET (for the .NET Language_Server build)
         # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
         # library and server inside the aws-encryption-sdk clone. 6.0 + 8.0
@@ -923,6 +956,15 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Restore the Gradle caches (orchestrator + Java server)
         # Gradle: the client-java/tests/orchestrator builds under
@@ -942,14 +984,14 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-gradle-v2-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-v2-
+            ${{ needs.plan.outputs.platform }}-gradle-v2-
 
       - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
         # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
@@ -1057,7 +1099,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ needs.plan.outputs.platform }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Restore the materialized aws-encryption-sdk-c clone
         # The clone carries the cmake build tree (test-server/.build); on a
@@ -1067,7 +1109,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
         # The clone carries the server's Gradle outputs, and the local Maven
@@ -1079,7 +1121,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Restore the materialized aws-encryption-sdk-python clone + venv
         # The venv holds editable installs of the clone and its build stamp,
@@ -1090,7 +1132,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -1206,7 +1248,7 @@ jobs:
       - name: Materialize the java, python, javascript, and c sources
         # The dependency caches below are keyed on these clones' lockfiles.
         working-directory: esdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=java,python,javascript,c stopAfter=materialize"
 
       # Dependency caches, keyed on each language's lockfiles so they carry
       # across branches and commits; only the code under test rebuilds.
@@ -1232,27 +1274,33 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-m2-${{ steps.depkeys.outputs.java }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ needs.plan.outputs.platform }}-m2-
 
       - name: Restore the npm downloads (javascript)
         id: npm-deps
         uses: actions/cache/restore@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
+          key: ${{ needs.plan.outputs.platform }}-npm-${{ steps.depkeys.outputs.javascript }}
           restore-keys: |
-            ${{ runner.os }}-npm-
+            ${{ needs.plan.outputs.platform }}-npm-
 
       - name: Restore the pip downloads (python)
         id: pip-deps
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
+          key: ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
           restore-keys: |
-            ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-
+            ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-
+
+      - name: Install cmake and ccache (c)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake ccache >/dev/null
 
       - name: Resolve the aws-c-common commit (c)
         id: awscc
@@ -1263,7 +1311,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.aws-c-common-install
-          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+          key: ${{ needs.plan.outputs.platform }}-aws-c-common-${{ steps.awscc.outputs.sha }}
 
       - name: Build aws-c-common (c)
         # CLaunchPlan's cmake configure needs an aws-c-common install;
@@ -1280,7 +1328,6 @@ jobs:
       - name: Set up ccache (c)
         run: |
           set -euo pipefail
-          sudo apt-get install -y -qq ccache >/dev/null
           {
             echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install"
             echo "CCACHE_DIR=${{ github.workspace }}/.ccache"
@@ -1293,16 +1340,16 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-ccache-
+            ${{ needs.plan.outputs.platform }}-ccache-
 
       - name: Build the java, python, javascript, and c servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=java,python,javascript,c stopAfter=launch"
 
       - name: Wait for the prebuilt servers
         # Each server the plan found missing is published by its prebuild job;
@@ -1334,7 +1381,7 @@ jobs:
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
         working-directory: esdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
       - name: Fetch the prebuilt servers into their clones
         env:
@@ -1345,6 +1392,7 @@ jobs:
           KEY_go: ${{ needs.plan.outputs.key_go }}
           KEY_rust: ${{ needs.plan.outputs.key_rust }}
           KEY_rustcpp: ${{ needs.plan.outputs.key_rustcpp }}
+          PATHS_rustcpp: ${{ needs.plan.outputs.paths_rustcpp }}
         run: |
           set -euo pipefail
           # This run's token reads this repository; the PAT reads commons.
@@ -1371,6 +1419,13 @@ jobs:
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
             tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
           done
+          # The rust-cpp server's rpath names the shim directory of the runner
+          # that built it, so name this runner's copy on the library path.
+          while IFS= read -r path; do
+            case "$path" in
+              *.so) echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/$(dirname "$path")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV" ;;
+            esac
+          done <<<"$PATHS_rustcpp"
 
       - name: Check every prebuilt server arrived
         # A server missing here would be built cold inside the test run.
@@ -1420,7 +1475,7 @@ jobs:
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
           ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
@@ -1458,35 +1513,35 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-m2-${{ steps.depkeys.outputs.java }}
 
       - name: Save the npm downloads (javascript)
         if: always() && env.SAVE_CACHES == 'true' && steps.npm-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
+          key: ${{ needs.plan.outputs.platform }}-npm-${{ steps.depkeys.outputs.javascript }}
 
       - name: Save the pip downloads (python)
         if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
+          key: ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
 
       - name: Save the aws-c-common install (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.awscc-install.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.aws-c-common-install
-          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+          key: ${{ needs.plan.outputs.platform }}-aws-c-common-${{ steps.awscc.outputs.sha }}
 
       - name: Save the C compiler cache (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.ccache-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
 
       - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
@@ -1496,7 +1551,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-gradle-v2-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
@@ -1508,14 +1563,14 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ needs.plan.outputs.platform }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Save the materialized aws-encryption-sdk-c clone
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-c.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
@@ -1524,7 +1579,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Save the materialized aws-encryption-sdk-python clone + venv
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-python.outputs.cache-hit != 'true'
@@ -1533,5 +1588,5 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
