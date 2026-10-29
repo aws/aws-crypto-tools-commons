@@ -26,13 +26,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "jocorell/mpl-test-server-java",
+        "branch": "main",
         "path": "AwsCryptographicMaterialProviders/runtimes/java"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "jocorell/mpl-test-server-java",
+        "ref": "main",
         "path": "test-server/mpl/java-v1-server"
       }
     },
@@ -44,13 +44,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "jocorell/mpl-test-server-java",
+        "branch": "main",
         "path": "AwsCryptographicMaterialProviders/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "jocorell/mpl-test-server-java",
+        "ref": "main",
         "path": "test-server/mpl/net-v2-server"
       }
     },
@@ -62,13 +62,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "jocorell/mpl-test-server-java",
+        "branch": "main",
         "path": "AwsCryptographicMaterialProviders/runtimes/python"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "jocorell/mpl-test-server-java",
+        "ref": "main",
         "path": "test-server/mpl/python-v1-server"
       }
     },
@@ -80,13 +80,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "jocorell/mpl-test-server-java",
+        "branch": "main",
         "path": "releases/go/mpl"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "jocorell/mpl-test-server-java",
+        "ref": "main",
         "path": "test-server/mpl/go-v1-server"
       }
     },
@@ -98,13 +98,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "jocorell/mpl-test-server-java",
+        "branch": "main",
         "path": "releases/rust/mpl"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "jocorell/mpl-test-server-java",
+        "ref": "main",
         "path": "test-server/mpl/rust-dafny-v1-server"
       }
     },
@@ -116,13 +116,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "aws-crypto-rust/mpl-test-server",
+        "branch": "main",
         "path": "mpl"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "aws-crypto-rust/mpl-test-server",
+        "ref": "main",
         "path": "mpl-test-server"
       }
     }

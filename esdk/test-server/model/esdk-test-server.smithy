@@ -514,6 +514,11 @@ structure CachingCmmConfig {
 
     /// Optional cap on messages encrypted under a single data key.
     limitMessages: Long
+
+    /// Optional name of a materials cache shared by every client created on the
+    /// same Language_Server with this name; without it, each client has its own
+    /// cache. Caching CMMs sharing a cache and a partitionId share cache entries.
+    sharedCacheName: String
 }
 
 list EncryptionContextKeys {
@@ -549,11 +554,17 @@ structure Keyring {
     /// AWS KMS RSA keyring (aws-kms-rsa-keyring.md).
     AwsKmsRsa: AwsKmsRsaKeyringConfig
 
+    /// AWS KMS ECDH keyring (aws-kms-ecdh-keyring.md).
+    AwsKmsEcdh: AwsKmsEcdhKeyringConfig
+
     /// Raw AES keyring (raw-aes-keyring.md).
     RawAes: RawAesKeyringConfig
 
     /// Raw RSA keyring (raw-rsa-keyring.md).
     RawRsa: RawRsaKeyringConfig
+
+    /// Raw ECDH keyring (raw-ecdh-keyring.md).
+    RawEcdh: RawEcdhKeyringConfig
 
     /// AWS KMS Hierarchical keyring: branch keys in a DynamoDB key store wrapped
     /// by a KMS key (aws-kms-hierarchical-keyring.md).
@@ -629,6 +640,50 @@ structure AwsKmsRsaKeyringConfig {
     grantTokens: GrantTokenList
 }
 
+/// AWS KMS ECDH keyring (aws-kms-ecdh-keyring.md). The KMS client is
+/// constructed server-side.
+structure AwsKmsEcdhKeyringConfig {
+    @required
+    keyAgreementScheme: KmsEcdhKeyAgreementScheme
+
+    @required
+    curveSpec: EcdhCurveSpec
+
+    grantTokens: GrantTokenList
+}
+
+/// The AWS KMS ECDH key agreement scheme. Exactly one member is expected to be
+/// set at runtime (Requirements 2.2, 2.3, 2.4).
+structure KmsEcdhKeyAgreementScheme {
+    /// Derive the shared secret from the sender's KMS ECC key and the
+    /// recipient's static public key.
+    KmsPrivateKeyToStaticPublicKey: KmsPrivateKeyToStaticPublicKeyConfig
+
+    /// Decrypt-only: derive the shared secret from the recipient's KMS ECC key
+    /// and the sender public key stored in each encrypted data key.
+    KmsPublicKeyDiscovery: KmsPublicKeyDiscoveryConfig
+}
+
+structure KmsPrivateKeyToStaticPublicKeyConfig {
+    /// The sender's KMS ECC key (KeyUsage KEY_AGREEMENT): key id, ARN, or alias.
+    @required
+    senderKmsIdentifier: String
+
+    /// The sender's DER-encoded public key (X.509 SubjectPublicKeyInfo). When
+    /// absent, the server fetches it with kms:GetPublicKey.
+    senderPublicKey: Blob
+
+    /// The recipient's DER-encoded public key (X.509 SubjectPublicKeyInfo).
+    @required
+    recipientPublicKey: Blob
+}
+
+structure KmsPublicKeyDiscoveryConfig {
+    /// The recipient's KMS ECC key (KeyUsage KEY_AGREEMENT): key id, ARN, or alias.
+    @required
+    recipientKmsIdentifier: String
+}
+
 /// Optional account/partition scoping for discovery keyrings.
 structure DiscoveryFilter {
     @required
@@ -694,6 +749,60 @@ structure RawRsaKeyringConfig {
 
     /// PEM-encoded private key (PKCS#8 PrivateKeyInfo).
     privateKey: Blob
+}
+
+/// Raw ECDH keyring (raw-ecdh-keyring.md).
+structure RawEcdhKeyringConfig {
+    @required
+    keyAgreementScheme: RawEcdhKeyAgreementScheme
+
+    @required
+    curveSpec: EcdhCurveSpec
+}
+
+/// The raw ECDH key agreement scheme. Exactly one member is expected to be set
+/// at runtime (Requirements 2.2, 2.3, 2.4).
+structure RawEcdhKeyAgreementScheme {
+    /// Derive the shared secret from the sender's static private key and the
+    /// recipient's static public key.
+    RawPrivateKeyToStaticPublicKey: RawPrivateKeyToStaticPublicKeyConfig
+
+    /// Encrypt-only: derive the shared secret from a fresh ephemeral key pair
+    /// and the recipient's static public key.
+    EphemeralPrivateKeyToStaticPublicKey: EphemeralPrivateKeyToStaticPublicKeyConfig
+
+    /// Decrypt-only: derive the shared secret from the recipient's static
+    /// private key and the sender public key stored in each encrypted data key.
+    PublicKeyDiscovery: PublicKeyDiscoveryConfig
+}
+
+structure RawPrivateKeyToStaticPublicKeyConfig {
+    /// PEM-encoded sender private key (PKCS#8 PrivateKeyInfo).
+    @required
+    senderStaticPrivateKey: Blob
+
+    /// DER-encoded recipient public key (X.509 SubjectPublicKeyInfo).
+    @required
+    recipientPublicKey: Blob
+}
+
+structure EphemeralPrivateKeyToStaticPublicKeyConfig {
+    /// DER-encoded recipient public key (X.509 SubjectPublicKeyInfo).
+    @required
+    recipientPublicKey: Blob
+}
+
+structure PublicKeyDiscoveryConfig {
+    /// PEM-encoded recipient private key (PKCS#8 PrivateKeyInfo).
+    @required
+    recipientStaticPrivateKey: Blob
+}
+
+enum EcdhCurveSpec {
+    ECC_NIST_P256
+    ECC_NIST_P384
+    ECC_NIST_P521
+    SM2
 }
 
 enum PaddingScheme {

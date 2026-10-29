@@ -1,0 +1,717 @@
+# DB-ESDK TestServer CI (aws-crypto-tools-commons). Called by
+# dbesdk-test-server.yml. Runs the three DB-ESDK servers (java-v3, rust-v1,
+# net-v4), which all live in the public aws-database-encryption-sdk-dynamodb
+# repository and use the published DB-ESDK libraries, so there is no Dafny
+# build.
+#
+# Jobs:
+#   plan     identifies the slow-to-compile servers (net, rust) by their source
+#            commit and lists the ones that have no already-built binary saved.
+#   prebuild compiles only those servers, one per runner, and saves each built
+#            binary as a workflow artifact named after its source commit.
+#   dbesdk-test-server
+#            runs at the same time as prebuild: it does its own setup and builds
+#            the fast java server, then waits for prebuild, downloads each
+#            pre-built binary into its source tree, and runs the tests. A small
+#            build-stamp file saved beside each binary lets a downloaded server
+#            start without being recompiled.
+#
+# Pre-built binaries are kept as workflow artifacts and found by name, first in
+# the calling repository and then in commons. Unlike a cache, an artifact is
+# not evicted when other workflows store their own caches.
+#
+# The tests call real AWS KMS and a DynamoDB keystore, so the test job takes on
+# an IAM role through GitHub OIDC and fails early, with a clear message, if that
+# role cannot be assumed. The prebuild job is given no AWS credentials.
+
+name: DB-ESDK TestServer
+
+on:
+  workflow_call:
+    inputs:
+      commons-ref:
+        description: >-
+          The aws-crypto-tools-commons ref (branch, tag, or commit) to check out
+          — the tests, model, orchestrator, and config. Leave empty to use the
+          commit that triggered the run.
+        type: string
+        default: ""
+      dbe-repository:
+        description: >-
+          owner/name of the DB-ESDK repository whose servers to test from its
+          checkout instead of their configured branch. Defaults to the calling
+          repository when that is not aws-crypto-tools-commons.
+        type: string
+        default: ""
+      dbe-ref:
+        description: >-
+          The dbe-repository ref whose servers to test. Defaults to the calling
+          commit; empty on a commons run clones each server at the ref pinned in
+          config/server-config.json.
+        type: string
+        default: ""
+      focus:
+        description: >-
+          Comma-separated languages under test (e.g. "rust"). Every server
+          still launches; only the pairs with a focus language on either leg
+          run. Empty runs the full matrix.
+        type: string
+        default: ""
+      languages:
+        description: >-
+          Comma-separated languages to launch (e.g. "java,rust"); the others
+          are neither built nor launched. Empty launches every configured
+          language.
+        type: string
+        default: ""
+      save-caches:
+        description: >-
+          Save the dependency caches from this run. They are saved from the
+          default branch (push and schedule) by default; every other ref only
+          restores them.
+        type: boolean
+        default: false
+      runner:
+        description: >-
+          Runner label for every job. Defaults to this repo's CodeBuild runner.
+          Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label, because a CodeBuild
+          project only picks up jobs from the repo it is connected to.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+
+# Callers must grant these.
+permissions:
+  contents: read
+  # The plan and test jobs read this run's jobs and the prebuilt-server
+  # artifacts.
+  actions: read
+  # For the KMS OIDC token exchange.
+  id-token: write
+
+env:
+  # The DB-ESDK repository whose checkout replaces its servers' configured
+  # branch. Defaults to the calling repository when that is not commons, so a
+  # caller tests its own code instead of the configured branch.
+  DBE_REPOSITORY: ${{ inputs.dbe-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
+  LANGUAGES: ${{ inputs.languages }}
+  # Dependency caches are written only from the default branch, so every
+  # branch restores the same warm set and pull requests never churn the cache
+  # store.
+  SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  # Resolves each heavy server's key and lists the servers with no prebuilt
+  # binary, so the prebuild job compiles only those.
+  plan:
+    name: find servers to prebuild
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      platform: ${{ steps.platform.outputs.platform }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      overlay: ${{ steps.keys.outputs.overlay }}
+      net_dir: ${{ steps.keys.outputs.net_dir }}
+      dir_java: ${{ steps.keys.outputs.dir_java }}
+      tip_java: ${{ steps.keys.outputs.tip_java }}
+      ws_rust: ${{ steps.keys.outputs.ws_rust }}
+      key_net: ${{ steps.keys.outputs.key_net }}
+      paths_net: ${{ steps.keys.outputs.paths_net }}
+      key_rust: ${{ steps.keys.outputs.key_rust }}
+      paths_rust: ${{ steps.keys.outputs.paths_rust }}
+    steps:
+      - name: Check out aws-crypto-tools-commons
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons-ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
+
+      - name: Check out the DB-ESDK repository under test
+        if: env.DBE_REPOSITORY != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DBE_REPOSITORY }}
+          ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
+          path: .dbe-product-repo
+
+      - name: Rewrite the DBE repo SSH URL to public HTTPS
+        # config/server-config.json gives the servers' source as SSH URLs and
+        # CI runners have no SSH keys; the repository is public, so no token.
+        run: |
+          set -euo pipefail
+          git config --global \
+            url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the prebuilt-server keys and paths
+        # Each key is the server's branch tip; each path list is the server's
+        # runnable output plus its build stamp, inside the materialized clone
+        # (<repo>@<sanitized ref>-<8-hex hash>) at the server's
+        # serverLocation.path.
+        id: keys
+        env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
+        run: |
+          set -euo pipefail
+          config=dbesdk/test-server/config/server-config.json
+          sources=dbesdk/test-server/build/sources
+          field() {
+            jq -r --arg l "$1" ".entries[] | select(.language==\$l) | .serverLocation.$2" "$config"
+          }
+          repo_of() {
+            local url; url=$(field "$1" url); url=$(basename "${url%.git}"); echo "${url##*:}"
+          }
+          # The DB-ESDK checkout is a working tree, not a clone.
+          own=""
+          if [ -n "$DBE_REPOSITORY" ]; then
+            own=$(basename "$DBE_REPOSITORY")
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/.dbe-product-repo" >> "$GITHUB_OUTPUT"
+          fi
+          # Whether $1 builds from the checkout.
+          from_checkout() {
+            [ -n "$own" ] && [ "$(repo_of "$1")" = "$own" ]
+          }
+          clone() {
+            local url ref
+            url=$(field "$1" url); ref=$(field "$1" ref)
+            if from_checkout "$1"; then echo ".dbe-product-repo"; return; fi
+            echo "$sources/$(python3 -c 'import re,sys,functools; u,r=sys.argv[1:3]; n=re.split("[/:]", u.rstrip("/"))[-1]; n=n[:-4] if n.endswith(".git") else n; s=lambda v: re.sub("[^A-Za-z0-9._-]", "_", v) or "_"; h=functools.reduce(lambda a, c: (31*a+ord(c)) & 0xffffffff, u+chr(10)+r, 0); print("%s@%s-%08x" % (s(n), s(r), h))' "$url" "$ref")"
+          }
+          # The server directory inside its clone.
+          server() { echo "$(clone "$1")/$(field "$1" path)"; }
+          tip() {
+            local url ref sha
+            if from_checkout "$1"; then git -C .dbe-product-repo rev-parse HEAD; return; fi
+            url=$(field "$1" url); ref=$(field "$1" ref)
+            # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
+            # this repo) is not sent to the other repository.
+            sha=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || sha=""
+            echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
+          }
+          # emit <name> <language> <key> <paths...>: a checkout build gets its own key.
+          # The key carries a hash of the cached paths: GitHub scopes an entry to
+          # its paths, so an entry saved under other paths must not share a key.
+          emit() {
+            local name="$1" language="$2" key="$3" src="" paths; shift 3
+            from_checkout "$language" && src="$own-src-"
+            paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
+            echo "key_$name=${PLATFORM}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
+            { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          }
+          net=$(server net); rust=$(server rust)
+          echo "net_dir=$net" >> "$GITHUB_OUTPUT"
+          emit net net "$(tip net)" \
+            "$net/bin/Release/net8.0" \
+            "$net/.dbesdk-build-stamp"
+          emit rust rust "$(tip rust)" \
+            "$rust/target/release/dbesdk-test-server" \
+            "$rust/.dbesdk-build-stamp"
+          # Cargo workspaces per Rust server, for rust-cache.
+          ws() { local name="$1"; shift; { echo "ws_$name<<EOF"; printf '%s -> target\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"; }
+          ws rust "$rust"
+          echo "dir_java=$(clone java)" >> "$GITHUB_OUTPUT"
+          echo "tip_java=$(tip java)" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: List the servers to build
+        # A server is prebuilt when an artifact named by its key exists in this
+        # repository or in commons; the rest are built by the prebuild job.
+        # Only languages this run launches are considered: `languages` limits
+        # the launch, `focus` does not (every server still launches).
+        id: matrix
+        env:
+          RUN_TOKEN: ${{ github.token }}
+          KEY_net: ${{ steps.keys.outputs.key_net }}
+          KEY_rust: ${{ steps.keys.outputs.key_rust }}
+        run: |
+          set -euo pipefail
+          # The DB-ESDK servers and their artifacts are reachable with this
+          # run's token from commons; a caller elsewhere that cannot read
+          # commons' artifacts simply finds nothing there and builds.
+          token() { echo "$RUN_TOKEN"; }
+          # find <key>: the newest unexpired artifact named <key>, as
+          # "<repository> <artifact id>", looked up in this repository then commons.
+          find() {
+            local repo id
+            for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
+              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+                -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
+                2>/dev/null) || id=""
+              if [ -n "$id" ]; then echo "$repo $id"; return; fi
+            done
+          }
+          in_run() { [ -z "$LANGUAGES" ] || [[ ",$LANGUAGES," == *",$1,"* ]]; }
+          missing=()
+          for pair in net:net rust:rust; do
+            k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
+            if ! in_run "$language"; then echo "not launched: $language"; continue; fi
+            found=$(find "${!key_var}")
+            if [ -n "$found" ]; then echo "prebuilt $language: $found"; else missing+=("$language"); fi
+          done
+          matrix=$(printf '%s\n' "${missing[@]}" | jq -R . | jq -cs 'map(select(. != ""))')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "servers to prebuild: $matrix"
+
+  # Compiles each missing heavy server on its own runner, in parallel, and
+  # publishes its binary; the test job fetches it and runs it there.
+  prebuild:
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      AWS_REGION: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      AWS_DEFAULT_REGION: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+      OVERLAY: ${{ needs.plan.outputs.overlay }}
+      OUT_KEY: ${{ matrix.language == 'net' && needs.plan.outputs.key_net || needs.plan.outputs.key_rust }}
+      OUT_PATHS: ${{ matrix.language == 'net' && needs.plan.outputs.paths_net || needs.plan.outputs.paths_rust }}
+    steps:
+      - name: Check out aws-crypto-tools-commons
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons-ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
+
+      - name: Check out the DB-ESDK repository under test
+        if: env.DBE_REPOSITORY != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DBE_REPOSITORY }}
+          ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
+          path: .dbe-product-repo
+
+      - name: Set up JDK 21 (Temurin) for the orchestrator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up the Rust toolchain
+        if: matrix.language == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Go (aws-lc-sys native build)
+        if: matrix.language == 'rust'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          # Not a Go project, so there is no go.sum for setup-go's cache.
+          cache: false
+
+      - name: Set up .NET 8
+        if: matrix.language == 'net'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: matrix.language == 'net'
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
+      - name: Rewrite the DBE repo SSH URL to public HTTPS
+        # config/server-config.json gives the servers' source as SSH URLs and
+        # CI runners have no SSH keys; the repository is public, so no token.
+        run: |
+          set -euo pipefail
+          git config --global \
+            url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Restore the Gradle caches (orchestrator)
+        id: gradle-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'dbesdk/test-server/*/build.gradle.kts',
+              'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-
+
+      - name: Materialize the ${{ matrix.language }} sources
+        # The caches below restore into the clone, so it exists first.
+        working-directory: dbesdk/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
+
+      - name: Restore the cargo registry and compiled dependencies
+        # Keyed on the toolchain and the workspace's Cargo.lock; our own crates
+        # are cleaned before saving, so every branch reuses the dependencies.
+        if: matrix.language == 'rust'
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dbesdk-${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
+          workspaces: ${{ needs.plan.outputs.ws_rust }}
+          save-if: ${{ env.SAVE_CACHES == 'true' }}
+
+      - name: Restore the NuGet packages
+        if: matrix.language == 'net'
+        id: nuget-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
+          restore-keys: |
+            ${{ needs.plan.outputs.platform }}-dbesdk-nuget-
+
+      - name: Build the ${{ matrix.language }} server and check it starts
+        working-directory: dbesdk/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
+
+      - name: Pack the ${{ matrix.language }} server
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
+          tar -czf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+
+      - name: Publish the ${{ matrix.language }} server
+        # Named by its key: later runs here, and runs in other repositories for
+        # servers built from commons' configuration, find it by that name.
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUT_KEY }}
+          path: ${{ runner.temp }}/prebuilt/${{ matrix.language }}.tgz
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Save the Gradle caches (orchestrator)
+        if: env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'dbesdk/test-server/*/build.gradle.kts',
+              'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+
+      - name: Save the NuGet packages
+        if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
+
+  # Starts alongside the prebuild job; its setup and the java build overlap the
+  # heavy builds, and it waits for their outputs just before the run.
+  dbesdk-test-server:
+    name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
+    needs: plan
+    runs-on: ${{ inputs.runner }}
+
+    env:
+      OVERLAY: ${{ needs.plan.outputs.overlay }}
+      AWS_REGION: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      AWS_DEFAULT_REGION: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+      # No daemon, so each server/Tests JVM the orchestrator forks inherits the
+      # short-lived OIDC credentials from this step's environment.
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+      # IAM role the tests assume for their AWS calls; its trust policy trusts both
+      # this repo and aws-database-encryption-sdk-dynamodb. Override with the repo variable.
+      KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/dbesdk-test-server-ci-kms-role' }}
+
+    steps:
+      - name: Checkout aws-crypto-tools-commons (tests, model, orchestrator)
+        # Name the repository explicitly: when another repository calls this
+        # workflow, checkout would default to that repo, but the tests, model,
+        # and orchestrator live here in commons.
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons-ref || (github.repository == 'aws/aws-crypto-tools-commons' && github.sha || '') }}
+
+      - name: Check out the DB-ESDK repository under test
+        # Only when a DB-ESDK checkout applies: check out that commit's servers
+        # so make orchestrate tests them directly instead of cloning them.
+        if: env.DBE_REPOSITORY != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DBE_REPOSITORY }}
+          ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
+          path: .dbe-product-repo
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Go
+        # Only used to build the rust server's aws-lc-sys native code.
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          # This isn't a Go project (Go only builds aws-lc-sys above), so there's no
+          # go.sum; skip setup-go's cache to avoid its "file not found" warning.
+          cache: false
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
+      - name: Restore the Gradle caches (orchestrator + Java server)
+        id: gradle-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'dbesdk/test-server/*/build.gradle.kts',
+              'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}
+          restore-keys: |
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-
+
+      - name: Install Smithy CLI
+        # Needed by `make validate`; pinned official release.
+        run: |
+          set -euo pipefail
+          SMITHY_VERSION="1.58.0"
+          url="https://github.com/smithy-lang/smithy/releases/download/${SMITHY_VERSION}/smithy-cli-linux-x86_64.zip"
+          tmp="$(mktemp -d)"
+          curl -sSL "$url" -o "$tmp/smithy-cli.zip"
+          unzip -q "$tmp/smithy-cli.zip" -d "$tmp"
+          sudo "$tmp/smithy-cli-linux-x86_64/install"
+          smithy --version
+
+      - name: Rewrite the DBE repo SSH URL to public HTTPS
+        # When servers are cloned (dbe-ref unset), config/server-config.json gives
+        # their source as SSH URLs. CI runners have no SSH keys, so rewrite SSH to
+        # public HTTPS for the job. Not needed locally, where SSH keys are present.
+        run: |
+          set -euo pipefail
+          git config --global \
+            url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Restore the materialized java clone
+        # The clone carries the java server's Gradle outputs, so Gradle finds the
+        # server up to date for the same commit. A dbe-ref run builds from its
+        # checkout instead of a clone.
+        id: sources-java
+        if: env.DBE_REPOSITORY == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.plan.outputs.dir_java }}
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
+
+      - name: Configure AWS credentials via OIDC
+        # Don't fail here; the next step reports a clear reason. The common case is a
+        # pull request from a fork, which GitHub denies an OIDC token, so no
+        # credentials can be obtained.
+        id: aws-credentials
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.KMS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.DBESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+
+      - name: Verify AWS credentials are active (gates the orchestrated run)
+        # The tests make real AWS calls, so stop here with a clear message if the
+        # credentials didn't resolve, rather than failing deep inside orchestrate.
+        run: |
+          if ! aws sts get-caller-identity; then
+            echo "::error::No usable AWS credentials ; the DB-ESDK tests make real AWS calls." >&2
+            echo "This run needs GitHub OIDC access to the role ${KMS_CI_ROLE_ARN}, whose trust" >&2
+            echo "policy must trust aws-crypto-tools-commons and whose permissions must reach the" >&2
+            echo "DB-ESDK KMS keys + branch-key DynamoDB keystore. A fork PR with no id-token" >&2
+            echo "cannot obtain credentials, and so cannot pass." >&2
+            exit 1
+          fi
+
+      - name: Validate model (smithy validate + model smoke checks)
+        working-directory: dbesdk/test-server
+        run: make validate
+
+      - name: Build the java server while the heavy ones build
+        # Its build stamp makes the orchestrated run skip this build.
+        if: inputs.languages == '' || contains(format(',{0},', inputs.languages), ',java,')
+        working-directory: dbesdk/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=java stopAfter=launch"
+
+      - name: Save the materialized java clone
+        # Saved before the heavy servers are fetched into the same clone, so the
+        # entry holds only the sources and the java build.
+        if: env.DBE_REPOSITORY == '' && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ needs.plan.outputs.dir_java }}
+          key: ${{ needs.plan.outputs.platform }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
+
+      - name: Wait for the prebuilt servers
+        # Each server the plan found missing is published by its prebuild job;
+        # wait for those jobs to finish.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+          # "failed", "done" (every matching prebuild job succeeded), or "wait".
+          STATE: >-
+            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
+            | if any(. == "failure" or . == "cancelled") then "failed"
+              elif length > 0 and all(. == "success") then "done" else "wait" end
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 2700))
+          for language in $(jq -r '.[]' <<<"$MATRIX"); do
+            while :; do
+              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
+                | jq -r --arg language "$language" "$STATE")
+              [ "$state" = "done" ] && break
+              if [ "$state" = "failed" ]; then echo "::error::the $language server build failed"; exit 1; fi
+              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
+              sleep 15
+            done
+            echo "ready after ${SECONDS}s: $language"
+          done
+
+      - name: Materialize the sources (clones only)
+        # The prebuilt outputs restore into these clones; each server's build
+        # stamp then skips its build.
+        working-directory: dbesdk/test-server
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
+
+      - name: Fetch the prebuilt servers into their clones
+        env:
+          RUN_TOKEN: ${{ github.token }}
+          KEY_net: ${{ needs.plan.outputs.key_net }}
+          KEY_rust: ${{ needs.plan.outputs.key_rust }}
+        run: |
+          set -euo pipefail
+          # The DB-ESDK servers and their artifacts are reachable with this
+          # run's token from commons.
+          token() { echo "$RUN_TOKEN"; }
+          # find <key>: the newest unexpired artifact named <key>, as
+          # "<repository> <artifact id>", looked up in this repository then commons.
+          find() {
+            local repo id
+            for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
+              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+                -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
+                2>/dev/null) || id=""
+              if [ -n "$id" ]; then echo "$repo $id"; return; fi
+            done
+          }
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          for pair in net:net rust:rust; do
+            k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
+            found=$(find "${!key_var}")
+            [ -n "$found" ] || continue
+            read -r repo id <<<"$found"
+            echo "$language: $repo artifact $id"
+            GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
+            unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
+            tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
+          done
+
+      - name: Check every prebuilt server arrived
+        # A server missing here would be built cold inside the test run.
+        run: |
+          set -euo pipefail
+          in_run() { [ -z "$LANGUAGES" ] || [[ ",$LANGUAGES," == *",$1,"* ]]; }
+          missing=""
+          for language in net rust; do
+            in_run "$language" || continue
+            [ -f "$RUNNER_TEMP/prebuilt/$language.tgz" ] || missing="$missing $language"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::prebuilt servers not restored:$missing"
+            exit 1
+          fi
+
+      - name: Run the test suite (make orchestrate)
+        working-directory: dbesdk/test-server
+        env:
+          # Wide readiness window for the concurrent server builds on a 2-core runner.
+          DBESDK_TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          # The name SubprocessLauncher reads.
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          FOCUS: ${{ inputs.focus }}
+        # $OVERLAY already carries the dbe-ref working-tree overlay (and is empty
+        # otherwise, in which case each server is cloned per server-config.json),
+        # so it is the single source of the overlay — passing DBESDK_DBE_REPO too
+        # would duplicate the workingTreeOverlay token.
+        run: |
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${LANGUAGES:+languages=$LANGUAGES} ${FOCUS:+focus=$FOCUS}"
+
+      - name: Publish test results to the run summary
+        if: always()
+        run: |
+          python3 test-server-common/tools/ci_summary.py \
+            dbesdk/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test reports + Resolution_Record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbesdk-test-server-reports
+          path: |
+            test-server-common/orchestrator/build/resolution-record.json
+            test-server-common/orchestrator/build/launch/*/*.log
+            dbesdk/test-server/build/resolution-record.json
+            dbesdk/test-server/build/launch/*/*.log
+            dbesdk/test-server/tests/build/reports/tests
+            dbesdk/test-server/tests/build/test-results
+          if-no-files-found: ignore
+
+      - name: Save the Gradle caches (orchestrator + Java server)
+        # `if: always()`: the orchestrate step exits non-zero on any failed
+        # Test, and a save that only ran on success would never save here.
+        if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: >-
+            ${{ needs.plan.outputs.platform }}-dbesdk-gradle-v1-${{ hashFiles(
+              'test-server-common/*/build.gradle.kts',
+              'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
+              'dbesdk/test-server/*/build.gradle.kts',
+              'dbesdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
+            ) }}

@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,9 +65,6 @@ public final class DotnetLaunchPlan implements Launcher {
     /** The Dafny version the repository's transpile pins (project.properties). */
     static final String REQUIRED_DAFNY_VERSION = "4.9.0";
 
-    /** Repository paths, besides the Dafny project, whose content determines the transpile output. */
-    static final List<String> TRANSPILE_SHARED_INPUTS =
-        List.of("SharedMakefileV2.mk", "libraries", "smithy-dafny", "mpl");
 
     /** A file the transpile writes, relative to the Dafny project. */
     static final String TRANSPILED_FILE = "runtimes/net/ImplementationFromDafny.cs";
@@ -253,26 +249,11 @@ public final class DotnetLaunchPlan implements Launcher {
     /**
      * The transpile inputs as recorded in the clone's {@code HEAD}: the tree,
      * submodule, and blob ids of the Dafny project and
-     * {@link #TRANSPILE_SHARED_INPUTS}, plus the Dafny version. {@code null}
+     * {@link DafnyProject#TRANSPILE_SHARED_INPUTS}, plus the Dafny version. {@code null}
      * (never up to date) when git cannot list them.
      */
     static String transpileInputs(Path repoRoot, Path dafnyProjectDir) {
-        List<String> command = new ArrayList<>(List.of("git", "ls-tree", "HEAD",
-            repoRoot.relativize(dafnyProjectDir).toString()));
-        command.addAll(TRANSPILE_SHARED_INPUTS);
-        try {
-            Process process = new ProcessBuilder(command).directory(repoRoot.toFile())
-                .redirectErrorStream(true).start();
-            String output = new String(process.getInputStream().readAllBytes(),
-                StandardCharsets.UTF_8).trim();
-            return process.waitFor() == 0 && !output.isEmpty()
-                ? "dafny " + REQUIRED_DAFNY_VERSION + "\n" + output : null;
-        } catch (IOException e) {
-            return null;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
-        }
+        return DafnyProject.transpileInputs(repoRoot, dafnyProjectDir, REQUIRED_DAFNY_VERSION);
     }
 
     /** {@code dotnet build <csproj> -c Release} (server directory). */

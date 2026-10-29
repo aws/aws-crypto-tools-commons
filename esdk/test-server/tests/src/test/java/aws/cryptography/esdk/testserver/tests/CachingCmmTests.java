@@ -19,6 +19,7 @@ import aws.cryptography.esdk.testserver.client.model.DecryptConcurrentlyInput;
 import aws.cryptography.esdk.testserver.client.model.DecryptInput;
 import aws.cryptography.esdk.testserver.client.model.DefaultCmmConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKAlgorithmSuiteId;
+import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import aws.cryptography.esdk.testserver.client.model.EncryptConcurrentlyInput;
@@ -36,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -462,5 +464,74 @@ class CachingCmmTests {
         KnownBugGate.gateDeclared(NOT_SHARED_BUG, target, () ->
             assertEquals(1, client.callCounts().getCachingCmmDecryptMaterialsCalls(),
                 target + ": ten concurrent decrypts of one message must make one call to the underlying CMM"));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Clients that share one cache
+    // ---------------------------------------------------------------------------
+
+    /**
+     * A client that requires commitment, encrypting after a client that forbids it
+     * cached its materials in the same shared cache and partition, must not write a
+     * non-committing message: its encrypt fails, or its message's algorithm suite is
+     * committing.
+     */
+    @ParameterizedTest(name = "sharedCacheRespectsRequireCommitment {0}")
+    @MethodSource("targets")
+    void sharedCacheRespectsRequireCommitment(LanguageServerTarget target) {
+        assertSharedCacheRespectsPolicy(target,
+            ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT, ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT);
+    }
+
+    /**
+     * A client that forbids commitment, encrypting after a client that requires it
+     * cached its materials in the same shared cache and partition, must not write a
+     * committing message: its encrypt fails, or its message's algorithm suite is
+     * non-committing.
+     */
+    @ParameterizedTest(name = "sharedCacheRespectsForbidCommitment {0}")
+    @MethodSource("targets")
+    void sharedCacheRespectsForbidCommitment(LanguageServerTarget target) {
+        assertSharedCacheRespectsPolicy(target,
+            ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT, ESDKCommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT);
+    }
+
+    private static void assertSharedCacheRespectsPolicy(LanguageServerTarget target,
+            ESDKCommitmentPolicy first, ESDKCommitmentPolicy second) {
+        FeatureGate.require(FEATURES, target);
+        String cacheName = "shared-" + UUID.randomUUID();
+        requireSharedCache(target, cacheName);
+
+        String firstClient = EsdkOps.createClient(target.endpoint(),
+            EsdkClientConfigs.rawAesSharedCaching(first, cacheName, cacheName));
+        String secondClient = EsdkOps.createClient(target.endpoint(),
+            EsdkClientConfigs.rawAesSharedCaching(second, cacheName, cacheName));
+        EsdkOps.encryptWithClient(target.endpoint(), firstClient, plaintext(16), null);
+
+        byte[] ciphertext;
+        try {
+            ciphertext = EsdkOps.encryptWithClient(target.endpoint(), secondClient, plaintext(16), null);
+        } catch (ESDKClientError expected) {
+            return;
+        }
+        boolean committing = EsdkMessage.isCommitting(EsdkMessage.parse(ciphertext).algorithmSuiteId);
+        assertTrue(committing == (second == ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT),
+            target + ": a " + second + " client sharing a cache with a " + first
+                + " client wrote a message its commitment policy does not allow");
+    }
+
+    /**
+     * Skip, visibly, on a server that does not share a named cache: two same-policy
+     * clients on one name and partition must reuse one cached data key.
+     */
+    private static void requireSharedCache(LanguageServerTarget target, String cacheName) {
+        ESDKCommitmentPolicy policy = ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
+        String probe = cacheName + "-probe";
+        String a = EsdkOps.createClient(target.endpoint(), EsdkClientConfigs.rawAesSharedCaching(policy, cacheName, probe));
+        String b = EsdkOps.createClient(target.endpoint(), EsdkClientConfigs.rawAesSharedCaching(policy, cacheName, probe));
+        String first = dataKeyOf(EsdkOps.encryptWithClient(target.endpoint(), a, plaintext(16), SUITE));
+        String second = dataKeyOf(EsdkOps.encryptWithClient(target.endpoint(), b, plaintext(16), SUITE));
+        Assumptions.assumeTrue(first.equals(second),
+            target + " does not share a Caching CMM cache across clients by sharedCacheName");
     }
 }
