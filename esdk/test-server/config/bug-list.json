@@ -61,6 +61,14 @@
       "description": "CreateClient rejects a Raw-AES wrapping key whose length does not match the wrapping suite as an ESDKClientError instead of the framework GenericServerError. The native Rust server and the C++ shim currently build the Raw-AES keyring through the Dafny MPL, which surfaces this config-validation failure as an ESDK error rather than a framework error.",
       "ticketId": null
     },
+    "raw-rsa-decrypt-reparses-private-key": {
+      "description": "raw RSA keyring decrypt parses the PEM private key on every call (~260 ms for RSA-4096), so the released-vector decrypts run only a few raw RSA vectors on this server",
+      "ticketId": null
+    },
+    "default-cmm-ignores-reproduced-only-encryption-context": {
+      "description": "the default CMM does not add reproduced encryption context pairs that are missing from the message header to the decryption materials (cmm-interface.md#decrypt-materials), so it cannot decrypt a message a required encryption context CMM wrote without that CMM",
+      "ticketId": null
+    },
     "stream-decrypt-rejects-multi-frame-signed-message": {
       "description": "streamed decrypt rejects a multi-frame message with a signing algorithm suite instead of releasing its regular frames, and provides no option to enable it (decrypt.md#decrypt-the-message-body)",
       "ticketId": null
