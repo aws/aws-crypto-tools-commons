@@ -24,9 +24,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Required-Encryption-Context CMM conformance. The CMM drops the required keys from the
- * header on encrypt and demands them, reproduced, on decrypt. Every test runs over the
- * cross-language pairwise matrix, with each side gated on the features it uses. Catalog
- * behaviors (esdk-test-behavior-catalog.md):
+ * header on encrypt and demands them, reproduced, on decrypt. The Required-EC round trip and
+ * the header check depend on the encryptor, so they run over the cross-language pairwise
+ * matrix. The other tests assert decrypt behavior, so they run decrypt-side
+ * ({@link ReferenceImplementation#decryptSide}). Each side is gated on the features it uses.
+ * Catalog behaviors (esdk-test-behavior-catalog.md):
  *
  * <ul>
  *   <li><b>CMM-007</b> — round-trips when the required keys are reproduced on decrypt
@@ -44,7 +46,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * so the header keeps {@code tenant} and drops {@code purpose}. This matches the Dafny
  * TestRequiredEncryptionContext tests.
  *
- * <p>CMM-007 and CMM-008 decrypt with each {@link DecryptCmm}. The Default CMM row is the
+ * <p>The CMM-008 rejections decrypt with each {@link DecryptCmm}. The Default CMM row is the
  * one a server without the Required-EC CMM (e.g. the native Rust ESDK) can run.
  *
  * <p>Fully offline (Raw-AES). ESDK-originated failures surface as {@link ESDKClientError}.
@@ -81,14 +83,23 @@ class RequiredEncryptionContextCmmTests {
         return LanguageServerRegistry.shared().pairs();
     }
 
-    static List<Arguments> pairsByDecryptCmm() {
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(FEATURES);
+    }
+
+    static List<Arguments> decryptSideByCmm() {
         List<Arguments> cases = new ArrayList<>();
-        for (TargetPair pair : pairs()) {
+        for (ReferencePair pair : decryptSide()) {
             for (DecryptCmm cmm : DecryptCmm.values()) {
                 cases.add(Arguments.of(pair, cmm));
             }
         }
         return cases;
+    }
+
+    /** Decrypt-side rows whose encryptor needs only Raw-AES and the Default CMM. */
+    static List<ReferencePair> rawAesDecryptSide() {
+        return ReferenceImplementation.decryptSide(Set.of("raw-aes"));
     }
 
     private static ESDKClientConfig config() {
@@ -109,18 +120,33 @@ class RequiredEncryptionContextCmmTests {
     }
 
     /**
-     * CMM-007: reproducing the required pair on decrypt round-trips. Dafny parity:
-     * TestRemoveOnEncryptRemoveAndSupplyOnDecryptHappyCase (Required-EC CMM) and
-     * TestRemoveOnEncryptAndSupplyOnDecryptHappyCase (Default CMM).
+     * CMM-007: reproducing the required pair on decrypt round-trips. Pairwise, because each
+     * encryptor must drop the required pair from the header and still bind it.
+     * Dafny parity (TestRemoveOnEncryptRemoveAndSupplyOnDecryptHappyCase).
      */
-    @ParameterizedTest(name = "reproducedRequiredEcDecrypts[{1}] {0}")
-    @MethodSource("pairsByDecryptCmm")
-    void decryptSucceedsWhenRequiredContextReproduced(TargetPair pair, DecryptCmm cmm) {
-        byte[] ciphertext = encrypt(pair, cmm);
-        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), cmm.config(), ciphertext, REPRODUCED);
+    @ParameterizedTest(name = "reproducedRequiredEcDecrypts {0}")
+    @MethodSource("pairs")
+    void decryptSucceedsWhenRequiredContextReproduced(TargetPair pair) {
+        byte[] ciphertext = encrypt(pair, DecryptCmm.REQUIRED_EC);
+        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, REPRODUCED);
         assertArrayEquals(PLAINTEXT, recovered,
-            "decrypt with the required pair reproduced must recover the plaintext (" + pair + ", "
-                + cmm + ")");
+            "decrypt with the required pair reproduced must recover the plaintext (" + pair + ")");
+    }
+
+    /**
+     * CMM-007 with the Default CMM: a Required-EC message decrypts when the required pair is
+     * reproduced, so the decryptor needs no Required-EC CMM of its own.
+     * Dafny parity (TestRemoveOnEncryptAndSupplyOnDecryptHappyCase).
+     */
+    @ParameterizedTest(name = "defaultCmmDecryptsWithReproducedContext {0}")
+    @MethodSource("decryptSide")
+    void decryptSucceedsWithDefaultCmmWhenRequiredContextReproduced(ReferencePair pair) {
+        byte[] ciphertext = encrypt(pair.asTargetPair(), DecryptCmm.DEFAULT);
+        byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(),
+            ciphertext, REPRODUCED);
+        assertArrayEquals(PLAINTEXT, recovered,
+            "decrypt with the Default CMM and the required pair reproduced must recover the "
+                + "plaintext (" + pair + ")");
     }
 
     /**
@@ -128,9 +154,9 @@ class RequiredEncryptionContextCmmTests {
      * the required pair is reproduced. Dafny parity (TestRemoveOnDecryptIsBackwardsCompatibleHappyCase).
      */
     @ParameterizedTest(name = "requiredEcCmmDecryptsFullyStoredMessage {0}")
-    @MethodSource("pairs")
-    void decryptSucceedsWithRequiredEcCmmOnFullyStoredMessage(TargetPair pair) {
-        requireSides(pair, Set.of("raw-aes"), FEATURES);
+    @MethodSource("rawAesDecryptSide")
+    void decryptSucceedsWithRequiredEcCmmOnFullyStoredMessage(ReferencePair pair) {
+        requireSides(pair.asTargetPair(), Set.of("raw-aes"), FEATURES);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), EsdkClientConfigs.rawAes(),
             PLAINTEXT, FULL_CONTEXT, null, null);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config(), ciphertext, REPRODUCED);
@@ -195,9 +221,9 @@ class RequiredEncryptionContextCmmTests {
      * Dafny parity (TestRemoveECAndNotSupplyOnDecryptFailure).
      */
     @ParameterizedTest(name = "missingReproducedEcRejected[{1}] {0}")
-    @MethodSource("pairsByDecryptCmm")
-    void decryptFailsWhenNoContextReproduced(TargetPair pair, DecryptCmm cmm) {
-        byte[] ciphertext = encrypt(pair, cmm);
+    @MethodSource("decryptSideByCmm")
+    void decryptFailsWhenNoContextReproduced(ReferencePair pair, DecryptCmm cmm) {
+        byte[] ciphertext = encrypt(pair.asTargetPair(), cmm);
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), cmm.config(), ciphertext),
             "decrypt without reproducing the required encryption context must fail (" + pair + ", "
@@ -209,9 +235,9 @@ class RequiredEncryptionContextCmmTests {
      * Dafny parity (TestRemoveECAndSupplyWithMissingRequiredValueDecryptFailure).
      */
     @ParameterizedTest(name = "partialReproducedEcRejected[{1}] {0}")
-    @MethodSource("pairsByDecryptCmm")
-    void decryptFailsWhenRequiredKeyMissing(TargetPair pair, DecryptCmm cmm) {
-        byte[] ciphertext = encrypt(pair, cmm);
+    @MethodSource("decryptSideByCmm")
+    void decryptFailsWhenRequiredKeyMissing(ReferencePair pair, DecryptCmm cmm) {
+        byte[] ciphertext = encrypt(pair.asTargetPair(), cmm);
         Map<String, String> partial = Map.of("tenant", "acme");  // missing "purpose"
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), cmm.config(), ciphertext, partial),
@@ -223,9 +249,9 @@ class RequiredEncryptionContextCmmTests {
      * Dafny parity (TestRemoveECAndSupplyMismatchedReprECFailure).
      */
     @ParameterizedTest(name = "wrongReproducedEcValueRejected[{1}] {0}")
-    @MethodSource("pairsByDecryptCmm")
-    void decryptFailsWhenRequiredValueWrong(TargetPair pair, DecryptCmm cmm) {
-        byte[] ciphertext = encrypt(pair, cmm);
+    @MethodSource("decryptSideByCmm")
+    void decryptFailsWhenRequiredValueWrong(ReferencePair pair, DecryptCmm cmm) {
+        byte[] ciphertext = encrypt(pair.asTargetPair(), cmm);
         Map<String, String> wrong = Map.of("purpose", "WRONG");
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), cmm.config(), ciphertext, wrong),
@@ -239,9 +265,9 @@ class RequiredEncryptionContextCmmTests {
      * sees a context that the wrapping never bound.
      */
     @ParameterizedTest(name = "supersetReproducedEcRejected {0}")
-    @MethodSource("pairs")
-    void decryptFailsWhenExtraKeyReproduced(TargetPair pair) {
-        byte[] ciphertext = encrypt(pair, DecryptCmm.DEFAULT);
+    @MethodSource("decryptSide")
+    void decryptFailsWhenExtraKeyReproduced(ReferencePair pair) {
+        byte[] ciphertext = encrypt(pair.asTargetPair(), DecryptCmm.DEFAULT);
         Map<String, String> superset = Map.of("purpose", "test", "extra", "not-on-the-message");
         assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), EsdkClientConfigs.rawAes(),

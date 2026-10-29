@@ -37,7 +37,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       value is rejected
  *       ({@code spec/client-apis/decrypt.md#get-the-decryption-materials}). Runs over
  *       the cross-language pairwise matrix. The superset, subset, and unrelated-key
- *       tests decrypt with Raw-AES, so the decryptor is gated on
+ *       tests assert only decrypt behavior, so they run decrypt-side
+ *       ({@link ReferenceImplementation#decryptSide}) with the decryptor gated on
  *       {@code default-cmm-reproduced-encryption-context}.</li>
  * </ul>
  *
@@ -62,11 +63,16 @@ class EncryptionContextBehaviorTests {
         return LanguageServerRegistry.shared().pairs();
     }
 
+    /** The producer leg needs only Raw-AES; the reproduced-EC capability gates per decryptor. */
+    static List<ReferencePair> decryptSide() {
+        return ReferenceImplementation.decryptSide(Set.of("raw-aes"));
+    }
+
     /**
-     * The encryptor makes a plain Raw-AES message.
+     * The reference makes a plain Raw-AES message.
      * The decryptor also needs its Default CMM to accept reproduced encryption context.
      */
-    private static void requireReproducedEcRow(TargetPair pair) {
+    private static void requireReproducedEcRow(ReferencePair pair) {
         FeatureGate.require(Set.of("raw-aes"),
             new TargetPair(pair.encryptTarget(), pair.encryptTarget()));
         FeatureGate.require(Set.of("raw-aes", "default-cmm-reproduced-encryption-context"),
@@ -140,11 +146,11 @@ class EncryptionContextBehaviorTests {
      * header's — an extra pair the message was not encrypted with. The Default CMM appends the
      * reproduced-only pair to the decryption materials, so the keyring unwraps under a context
      * the wrapping never bound and the data-key unwrap fails. Dafny parity
-     * (TestReproducedEncryptionContext.TestEncryptionContextOnDecryptFailure). Cross-language matrix.
+     * (TestReproducedEncryptionContext.TestEncryptionContextOnDecryptFailure). Decrypt-side.
      */
     @ParameterizedTest(name = "reproducedEcSupersetRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsSupersetReproducedContext(TargetPair pair) {
+    @MethodSource("decryptSide")
+    void decryptRejectsSupersetReproducedContext(ReferencePair pair) {
         requireReproducedEcRow(pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         Map<String, String> ec = Map.of("purpose", "test");
@@ -159,11 +165,11 @@ class EncryptionContextBehaviorTests {
     /**
      * EC-022: a message that stored all encryption context in the header decrypts when a strict
      * subset of that context is reproduced — every reproduced pair matches the header, so the
-     * materials keep the full header context and the unwrap succeeds. Cross-language matrix.
+     * materials keep the full header context and the unwrap succeeds. Decrypt-side.
      */
     @ParameterizedTest(name = "reproducedEcSubsetDecrypts {0}")
-    @MethodSource("pairs")
-    void decryptSucceedsWithSubsetReproducedContext(TargetPair pair) {
+    @MethodSource("decryptSide")
+    void decryptSucceedsWithSubsetReproducedContext(ReferencePair pair) {
         requireReproducedEcRow(pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
@@ -177,11 +183,11 @@ class EncryptionContextBehaviorTests {
 
     /**
      * Decrypt fails when the reproduced context holds only a key that the message does not have.
-     * Dafny parity (TestRequiredEncryptionContext.TestDifferentECOnDecryptFailure). Cross-language matrix.
+     * Dafny parity (TestRequiredEncryptionContext.TestDifferentECOnDecryptFailure). Decrypt-side.
      */
     @ParameterizedTest(name = "reproducedEcUnrelatedKeyRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsUnrelatedReproducedContext(TargetPair pair) {
+    @MethodSource("decryptSide")
+    void decryptRejectsUnrelatedReproducedContext(ReferencePair pair) {
         requireReproducedEcRow(pair);
         ESDKClientConfig config = EsdkClientConfigs.rawAes();
         Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
