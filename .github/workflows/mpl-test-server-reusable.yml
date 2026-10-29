@@ -474,6 +474,9 @@ jobs:
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up .NET (the .NET build; the Dafny tool)
         if: env.DAFNY_BUILD == 'true'

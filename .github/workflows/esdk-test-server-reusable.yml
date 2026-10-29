@@ -600,6 +600,9 @@ jobs:
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up .NET (the Dafny tool; .NET library build)
         if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
@@ -943,6 +946,9 @@ jobs:
 
       - name: Set up the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up Go
         uses: actions/setup-go@v5
