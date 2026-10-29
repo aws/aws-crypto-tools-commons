@@ -61,6 +61,10 @@
       "description": "CreateClient rejects a Raw-AES wrapping key whose length does not match the wrapping suite as an ESDKClientError instead of the framework GenericServerError. The native Rust server and the C++ shim currently build the Raw-AES keyring through the Dafny MPL, which surfaces this config-validation failure as an ESDK error rather than a framework error.",
       "ticketId": null
     },
+    "caching-cmm-concurrent-misses-not-shared": {
+      "description": "concurrent cache misses for the same caching CMM entry each call the underlying CMM, instead of sharing one request (one new data key per caller on encrypt)",
+      "ticketId": null
+    },
     "stream-decrypt-rejects-multi-frame-signed-message": {
       "description": "streamed decrypt rejects a multi-frame message with a signing algorithm suite instead of releasing its regular frames, and provides no option to enable it (decrypt.md#decrypt-the-message-body)",
       "ticketId": null
