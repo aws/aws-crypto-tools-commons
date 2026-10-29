@@ -166,13 +166,23 @@ jobs:
           ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
           path: .dbe-product-repo
 
-      - name: Rewrite the DBE repo SSH URL to public HTTPS
+      - name: Rewrite the DB-ESDK repos' SSH URLs to HTTPS
         # config/server-config.json gives the servers' source as SSH URLs and
-        # CI runners have no SSH keys; the repository is public, so no token.
+        # CI runners have no SSH keys. aws-crypto-tools-rust (the rust-native
+        # server) is private, so the clone authenticates with the read-only
+        # repo-pat when the caller passes one; the other repositories are public.
+        # The token reaches git only through the runner's ephemeral global config.
+        env:
+          REPO_PAT: ${{ secrets.repo-pat }}
         run: |
           set -euo pipefail
-          git config --global \
-            url."https://github.com/".insteadOf "git@github.com:"
+          if [ -n "${REPO_PAT:-}" ]; then
+            git config --global \
+              url."https://x-access-token:${REPO_PAT}@github.com/".insteadOf "git@github.com:"
+          else
+            git config --global \
+              url."https://github.com/".insteadOf "git@github.com:"
+          fi
 
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's branch tip; each path list is the server's
@@ -345,13 +355,23 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Rewrite the DBE repo SSH URL to public HTTPS
+      - name: Rewrite the DB-ESDK repos' SSH URLs to HTTPS
         # config/server-config.json gives the servers' source as SSH URLs and
-        # CI runners have no SSH keys; the repository is public, so no token.
+        # CI runners have no SSH keys. aws-crypto-tools-rust (the rust-native
+        # server) is private, so the clone authenticates with the read-only
+        # repo-pat when the caller passes one; the other repositories are public.
+        # The token reaches git only through the runner's ephemeral global config.
+        env:
+          REPO_PAT: ${{ secrets.repo-pat }}
         run: |
           set -euo pipefail
-          git config --global \
-            url."https://github.com/".insteadOf "git@github.com:"
+          if [ -n "${REPO_PAT:-}" ]; then
+            git config --global \
+              url."https://x-access-token:${REPO_PAT}@github.com/".insteadOf "git@github.com:"
+          else
+            git config --global \
+              url."https://github.com/".insteadOf "git@github.com:"
+          fi
 
       - name: Restore the Gradle caches (orchestrator)
         id: gradle-cache
@@ -539,14 +559,23 @@ jobs:
           sudo "$tmp/smithy-cli-linux-x86_64/install"
           smithy --version
 
-      - name: Rewrite the DBE repo SSH URL to public HTTPS
-        # When servers are cloned (dbe-ref unset), config/server-config.json gives
-        # their source as SSH URLs. CI runners have no SSH keys, so rewrite SSH to
-        # public HTTPS for the job. Not needed locally, where SSH keys are present.
+      - name: Rewrite the DB-ESDK repos' SSH URLs to HTTPS
+        # config/server-config.json gives the servers' source as SSH URLs and
+        # CI runners have no SSH keys. aws-crypto-tools-rust (the rust-native
+        # server) is private, so the clone authenticates with the read-only
+        # repo-pat when the caller passes one; the other repositories are public.
+        # The token reaches git only through the runner's ephemeral global config.
+        env:
+          REPO_PAT: ${{ secrets.repo-pat }}
         run: |
           set -euo pipefail
-          git config --global \
-            url."https://github.com/".insteadOf "git@github.com:"
+          if [ -n "${REPO_PAT:-}" ]; then
+            git config --global \
+              url."https://x-access-token:${REPO_PAT}@github.com/".insteadOf "git@github.com:"
+          else
+            git config --global \
+              url."https://github.com/".insteadOf "git@github.com:"
+          fi
 
       - name: Restore the materialized java clone
         # The clone carries the java server's Gradle outputs, so Gradle finds the
