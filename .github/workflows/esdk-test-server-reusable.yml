@@ -167,10 +167,12 @@ on:
         default: false
       runner:
         description: >-
-          Runner label for every job. Callers on CodeBuild-hosted runners pass
-          codebuild-<project>-<run_id>-<run_attempt>.
+          Runner label for every job. Defaults to this repo's CodeBuild runner.
+          Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label, because a CodeBuild
+          project only picks up jobs from the repo it is connected to.
         type: string
-        default: ubuntu-latest
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
     secrets:
       repo-pat:
         description: >-
