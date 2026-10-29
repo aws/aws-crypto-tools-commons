@@ -95,6 +95,14 @@ on:
           restores them.
         type: boolean
         default: false
+      runner:
+        description: >-
+          Runner label for every job. Defaults to this repo's CodeBuild runner.
+          Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label, because a CodeBuild
+          project only picks up jobs from the repo it is connected to.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
     secrets:
       repo-pat:
         description: >-
@@ -129,7 +137,7 @@ jobs:
   # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
   resolve:
     name: resolve refs
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
       # The resolve script reads the pull request description.
@@ -166,11 +174,12 @@ jobs:
   # output, so the prebuild job builds only those.
   plan:
     name: find servers to prebuild
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     needs: resolve
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       mpl_root: ${{ steps.keys.outputs.mpl_root }}
@@ -244,12 +253,19 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's commit; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>) or the checkout.
         id: keys
         env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
           PYTHON_FULL_VERSION: ${{ steps.python.outputs.python-version }}
         run: |
           set -euo pipefail
@@ -268,7 +284,8 @@ jobs:
           own=""
           if [ -n "$LANGUAGE_REPOSITORY" ]; then
             own=$(basename "$LANGUAGE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
           from_checkout() {
@@ -299,7 +316,7 @@ jobs:
             local name="$1" language="$2" suffix="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-mpl-out-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-mpl-out2-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           mpl=$(repo_root java)
@@ -328,7 +345,7 @@ jobs:
           # The venv (editable installs of the transpiled library and the
           # server, plus its stamp) and the transpiled library source.
           repo_key=$(echo "$GITHUB_REPOSITORY" | tr '/' '_')
-          emit python python "-dafny$DAFNY_VERSION-py$PYTHON_FULL_VERSION-$repo_key" \
+          emit python python "-dafny$DAFNY_VERSION-python$PYTHON_FULL_VERSION-$repo_key" \
             "mpl/test-server/build/launch/python/venv" \
             "$python_library"
           {
@@ -383,7 +400,7 @@ jobs:
   prebuild:
     needs: [resolve, plan]
     if: needs.plan.outputs.matrix != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -457,14 +474,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-mpl-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-mpl-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
               'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-gradle-
+            ${{ needs.plan.outputs.platform }}-mpl-gradle-
 
       - name: Set up Python (the python server venv; the Dafny Python formatters)
         if: env.DAFNY_BUILD == 'true'
@@ -481,10 +498,7 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up .NET (the .NET build; the Dafny tool)
         if: env.DAFNY_BUILD == 'true'
@@ -493,6 +507,16 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: env.DAFNY_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Install Dafny ${{ env.DAFNY_VERSION }}
         # The dafnyVersion in the MPL's project.properties.
@@ -518,7 +542,7 @@ jobs:
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
         working-directory: mpl/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
       - name: Initialize the MPL submodules + install the smithy-dafny codegen dependencies
         # The launch plan would initialize the submodules itself; smithy-dafny
@@ -544,6 +568,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: mpl-${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -555,9 +580,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-go-
+            ${{ needs.plan.outputs.platform }}-mpl-go-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -565,9 +590,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-nuget-
+            ${{ needs.plan.outputs.platform }}-mpl-nuget-
 
       - name: Build the ${{ matrix.language }} server and check it starts
         # For java, net, and python this transpiles AwsCryptographicMaterialProviders
@@ -575,15 +600,23 @@ jobs:
         working-directory: mpl/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Pack the ${{ matrix.language }} server
         # -P keeps the absolute ~/.m2 paths of the java output as they are.
+        # The runner's work directory differs between runners (CodeBuild puts
+        # it under a per-build path), so absolute paths and symlink targets
+        # under it are stored as @RUNNER_ROOT@, and the directory is recorded
+        # in <language>.root for the unpack step to rewrite file contents.
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prebuilt"
+          root=$(dirname "$RUNNER_WORKSPACE")
+          echo "$root" > "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.root"
           mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
-          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" \
+            --transform "s|^$root/|@RUNNER_ROOT@/|" \
+            -- "${paths[@]}" "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.root"
 
       - name: Publish the ${{ matrix.language }} server
         # Named by its key: later runs here, and runs in other repositories for
@@ -602,21 +635,21 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
+          key: ${{ needs.plan.outputs.platform }}-mpl-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
 
   # Starts alongside the prebuild job; its setup overlaps the builds, and it
   # waits for their outputs just before the run.
   mpl-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
     needs: [resolve, plan]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
       actions: read
@@ -671,6 +704,15 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
       - name: Restore the Gradle caches (orchestrator + Java server)
         id: gradle-cache
         uses: actions/cache/restore@v4
@@ -678,14 +720,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-mpl-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-mpl-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
               'mpl/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-mpl-gradle-
+            ${{ needs.plan.outputs.platform }}-mpl-gradle-
 
       - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
         env:
@@ -716,7 +758,7 @@ jobs:
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
         working-directory: mpl/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
       - name: Wait for the prebuilt servers
         # Each server the plan found missing is published by its prebuild job;
@@ -769,6 +811,22 @@ jobs:
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
             done
           }
+          # unpack <archive> <root file>: extracts under this runner's work
+          # directory and rewrites the packing runner's directory in the
+          # extracted text files (e.g. venv scripts and pyvenv.cfg).
+          unpack() {
+            local archive="$1" root_file="$2" root old f
+            root=$(dirname "$RUNNER_WORKSPACE")
+            tar -xzPf "$archive" --transform "s|^@RUNNER_ROOT@/|$root/|"
+            old=$(cat "$root_file")
+            [ "$old" != "$root" ] || return 0
+            tar -tzPf "$archive" | sed "s|^@RUNNER_ROOT@/|$root/|" |
+              while IFS= read -r f; do
+                if [ -f "$f" ] && [ ! -L "$f" ] && grep -qIF -- "$old" "$f"; then
+                  sed -i "s|$old|$root|g" "$f"
+                fi
+              done
+          }
           mkdir -p "$RUNNER_TEMP/prebuilt"
           for pair in rust:rust rustdafny:rust-dafny net:net go:go java:java python:python; do
             k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
@@ -778,7 +836,7 @@ jobs:
             echo "$language: $repo artifact $id"
             GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
-            tar -xzPf "$RUNNER_TEMP/prebuilt/$language.tgz"
+            unpack "$RUNNER_TEMP/prebuilt/$language.tgz" "$RUNNER_TEMP/prebuilt/$language.root"
           done
 
       - name: Check every prebuilt server arrived
@@ -815,7 +873,7 @@ jobs:
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
       - name: Publish test results to the run summary
         if: always()
@@ -846,7 +904,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-mpl-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-mpl-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'mpl/test-server/*/build.gradle.kts',
