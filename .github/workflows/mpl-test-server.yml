@@ -41,6 +41,8 @@ permissions:
   actions: read
   # The reusable workflow's test job assumes an AWS role through GitHub OIDC.
   id-token: write
+  # Its resolve job reads the pull request description.
+  pull-requests: read
 
 jobs:
   mpl:
@@ -50,5 +52,8 @@ jobs:
       focus: ${{ inputs.focus || '' }}
       language-repository: ${{ inputs.language-repository || '' }}
       language-ref: ${{ inputs.language-ref || '' }}
+      # The MPL repository's CI role does not trust this repository; this one
+      # does, and reads the hierarchical keyring fixtures.
+      aws-role-arn: arn:aws:iam::370957321024:role/GitHub-CI-Public-ESDK-Dafny-Role-us-west-2
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
