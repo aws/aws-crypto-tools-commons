@@ -1100,6 +1100,10 @@ jobs:
           echo "rustc=$(rustc --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
           echo "go_version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
           echo "python_version=$(python3 -c 'import platform; print(platform.python_version())')" >> "$GITHUB_OUTPUT"
+          # A venv holds absolute paths: its interpreter symlink and its
+          # editable installs. It only works again at the same workspace path
+          # with the same interpreter, so both go in its cache key.
+          echo "python_venv_path=$(printf '%s\n%s\n' "$GITHUB_WORKSPACE" "$(python3 -c 'import sys; print(sys.base_prefix)')" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       - name: Restore the materialized aws-encryption-sdk-javascript clone
         # NodeLaunchPlan's stamp skips the root npm ci + lerna build-node +
@@ -1143,7 +1147,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}-${{ steps.pins.outputs.python_venv_path }}
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -1607,5 +1611,5 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}-${{ steps.pins.outputs.python_venv_path }}
 

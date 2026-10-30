@@ -40,7 +40,7 @@ class PythonLaunchPlanTest {
         assertEquals(Path.of("/scratch/python-launch/venv"), VENV,
             "the venv lives inside the plan-owned work directory");
         assertEquals(
-            List.of("python3", "-m", "venv", VENV.toString()),
+            List.of("python3", "-m", "venv", "--clear", VENV.toString()),
             PythonLaunchPlan.createVenvCommand("python3", VENV));
     }
 
