@@ -624,7 +624,7 @@ public final class TestServerOrchestrator {
             if (!server.reachable()) {
                 return PipelineOutcome.aborted("the " + server.language()
                     + " Language_Server is no longer reachable on its configured port "
-                    + server.port());
+                    + server.port() + server.state());
             }
         }
 

@@ -7,9 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for the shared {@link SubprocessLauncher} machinery's failure
@@ -127,5 +130,63 @@ class SubprocessLauncherTest {
             assertTrue(ex.getMessage().contains(bad),
                 "the error must carry the rejected value");
         }
+    }
+
+    @Test
+    @DisplayName("a server whose bind loses the port to another socket is started again")
+    void addressInUseAtStartupIsRetried(@TempDir Path dir) throws Exception {
+        int port = freePort();
+        Path marker = dir.resolve("tried");
+        // The first start reports what a server's bind prints when another
+        // socket holds the port, and exits; the second start serves.
+        ProcessBuilder flaky = new ProcessBuilder("sh", "-c",
+            "if [ ! -e '" + marker + "' ]; then touch '" + marker + "';"
+                + " echo 'listen tcp 127.0.0.1:" + port + ": bind: address already in use'; exit 1; fi;"
+                + " exec python3 -m http.server " + port + " --bind 127.0.0.1");
+        flaky.redirectErrorStream(true);
+        flaky.redirectOutput(dir.resolve("server.log").toFile());
+        SubprocessLauncher launcher = new SubprocessLauncher(Duration.ofSeconds(30));
+
+        LaunchedServer server = launcher.launch("go", port, flaky);
+        try {
+            assertTrue(server.reachable(), "the second start must serve on the port");
+        } finally {
+            server.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a server that keeps losing its port is a BUILD failure that shows its log")
+    void addressInUseEveryTimeIsBuildFailure(@TempDir Path dir) {
+        int port = freePort();
+        ProcessBuilder alwaysInUse = new ProcessBuilder("sh", "-c",
+            "echo 'OSError: [Errno 98] Address already in use'; exit 1");
+        alwaysInUse.redirectErrorStream(true);
+        alwaysInUse.redirectOutput(dir.resolve("server.log").toFile());
+        SubprocessLauncher launcher = new SubprocessLauncher(Duration.ofSeconds(30));
+
+        ServerLaunchException ex = assertThrows(ServerLaunchException.class,
+            () -> launcher.launch("python", port, alwaysInUse));
+        assertEquals(ServerLaunchException.Category.BUILD, ex.category());
+        assertTrue(ex.getMessage().contains("Address already in use"),
+            "the failure must carry the server's own log line");
+    }
+
+    @Test
+    @DisplayName("a server that exits for another reason is not started again")
+    void otherEarlyExitIsNotRetried(@TempDir Path dir) throws IOException {
+        int port = freePort();
+        Path starts = dir.resolve("starts");
+        ProcessBuilder crashes = new ProcessBuilder("sh", "-c",
+            "echo x >> '" + starts + "'; echo 'panicked: bad config'; exit 101");
+        crashes.redirectErrorStream(true);
+        crashes.redirectOutput(dir.resolve("server.log").toFile());
+        SubprocessLauncher launcher = new SubprocessLauncher(Duration.ofSeconds(30));
+
+        ServerLaunchException ex = assertThrows(ServerLaunchException.class,
+            () -> launcher.launch("rust", port, crashes));
+        assertEquals(ServerLaunchException.Category.BUILD, ex.category());
+        assertTrue(ex.getMessage().contains("panicked: bad config"));
+        assertEquals(1, Files.readAllLines(starts).size(), "a crash must not be retried");
     }
 }

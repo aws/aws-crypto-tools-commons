@@ -1,8 +1,10 @@
 package aws.cryptography.testserver.orchestrator.launch;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * A running {@code Language_Server} bound to its configured port (Requirement
@@ -39,6 +41,7 @@ public final class LaunchedServer {
     private final URI endpoint;
     private final Terminator terminator;
     private final BooleanSupplier reachabilityProbe;
+    private final Supplier<String> state;
     private CloseResult closeResult;
 
     /**
@@ -60,21 +63,39 @@ public final class LaunchedServer {
         this.endpoint = endpoint;
         this.terminator = terminator;
         this.reachabilityProbe = reachabilityProbe;
+        this.state = () -> "";
+    }
+
+    private LaunchedServer(String language, int port, URI endpoint, Terminator terminator,
+            Supplier<String> state) {
+        this.language = language;
+        this.port = port;
+        this.endpoint = endpoint;
+        this.terminator = terminator;
+        this.reachabilityProbe = () -> Ports.acceptsConnection(port);
+        this.state = state;
     }
 
     /**
      * A server backed by a launched subprocess: {@code close()} kills the whole
      * process tree, then verifies {@code port} no longer accepts connections
-     * (Requirements 2.6, 2.11).
+     * (Requirements 2.6, 2.11). {@code log} is the file the server writes to
+     * (null if none); its last lines explain a server that stops answering.
      */
-    public static LaunchedServer forProcess(String language, int port, URI endpoint, Process process) {
-        return new LaunchedServer(language, port, endpoint, () -> {
+    public static LaunchedServer forProcess(String language, int port, URI endpoint, Process process,
+            Path log) {
+        Terminator terminator = () -> {
             boolean treeTerminated = ProcessTrees.killTree(process.toHandle());
             boolean portReleased = Ports.awaitReleased(port, PORT_RELEASE_WAIT);
             return treeTerminated && portReleased
                 ? CloseResult.stopped()
                 : CloseResult.stillRunning(language);
-        });
+        };
+        Supplier<String> state = () -> (process.isAlive()
+                ? " (its process is still running)"
+                : " (its process exited with code " + process.exitValue() + ")")
+            + ServerLogs.tail(log);
+        return new LaunchedServer(language, port, endpoint, terminator, state);
     }
 
     public String language() {
@@ -100,6 +121,14 @@ public final class LaunchedServer {
      */
     public boolean reachable() {
         return reachabilityProbe.getAsBoolean();
+    }
+
+    /**
+     * @return what is known about the server's process and its last log
+     *     lines, as a message suffix; "" for a server with no process
+     */
+    public String state() {
+        return state.get();
     }
 
     /**
