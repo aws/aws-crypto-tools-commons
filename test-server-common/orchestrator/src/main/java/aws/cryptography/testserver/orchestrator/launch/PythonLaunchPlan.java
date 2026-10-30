@@ -196,9 +196,14 @@ public final class PythonLaunchPlan implements Launcher {
         return venvDir.resolve("bin").resolve("pip");
     }
 
-    /** {@code python3 -m venv <venvDir>} (the Makefile's venv creation). */
+    /**
+     * {@code python3 -m venv --clear <venvDir>} (the Makefile's venv creation).
+     * {@code --clear} replaces a venv whose interpreter link no longer resolves,
+     * for example one restored from a cache saved on a runner with a different
+     * Python install path.
+     */
     static List<String> createVenvCommand(String python3, Path venvDir) {
-        return List.of(python3, "-m", "venv", venvDir.toString());
+        return List.of(python3, "-m", "venv", "--clear", venvDir.toString());
     }
 
     /** {@code <venv>/bin/pip install --quiet --upgrade pip}. */
