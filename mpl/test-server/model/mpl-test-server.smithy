@@ -13,14 +13,15 @@ use smithy.protocols#rpcv2Cbor
 /// CMM materials retrieval.
 ///
 /// Scope is the MPL surface every configured Language_Server implements: the
-/// Raw AES keyring and the Default CMM, over ESDK algorithm suites only.
+/// Raw AES keyring, the AWS KMS Hierarchical keyring with its key store and
+/// materials cache, and the Default CMM, over ESDK algorithm suites only.
 /// Keyrings, CMMs, and suite formats a server does not implement are not
 /// modeled.
 ///
 /// Every Create* operation returns an opaque ResourceId into a server-side
-/// registry, because a keyring or CMM cannot cross the wire. Every operation on
-/// a created resource takes that id back. A server MUST answer an absent,
-/// unknown, or wrong-kind id with GenericServerError.
+/// registry, because a keyring, CMM, key store, or materials cache cannot cross
+/// the wire. Every operation on a created resource takes that id back. A server
+/// MUST answer an absent, unknown, or wrong-kind id with GenericServerError.
 ///
 /// Errors travel as the rpcv2Cbor body `{"__type": <shape id>, "message": ...}`
 /// with HTTP 400, where <shape id> is exactly
@@ -31,6 +32,9 @@ service MPLTestServer {
     version: "2026-09-28"
     operations: [
         CreateRawAesKeyring
+        CreateKeyStoreClient
+        CreateCryptographicMaterialsCache
+        CreateAwsKmsHierarchicalKeyring
         CreateDefaultCmm
         InitializeEncryptionMaterials
         InitializeDecryptionMaterials
@@ -53,6 +57,31 @@ service MPLTestServer {
 operation CreateRawAesKeyring {
     input: CreateRawAesKeyringRequest
     output: CreateRawAesKeyringResponse
+    errors: [GenericServerError, MPLClientError]
+}
+
+/// Construct and register a key store client over an existing DynamoDB branch
+/// key store table, returning its handle. This constructs the KeyStore; it is
+/// not the KeyStore's CreateKeyStore operation, which creates the table.
+operation CreateKeyStoreClient {
+    input: CreateKeyStoreClientRequest
+    output: CreateKeyStoreClientResponse
+    errors: [GenericServerError, MPLClientError]
+}
+
+/// Construct and register a materials cache, returning its handle. A cache
+/// handle passed to more than one hierarchical keyring is shared between them.
+operation CreateCryptographicMaterialsCache {
+    input: CreateCryptographicMaterialsCacheRequest
+    output: CreateCryptographicMaterialsCacheResponse
+    errors: [GenericServerError, MPLClientError]
+}
+
+/// Construct and register an AWS KMS Hierarchical keyring over a
+/// previously-registered key store, returning its handle.
+operation CreateAwsKmsHierarchicalKeyring {
+    input: CreateAwsKmsHierarchicalKeyringRequest
+    output: CreateAwsKmsHierarchicalKeyringResponse
     errors: [GenericServerError, MPLClientError]
 }
 
@@ -178,6 +207,149 @@ structure CreateRawAesKeyringResponse {
     /// Handle referencing the registered keyring for subsequent operations.
     @required
     keyringId: ResourceId
+}
+
+// ===========================================================================
+// CreateKeyStoreClient shapes
+// ===========================================================================
+
+/// The server builds the key store's DynamoDB and KMS clients itself, from the
+/// ambient AWS credentials and the regions given here. The regions are explicit
+/// so every server reaches the same endpoints regardless of its environment.
+@input
+structure CreateKeyStoreClientRequest {
+    /// DynamoDB table holding the branch keys.
+    @required
+    ddbTableName: String
+
+    /// Logical key store name bound into each branch key's encryption context.
+    @required
+    logicalKeyStoreName: String
+
+    /// How the key store chooses the KMS key that unwraps a branch key.
+    @required
+    kmsConfiguration: KmsConfiguration
+
+    /// Region of the key store's KMS client.
+    @required
+    kmsClientRegion: String
+
+    /// Region of the key store's DynamoDB client.
+    @required
+    ddbClientRegion: String
+}
+
+/// Mirrors the key store's KMSConfiguration.
+union KmsConfiguration {
+    /// Use only this KMS key. An MRK ARN is treated as single-region: a branch
+    /// key whose record names another region's replica is rejected.
+    kmsKeyArn: String
+
+    /// Use only this KMS key, matching a record that names any replica of the
+    /// same multi-Region key.
+    kmsMRKeyArn: String
+
+    /// Use the KMS key ARN each branch key record names.
+    discovery: Discovery
+
+    /// Use the KMS key ARN each branch key record names, with an MRK ARN's
+    /// region replaced by the given region.
+    mrDiscovery: MRDiscovery
+}
+
+structure Discovery {}
+
+structure MRDiscovery {
+    @required
+    region: String
+}
+
+@output
+structure CreateKeyStoreClientResponse {
+    /// Handle referencing the registered key store for subsequent operations.
+    @required
+    keyStoreId: ResourceId
+}
+
+// ===========================================================================
+// CreateCryptographicMaterialsCache shapes
+// ===========================================================================
+
+/// The MPL's Default cache type.
+@input
+structure CreateCryptographicMaterialsCacheRequest {
+    /// Maximum number of entries the cache holds.
+    @required
+    @range(min: 1)
+    entryCapacity: Integer
+}
+
+@output
+structure CreateCryptographicMaterialsCacheResponse {
+    /// Handle referencing the registered cache.
+    @required
+    cacheId: ResourceId
+}
+
+// ===========================================================================
+// CreateAwsKmsHierarchicalKeyring shapes
+// ===========================================================================
+
+/// Exactly one of branchKeyId and branchKeyIdSupplier is set for a valid
+/// keyring; the request passes both, or neither, through to the MPL unchanged,
+/// so the MPL's own validation answers with MPLClientError.
+@input
+structure CreateAwsKmsHierarchicalKeyringRequest {
+    /// Handle of a previously-registered key store.
+    @required
+    keyStoreId: ResourceId
+
+    /// A single branch key used for every request.
+    branchKeyId: String
+
+    /// Selects the branch key per request from the encryption context.
+    branchKeyIdSupplier: StaticBranchKeyIdSupplier
+
+    /// How long, in seconds, fetched branch key materials stay in the cache.
+    /// Each server converts this to its MPL's TTL type (for example a
+    /// std::time::Duration in native Rust, the integer itself in Java).
+    @required
+    ttlSeconds: Integer
+
+    /// Handle of a previously-registered cache, used as the keyring's Shared
+    /// cache. When absent the keyring creates its own default cache.
+    cacheId: ResourceId
+
+    /// Partition of a shared cache this keyring reads and writes. When absent
+    /// the MPL generates a random one.
+    partitionId: String
+}
+
+@output
+structure CreateAwsKmsHierarchicalKeyringResponse {
+    /// Handle referencing the registered keyring for subsequent operations.
+    @required
+    keyringId: ResourceId
+}
+
+/// A branch key id supplier described as data, because the MPL's supplier is a
+/// callback that cannot cross the wire. The server implements the MPL's branch
+/// key id supplier interface as: look up the encryption context value under
+/// encryptionContextKey; if branchKeyIds maps that value, return the mapped
+/// branch key id; otherwise fail, so the keyring operation fails with
+/// MPLClientError.
+structure StaticBranchKeyIdSupplier {
+    @required
+    encryptionContextKey: String
+
+    /// Encryption context value to branch key id.
+    @required
+    branchKeyIds: BranchKeyIdMap
+}
+
+map BranchKeyIdMap {
+    key: String
+    value: String
 }
 
 // ===========================================================================

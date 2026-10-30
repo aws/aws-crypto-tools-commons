@@ -9,8 +9,22 @@
 # The java, net, and python servers build on the MPL's own source: each
 # transpiles AwsCryptographicMaterialProviders and its dependencies from Dafny
 # (smithy-dafny, Dafny 4.9.0) and builds that runtime. The go and rust-dafny servers build on
-# the MPL's committed generated code (releases/). The Tests are offline: no AWS
-# credentials are needed.
+# the MPL's committed generated code (releases/). The hierarchical keyring
+# Tests read branch keys from DynamoDB and unwrap them with KMS, so the test
+# job assumes an AWS role (see AWS CREDENTIALS); every other Test is offline.
+#
+# AWS CREDENTIALS: only the `mpl-test-server` job assumes a role, through
+# GitHub OIDC, so the calling workflow must grant `id-token: write`. The role
+# defaults to the one the MPL repository's CI uses,
+# GitHub-CI-MPL-Dafny-Role-us-west-2, which trusts only that repository; any
+# other caller passes a role that trusts it in `aws-role-arn`.
+#
+# PULL REQUEST DESCRIPTION: the `resolve` job reads the calling pull request's
+# description for Test-Server-Override lines, so the calling workflow must
+# grant `pull-requests: read`. Without it, a private repository falls back to
+# the description as it was when the run was triggered. A role the caller cannot assume leaves
+# the run without credentials rather than failing it: the offline Tests still
+# run, and the hierarchical keyring Tests fail on their first AWS call.
 #
 # JOBS: `plan` keys every server on its commit and lists the ones with no
 # prebuilt output; `prebuild` builds only
@@ -69,6 +83,12 @@ on:
         description: The aws-crypto-tools-commons ref to run when called from another repository.
         type: string
         default: main
+      aws-role-arn:
+        description: >-
+          AWS role the test job assumes through GitHub OIDC, for the
+          hierarchical keyring Tests. Defaults to the MPL repository's CI role.
+        type: string
+        default: ""
       save-caches:
         description: >-
           Save the dependency caches from this run. They are saved from the
@@ -119,6 +139,10 @@ jobs:
   resolve:
     name: resolve refs
     runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      # The resolve script reads the pull request description.
+      pull-requests: read
     outputs:
       commons_ref: ${{ steps.refs.outputs.commons_ref }}
       language_repository: ${{ steps.refs.outputs.language_repository }}
@@ -648,9 +672,15 @@ jobs:
       && needs.plan.result == 'success'
       && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
     runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      actions: read
+      # GitHub OIDC, for the AWS credentials step.
+      id-token: write
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
+      MPL_TEST_SERVER_ROLE_ARN: ${{ inputs.aws-role-arn || 'arn:aws:iam::370957321024:role/GitHub-CI-MPL-Dafny-Role-us-west-2' }}
     steps:
       - name: Keep the server ports out of the ephemeral port range
         # The kernel gives each outgoing connection a source port from
@@ -830,6 +860,17 @@ jobs:
             echo "::error::prebuilt servers not restored:$missing"
             exit 1
           fi
+
+      - name: Assume the AWS role for the hierarchical keyring Tests
+        # continue-on-error: a caller whose repository the role does not trust
+        # still runs the offline Tests; the hierarchical keyring Tests then
+        # fail on their first AWS call.
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.MPL_TEST_SERVER_ROLE_ARN }}
+          role-session-name: MPLTestServer
+          aws-region: us-west-2
 
       - name: Run the test suite (make orchestrate)
         # Launches every configured server (every library build skipped by its
