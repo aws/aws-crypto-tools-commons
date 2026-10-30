@@ -1242,21 +1242,43 @@ jobs:
         # One download of the awslabs/aws-encryption-sdk-test-vectors
         # awses-decrypt corpora, extracted under $RUNNER_TEMP; every
         # Language_Server then replays them (ReleasedVectorDecryptTests). The
-        # default offline (raw-keyring) positive vectors need no KMS. A corpus
-        # that fails to fetch is skipped, not fatal — the harness runs whatever
-        # is present and skips when none is.
+        # default offline (raw-keyring) vectors need no KMS. Every corpus is
+        # required: a failed fetch fails the job.
         shell: bash
+        env:
+          REPO_PAT: ${{ secrets.repo-pat }}
         run: |
           DIR="$RUNNER_TEMP/released-vectors"
           mkdir -p "$DIR"
           base="https://github.com/awslabs/aws-encryption-sdk-test-vectors/raw/master/vectors/awses-decrypt"
           for corpus in python-1.3.5 python-1.3.7 python-1.3.8 python-2.0.0 python-2.2.0 python-2.3.0; do
-            if curl -fsSL --retry 3 -o "$DIR/$corpus.zip" "$base/$corpus.zip"; then
-              mkdir -p "$DIR/$corpus"
-              unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus" && rm -f "$DIR/$corpus.zip"
-            else
-              echo "::warning::could not fetch $corpus decrypt vectors; skipping that corpus"
-            fi
+            curl -fsSL --retry 5 --retry-all-errors -o "$DIR/$corpus.zip" "$base/$corpus.zip"
+            mkdir -p "$DIR/$corpus"
+            unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus"
+            rm -f "$DIR/$corpus.zip"
+          done
+          # Messages the Java and Python MasterKeyProvider APIs write today, from the
+          # newest green aws-encryption-sdk Daily CI run. Too large to vendor
+          # (~9 MB of raw-AES ciphertexts each).
+          read -r run_id sha < <(GH_TOKEN="$REPO_PAT" gh run list -R aws/aws-encryption-sdk \
+            --workflow daily_ci.yml --branch mainline --status success -L 1 \
+            --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"') || true
+          if [ -z "${run_id:-}" ]; then
+            echo "::error::no green aws-encryption-sdk Daily CI run to take the MKP corpora from" >&2
+            exit 1
+          fi
+          for writer in java_mkp python_mkp; do
+            for attempt in 1 2 3; do
+              GH_TOKEN="$REPO_PAT" gh run download "$run_id" -R aws/aws-encryption-sdk \
+                -n "ubuntu-22.04_vector_artifact_${writer}_legacy_format_${sha}" \
+                -D "$DIR/daily-${writer}" && break
+              if [ "$attempt" = 3 ]; then
+                echo "::error::could not fetch the $writer decrypt vectors from run $run_id" >&2
+                exit 1
+              fi
+              rm -rf "$DIR/daily-${writer}"
+              sleep 15
+            done
           done
           echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
 
@@ -1457,6 +1479,9 @@ jobs:
           # nine servers building concurrently on a 2-core hosted runner the
           # default 180s starves it out — 900s absorbs the contention.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          # The .NET server allocates heavily per request; the default workstation
+          # GC collects on one thread and keeps the server near one core.
+          DOTNET_gcServer: "1"
           FOCUS: ${{ inputs.focus }}
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
@@ -1464,7 +1489,16 @@ jobs:
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
           ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
-        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
+        run: |
+          # The build steps above launch some servers to check they start; one that
+          # outlives its step holds its port, and the run below would talk to it.
+          for port in $(seq 8091 8099); do
+            if fuser -n tcp "$port" > /dev/null 2>&1; then
+              echo "::warning::port $port still in use before the run: $(ss -ltnpH "sport = :$port")"
+              fuser -k -n tcp "$port" > /dev/null 2>&1 || true
+            fi
+          done
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
