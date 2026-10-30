@@ -400,6 +400,18 @@ jobs:
       OUT_KEY: ${{ matrix.language == 'rust' && needs.plan.outputs.key_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'java' && needs.plan.outputs.key_java || needs.plan.outputs.key_python }}
       OUT_PATHS: ${{ matrix.language == 'rust' && needs.plan.outputs.paths_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'java' && needs.plan.outputs.paths_java || needs.plan.outputs.paths_python }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -641,6 +653,18 @@ jobs:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
