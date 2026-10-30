@@ -149,7 +149,7 @@ errors = []
 if server.get("product") != "esdk":
     errors.append('product is %r, expected exactly "esdk"' % server.get("product"))
 features = feature.get("features")
-if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "raw-ecdh", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "aws-kms-ecdh", "required-encryption-context", "caching"]):
+if not isinstance(features, list) or sorted(features) != sorted(["streaming", "MPL", "hierarchical", "raw-aes", "raw-rsa", "raw-ecdh", "multi", "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa", "aws-kms-ecdh", "required-encryption-context", "default-cmm-reproduced-encryption-context", "caching"]):
     errors.append('Feature_Catalog is %r, expected exactly the per-keyring/per-CMM Feature_Catalog' % features)
 print("\n".join(errors))
 sys.exit(1 if errors else 0)
