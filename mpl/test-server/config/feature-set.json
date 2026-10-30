@@ -5,7 +5,19 @@
     "supported/unsupported half of every feature here in its own feature-config.json;",
     "the union must equal this catalog. Each feature names one keyring or CMM",
     "a Language_Server may implement. Add a feature here together with the",
-    "model operations and Tests that exercise it."
+    "model operations and Tests that exercise it.",
+    "",
+    "NOT TESTED: MPL behavior the Dafny MPL tests cover that has no model operation",
+    "or Feature here, and no Tests.",
+    "  - Raw RSA and AWS KMS RSA keyrings: the native Rust MPL has no RSA.",
+    "  - Raw ECDH and AWS KMS ECDH keyrings: the native Rust MPL has no ECDH.",
+    "  - Required Encryption Context CMM: the native Rust MPL has none.",
+    "  - requiredEncryptionContextKeys on GetEncryptionMaterials (AllDefaultCmm.dfy",
+    "    success set): GetEncryptionMaterialsRequest has no such member, so only",
+    "    the reproducedEncryptionContext half of that set is ported.",
+    "  - Missing-plaintext-data-key vectors (AllDefaultCmm.dfy): they need a static",
+    "    keyring that returns a fixed or absent data key; the model has none.",
+    "  - AWS KMS hierarchical keyring and branch key store: not yet modeled."
   ],
   "product": "mpl",
   "features": [
