@@ -40,9 +40,22 @@ final class Ports {
         }
     }
 
-    /** @return true iff something on loopback {@code port} accepts a TCP connection (Req 2.9). */
+    /**
+     * @return true iff something on loopback {@code port} accepts a TCP connection (Req 2.9).
+     *
+     * <p>When {@code port} is inside the host's ephemeral range, the kernel can
+     * pick {@code port} itself as this socket's source port. The connect then
+     * succeeds with nothing listening (a TCP self-connect), and the socket
+     * holds the port so the server's own bind fails. The source port is
+     * therefore bound first, and the probe never connects from {@code port}.
+     */
     static boolean acceptsConnection(int port) {
         try (Socket socket = new Socket()) {
+            socket.setReuseAddress(true);
+            socket.bind(new InetSocketAddress("127.0.0.1", 0));
+            if (socket.getLocalPort() == port) {
+                return false;
+            }
             socket.connect(new InetSocketAddress("127.0.0.1", port), CONNECT_TIMEOUT_MILLIS);
             return true;
         } catch (IOException e) {
