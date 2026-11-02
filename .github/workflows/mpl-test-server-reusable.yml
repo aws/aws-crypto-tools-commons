@@ -3,7 +3,7 @@
 #
 # A run builds and launches every configured MPL Language_Server, runs
 # the Tests over the server pairs, and fails on any failed Test. The native
-# rust server lives in aws-crypto-tools-rust (mpl-test-server/); the java,
+# rust server lives in aws-crypto-tools-rust (mpl/test-server/); the java,
 # net, python, go, and rust-dafny servers live in
 # aws-cryptographic-material-providers-library (test-server/mpl/<lang>-v<major>-server/).
 # The java, net, and python servers build on the MPL's own source: each
