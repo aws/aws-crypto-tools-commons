@@ -15,8 +15,12 @@
     "  - requiredEncryptionContextKeys on GetEncryptionMaterials (AllDefaultCmm.dfy",
     "    success set): GetEncryptionMaterialsRequest has no such member, so only",
     "    the reproducedEncryptionContext half of that set is ported.",
-    "  - Missing-plaintext-data-key vectors (AllDefaultCmm.dfy): they need a static",
-    "    keyring that returns a fixed or absent data key; the model has none.",
+    "  - The materials checks on a keyring the Default CMM did not call: a keyring",
+    "    called directly, or the materials a CMM other than the Default CMM",
+    "    returns. The Dafny MPL checks only the keyring its Default CMM calls.",
+    "  - The keyring changing a signing key, removing an encrypted data key, or",
+    "    replacing a data key: the Default CMM's signing key is random, and the",
+    "    materials it hands a keyring have no data key yet.",
     "  - Hierarchical keyring over DBE suites (TestHierarchyClientDBESuite): the",
     "    model has ESDK suites only. The branch key id supplier tests, which the",
     "    Dafny MPL runs over a DBE suite, are ported over an ESDK suite.",
@@ -34,6 +38,7 @@
   "features": [
     "raw-aes",
     "hierarchical",
-    "default-cmm"
+    "default-cmm",
+    "static-keyring"
   ]
 }
