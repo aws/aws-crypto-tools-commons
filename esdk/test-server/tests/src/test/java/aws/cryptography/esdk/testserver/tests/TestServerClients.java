@@ -3,6 +3,9 @@ package aws.cryptography.esdk.testserver.tests;
 import aws.cryptography.esdk.testserver.client.client.ESDKTestServerClient;
 import aws.cryptography.testserver.tests.TestServerClientCache;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 
@@ -22,6 +25,9 @@ public final class TestServerClients {
     private static final TestServerClientCache<ESDKTestServerClient> CACHE =
         new TestServerClientCache<>(TestServerClients::build);
 
+    /** A request a Language_Server has not answered by now fails instead of hanging the run. */
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(60);
+
     private TestServerClients() {
     }
 
@@ -38,7 +44,9 @@ public final class TestServerClients {
     private static ESDKTestServerClient build(URI endpoint) {
         return ESDKTestServerClient.builder()
             .endpoint(endpoint.toString())
-            .transport(new JavaHttpClientTransport())
+            .transport(new JavaHttpClientTransport(
+                HttpClient.newBuilder().executor(Executors.newVirtualThreadPerTaskExecutor()).build(),
+                REQUEST_TIMEOUT))
             .build();
     }
 }

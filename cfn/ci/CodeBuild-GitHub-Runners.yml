@@ -1,0 +1,674 @@
+# CodeBuild-hosted GitHub Actions runners for the Crypto Tools repositories.
+#
+# Creates a reserved-capacity Linux fleet (and, when enabled, macOS and Windows
+# fleets), one runner project per repository and fleet (each project registers
+# its own repository webhook), and a CloudWatch dashboard of Linux runner usage.
+#
+# Each fleet has a fixed number of instances. The Linux and Windows fleets
+# overflow to on-demand compute; CodeBuild has no on-demand macOS compute, so
+# macOS jobs beyond the fleet's capacity queue.
+#
+# Prerequisite: a Secrets Manager secret, in the stack's region, holding a
+# GitHub personal access token (scopes repo, admin:repo_hook) of a user who is
+# admin on every listed repository. Its value must be
+#   {"ServerType":"GITHUB","AuthType":"PERSONAL_ACCESS_TOKEN","Token":"<token>"}
+#
+# Deploy:
+#   aws cloudformation deploy \
+#     --region us-west-2 \
+#     --stack-name CryptoTools-CodeBuild-GitHub-Runners \
+#     --template-file cfn/ci/CodeBuild-GitHub-Runners.yml \
+#     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+#     --parameter-overrides GitHubTokenSecretArn=<secret-arn>
+#
+# A workflow job selects a runner with:
+#   runs-on: codebuild-<ProjectPrefix>-<linux|macos|windows>-<repo-name>-${{ github.run_id }}-${{ github.run_attempt }}
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::LanguageExtensions
+Description: CodeBuild-hosted GitHub Actions runners for Crypto Tools CI
+
+Parameters:
+  Repositories:
+    Type: CommaDelimitedList
+    Description: owner/name of each GitHub repository that gets runner projects.
+    Default: aws/aws-crypto-tools-rust
+  ProjectPrefix:
+    Type: String
+    Description: Prefix of each fleet and runner project name.
+    Default: CryptoToolsCI
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9_-]*$'
+  GitHubTokenSecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret holding the GitHub token.
+  BuildTimeoutMinutes:
+    Type: Number
+    Description: Maximum minutes one runner build (one workflow job) may run.
+    MinValue: 5
+    MaxValue: 2160
+    Default: 360
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+  AlarmTopicArn:
+    Type: String
+    Description: SNS topic notified by the alarms. Empty creates alarms with no action.
+    Default: ''
+  DashboardSharingRoleName:
+    Type: String
+    Description: >-
+      Existing IAM role that shared CloudWatch dashboards assume to read this
+      account. The stack lets it query the cost table's log group. Empty skips.
+    Default: CloudWatchDashboards
+
+  LinuxComputeType:
+    Type: String
+    AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE, BUILD_GENERAL1_XLARGE, BUILD_GENERAL1_2XLARGE]
+    Default: BUILD_GENERAL1_LARGE
+  LinuxImage:
+    Type: String
+    Default: aws/codebuild/standard:7.0
+  LinuxPrivilegedMode:
+    Type: String
+    Description: >-
+      Run Linux builds in privileged mode, which starts a Docker daemon so jobs
+      can use Docker container actions, service containers, and docker run.
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+  LinuxFleetCapacity:
+    Type: Number
+    Description: Linux fleet instances. Builds beyond them run on demand.
+    MinValue: 1
+    Default: 2
+
+  EnableMacFleet:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+  MacComputeType:
+    Type: String
+    Description: >-
+      macOS fleet compute type. CodeBuild cannot change a macOS fleet's compute
+      type in place, so changing this replaces the fleet.
+    AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE]
+    Default: BUILD_GENERAL1_LARGE
+  MacImage:
+    Type: String
+    Default: aws/codebuild/macos-arm-base:15
+  MacFleetCapacity:
+    Type: Number
+    Description: macOS fleet instances. Fixed size; jobs beyond it queue.
+    MinValue: 1
+    Default: 2
+
+  EnableWindowsFleet:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+  WindowsComputeType:
+    Type: String
+    AllowedValues: [BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE]
+    Default: BUILD_GENERAL1_LARGE
+  WindowsImage:
+    Type: String
+    Default: aws/codebuild/windows-base:2019-3.0
+  WindowsFleetCapacity:
+    Type: Number
+    Description: Windows fleet instances. Builds beyond them run on demand.
+    MinValue: 1
+    Default: 1
+
+  # USD per minute, used only for the dashboard's cost estimate. Defaults are
+  # the us-west-2 prices for the default compute types.
+  LinuxReservedRate:
+    Type: Number
+    Default: 0.012
+  LinuxOnDemandRate:
+    Type: Number
+    Default: 0.020
+  WindowsReservedRate:
+    Type: Number
+    Default: 0.0216
+  WindowsOnDemandRate:
+    Type: Number
+    Default: 0.036
+
+Conditions:
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
+  MacFleet: !Equals [!Ref EnableMacFleet, 'true']
+  MacFleetLarge: !Equals [!Ref MacComputeType, BUILD_GENERAL1_LARGE]
+  WindowsFleet: !Equals [!Ref EnableWindowsFleet, 'true']
+  HasDashboardSharingRole: !Not [!Equals [!Ref DashboardSharingRoleName, '']]
+
+Resources:
+  BuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/${ProjectPrefix}
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Jobs on these runners get this role's credentials, so it carries only what
+  # the runner itself needs. Workflows that call AWS keep assuming their own
+  # role through GitHub OIDC.
+  RunnerServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: runner
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${BuildLogGroup}:log-stream:*
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref GitHubTokenSecretArn
+
+  LinuxFleet:
+    Type: AWS::CodeBuild::Fleet
+    Properties:
+      Name: !Sub ${ProjectPrefix}-linux-fleet
+      EnvironmentType: LINUX_CONTAINER
+      ComputeType: !Ref LinuxComputeType
+      BaseCapacity: !Ref LinuxFleetCapacity
+      OverflowBehavior: ON_DEMAND
+
+  MacFleet:
+    Type: AWS::CodeBuild::Fleet
+    Condition: MacFleet
+    Properties:
+      # The name can only be set at creation, so naming the fleet by its
+      # compute type makes a new compute type create a new fleet and then
+      # delete the old one.
+      Name: !Sub
+        - ${ProjectPrefix}-macos-${Size}-fleet
+        - Size: !If [MacFleetLarge, large, medium]
+      EnvironmentType: MAC_ARM
+      ComputeType: !Ref MacComputeType
+      BaseCapacity: !Ref MacFleetCapacity
+      OverflowBehavior: QUEUE
+
+  WindowsFleet:
+    Type: AWS::CodeBuild::Fleet
+    Condition: WindowsFleet
+    Properties:
+      Name: !Sub ${ProjectPrefix}-windows-fleet
+      EnvironmentType: WINDOWS_SERVER_2019_CONTAINER
+      ComputeType: !Ref WindowsComputeType
+      BaseCapacity: !Ref WindowsFleetCapacity
+      OverflowBehavior: ON_DEMAND
+
+  Fn::ForEach::RepositoryRunners:
+    - Repo
+    - !Ref Repositories
+    - LinuxRunner&{Repo}:
+        Type: AWS::CodeBuild::Project
+        Properties:
+          Name: !Join ['-', [!Ref ProjectPrefix, linux, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions Linux runner for ', !Ref Repo]]
+          ServiceRole: !GetAtt RunnerServiceRole.Arn
+          TimeoutInMinutes: !Ref BuildTimeoutMinutes
+          Artifacts:
+            Type: NO_ARTIFACTS
+          Source:
+            Type: GITHUB
+            Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
+            ReportBuildStatus: false
+            Auth:
+              Type: SECRETS_MANAGER
+              Resource: !Ref GitHubTokenSecretArn
+          Environment:
+            Type: LINUX_CONTAINER
+            ComputeType: !Ref LinuxComputeType
+            Image: !Ref LinuxImage
+            PrivilegedMode: !Ref LinuxPrivilegedMode
+            Fleet:
+              FleetArn: !GetAtt LinuxFleet.Arn
+          LogsConfig:
+            CloudWatchLogs:
+              Status: ENABLED
+              GroupName: !Ref BuildLogGroup
+              StreamName: !Join ['/', [linux, !Select [1, !Split ['/', !Ref Repo]]]]
+          Triggers:
+            Webhook: true
+            FilterGroups:
+              - - Type: EVENT
+                  Pattern: WORKFLOW_JOB_QUEUED
+
+      MacRunner&{Repo}:
+        Type: AWS::CodeBuild::Project
+        Condition: MacFleet
+        Properties:
+          Name: !Join ['-', [!Ref ProjectPrefix, macos, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions macOS runner for ', !Ref Repo]]
+          ServiceRole: !GetAtt RunnerServiceRole.Arn
+          TimeoutInMinutes: !Ref BuildTimeoutMinutes
+          Artifacts:
+            Type: NO_ARTIFACTS
+          Source:
+            Type: GITHUB
+            Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
+            ReportBuildStatus: false
+            Auth:
+              Type: SECRETS_MANAGER
+              Resource: !Ref GitHubTokenSecretArn
+          Environment:
+            Type: MAC_ARM
+            ComputeType: !Ref MacComputeType
+            Image: !Ref MacImage
+            Fleet:
+              FleetArn: !GetAtt MacFleet.Arn
+          LogsConfig:
+            CloudWatchLogs:
+              Status: ENABLED
+              GroupName: !Ref BuildLogGroup
+              StreamName: !Join ['/', [macos, !Select [1, !Split ['/', !Ref Repo]]]]
+          Triggers:
+            Webhook: true
+            FilterGroups:
+              - - Type: EVENT
+                  Pattern: WORKFLOW_JOB_QUEUED
+
+      WindowsRunner&{Repo}:
+        Type: AWS::CodeBuild::Project
+        Condition: WindowsFleet
+        Properties:
+          Name: !Join ['-', [!Ref ProjectPrefix, windows, !Select [1, !Split ['/', !Ref Repo]]]]
+          Description: !Join ['', ['GitHub Actions Windows runner for ', !Ref Repo]]
+          ServiceRole: !GetAtt RunnerServiceRole.Arn
+          TimeoutInMinutes: !Ref BuildTimeoutMinutes
+          Artifacts:
+            Type: NO_ARTIFACTS
+          Source:
+            Type: GITHUB
+            Location: !Join ['', ['https://github.com/', !Ref Repo]]
+            # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
+            ReportBuildStatus: false
+            Auth:
+              Type: SECRETS_MANAGER
+              Resource: !Ref GitHubTokenSecretArn
+          Environment:
+            Type: WINDOWS_SERVER_2019_CONTAINER
+            ComputeType: !Ref WindowsComputeType
+            Image: !Ref WindowsImage
+            Fleet:
+              FleetArn: !GetAtt WindowsFleet.Arn
+          LogsConfig:
+            CloudWatchLogs:
+              Status: ENABLED
+              GroupName: !Ref BuildLogGroup
+              StreamName: !Join ['/', [windows, !Select [1, !Split ['/', !Ref Repo]]]]
+          Triggers:
+            Webhook: true
+            FilterGroups:
+              - - Type: EVENT
+                  Pattern: WORKFLOW_JOB_QUEUED
+
+      QueueAlarmLinux&{Repo}:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+          AlarmDescription: !Join ['', ['p90 linux runner queue wait above 5 minutes for ', !Ref Repo]]
+          Namespace: AWS/CodeBuild
+          MetricName: QueuedDuration
+          Dimensions:
+            - Name: ProjectName
+              Value: !Join ['-', [!Ref ProjectPrefix, linux, !Select [1, !Split ['/', !Ref Repo]]]]
+          ExtendedStatistic: p90
+          Period: 300
+          EvaluationPeriods: 3
+          Threshold: 300
+          ComparisonOperator: GreaterThanThreshold
+          TreatMissingData: notBreaching
+          AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+      QueueAlarmMac&{Repo}:
+        Type: AWS::CloudWatch::Alarm
+        Condition: MacFleet
+        Properties:
+          AlarmDescription: !Join ['', ['p90 macos runner queue wait above 5 minutes for ', !Ref Repo]]
+          Namespace: AWS/CodeBuild
+          MetricName: QueuedDuration
+          Dimensions:
+            - Name: ProjectName
+              Value: !Join ['-', [!Ref ProjectPrefix, macos, !Select [1, !Split ['/', !Ref Repo]]]]
+          ExtendedStatistic: p90
+          Period: 300
+          EvaluationPeriods: 3
+          Threshold: 300
+          ComparisonOperator: GreaterThanThreshold
+          TreatMissingData: notBreaching
+          AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+      QueueAlarmWindows&{Repo}:
+        Type: AWS::CloudWatch::Alarm
+        Condition: WindowsFleet
+        Properties:
+          AlarmDescription: !Join ['', ['p90 windows runner queue wait above 5 minutes for ', !Ref Repo]]
+          Namespace: AWS/CodeBuild
+          MetricName: QueuedDuration
+          Dimensions:
+            - Name: ProjectName
+              Value: !Join ['-', [!Ref ProjectPrefix, windows, !Select [1, !Split ['/', !Ref Repo]]]]
+          ExtendedStatistic: p90
+          Period: 300
+          EvaluationPeriods: 3
+          Threshold: 300
+          ComparisonOperator: GreaterThanThreshold
+          TreatMissingData: notBreaching
+          AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+  # Publishes the number of running and queued runner builds per fleet every
+  # minute. CodeBuild has no concurrency metric of its own.
+  UsageMetricsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: usage-metrics
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: codebuild:ListProjects
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codebuild:ListBuildsForProject
+                  - codebuild:BatchGetBuilds
+                Resource: !Sub arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/${ProjectPrefix}-*
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: CryptoTools/CodeBuildRunners
+
+  UsageMetricsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ProjectPrefix}-usage-metrics
+      RetentionInDays: !Ref LogRetentionDays
+
+  UsageMetricsLogGroupDashboardAccess:
+    Type: AWS::IAM::RolePolicy
+    Condition: HasDashboardSharingRole
+    Properties:
+      RoleName: !Ref DashboardSharingRoleName
+      PolicyName: !Sub ${ProjectPrefix}-usage-metrics-logs
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:DescribeLogGroups
+              - logs:GetLogRecord
+              - logs:StartQuery
+            Resource: !GetAtt UsageMetricsLogGroup.Arn
+          # These take a query ID rather than a log group, so they cannot be
+          # scoped to one. The role only gets query IDs from StartQuery above.
+          - Effect: Allow
+            Action:
+              - logs:GetQueryResults
+              - logs:StopQuery
+            Resource: '*'
+
+  UsageMetricsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      LoggingConfig:
+        LogGroup: !Ref UsageMetricsLogGroup
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 50
+      Role: !GetAtt UsageMetricsRole.Arn
+      Environment:
+        Variables:
+          PROJECT_PREFIX: !Sub ${ProjectPrefix}-
+          NAMESPACE: CryptoTools/CodeBuildRunners
+          LINUX_CAPACITY: !Ref LinuxFleetCapacity
+          LINUX_RESERVED_RATE: !Ref LinuxReservedRate
+          LINUX_ON_DEMAND_RATE: !Ref LinuxOnDemandRate
+          MACOS_CAPACITY: !If [MacFleet, !Ref MacFleetCapacity, 0]
+          MACOS_RESERVED_RATE: !If [MacFleetLarge, 0.036, 0.020]
+          MACOS_ON_DEMAND_RATE: 0
+          WINDOWS_CAPACITY: !If [WindowsFleet, !Ref WindowsFleetCapacity, 0]
+          WINDOWS_RESERVED_RATE: !Ref WindowsReservedRate
+          WINDOWS_ON_DEMAND_RATE: !Ref WindowsOnDemandRate
+      Code:
+        ZipFile: |
+          import json
+          import os
+          from collections import Counter
+          from datetime import datetime, timezone
+
+          import boto3
+
+          codebuild = boto3.client("codebuild")
+          cloudwatch = boto3.client("cloudwatch")
+          PREFIX = os.environ["PROJECT_PREFIX"]
+          NAMESPACE = os.environ["NAMESPACE"]
+          FLEETS = ("linux", "macos", "windows")
+          # In-progress builds are among a project's most recent builds.
+          RECENT_BUILDS = 300
+          # Phases before the workflow job starts running.
+          WAITING_PHASES = {"SUBMITTED", "QUEUED", "PROVISIONING"}
+          # Reserved capacities the dashboard compares Linux cost across.
+          RESERVED_OPTIONS = range(0, 301)
+
+
+          def projects():
+              for page in codebuild.get_paginator("list_projects").paginate():
+                  yield from (p for p in page["projects"] if p.startswith(PREFIX))
+
+
+          def count(project, now):
+              ids = []
+              # Newest first by default; CodeBuild rejects sortOrder alongside nextToken.
+              for page in codebuild.get_paginator("list_builds_for_project").paginate(
+                  projectName=project
+              ):
+                  ids.extend(page["ids"])
+                  if len(ids) >= RECENT_BUILDS:
+                      break
+              c = Counter()
+              for i in range(0, min(len(ids), RECENT_BUILDS), 100):
+                  for build in codebuild.batch_get_builds(ids=ids[i : i + 100])["builds"]:
+                      if build["buildStatus"] != "IN_PROGRESS":
+                          continue
+                      if build.get("currentPhase") in WAITING_PHASES:
+                          c["QueuedBuilds"] += 1
+                          wait = (now - build["startTime"]).total_seconds()
+                          c["LongestWaitSeconds"] = max(c["LongestWaitSeconds"], wait)
+                      elif build["environment"].get("fleet"):
+                          c["FleetBuilds"] += 1
+                      else:
+                          c["OnDemandBuilds"] += 1
+              return c
+
+
+          def minute_cost(fleet, on_demand):
+              # Fleet instances bill every minute; overflow builds bill on demand.
+              env = lambda key: float(os.environ[f"{fleet.upper()}_{key}"])
+              return env("CAPACITY") * env("RESERVED_RATE") + on_demand * env("ON_DEMAND_RATE")
+
+
+          def datum(name, value, dims, unit="Count"):
+              return {
+                  "MetricName": name,
+                  "Value": value,
+                  "Unit": unit,
+                  "Dimensions": [{"Name": k, "Value": v} for k, v in dims.items()],
+              }
+
+
+          def handler(event, context):
+              now = datetime.now(timezone.utc)
+              names = ("FleetBuilds", "OnDemandBuilds", "QueuedBuilds")
+              data, totals, longest = [], {f: Counter() for f in FLEETS}, Counter()
+              for project in projects():
+                  fleet = project[len(PREFIX) :].split("-", 1)[0]
+                  if fleet not in FLEETS:
+                      continue
+                  c = count(project, now)
+                  totals[fleet].update({n: c[n] for n in names})
+                  longest[fleet] = max(longest[fleet], c["LongestWaitSeconds"])
+                  dims = {"Fleet": fleet, "Project": project}
+                  data += [datum(n, c[n], dims) for n in names]
+              total_cost = 0.0
+              for fleet in FLEETS:
+                  dims = {"Fleet": fleet}
+                  cost = minute_cost(fleet, totals[fleet]["OnDemandBuilds"])
+                  total_cost += cost
+                  data += [datum(n, totals[fleet][n], dims) for n in names]
+                  data += [
+                      datum("LongestWaitSeconds", longest[fleet], dims, "Seconds"),
+                      datum("EstimatedCostUSD", cost, dims, "None"),
+                  ]
+              data.append(datum("EstimatedCostUSD", total_cost, {}, "None"))
+              # One log line per reserved capacity: the dashboard's Logs Insights
+              # query sums them to find the cheapest capacity for any time range.
+              # Queued builds are not billed, so only running builds count.
+              demand = totals["linux"]["FleetBuilds"] + totals["linux"]["OnDemandBuilds"]
+              actual = minute_cost("linux", totals["linux"]["OnDemandBuilds"])
+              rate = lambda key: float(os.environ[f"LINUX_{key}"])
+              for r in RESERVED_OPTIONS:
+                  cost = r * rate("RESERVED_RATE") + max(0, demand - r) * rate("ON_DEMAND_RATE")
+                  print(json.dumps({"reserved": r, "cost": cost, "actual": actual}))
+              for i in range(0, len(data), 1000):
+                  cloudwatch.put_metric_data(Namespace=NAMESPACE, MetricData=data[i : i + 1000])
+
+  UsageMetricsSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      Targets:
+        - Id: usage-metrics
+          Arn: !GetAtt UsageMetricsFunction.Arn
+
+  UsageMetricsSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UsageMetricsFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UsageMetricsSchedule.Arn
+
+  UsageDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${ProjectPrefix}-runners
+      DashboardBody: !Sub |
+        {
+          "start": "-P7D",
+          "periodOverride": "inherit",
+          "widgets": [
+            {
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 1,
+              "properties": {
+                "markdown": "Metrics for the CodeBuild fleet that runs the Linux GitHub Actions jobs. [Link to fleet](https://tiny.amazon.com/12cfzcrrm/IsenLink)"
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 1, "width": 24, "height": 6,
+              "properties": {
+                "title": "Linux concurrent jobs",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "FleetBuilds", "Fleet", "linux", {"label": "On the fleet", "color": "#1f77b4"}],
+                  ["CryptoTools/CodeBuildRunners", "OnDemandBuilds", "Fleet", "linux", {"label": "On demand", "color": "#ff7f0e"}],
+                  ["CryptoTools/CodeBuildRunners", "QueuedBuilds", "Fleet", "linux", {"label": "Waiting", "color": "#2ca02c"}]
+                ],
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 7, "width": 24, "height": 6,
+              "properties": {
+                "title": "Longest wait",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
+                "metrics": [
+                  ["CryptoTools/CodeBuildRunners", "LongestWaitSeconds", "Fleet", "linux", {"label": "Longest wait", "color": "#2ca02c"}]
+                ],
+                "yAxis": {"left": {"min": 0, "showUnits": false}}
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 13, "width": 12, "height": 6,
+              "properties": {
+                "title": "Linux CPU utilization (%)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Maximum', 300)", "id": "cpumax", "visible": false}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"CPUUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 300)", "id": "cpuavg", "visible": false}],
+                  [{"expression": "MAX(cpumax)", "label": "Busiest job", "color": "#1f77b4"}],
+                  [{"expression": "AVG(cpuavg)", "label": "Average job", "color": "#aec7e8"}]
+                ],
+                "yAxis": {"left": {"min": 0, "max": 100}}
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 13, "width": 12, "height": 6,
+              "properties": {
+                "title": "Linux memory utilization (%)",
+                "region": "${AWS::Region}", "view": "timeSeries", "period": 300, "stat": "Maximum",
+                "metrics": [
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Maximum', 300)", "id": "memmax", "visible": false}],
+                  [{"expression": "SEARCH('{AWS/CodeBuild,ProjectName} MetricName=\"MemoryUtilizedPercent\" ProjectName=${ProjectPrefix} ProjectName=linux', 'Average', 300)", "id": "memavg", "visible": false}],
+                  [{"expression": "MAX(memmax)", "label": "Busiest job", "color": "#1f77b4"}],
+                  [{"expression": "AVG(memavg)", "label": "Average job", "color": "#aec7e8"}]
+                ],
+                "yAxis": {"left": {"min": 0, "max": 100}}
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 22, "width": 24, "height": 4,
+              "properties": {
+                "markdown": "CodeBuild reserved hosts bill every minute, even if they are idle. An on-demand job bills only while it runs, but is 67% more expensive. These metrics capture how many hosts should have been allocated in the selected time range to minimize costs.\n\nBest hosts is the reserved host count to minimize cost in the selected time period.\n\nBest cost is what using that count would have cost.\n\nSavings is Actual minus Best cost."
+              }
+            },
+            {
+              "type": "log", "x": 0, "y": 19, "width": 24, "height": 3,
+              "properties": {
+                "title": "Linux cost over the selected time range",
+                "region": "${AWS::Region}", "view": "table",
+                "query": "SOURCE '${UsageMetricsLogGroup}' | filter ispresent(reserved) | stats sum(actual) as actualSum, sum(cost) as bestSum by reserved | sort bestSum asc | limit 1 | fields floor(actualSum * 100 + 0.5) / 100 as `Actual ($)`, reserved as `Best hosts`, floor(bestSum * 100 + 0.5) / 100 as `Best cost ($)`, floor((actualSum - bestSum) * 100 + 0.5) / 100 as `Savings ($)` | display `Actual ($)`, `Best hosts`, `Best cost ($)`, `Savings ($)`"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  LinuxFleetArn:
+    Value: !GetAtt LinuxFleet.Arn
+  MacFleetArn:
+    Condition: MacFleet
+    Value: !GetAtt MacFleet.Arn
+  WindowsFleetArn:
+    Condition: WindowsFleet
+    Value: !GetAtt WindowsFleet.Arn
+  RunnerServiceRoleArn:
+    Value: !GetAtt RunnerServiceRole.Arn
+  DashboardUrl:
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards/dashboard/${ProjectPrefix}-runners

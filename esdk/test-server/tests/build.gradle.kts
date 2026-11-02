@@ -57,6 +57,9 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
+    // The vector suites hold ~260k dynamic tests and their messages; the 512 MiB
+    // default leaves the test JVM spending most of its time in GC.
+    maxHeapSize = "3g"
     useJUnitPlatform {
         // jqwik registers its own JUnit Platform engine; include it explicitly.
         includeEngines("jqwik", "junit-jupiter")
@@ -74,7 +77,9 @@ tasks.withType<Test>().configureEach {
             .associateWith { System.getProperty(it) }
     )
     testLogging {
-        events("passed", "skipped", "failed")
+        // Results come from the JUnit XML; logging every passed and skipped test
+        // (~300k) costs the Gradle daemon a core.
+        events("failed")
         showStandardStreams = true
     }
 }

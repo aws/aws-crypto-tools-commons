@@ -3,7 +3,7 @@
 #
 # A run builds and launches every configured Primitives Language_Server, runs
 # the Tests over the server pairs, and fails on any failed Test. The native
-# rust server lives in aws-crypto-tools-rust (prim-test-server/); the java,
+# rust server lives in aws-crypto-tools-rust (prim/test-server/); the java,
 # net, python, go, and rust-dafny servers live in
 # aws-cryptographic-material-providers-library (test-server/<lang>-v<major>-server/).
 # The java, net, and python servers build on the MPL's own AtomicPrimitives
@@ -15,8 +15,9 @@
 # JOBS: `plan` keys every server on its commit and lists the ones with no
 # prebuilt output; `prebuild` builds only
 # those, one runner each, and publishes each output as an artifact named by its
-# key; `primitives-test-server` does its setup in parallel with `prebuild`,
-# waits for it, fetches every output into its clone, and runs the Tests. The
+# key; `primitives-test-server` starts once `prebuild` has finished (or was
+# skipped because nothing needed building), fetches every output into its
+# clone, and runs the Tests. The
 # build stamps make every fetched server launch without rebuilding, so the
 # test job needs neither Dafny nor the Rust, Go, or smithy-dafny toolchains.
 # Each Dafny transpile runs alone on its own runner.
@@ -75,6 +76,14 @@ on:
           restores them.
         type: boolean
         default: false
+      runner:
+        description: >-
+          Runner label for every job. Defaults to this repo's CodeBuild runner.
+          Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label, because a CodeBuild
+          project only picks up jobs from the repo it is connected to.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
     secrets:
       repo-pat:
         description: >-
@@ -109,7 +118,7 @@ jobs:
   # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
   resolve:
     name: resolve refs
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     outputs:
       commons_ref: ${{ steps.refs.outputs.commons_ref }}
       language_repository: ${{ steps.refs.outputs.language_repository }}
@@ -142,11 +151,12 @@ jobs:
   # output, so the prebuild job builds only those.
   plan:
     name: find servers to prebuild
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     needs: resolve
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       mpl_root: ${{ steps.keys.outputs.mpl_root }}
@@ -220,12 +230,19 @@ jobs:
             url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
             "git@github.com:"
 
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's commit; each path list is the server's
         # runnable output plus its build stamp, inside the materialized clone
         # (<repo>@<sanitized ref>-<8-hex hash>) or the checkout.
         id: keys
         env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
           PYTHON_FULL_VERSION: ${{ steps.python.outputs.python-version }}
         run: |
           set -euo pipefail
@@ -244,7 +261,8 @@ jobs:
           own=""
           if [ -n "$LANGUAGE_REPOSITORY" ]; then
             own=$(basename "$LANGUAGE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
           from_checkout() {
@@ -275,7 +293,7 @@ jobs:
             local name="$1" language="$2" suffix="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-primitives-out-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-primitives-out2-$name-$paths-$src$(tip "$language")$suffix" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           mpl=$(repo_root java)
@@ -305,7 +323,7 @@ jobs:
           # The venv (editable installs of the transpiled library and the
           # server, plus its stamp) and the transpiled library source.
           repo_key=$(echo "$GITHUB_REPOSITORY" | tr '/' '_')
-          emit python python "-dafny$DAFNY_VERSION-py$PYTHON_FULL_VERSION-$repo_key" \
+          emit python python "-dafny$DAFNY_VERSION-python$PYTHON_FULL_VERSION-$repo_key" \
             "primitives/test-server/build/launch/python/venv" \
             "$python_library"
           {
@@ -360,7 +378,7 @@ jobs:
   prebuild:
     needs: [resolve, plan]
     if: needs.plan.outputs.matrix != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -382,6 +400,18 @@ jobs:
       OUT_KEY: ${{ matrix.language == 'rust' && needs.plan.outputs.key_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'java' && needs.plan.outputs.key_java || needs.plan.outputs.key_python }}
       OUT_PATHS: ${{ matrix.language == 'rust' && needs.plan.outputs.paths_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'java' && needs.plan.outputs.paths_java || needs.plan.outputs.paths_python }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -434,14 +464,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-primitives-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-primitives-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'primitives/test-server/*/build.gradle.kts',
               'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-primitives-gradle-
+            ${{ needs.plan.outputs.platform }}-primitives-gradle-
 
       - name: Set up Python (the python server venv; the Dafny Python formatters)
         if: env.DAFNY_BUILD == 'true'
@@ -458,10 +488,10 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up .NET (the .NET build; the Dafny tool)
         if: env.DAFNY_BUILD == 'true'
@@ -470,6 +500,16 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: env.DAFNY_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Install Dafny ${{ env.DAFNY_VERSION }}
         # The dafnyVersion in the MPL's project.properties.
@@ -495,7 +535,7 @@ jobs:
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
         working-directory: primitives/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
       - name: Initialize the MPL submodules + install the smithy-dafny codegen dependencies
         # The launch plan would initialize the submodules itself; smithy-dafny
@@ -521,6 +561,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: primitives-${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -532,9 +573,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-primitives-go-
+            ${{ needs.plan.outputs.platform }}-primitives-go-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -542,9 +583,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
+          key: ${{ needs.plan.outputs.platform }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
           restore-keys: |
-            ${{ runner.os }}-primitives-nuget-
+            ${{ needs.plan.outputs.platform }}-primitives-nuget-
 
       - name: Build the ${{ matrix.language }} server and check it starts
         # For java, net, and python this transpiles AwsCryptographyPrimitives
@@ -552,15 +593,23 @@ jobs:
         working-directory: primitives/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Pack the ${{ matrix.language }} server
         # -P keeps the absolute ~/.m2 paths of the java output as they are.
+        # The runner's work directory differs between runners (CodeBuild puts
+        # it under a per-build path), so absolute paths and symlink targets
+        # under it are stored as @RUNNER_ROOT@, and the directory is recorded
+        # in <language>.root for the unpack step to rewrite file contents.
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prebuilt"
+          root=$(dirname "$RUNNER_WORKSPACE")
+          echo "$root" > "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.root"
           mapfile -t paths < <(printf '%s\n' "$OUT_PATHS" | sed '/^$/d')
-          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" -- "${paths[@]}"
+          tar -czPf "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.tgz" \
+            --transform "s|^$root/|@RUNNER_ROOT@/|" \
+            -- "${paths[@]}" "$RUNNER_TEMP/prebuilt/${{ matrix.language }}.root"
 
       - name: Publish the ${{ matrix.language }} server
         # Named by its key: later runs here, and runs in other repositories for
@@ -579,25 +628,43 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
+          key: ${{ needs.plan.outputs.platform }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
 
-  # Starts alongside the prebuild job; its setup overlaps the builds, and it
-  # waits for their outputs just before the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   primitives-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: [resolve, plan]
-    runs-on: ubuntu-latest
+    needs: [resolve, plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.resolve.result == 'success'
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
+    runs-on: ${{ inputs.runner }}
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -642,6 +709,15 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
       - name: Restore the Gradle caches (orchestrator + Java server)
         id: gradle-cache
         uses: actions/cache/restore@v4
@@ -649,14 +725,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-primitives-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-primitives-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'primitives/test-server/*/build.gradle.kts',
               'primitives/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-primitives-gradle-
+            ${{ needs.plan.outputs.platform }}-primitives-gradle-
 
       - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
         env:
@@ -687,33 +763,7 @@ jobs:
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
         working-directory: primitives/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
-
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 3600))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = "done" ] && break
-              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
       - name: Fetch the prebuilt servers into their clones
         env:
@@ -740,6 +790,22 @@ jobs:
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
             done
           }
+          # unpack <archive> <root file>: extracts under this runner's work
+          # directory and rewrites the packing runner's directory in the
+          # extracted text files (e.g. venv scripts and pyvenv.cfg).
+          unpack() {
+            local archive="$1" root_file="$2" root old f
+            root=$(dirname "$RUNNER_WORKSPACE")
+            tar -xzPf "$archive" --transform "s|^@RUNNER_ROOT@/|$root/|"
+            old=$(cat "$root_file")
+            [ "$old" != "$root" ] || return 0
+            tar -tzPf "$archive" | sed "s|^@RUNNER_ROOT@/|$root/|" |
+              while IFS= read -r f; do
+                if [ -f "$f" ] && [ ! -L "$f" ] && grep -qIF -- "$old" "$f"; then
+                  sed -i "s|$old|$root|g" "$f"
+                fi
+              done
+          }
           mkdir -p "$RUNNER_TEMP/prebuilt"
           for pair in rust:rust rustdafny:rust-dafny net:net go:go java:java python:python; do
             k=${pair%%:*}; language=${pair#*:}; key_var="KEY_$k"
@@ -749,7 +815,7 @@ jobs:
             echo "$language: $repo artifact $id"
             GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
-            tar -xzPf "$RUNNER_TEMP/prebuilt/$language.tgz"
+            unpack "$RUNNER_TEMP/prebuilt/$language.tgz" "$RUNNER_TEMP/prebuilt/$language.root"
           done
 
       - name: Check every prebuilt server arrived
@@ -775,7 +841,7 @@ jobs:
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
       - name: Publish test results to the run summary
         if: always()
@@ -806,7 +872,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-primitives-gradle-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-primitives-gradle-${{ hashFiles(
               'test-server-common/*/build.gradle.kts',
               'test-server-common/*/gradle/wrapper/gradle-wrapper.properties',
               'primitives/test-server/*/build.gradle.kts',
