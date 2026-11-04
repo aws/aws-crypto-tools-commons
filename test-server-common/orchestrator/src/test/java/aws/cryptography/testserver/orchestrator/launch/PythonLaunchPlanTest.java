@@ -35,7 +35,7 @@ class PythonLaunchPlanTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("the venv is created with python3 -m venv in the plan's work directory")
+    @DisplayName("the venv is created with python3 -m venv --clear in the plan's work directory")
     void venvCreation() {
         assertEquals(Path.of("/scratch/python-launch/venv"), VENV,
             "the venv lives inside the plan-owned work directory");

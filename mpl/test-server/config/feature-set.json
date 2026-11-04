@@ -17,11 +17,23 @@
     "    the reproducedEncryptionContext half of that set is ported.",
     "  - Missing-plaintext-data-key vectors (AllDefaultCmm.dfy): they need a static",
     "    keyring that returns a fixed or absent data key; the model has none.",
-    "  - AWS KMS hierarchical keyring and branch key store: not yet modeled."
+    "  - Hierarchical keyring over DBE suites (TestHierarchyClientDBESuite): the",
+    "    model has ESDK suites only. The branch key id supplier tests, which the",
+    "    Dafny MPL runs over a DBE suite, are ported over an ESDK suite.",
+    "  - The exact IncorrectDataKeys message (TestInvalidDataKeyError): error text",
+    "    is not portable across implementations; only MPLClientError is asserted.",
+    "  - Key store operations (CreateKeyStore, CreateKey, VersionKey,",
+    "    GetActiveBranchKey, GetBranchKeyVersion, GetBeaconKey, GetKeyStoreInfo):",
+    "    the hierarchical keyring tests read pre-provisioned branch keys; the key",
+    "    store's own operations are not modeled.",
+    "  - Materials cache types other than Default, and the keyring's own cache",
+    "    configuration: a keyring uses either its default cache or a Shared",
+    "    Default cache passed by handle."
   ],
   "product": "mpl",
   "features": [
     "raw-aes",
+    "hierarchical",
     "default-cmm"
   ]
 }

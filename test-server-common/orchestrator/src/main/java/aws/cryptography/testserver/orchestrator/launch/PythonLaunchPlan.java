@@ -198,8 +198,9 @@ public final class PythonLaunchPlan implements Launcher {
 
     /**
      * {@code python3 -m venv --clear <venvDir>} (the Makefile's venv creation).
-     * It runs only when the venv has no working interpreter, so whatever is
-     * left in the directory is broken and is cleared first.
+     * {@code --clear} replaces a venv whose interpreter link no longer resolves,
+     * for example one restored from a cache saved on a runner with a different
+     * Python install path.
      */
     static List<String> createVenvCommand(String python3, Path venvDir) {
         return List.of(python3, "-m", "venv", "--clear", venvDir.toString());

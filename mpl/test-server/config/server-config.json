@@ -12,7 +12,7 @@
     "java, net and python build on the MPL's own source: their libraryRepository path",
     "is AwsCryptographicMaterialProviders/runtimes/<lang>, which the launch plans transpile",
     "from Dafny first; go and rust-dafny build the MPL's committed releases/ code. The native Rust",
-    "Language_Server lives in aws-crypto-tools-rust under mpl-test-server/. configPath",
+    "Language_Server lives in aws-crypto-tools-rust under mpl/test-server/. configPath",
     "names the DIRECTORY holding each server's per-server trio",
     "(server-config.json/feature-config.json/bug-config.json)."
   ],
@@ -112,7 +112,7 @@
       "language": "rust",
       "majorVersion": 1,
       "port": 8093,
-      "configPath": "mpl-test-server",
+      "configPath": "mpl/test-server",
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
@@ -123,7 +123,7 @@
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
         "ref": "main",
-        "path": "mpl-test-server"
+        "path": "mpl/test-server"
       }
     }
   ]
