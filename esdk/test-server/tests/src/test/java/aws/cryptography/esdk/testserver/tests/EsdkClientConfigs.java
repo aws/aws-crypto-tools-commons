@@ -66,8 +66,7 @@ import java.util.Set;
  * credential-free; it feeds the arbitrary-plaintext property tests, which stay
  * offline. The <strong>Caching CMM</strong> scenarios wrap a Default CMM over a Raw
  * AES, Raw RSA, or AWS KMS keyring and require the {@code caching} Feature and that
- * keyring's Feature, not {@code MPL}: a caching CMM need not be an MPL one (the
- * ESDK for Java's wraps master key providers).
+ * keyring's Feature.
  */
 public final class EsdkClientConfigs {
 
@@ -487,20 +486,20 @@ public final class EsdkClientConfigs {
             // keyring on both legs.
             new Scenario("rawEcdh(static)+default",
                 require(defaultCmm(rawEcdhStaticKeyring())), null, List.of(), null,
-                Set.of("MPL", "raw-ecdh")),
+                Set.of("raw-ecdh")),
 
             // Raw-ECDH static on encrypt; the recipient decrypts by discovery.
             new Scenario("rawEcdh(static->discovery)+default",
                 require(defaultCmm(rawEcdhStaticKeyring())), null, List.of(),
                 require(defaultCmm(rawEcdhDiscoveryKeyring())),
-                Set.of("MPL", "raw-ecdh")),
+                Set.of("raw-ecdh")),
 
             // Raw-ECDH ephemeral sender key on encrypt; the recipient decrypts by
             // discovery.
             new Scenario("rawEcdh(ephemeral->discovery)+default",
                 require(defaultCmm(rawEcdhEphemeralKeyring())), null, List.of(),
                 require(defaultCmm(rawEcdhDiscoveryKeyring())),
-                Set.of("MPL", "raw-ecdh")),
+                Set.of("raw-ecdh")),
 
             // Caching CMM over a Default CMM / Raw-AES keyring on both legs.
             new Scenario("rawAes+caching",
