@@ -273,8 +273,7 @@ structure CreateKeyStoreClientRequest {
     ddbClientRegion: String
 
     /// URL the key store's DynamoDB client sends its requests to, in place of
-    /// the region's endpoint. Only a server that supports the `ddb-endpoint`
-    /// feature reads it.
+    /// the region's endpoint.
     ddbEndpoint: String
 }
 

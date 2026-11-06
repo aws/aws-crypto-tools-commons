@@ -470,7 +470,7 @@ public class AwsKmsHierarchicalKeyringTest {
     @ParameterizedTest(name = "[hierarchical] active key read rejects another branch key's record {0}")
     @MethodSource("targets")
     void activeKeyReadRejectsOtherBranchKeysRecord(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical", "ddb-endpoint"), target);
+        FeatureGate.require(Set.of("hierarchical"), target);
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
 
         try (FakeDynamoDb ddb = FakeDynamoDb.serving(KEY_STORE_REGION, KEY_STORE_TABLE_NAME,
@@ -483,7 +483,7 @@ public class AwsKmsHierarchicalKeyringTest {
     @ParameterizedTest(name = "[hierarchical] version read rejects a record of another type {0}")
     @MethodSource("targets")
     void versionReadRejectsRecordOfOtherType(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical", "ddb-endpoint"), target);
+        FeatureGate.require(Set.of("hierarchical"), target);
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
         EncryptionMaterials encrypted = onEncrypt(client, hierarchyKeyring(client),
             initializeEncryption(client, EC));
