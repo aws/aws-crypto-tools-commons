@@ -38,6 +38,7 @@
   .s-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
   .s-part { background:color-mix(in srgb,var(--part) 35%,transparent); }
   .s-fail { background:color-mix(in srgb,var(--fail) 40%,transparent); }
+  .s-none { color:var(--dim); border:1px dashed var(--line); }
   .s-zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
   .s-undecl { color:var(--dim); }
   .small { font-size:12px; font-weight:400; }
@@ -121,7 +122,8 @@
       <span><i class="sw s-pass"></i>supported, all pass</span>
       <span><i class="sw s-part"></i>supported, some skipped (not by the gate)</span>
       <span><i class="sw s-fail"></i>supported, some fail</span>
-      <span><i class="sw s-zero"></i>supported, 0 passed</span>
+      <span><i class="sw s-zero"></i>supported, ran, 0 passed</span>
+      <span><i class="sw s-none"></i>supported, no runs</span>
       <span><i class="sw" style="border:1px solid var(--line)"></i>declared unsupported</span>
       <span><i class="sw s-missing"></i>in neither list</span>
     </div>
@@ -201,9 +203,9 @@ function cellStats(s, f) {
   const state = declState(s, f), ran = pass + fail + skip;
   const supported = state === "supported" || state === "n/a";
   const cls = state === "missing" ? "s-missing" : !supported ? "s-undecl"
-    : pass === 0 ? "s-zero" : fail ? "s-fail" : skip ? "s-part" : "s-pass";
+    : ran === 0 ? "s-none" : pass === 0 ? "s-zero" : fail ? "s-fail" : skip ? "s-part" : "s-pass";
   return { pass, fail, skip, gated, partner, ran, state, cls,
-    problem: state === "missing" || (state === "supported" && (pass === 0 || fail || skip)) };
+    problem: state === "missing" || (state === "supported" && ran > 0 && (pass === 0 || fail || skip)) };
 }
 
 function renderHeader() {
@@ -220,12 +222,12 @@ function renderSummary() {
   const st = S.features.filter(f => f !== NONE).flatMap(f => (s ? [s] : S.servers).map(srv => cellStats(srv, f)));
   const supported = st.filter(c => c.state === "supported");
   const green = supported.filter(c => c.cls === "s-pass").length;
-  const zero = supported.filter(c => c.pass === 0).length;
+  const zero = supported.filter(c => c.ran > 0 && c.pass === 0).length;
   const all = sum(S.cases, s);
   $("summary").innerHTML = `
     <div class="card"><small>${s ? s + " supports" : "supported"}</small><b>${supported.length}/${st.length}</b><small>${s ? "features" : "server-feature pairs"}</small></div>
     <div class="card"><small>supported, all pass</small><b>${green}</b><small>${s ? "features" : "pairs"}</small></div>
-    <div class="card"><small>supported, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>${s ? "features" : "pairs"}</small></div>
+    <div class="card"><small>supported, ran, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>${s ? "features" : "pairs"}</small></div>
     <div class="card"><small>test runs</small><b>${all[0].toLocaleString()}</b><small>passed · ${all[1]} failed · ${all[4].toLocaleString()} other skips · ${all[2].toLocaleString()} gated</small></div>`;
 }
 
@@ -234,7 +236,7 @@ function renderSummary() {
 function verdictCell(c, attrs, compact) {
   if (c.state === "missing") return `<span class="cell s-missing" ${attrs}>missing</span>`;
   if (c.state === "unsupported") return `<span class="cell s-undecl" ${attrs}>—${c.ran && !compact ? `<small>${c.pass.toLocaleString()} ran</small>` : ""}</span>`;
-  if (c.ran === 0) return `<span class="cell s-zero" ${attrs}>✗ 0 ran</span>`;
+  if (c.ran === 0) return `<span class="cell s-none" ${attrs} title="No test run was recorded for this feature on this server">no runs</span>`;
   const pct = Math.floor(100 * c.pass / c.ran), icon = c.fail ? "✗" : c.skip ? "!" : "✓";
   return `<span class="cell ${c.cls}" ${attrs}>${icon} ${pct}%${compact ? "" : `<small>${c.pass.toLocaleString()}/${c.ran.toLocaleString()}</small>`}</span>`;
 }
@@ -254,7 +256,7 @@ function roleStats(s, f, role) {
   }
   const ran = p + fl + k, supported = base.state === "supported" || base.state === "n/a";
   return { ...base, pass:p, fail:fl, skip:k, gated:g, ran,
-    cls: base.state === "missing" ? "s-missing" : !supported ? "s-undecl" : p === 0 ? "s-zero" : fl ? "s-fail" : k ? "s-part" : "s-pass" };
+    cls: base.state === "missing" ? "s-missing" : !supported ? "s-undecl" : ran === 0 ? "s-none" : p === 0 ? "s-zero" : fl ? "s-fail" : k ? "s-part" : "s-pass" };
 }
 
 function renderMatrix() {
@@ -331,7 +333,7 @@ function comboRows(f, cases) {
     for (const s of S.servers) {
       if (!feats.every(x => declState(s, x) === "supported")) { h += `<td class="s-undecl">—</td>`; continue; }
       const [p, fl, , , sk] = row.by[s] || [0, 0, 0, 0, 0], ran = p + fl + sk;
-      h += `<td class="${ran === 0 ? "s-zero" : fl ? "s-fail" : sk ? "s-part" : "s-pass"}">${ran ? Math.floor(100 * p / ran) + "%" : "0 ran"}</td>`;
+      h += `<td class="${ran === 0 ? "s-none" : fl ? "s-fail" : sk ? "s-part" : "s-pass"}">${ran ? Math.floor(100 * p / ran) + "%" : "no runs"}</td>`;
     }
     h += "</tr>";
   }
