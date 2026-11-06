@@ -14,7 +14,8 @@ use smithy.protocols#rpcv2Cbor
 ///
 /// Scope is the MPL surface every configured Language_Server implements: the
 /// Raw AES keyring, the AWS KMS Hierarchical keyring with its key store and
-/// materials cache, and the Default CMM, over ESDK algorithm suites only.
+/// materials cache, a static test keyring, and the Default CMM, over ESDK
+/// algorithm suites only.
 /// Keyrings, CMMs, and suite formats a server does not implement are not
 /// modeled.
 ///
@@ -32,6 +33,7 @@ service MPLTestServer {
     version: "2026-09-28"
     operations: [
         CreateRawAesKeyring
+        CreateStaticKeyring
         CreateKeyStoreClient
         CreateCryptographicMaterialsCache
         CreateAwsKmsHierarchicalKeyring
@@ -57,6 +59,16 @@ service MPLTestServer {
 operation CreateRawAesKeyring {
     input: CreateRawAesKeyringRequest
     output: CreateRawAesKeyringResponse
+    errors: [GenericServerError, MPLClientError]
+}
+
+/// Construct and register a static keyring, returning its handle. The server
+/// implements the MPL's keyring interface itself, as a customer's keyring
+/// would, so a test can check what the MPL does with the materials a keyring
+/// returns.
+operation CreateStaticKeyring {
+    input: CreateStaticKeyringRequest
+    output: CreateStaticKeyringResponse
     errors: [GenericServerError, MPLClientError]
 }
 
@@ -204,6 +216,28 @@ structure CreateRawAesKeyringRequest {
 
 @output
 structure CreateRawAesKeyringResponse {
+    /// Handle referencing the registered keyring for subsequent operations.
+    @required
+    keyringId: ResourceId
+}
+
+// ===========================================================================
+// CreateStaticKeyring shapes
+// ===========================================================================
+
+/// The materials the keyring returns. OnEncrypt returns encryptionMaterials
+/// and OnDecrypt returns decryptionMaterials, whatever materials they were
+/// given; when a member is absent, that operation returns the materials it was
+/// given, unchanged.
+@input
+structure CreateStaticKeyringRequest {
+    encryptionMaterials: EncryptionMaterials
+
+    decryptionMaterials: DecryptionMaterials
+}
+
+@output
+structure CreateStaticKeyringResponse {
     /// Handle referencing the registered keyring for subsequent operations.
     @required
     keyringId: ResourceId
