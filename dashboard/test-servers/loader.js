@@ -359,6 +359,19 @@ async function zipText(zip, e) {
   }
 }
 
+// A downloaded artifact never changes, so its parsed contents are cached by
+// artifact id and a reload only downloads artifacts it has not seen.
+async function cachedArtifact(repo, art, progress, parse) {
+  const key = `cov2:${repo}:${art.id}`;
+  const hit = await cacheGet(key);
+  if (hit) return hit;
+  progress(`Downloading ${art.name} (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);
+  const zip = await (await gh(`repos/${repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+  const value = await parse(zip, zipEntries(zip));
+  await cachePut(key, value);
+  return value;
+}
+
 // Local coverage for a commit: the given run's own artifacts (a test server
 // run inside the library's CI) plus every other run on that commit, since a
 // repository can upload each language's coverage from a different workflow.
@@ -368,7 +381,7 @@ async function localCoverage(repo, commit, run, progress) {
     .artifacts.filter(a => a.name.startsWith("local-coverage-") && !a.expired);
   const runs = (await ghJson(`repos/${repo}/actions/runs?head_sha=${commit}&per_page=100`)).workflow_runs;
   const ids = [...new Set([...(run.repo === repo ? [run.databaseId] : []), ...runs.map(r => r.id)])];
-  const newest = new Map(), from = new Set();
+  const newest = new Map();
   for (const id of ids) for (const a of await named(id)) {
     const seen = newest.get(a.name);
     if (!seen || a.created_at > seen.created_at) newest.set(a.name, { ...a, runUrl:`https://github.com/${repo}/actions/runs/${id}` });
@@ -376,37 +389,39 @@ async function localCoverage(repo, commit, run, progress) {
   if (!newest.size) return null;
   const files = new Map();
   for (const a of newest.values()) {
-    progress(`Downloading ${a.name}…`);
-    from.add(a.runUrl);
-    const zip = await (await gh(`repos/${repo}/actions/artifacts/${a.id}/zip`)).arrayBuffer();
-    for (const e of zipEntries(zip).filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), files);
+    const part = await cachedArtifact(repo, a, progress, async (zip, entries) => {
+      const m = new Map();
+      for (const e of entries.filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), m);
+      return m;
+    });
+    for (const [f, lines] of part) {
+      const into = files.get(f) || new Map();
+      for (const [n, h] of lines) into.set(n, Math.max(into.get(n) || 0, h));
+      files.set(f, into);
+    }
   }
-  return { files, from:[...from][0], runs:[...from], artifacts:[...newest.keys()].sort() };
+  const from = [...new Set([...newest.values()].map(a => a.runUrl))];
+  return { files, from:from[0], runs:from, artifacts:[...newest.keys()].sort() };
 }
 
 // -> [{ language, repository, commit, server: Map, local: {files, from} | null }]
 async function fetchCoverage(product, run, progress) {
-  const key = `cov1:${run.repo}:${product}:${run.databaseId}`;
-  const hit = await cacheGet(key);
-  if (hit) return hit;
   const art = await reportArtifact(run.repo, run.databaseId, product);
   if (!art) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
-  progress(`Downloading ${product} reports (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);
-  const zip = await (await gh(`repos/${run.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
-  const entries = zipEntries(zip);
+  const reports = await cachedArtifact(run.repo, art, progress, async (zip, entries) => {
+    const out = [];
+    for (const e of entries.filter(e => /(^|\/)coverage\/[^/]+\.json$/.test(e.name))) {
+      const lcov = entries.find(x => x.name === e.name.replace(/\.json$/, ".lcov"));
+      if (lcov) out.push({ meta:JSON.parse(await zipText(zip, e)), server:parseLcov(await zipText(zip, lcov)) });
+    }
+    return out;
+  });
   const out = [];
-  for (const e of entries.filter(e => /(^|\/)coverage\/[^/]+\.json$/.test(e.name))) {
-    const meta = JSON.parse(await zipText(zip, e));
-    const lcov = entries.find(x => x.name === e.name.replace(/\.json$/, ".lcov"));
-    if (!lcov) continue;
-    progress(`Reading ${meta.language} coverage…`);
-    const server = parseLcov(await zipText(zip, lcov));
+  for (const { meta, server } of reports) {
     progress(`Finding ${meta.repository} local coverage for ${meta.commit.slice(0, 7)}…`);
     const local = await localCoverage(meta.repository, meta.commit, run, progress);
     out.push({ ...meta, server, local });
   }
-  // Only cache a finished answer: local coverage may still be on its way.
-  if (out.every(c => c.local)) await cachePut(key, out);
   return out;
 }
 

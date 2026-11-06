@@ -106,9 +106,10 @@ const isServerCode = f => /(^|\/)[\w-]*test-servers?\//.test(f);
 const libraryPath = e => (e.libraryRepository.path || ".").replace(/^\.\/?|\/$/g, "");
 
 // Only the library's own files count; the test server's code is kept apart.
-function mergeFiles(cov, path = "") {
+function mergeFiles(cov, path = "", excluded = []) {
   const local = cov.local ? cov.local.files : new Map();
-  const wanted = f => !path || f.startsWith(path + "/") || isServerCode(f);
+  const inside = (f, p) => f.startsWith(p + "/");
+  const wanted = f => !excluded.some(p => inside(f, p)) && (!path || inside(f, path) || isServerCode(f));
   const names = new Set([...cov.server.keys(), ...local.keys()].filter(wanted));
   return [...names].map(f => {
     const s = cov.server.get(f) || new Map(), l = local.get(f) || new Map();
@@ -251,9 +252,16 @@ async function loadLibrary(label) {
     // The library is the part of its repository that server-config.json names
     // (esdk/ in aws-crypto-tools-rust, which also holds mpl/ and prim/).
     const libPath = Object.fromEntries(entries.map(e => [e.language, libraryPath(e)]));
+    // A folder another server claims as its own library is left out, so the
+    // C++ shim under esdk/shims/ counts for rust-cpp and not for rust.
+    const repoOf = e => e.libraryRepository.url.replace(/^.*github\.com[:/]/, "").replace(/\.git$/, "");
+    const claimed = Object.fromEntries(entries.map(e => [e.language, entries
+      .filter(o => o !== e && repoOf(o) === repoOf(e))
+      .map(libraryPath)
+      .filter(p => p && p !== libraryPath(e) && (!libraryPath(e) || p.startsWith(libraryPath(e) + "/")))]));
     renderLeft();
     a.covs = (await fetchCoverage(product, a.run, note))
-      .map(c => ({ ...c, files:mergeFiles(c, libPath[c.language] || "") }));
+      .map(c => ({ ...c, files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
   } catch (err) { a.error = "Load failed: " + (err.message || err); }
   renderLeft();
 }
