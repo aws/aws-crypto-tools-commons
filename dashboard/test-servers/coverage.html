@@ -61,13 +61,22 @@
   .tabs button { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; }
   .tabs button.on { border-color:var(--sel); color:var(--sel); }
   .note { color:#e3b341; font-size:12px; }
+  table.matrix { border-collapse:collapse; margin-bottom:6px; }
+  .matrix th, .matrix td { border:1px solid var(--line); padding:6px 10px; text-align:center; font-size:12px; }
+  .matrix tbody th { text-align:left; white-space:nowrap; font-weight:600; }
+  .matrix td.cov { cursor:pointer; min-width:78px; }
+  .matrix td.cov b { display:block; font-size:15px; font-variant-numeric:tabular-nums; }
+  .matrix td.cov small { color:var(--dim); font-size:10px; }
+  .matrix td.cov:hover { outline:2px solid var(--sel); outline-offset:-2px; }
+  .matrix td.selected { outline:2px solid #fff; outline-offset:-2px; }
+  .matrix td.nocov { color:var(--dim); }
+  .matrix td.na { background:var(--bg); }
 </style>
 </head>
 <body>
 <header>
   <h1>Line Coverage</h1>
   <a href="index.html" id="back" class="small">← test results</a>
-  <label>Test server <select id="suite"></select></label>
   <label title="Empty: newest passing run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run.">PR / commit <input type="text" id="source" size="34" placeholder="newest passing run on commons main"></label>
   <label>Find file <input type="text" id="search" placeholder="e.g. decrypt"></label>
   <span class="run" id="run"></span>
@@ -83,18 +92,24 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
 const ui = { source:new URLSearchParams(location.search).get("run") || "", lang:null, file:null, sort:"both", search:"" };
-let C = null;       // [{ language, repository, commit, server, local, files }]
-let RUN = null;
+// label -> { run, servers:[language], covs:[{ language, repository, commit, server, local, files }], error }
+const ALL = {};
+let C = null;       // the selected library's covs
+ui.lib = null;
 
 // A file belongs to the test server, not the library, when its path has a
 // test-server directory in it.
-const isServerCode = f => /(^|\/)test-server\//.test(f);
+const isServerCode = f => /(^|\/)[\w-]*test-servers?\//.test(f);
 
 // Per file: the line numbers either build instrumented, and which of them
 // each side ran. A line counts as covered by both when either side ran it.
-function mergeFiles(cov) {
+const libraryPath = e => (e.libraryRepository.path || ".").replace(/^\.\/?|\/$/g, "");
+
+// Only the library's own files count; the test server's code is kept apart.
+function mergeFiles(cov, path = "") {
   const local = cov.local ? cov.local.files : new Map();
-  const names = new Set([...cov.server.keys(), ...local.keys()]);
+  const wanted = f => !path || f.startsWith(path + "/") || isServerCode(f);
+  const names = new Set([...cov.server.keys(), ...local.keys()].filter(wanted));
   return [...names].map(f => {
     const s = cov.server.get(f) || new Map(), l = local.get(f) || new Map();
     const lines = new Set([...s.keys(), ...l.keys()]);
@@ -124,21 +139,45 @@ function card(label, cls, n, d, sub) {
   return `<div class="card ${cls}"><small>${label}</small><b>${pctText(n, d)}</b><small>${n.toLocaleString()} / ${d.toLocaleString()} lines${sub ? " · " + sub : ""}</small></div>`;
 }
 
+// Rows: libraries. Columns: every server any library lists. A cell is the
+// library's line coverage from that server's test server run plus the
+// library's local tests, line by line; the small number is the test server alone.
+function renderMatrix() {
+  const langs = [...new Set(Object.values(ALL).flatMap(a => a.servers || []))];
+  const cell = (label, lang) => {
+    const a = ALL[label];
+    if (!a || !(a.servers || []).includes(lang)) return `<td class="na"></td>`;
+    const cov = (a.covs || []).find(c => c.language === lang);
+    const on = ui.lib === label && ui.lang === lang ? " selected" : "";
+    if (!cov) return `<td class="nocov${on}" title="no coverage from this server yet">–</td>`;
+    const t = totals(cov.files.filter(x => !x.code)), p = pct(t.b, t.total);
+    if (!t.total) return `<td class="cov nocov${on}" data-lib="${label}" data-lang="${lang}" title="The run covered none of the library's own files. The server may use a published package.">no library code</td>`;
+    const tint = p >= 80 ? "var(--pass)" : p >= 50 ? "var(--part)" : "var(--fail)";
+    return `<td class="cov${on}" data-lib="${label}" data-lang="${lang}" style="background:color-mix(in srgb,${tint} 30%,transparent)">
+      <b>${pctText(t.b, t.total)}</b><small>server ${pctText(t.s, t.total)}${cov.local ? "" : " · no local"}</small></td>`;
+  };
+  const rows = Object.keys(PRODUCTS).map(label => {
+    const a = ALL[label] || {};
+    const run = a.run ? ` <a class="small" href="${a.run.url}" target="_blank" title="${esc(a.run.branch)} @ ${a.run.headSha.slice(0, 7)} · ${esc(a.run.conclusion)}">run</a>` : "";
+    const err = a.error ? `<div class="note">${esc(a.error).slice(0, 120)}</div>` : !a.run && !a.error ? `<div class="sub">loading…</div>` : "";
+    return `<tr><th>${label}${run}${err}</th>${langs.map(l => cell(label, l)).join("")}</tr>`;
+  }).join("");
+  return `<table class="matrix"><thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
+    <div class="sub">Big number: library lines run by the test server or by the library's own tests. Small: the test server alone. – means that server does not report coverage yet. Click a cell for its files.</div>`;
+}
+
 function renderLeft() {
   const left = $("left");
-  if (!C.length) {
-    left.innerHTML = `<div class="empty">This run has no line coverage. Coverage comes from runs made after the coverage change landed.</div>`;
-    return;
-  }
-  const cov = C.find(c => c.language === ui.lang) || C[0];
-  ui.lang = cov.language;
+  const matrix = renderMatrix();
+  C = ui.lib && ALL[ui.lib] ? ALL[ui.lib].covs || [] : [];
+  const cov = C.find(c => c.language === ui.lang);
+  if (!cov) { left.innerHTML = matrix; return; }
   const lib = cov.files.filter(x => !x.code), srv = cov.files.filter(x => x.code);
   const t = totals(lib), ts = totals(srv);
-  const tabs = C.length > 1 ? `<div class="tabs">${C.map(c => `<button data-lang="${c.language}" class="${c.language === ui.lang ? "on" : ""}">${c.language}</button>`).join("")}</div>` : "";
   const localNote = cov.local
     ? `local tests from <a href="${esc(cov.local.from)}" target="_blank">this run</a> (${cov.local.artifacts.join(", ")})`
     : `<span class="note">no local coverage found for ${cov.commit.slice(0, 7)} in ${esc(cov.repository)} yet, so "both" is the test server alone</span>`;
-  let h = `${tabs}<h2>${esc(cov.language)} library · <a href="https://github.com/${cov.repository}/tree/${cov.commit}" target="_blank">${esc(cov.repository)}@${cov.commit.slice(0, 7)}</a></h2>
+  let h = `${matrix}<h2 style="margin-top:18px">${esc(ui.lib)} · ${esc(cov.language)} server · <a href="https://github.com/${cov.repository}/tree/${cov.commit}" target="_blank">${esc(cov.repository)}@${cov.commit.slice(0, 7)}</a></h2>
     <div class="sub">${localNote}</div>
     <div class="summary">
       ${card("Test server", "srv", t.s, t.total)}
@@ -200,24 +239,33 @@ async function renderDetail() {
 }
 
 const status = msg => { $("left").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
+async function loadLibrary(label) {
+  const product = PRODUCTS[label], a = ALL[label] = {};
+  const note = msg => { a.status = msg; };
+  try {
+    a.run = ui.source ? await resolveRun(product, ui.source) : await latestGreenRun(product);
+    if (!a.run) throw new Error(`no successful ${product}-test-server.yml run on main`);
+    const ref = a.run.repo === COMMONS ? a.run.headSha : "main";
+    const entries = JSON.parse(await ghRaw(COMMONS, `${product}/test-server/config/server-config.json`, ref)).entries;
+    a.servers = entries.map(e => e.language);
+    // The library is the part of its repository that server-config.json names
+    // (esdk/ in aws-crypto-tools-rust, which also holds mpl/ and prim/).
+    const libPath = Object.fromEntries(entries.map(e => [e.language, libraryPath(e)]));
+    renderLeft();
+    a.covs = (await fetchCoverage(product, a.run, note))
+      .map(c => ({ ...c, files:mergeFiles(c, libPath[c.language] || "") }));
+  } catch (err) { a.error = "Load failed: " + (err.message || err); }
+  renderLeft();
+}
 async function load() {
   if (!localStorage.getItem("github-dashboard-token")) { status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."); return; }
-  const label = $("suite").value, product = PRODUCTS[label];
-  try {
-    status(`Finding the ${label} run…`);
-    RUN = ui.source ? await resolveRun(product, ui.source) : await latestGreenRun(product);
-    if (!RUN) throw new Error(`no successful ${product}-test-server.yml run on main`);
-    $("run").innerHTML = `<a href="${RUN.url}" target="_blank">${esc(RUN.repo.split("/")[1])} run ${RUN.databaseId}</a> · ${esc(RUN.branch)} @ ${RUN.headSha.slice(0, 7)} · ${esc(RUN.conclusion)}${RUN.note ? " · " + esc(RUN.note) : ""}`;
-    const raw = await fetchCoverage(product, RUN, status);
-    C = raw.map(c => ({ ...c, files:mergeFiles(c) }));
-  } catch (err) { status("Load failed: " + (err.message || err)); return; }
-  if (!C.some(c => c.language === ui.lang)) ui.lang = C[0] && C[0].language;
+  for (const k in ALL) delete ALL[k];
   ui.file = null;
   renderLeft(); renderDetail();
+  // One library at a time: each report zip is tens of MB.
+  for (const label of Object.keys(PRODUCTS)) await loadLibrary(label);
 }
 
-$("suite").innerHTML = Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
-$("suite").onchange = load;
 $("source").value = ui.source;
 $("back").href = "index.html" + location.search;
 $("source").onchange = e => {
@@ -231,8 +279,8 @@ $("source").onchange = e => {
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); C && renderLeft(); }, 200); };
 $("left").addEventListener("click", e => {
-  const tab = e.target.closest("[data-lang]");
-  if (tab) { ui.lang = tab.dataset.lang; ui.file = null; renderLeft(); renderDetail(); return; }
+  const cellEl = e.target.closest("td[data-lib]");
+  if (cellEl) { ui.lib = cellEl.dataset.lib; ui.lang = cellEl.dataset.lang; ui.file = null; renderLeft(); renderDetail(); return; }
   const th = e.target.closest("[data-sort]");
   if (th) { ui.sort = th.dataset.sort; renderLeft(); return; }
   const tr = e.target.closest("tr[data-file]");

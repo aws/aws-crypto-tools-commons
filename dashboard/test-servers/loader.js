@@ -349,7 +349,15 @@ function parseLcov(text, into = new Map()) {
   return into;
 }
 
-const zipText = async (zip, e) => new Response(entryStream(zip, e)).text();
+async function zipText(zip, e) {
+  let text = "";
+  const reader = entryStream(zip, e).getReader();
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return text;
+    text += value;
+  }
+}
 
 // Local coverage for a commit: the given run's own artifacts first (a test
 // server run inside the library's CI), else the newest run on that commit.

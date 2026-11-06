@@ -2978,10 +2978,30 @@ body {
 .ci-run-in-progress { color: #d29922; font-weight: 500; }
 
 /* Test server results tab */
+.test-servers-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.test-servers-tabs button {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    cursor: pointer;
+}
+
+.test-servers-tabs button.active {
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+
 .test-servers-frame {
     display: block;
     width: 100%;
-    height: calc(100vh - 48px);
+    height: calc(100vh - 88px);
     border: 1px solid var(--border-color);
     border-radius: 6px;
 }

@@ -250,6 +250,16 @@ class GitHubDashboard {
             // The test server pages fetch their own data, so load the frame once.
             const frame = document.getElementById('testServersFrame');
             if (!frame.getAttribute('src')) frame.src = 'test-servers/index.html';
+            const tabs = document.getElementById('testServersTabs');
+            if (!tabs.dataset.bound) {
+                tabs.dataset.bound = 'true';
+                tabs.addEventListener('click', (e) => {
+                    const button = e.target.closest('button[data-page]');
+                    if (!button) return;
+                    tabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === button));
+                    frame.src = 'test-servers/' + button.dataset.page;
+                });
+            }
             return;
         }
 
