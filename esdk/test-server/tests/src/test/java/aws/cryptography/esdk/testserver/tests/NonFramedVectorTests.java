@@ -177,4 +177,28 @@ class NonFramedVectorTests {
                     + " exceeds 2^36 - 32 and must be rejected");
         }
     }
+
+    /**
+     * A non-framed body whose encrypted content length is set to the largest value the bound
+     * allows (2^36 - 32), while the message still carries only the vector's real content, is
+     * rejected because the body ends before the declared length. Decrypt must read the content
+     * as it arrives rather than reserving the declared length up front.
+     */
+    @ParameterizedTest(name = "nonFramedContentLengthAtBoundTruncatedRejected[{1}] {0}")
+    @MethodSource("cases")
+    void nonFramedContentLengthAtBoundTruncatedRejected(LanguageServerTarget target, Vector vector) {
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
+        byte[] tampered = resource(vector.ciphertextResource());
+        int contentLength = resource(vector.plaintextResource()).length;
+        // Non-framed body (non-signing suite): ... IV(12) ‖ contentLength(8 BE) ‖ content ‖ tag(16).
+        int contentLengthOffset = tampered.length - 16 - contentLength - 8;
+        long declared = (1L << 36) - 32;
+        for (int i = 0; i < 8; i++) {
+            tampered[contentLengthOffset + i] = (byte) (declared >>> (8 * (7 - i)));
+        }
+        assertThrows(ESDKClientError.class,
+            () -> EsdkOps.decrypt(target.endpoint(), config(vector.decryptPolicy()), tampered),
+            target + " " + vector + ": a non-framed content length of 2^36 - 32 with only "
+                + contentLength + " content bytes present must be rejected");
+    }
 }
