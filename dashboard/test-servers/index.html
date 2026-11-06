@@ -225,9 +225,9 @@ function renderSummary() {
   const zero = supported.filter(c => c.ran > 0 && c.pass === 0).length;
   const all = sum(S.cases, s);
   $("summary").innerHTML = `
-    <div class="card"><small>${s ? s + " supports" : "supported"}</small><b>${supported.length}/${st.length}</b><small>${s ? "features" : "server-feature pairs"}</small></div>
-    <div class="card"><small>supported, all pass</small><b>${green}</b><small>${s ? "features" : "pairs"}</small></div>
-    <div class="card"><small>supported, ran, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>${s ? "features" : "pairs"}</small></div>
+    <div class="card" title="Features the server says it supports, out of all features"><small>${s ? s + " supports" : "supported"}</small><b>${supported.length}/${st.length}</b><small>${s ? "features" : "server-feature pairs"}</small></div>
+    <div class="card" title="Supported, and every test that ran passed"><small>supported, all pass</small><b>${green}</b><small>${s ? "features" : "pairs"}</small></div>
+    <div class="card" title="Supported, tests ran, and none passed. Turn on Only problems to find them."><small>supported, ran, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>${s ? "features" : "pairs"}</small></div>
     <div class="card"><small>test runs</small><b>${all[0].toLocaleString()}</b><small>passed · ${all[1]} failed · ${all[4].toLocaleString()} other skips · ${all[2].toLocaleString()} gated</small></div>`;
 }
 
