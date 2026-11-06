@@ -439,18 +439,18 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
-          emit rustdafny rust-dafny "$esdk_tip" \
+          emit rustdafny rust-dafny "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
           emit go go "$esdk_tip" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          # The rust server is built with line coverage on; "-coverage" keeps
-          # it apart from prebuilt servers that were built without it.
+          # "-coverage": built with line coverage on, so apart from older
+          # prebuilt servers built without it.
           emit rust rust "$(tip rust)-coverage" \
             "$rust/esdk/test-server/target/release/esdk-test-server" \
             "$rust/esdk/test-server/.esdk-build-stamp"
-          emit rustcpp rust-cpp "$(tip rust-cpp)" \
+          emit rustcpp rust-cpp "$(tip rust-cpp)-coverage" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
@@ -743,13 +743,16 @@ jobs:
         working-directory: ${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny/codegen
         run: ./gradlew --version > /dev/null
 
-      - name: Build the rust server with line coverage
-        # Before the cargo cache, whose key includes RUSTFLAGS. The start check
-        # below writes its profile to the temp directory, not the clone.
-        if: matrix.language == 'rust'
-        run: |
-          echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
-          echo "LLVM_PROFILE_FILE=$RUNNER_TEMP/coverage/rust-%p-%m.profraw" >> "$GITHUB_ENV"
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -901,6 +904,11 @@ jobs:
             "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
               || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
           fi
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -1521,9 +1529,6 @@ jobs:
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
           ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
-          # Where the coverage-instrumented rust server writes its profile when
-          # it stops. Servers built without coverage ignore it.
-          LLVM_PROFILE_FILE: ${{ runner.temp }}/coverage/rust-%p-%m.profraw
         run: |
           # The build steps above launch some servers to check they start; one that
           # outlives its step holds its port, and the run below would talk to it.
@@ -1535,36 +1540,12 @@ jobs:
           done
           make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
-      - name: Write the rust server's line coverage
-        # Writes build/coverage/rust.lcov (paths relative to the rust
-        # repository) and rust.json (which repository and commit it covers),
-        # for the dashboard to merge with the repository's own test coverage.
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
         if: always()
-        working-directory: esdk/test-server
-        env:
-          PATHS_rust: ${{ needs.plan.outputs.paths_rust }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          profiles=("$RUNNER_TEMP"/coverage/rust-*.profraw)
-          if [ ${#profiles[@]} -eq 0 ]; then
-            echo "::notice::the rust server wrote no coverage profile"
-            exit 0
-          fi
-          binary=$(printf '%s\n' "$PATHS_rust" | sed -n 1p)
-          clone=${binary%/esdk/test-server/target/release/esdk-test-server}
-          tools="$(rustc --print target-libdir)/../bin"
-          out=build/coverage
-          mkdir -p "$out"
-          "$tools/llvm-profdata" merge -sparse "${profiles[@]}" -o "$RUNNER_TEMP/coverage/rust.profdata"
-          "$tools/llvm-cov" export -format=lcov -instr-profile="$RUNNER_TEMP/coverage/rust.profdata" \
-            "$GITHUB_WORKSPACE/$binary" \
-            | python3 ../../test-server-common/tools/lcov_paths.py "$clone" > "$out/rust.lcov"
-          url=$(jq -r '.entries[] | select(.language=="rust") | .serverLocation.url' config/server-config.json)
-          repo=$(echo "$url" | sed -E 's#^.*github\.com[:/]##; s#\.git$##')
-          commit=$(git -C "$GITHUB_WORKSPACE/$clone" rev-parse HEAD)
-          jq -n --arg repo "$repo" --arg commit "$commit" '{language:"rust", repository:$repo, commit:$commit}' > "$out/rust.json"
-          echo "rust: $(grep -c '^SF:' "$out/rust.lcov") files from $repo@$commit"
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" esdk/test-server/build/coverage
 
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
