@@ -1182,7 +1182,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}-coverage
 
       - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
         # The clone carries the server's Gradle outputs, and the local Maven
@@ -1436,9 +1436,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-coverage-${{ github.run_id }}
           restore-keys: |
-            ${{ needs.plan.outputs.platform }}-ccache-
+            ${{ needs.plan.outputs.platform }}-ccache-coverage-
 
       - name: Build the java, python, javascript, and c servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
@@ -1631,7 +1631,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-coverage-${{ github.run_id }}
 
       - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
@@ -1660,7 +1660,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}-coverage
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
