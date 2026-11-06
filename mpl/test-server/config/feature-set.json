@@ -40,6 +40,7 @@
     "raw-aes",
     "hierarchical",
     "default-cmm",
-    "static-keyring"
+    "static-keyring",
+    "ddb-endpoint"
   ]
 }
