@@ -326,10 +326,10 @@ jobs:
           java_project="$mpl/$(dirname "$(dirname "$(library_path java)")")"
           python_library="$mpl/$(library_path python)"
           m2=$HOME/.m2/repository/software/amazon/cryptography
-          emit rust rust "" \
+          emit rust rust "-coverage" \
             "$rust/target/release/mpl-test-server" \
             "$rust/.mpl-build-stamp"
-          emit rustdafny rust-dafny "" \
+          emit rustdafny rust-dafny "-coverage" \
             "$rustdafny/target/release/mpl-test-server" \
             "$rustdafny/.mpl-build-stamp"
           emit net net "-dafny$DAFNY_VERSION" \
@@ -577,6 +577,17 @@ jobs:
           # does.
           (cd "$mpl/smithy-dafny/codegen" && JAVA_HOME="$JAVA_HOME_17_X64" ./gradlew --version)
 
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
         # are cleaned before saving, so every branch reuses the dependencies.
@@ -694,6 +705,11 @@ jobs:
             "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
               || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
           fi
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -889,6 +905,20 @@ jobs:
           python3 test-server-common/tools/ci_summary.py \
             mpl/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up llvm-tools for the coverage reports
+        # Turns the Rust servers' coverage profiles into reports.
+        if: always()
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
+        if: always()
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" mpl/test-server/build/coverage
+
       - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
@@ -896,6 +926,7 @@ jobs:
           name: mpl-test-server-reports
           path: |
             mpl/test-server/build/resolution-record.json
+            mpl/test-server/build/coverage
             test-server-common/orchestrator/build/resolution-record.json
             mpl/test-server/build/launch/*/*.log
             mpl/test-server/tests/build/reports/tests

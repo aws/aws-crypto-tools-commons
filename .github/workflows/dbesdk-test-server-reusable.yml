@@ -209,7 +209,7 @@ jobs:
           emit net net "$(tip net)" \
             "$net/bin/Release/net8.0" \
             "$net/.dbesdk-build-stamp"
-          emit rust rust "$(tip rust)" \
+          emit rust rust "$(tip rust)-coverage" \
             "$rust/target/release/dbesdk-test-server" \
             "$rust/.dbesdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
@@ -369,6 +369,17 @@ jobs:
         working-directory: dbesdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and the workspace's Cargo.lock; our own crates
         # are cleaned before saving, so every branch reuses the dependencies.
@@ -459,6 +470,11 @@ jobs:
       KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/dbesdk-test-server-ci-kms-role' }}
 
     steps:
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
       - name: Keep the server ports out of the ephemeral port range
         # The kernel gives each outgoing connection a source port from
         # ip_local_port_range. When that range covers a server's port, a
@@ -694,6 +710,20 @@ jobs:
           python3 test-server-common/tools/ci_summary.py \
             dbesdk/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up llvm-tools for the coverage reports
+        # Turns the Rust servers' coverage profiles into reports.
+        if: always()
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
+        if: always()
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" dbesdk/test-server/build/coverage
+
       - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
@@ -703,6 +733,7 @@ jobs:
             test-server-common/orchestrator/build/resolution-record.json
             test-server-common/orchestrator/build/launch/*/*.log
             dbesdk/test-server/build/resolution-record.json
+            dbesdk/test-server/build/coverage
             dbesdk/test-server/build/launch/*/*.log
             dbesdk/test-server/tests/build/reports/tests
             dbesdk/test-server/tests/build/test-results
