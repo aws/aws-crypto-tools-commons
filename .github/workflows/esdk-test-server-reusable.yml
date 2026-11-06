@@ -909,6 +909,25 @@ jobs:
         # line coverage under this directory (the orchestrator's Coverage).
         run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
 
+      - name: Download the JaCoCo agent and command line
+        # The Java launch plan runs each Java server with the agent, and
+        # coverage_report.py turns the agent's data into lcov with the
+        # command line.
+        env:
+          JACOCO_VERSION: 0.8.13
+        run: |
+          dir="$RUNNER_TEMP/jacoco"
+          mkdir -p "$dir"
+          base=https://repo1.maven.org/maven2/org/jacoco
+          curl -sSfL -o "$dir/jacocoagent.jar" "$base/org.jacoco.agent/$JACOCO_VERSION/org.jacoco.agent-$JACOCO_VERSION-runtime.jar"
+          curl -sSfL -o "$dir/jacococli.jar" "$base/org.jacoco.cli/$JACOCO_VERSION/org.jacoco.cli-$JACOCO_VERSION-nodeps.jar"
+          printf '%s  %s\n' \
+            47e700ccb0fdb9e27c5241353f8161938f4e53c3561dd35e063c5fe88dc3349b jacocoagent.jar \
+            8f748683833d4dc4d72cea5d6b43f49344687b831e0582c97bcb9b984e3de0a3 jacococli.jar \
+            | (cd "$dir" && sha256sum -c -)
+          echo "TESTSERVER_JACOCO_AGENT=$dir/jacocoagent.jar" >> "$GITHUB_ENV"
+          echo "TESTSERVER_JACOCO_CLI=$dir/jacococli.jar" >> "$GITHUB_ENV"
+
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:

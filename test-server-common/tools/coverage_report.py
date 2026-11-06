@@ -56,8 +56,45 @@ def llvm(meta, directory):
     return run(args, capture_output=True, text=True).stdout
 
 
+def jacoco(meta, directory):
+    """JVM servers run with the JaCoCo agent (JavaLaunchPlan).
+
+    The agent dumped the library classes it saw under classes/, so the report
+    reads the exact class files the server ran. A line counts as hit when
+    JaCoCo covered at least one of its instructions; JaCoCo keeps no hit
+    counts.
+    """
+    data = os.path.join(directory, "jacoco.exec")
+    classes = os.path.join(directory, "classes")
+    if not os.path.exists(data) or not os.path.isdir(classes):
+        return None
+    xml_path = os.path.join(directory, "jacoco.xml")
+    run(["java", "-jar", os.environ["TESTSERVER_JACOCO_CLI"], "report", data,
+         "--classfiles", classes, "--xml", xml_path])
+    return jacoco_xml_to_lcov(xml_path, meta["sources"])
+
+
+def jacoco_xml_to_lcov(xml_path, sources):
+    """lcov for each JaCoCo <sourcefile> found under one of the source roots."""
+    import xml.etree.ElementTree as ElementTree
+    out = []
+    for package in ElementTree.parse(xml_path).getroot().iter("package"):
+        for sourcefile in package.findall("sourcefile"):
+            relative = os.path.join(package.get("name"), sourcefile.get("name"))
+            path = next((os.path.join(root, relative) for root in sources
+                         if os.path.isfile(os.path.join(root, relative))), None)
+            if path is None:
+                continue
+            out.append("SF:%s\n" % path)
+            for line in sourcefile.findall("line"):
+                out.append("DA:%s,%d\n" % (line.get("nr"), 1 if int(line.get("ci")) > 0 else 0))
+            out.append("end_of_record\n")
+    return "".join(out)
+
+
 CONVERTERS = {
     "llvm": llvm,
+    "jacoco": jacoco,
 }
 
 
