@@ -359,25 +359,29 @@ async function zipText(zip, e) {
   }
 }
 
-// Local coverage for a commit: the given run's own artifacts first (a test
-// server run inside the library's CI), else the newest run on that commit.
+// Local coverage for a commit: the given run's own artifacts (a test server
+// run inside the library's CI) plus every other run on that commit, since a
+// repository can upload each language's coverage from a different workflow.
+// The newest artifact of each name wins.
 async function localCoverage(repo, commit, run, progress) {
   const named = async runId => (await ghJson(`repos/${repo}/actions/runs/${runId}/artifacts?per_page=100`))
     .artifacts.filter(a => a.name.startsWith("local-coverage-") && !a.expired);
-  let arts = run.repo === repo ? await named(run.databaseId) : [];
-  let from = arts.length ? run.url : null;
-  if (!arts.length) {
-    const runs = (await ghJson(`repos/${repo}/actions/runs?head_sha=${commit}&per_page=30`)).workflow_runs;
-    for (const r of runs) { arts = await named(r.id); if (arts.length) { from = r.html_url; break; } }
+  const runs = (await ghJson(`repos/${repo}/actions/runs?head_sha=${commit}&per_page=100`)).workflow_runs;
+  const ids = [...new Set([...(run.repo === repo ? [run.databaseId] : []), ...runs.map(r => r.id)])];
+  const newest = new Map(), from = new Set();
+  for (const id of ids) for (const a of await named(id)) {
+    const seen = newest.get(a.name);
+    if (!seen || a.created_at > seen.created_at) newest.set(a.name, { ...a, runUrl:`https://github.com/${repo}/actions/runs/${id}` });
   }
-  if (!arts.length) return null;
+  if (!newest.size) return null;
   const files = new Map();
-  for (const a of arts) {
+  for (const a of newest.values()) {
     progress(`Downloading ${a.name}…`);
+    from.add(a.runUrl);
     const zip = await (await gh(`repos/${repo}/actions/artifacts/${a.id}/zip`)).arrayBuffer();
     for (const e of zipEntries(zip).filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), files);
   }
-  return { files, from, artifacts:arts.map(a => a.name) };
+  return { files, from:[...from][0], runs:[...from], artifacts:[...newest.keys()].sort() };
 }
 
 // -> [{ language, repository, commit, server: Map, local: {files, from} | null }]
