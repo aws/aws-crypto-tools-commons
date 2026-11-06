@@ -76,6 +76,20 @@ class GradleTestRunnerTest {
     }
 
     @Test
+    @DisplayName("a dry run passes testserver.dryRun=true; a normal run passes nothing")
+    void commandCarriesTheDryRun() {
+        List<TestTarget> targets =
+            List.of(new TestTarget("rust", 1, "dbe", URI.create("http://dry-run.invalid:1")));
+        TestRunInput dry = new TestRunInput(targets, Map.of(), List.of(), Map.of(), "rust", Map.of(), true);
+        TestRunInput normal = new TestRunInput(targets, Map.of(), List.of(), Map.of(), "rust", Map.of());
+
+        assertTrue(GradleTestRunner.command(Path.of("tests"), dry, "")
+            .contains("-Dtestserver.dryRun=true"));
+        assertTrue(GradleTestRunner.command(Path.of("tests"), normal, "").stream()
+            .noneMatch(a -> a.startsWith("-Dtestserver.dryRun")));
+    }
+
+    @Test
     @DisplayName("a focus is passed as testserver.focus; no focus passes nothing")
     void commandCarriesTheFocus() {
         TestRunInput input = new TestRunInput(

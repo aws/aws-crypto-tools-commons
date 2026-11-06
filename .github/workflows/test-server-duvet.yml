@@ -1,0 +1,45 @@
+# Unit tests for the dry run and the duvet annotation picker that
+# test-server-duvet-reusable.yml runs for each language repository.
+
+name: TestServer duvet annotations
+
+on:
+  pull_request:
+    paths:
+      - "test-server-common/**"
+      - ".github/workflows/test-server-duvet.yml"
+      - ".github/workflows/test-server-duvet-reusable.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "test-server-common/**"
+      - ".github/workflows/test-server-duvet.yml"
+      - ".github/workflows/test-server-duvet-reusable.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: dry run + picker unit tests
+    runs-on: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: tests-support (DryRun, FeatureGateLog)
+        working-directory: test-server-common/tests-support
+        run: ../orchestrator/gradlew --console=plain -p . test --tests '*DryRunTest' --tests '*FeatureGateLogTest'
+
+      - name: orchestrator (dryRun mode)
+        working-directory: test-server-common/orchestrator
+        run: ./gradlew --console=plain test --tests '*DryRunOrchestratorTest' --tests '*GradleTestRunnerTest'
+
+      - name: duvet annotation picker
+        run: python3 -m unittest discover -s test-server-common/tools -v
