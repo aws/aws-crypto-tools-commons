@@ -33,11 +33,21 @@
     "    store's own operations are not modeled.",
     "  - Materials cache types other than Default, and the keyring's own cache",
     "    configuration: a keyring uses either its default cache or a Shared",
-    "    Default cache passed by handle."
+    "    Default cache passed by handle.",
+    "  - AWS KMS keyring checks on KMS responses: a GenerateDataKey or Encrypt",
+    "    response with a missing or malformed key id, data key or ciphertext, a",
+    "    CiphertextForRecipient, or a key id of 64 KiB or more, and a Decrypt",
+    "    response that names another key. Real KMS does not send these, and",
+    "    the model has no fake KMS.",
+    "  - AWS KMS keyring OnDecrypt with an aws-kms encrypted data key whose",
+    "    provider info is an alias ARN. aws-kms-keyring.md#ondecrypt says",
+    "    OnDecrypt MUST fail, but the Dafny, Rust, JavaScript and C keyrings all",
+    "    skip that key. The spec question is open."
   ],
   "product": "mpl",
   "features": [
     "raw-aes",
+    "aws-kms",
     "hierarchical",
     "default-cmm",
     "static-keyring"

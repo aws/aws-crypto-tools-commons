@@ -13,9 +13,9 @@ use smithy.protocols#rpcv2Cbor
 /// CMM materials retrieval.
 ///
 /// Scope is the MPL surface every configured Language_Server implements: the
-/// Raw AES keyring, the AWS KMS Hierarchical keyring with its key store and
-/// materials cache, a static test keyring, and the Default CMM, over ESDK
-/// algorithm suites only.
+/// Raw AES keyring, the AWS KMS keyring, the AWS KMS Hierarchical keyring
+/// with its key store and materials cache, a static test keyring, and the
+/// Default CMM, over ESDK algorithm suites only.
 /// Keyrings, CMMs, and suite formats a server does not implement are not
 /// modeled.
 ///
@@ -34,6 +34,7 @@ service MPLTestServer {
     operations: [
         CreateRawAesKeyring
         CreateStaticKeyring
+        CreateAwsKmsKeyring
         CreateKeyStoreClient
         CreateCryptographicMaterialsCache
         CreateAwsKmsHierarchicalKeyring
@@ -69,6 +70,13 @@ operation CreateRawAesKeyring {
 operation CreateStaticKeyring {
     input: CreateStaticKeyringRequest
     output: CreateStaticKeyringResponse
+    errors: [GenericServerError, MPLClientError]
+}
+
+/// Construct and register an AWS KMS keyring, returning its handle.
+operation CreateAwsKmsKeyring {
+    input: CreateAwsKmsKeyringRequest
+    output: CreateAwsKmsKeyringResponse
     errors: [GenericServerError, MPLClientError]
 }
 
@@ -241,6 +249,39 @@ structure CreateStaticKeyringResponse {
     /// Handle referencing the registered keyring for subsequent operations.
     @required
     keyringId: ResourceId
+}
+
+// ===========================================================================
+// CreateAwsKmsKeyring shapes
+// ===========================================================================
+
+/// The server builds the keyring's KMS client itself, from the ambient AWS
+/// credentials and the region given here. kmsKeyId and grantTokens pass
+/// through to the MPL unchanged, so the MPL's own validation answers a bad
+/// value with MPLClientError.
+@input
+structure CreateAwsKmsKeyringRequest {
+    /// A key ARN, key ID, alias name, or alias ARN.
+    @required
+    kmsKeyId: String
+
+    /// Region of the keyring's KMS client.
+    @required
+    kmsClientRegion: String
+
+    /// Grant tokens sent with every KMS request.
+    grantTokens: GrantTokenList
+}
+
+@output
+structure CreateAwsKmsKeyringResponse {
+    /// Handle referencing the registered keyring for subsequent operations.
+    @required
+    keyringId: ResourceId
+}
+
+list GrantTokenList {
+    member: String
 }
 
 // ===========================================================================
