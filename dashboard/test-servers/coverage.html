@@ -70,7 +70,6 @@
   <label>Test server <select id="suite"></select></label>
   <label title="Empty: newest passing run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run.">PR / commit <input type="text" id="source" size="34" placeholder="newest passing run on commons main"></label>
   <label>Find file <input type="text" id="search" placeholder="e.g. decrypt"></label>
-  <label>GitHub token <input type="password" id="token" placeholder="classic, repo scope" size="18"></label>
   <span class="run" id="run"></span>
 </header>
 <main>
@@ -202,7 +201,7 @@ async function renderDetail() {
 
 const status = msg => { $("left").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
 async function load() {
-  if (!localStorage.getItem("github-dashboard-token")) { status("Paste a GitHub token above (classic, repo scope, SSO-authorized for aws). It stays in this browser's localStorage."); return; }
+  if (!localStorage.getItem("github-dashboard-token")) { status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."); return; }
   const label = $("suite").value, product = PRODUCTS[label];
   try {
     status(`Finding the ${label} run…`);
@@ -229,8 +228,6 @@ $("source").onchange = e => {
   $("back").href = "index.html" + location.search;
   load();
 };
-$("token").value = localStorage.getItem("github-dashboard-token") || "";
-$("token").onchange = e => { localStorage.setItem("github-dashboard-token", e.target.value.trim()); load(); };
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); C && renderLeft(); }, 200); };
 $("left").addEventListener("click", e => {

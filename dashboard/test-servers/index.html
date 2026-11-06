@@ -111,7 +111,6 @@
   <a href="upset.html" id="upsetLink" class="small">UpSet view</a>
   <a href="coverage.html" id="coverageLink" class="small">Line coverage</a>
   <label>Find test <input type="text" id="search" placeholder="e.g. bitFlip"></label>
-  <label>GitHub token <input type="password" id="token" placeholder="classic, repo scope" size="18"></label>
   <span class="run" id="run"></span>
 </header>
 <main>
@@ -142,7 +141,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
 
 let S; // current suite
-const ui = { split:false, source:new URLSearchParams(location.search).get("run") || "", focus:"rust", sel:null, onlyProblems:false, search:"", open:new Set(), openCase:null, shown:{} };
+const ui = { split:false, source:new URLSearchParams(location.search).get("run") || "", focus:"", sel:null, onlyProblems:false, search:"", open:new Set(), openCase:null, shown:{} };
 
 function loadSuite(name, d, r) {
   const servers = d.servers.map(s => s.language);
@@ -168,9 +167,10 @@ function loadSuite(name, d, r) {
 const declState = (s, f) => f === NONE ? "n/a" : S.decl[s + "|" + f] || "missing";
 const counts = (c, s) => S.li[s] === undefined ? [0, 0, 0, 0, 0] : c.r[S.li[s]];
 function sum(cases, s) {
-  // [pass, fail, gate skip (expected), partner skip, other skip]
+  // [pass, fail, gate skip (expected), partner skip, other skip]; no server means every server.
   const t = [0, 0, 0, 0, 0];
-  for (const c of cases) { const x = counts(c, s); for (let i = 0; i < 5; i++) t[i] += x[i]; }
+  for (const srv of s ? [s] : S.servers)
+    for (const c of cases) { const x = counts(c, srv); for (let i = 0; i < 5; i++) t[i] += x[i]; }
   return t;
 }
 const dotClass = ([p, f, g, o, k]) => p + f + k === 0 ? (g ? "skip" : "notrun") : f ? "fail" : p && k ? "mixed" : k ? "skip" : "pass";
@@ -217,15 +217,15 @@ function renderHeader() {
 
 function renderSummary() {
   const s = ui.focus;
-  const st = S.features.filter(f => f !== NONE).map(f => cellStats(s, f));
+  const st = S.features.filter(f => f !== NONE).flatMap(f => (s ? [s] : S.servers).map(srv => cellStats(srv, f)));
   const supported = st.filter(c => c.state === "supported");
   const green = supported.filter(c => c.cls === "s-pass").length;
   const zero = supported.filter(c => c.pass === 0).length;
   const all = sum(S.cases, s);
   $("summary").innerHTML = `
-    <div class="card"><small>${s} supports</small><b>${supported.length}/${st.length}</b><small>features</small></div>
-    <div class="card"><small>supported, all pass</small><b>${green}</b><small>features</small></div>
-    <div class="card"><small>supported, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>features</small></div>
+    <div class="card"><small>${s ? s + " supports" : "supported"}</small><b>${supported.length}/${st.length}</b><small>${s ? "features" : "server-feature pairs"}</small></div>
+    <div class="card"><small>supported, all pass</small><b>${green}</b><small>${s ? "features" : "pairs"}</small></div>
+    <div class="card"><small>supported, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>${s ? "features" : "pairs"}</small></div>
     <div class="card"><small>test runs</small><b>${all[0].toLocaleString()}</b><small>passed · ${all[1]} failed · ${all[4].toLocaleString()} other skips · ${all[2].toLocaleString()} gated</small></div>`;
 }
 
@@ -530,7 +530,7 @@ const status = msg => { $("detail").innerHTML = `<div class="empty">${esc(msg)}<
 async function selectSuite(name) {
   if (!localStorage.getItem("github-dashboard-token")) {
     $("matrix").innerHTML = ""; $("summary").innerHTML = "";
-    status("Paste a GitHub token above (classic, repo scope, SSO-authorized for aws). It stays in this browser's localStorage.");
+    status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).");
     return false;
   }
   try {
@@ -541,9 +541,9 @@ async function selectSuite(name) {
     return false;
   }
   loadSuite(name, loaded[name + "|" + ui.source].decl, loaded[name + "|" + ui.source].results);
-  if (!S.servers.includes(ui.focus)) ui.focus = S.servers.includes("rust") ? "rust" : S.servers[0];
+  if (!S.servers.includes(ui.focus)) ui.focus = "";
   ui.sel = null; ui.openCase = null; ui.open.clear(); ui.shown = {};
-  $("focus").innerHTML = S.servers.map(s => `<option ${s === ui.focus ? "selected" : ""}>${s}</option>`).join("");
+  $("focus").innerHTML = `<option value="">(none)</option>` + S.servers.map(s => `<option ${s === ui.focus ? "selected" : ""}>${s}</option>`).join("");
   const bad = S.servers.filter(s => S.src[s].error);
   if (bad.length) console.warn("feature-config.json not readable for", bad.map(s => `${s}: ${S.src[s].error}`));
   return true;
@@ -560,8 +560,6 @@ $("source").onchange = e => {
   history.replaceState(null, "", "?" + q);
   show($("suite").value);
 };
-$("token").value = localStorage.getItem("github-dashboard-token") || "";
-$("token").onchange = e => { localStorage.setItem("github-dashboard-token", e.target.value.trim()); show($("suite").value); };
 $("focus").onchange = e => { ui.focus = e.target.value; render(); };
 $("onlyProblems").onchange = e => { ui.onlyProblems = e.target.checked; render(); };
 $("split").onchange = e => { ui.split = e.target.checked; renderMatrix(); };
