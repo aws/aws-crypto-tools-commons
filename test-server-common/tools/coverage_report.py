@@ -115,7 +115,7 @@ def v8(meta, directory):
     modules = os.path.join(os.path.realpath(meta["root"]), "modules") + "/"
 
     def library_file(path):
-        path = os.path.normpath(os.path.join(meta["root"], path))
+        path = os.path.realpath(os.path.join(meta["root"], path))
         return path.startswith(modules) and "/node_modules/" not in path
 
     return keep_files(lcov, library_file)
@@ -131,7 +131,10 @@ def gcov(meta, directory):
     """
     prefix = os.path.join(directory, "gcda")
     counts = {}
-    for data in glob.glob(os.path.join(prefix, "**", "*.gcda"), recursive=True):
+    # os.walk, not glob: the build tree is test-server/.build, which glob skips.
+    found = [os.path.join(parent, name) for parent, _, names in os.walk(prefix)
+             for name in names if name.endswith(".gcda")]
+    for data in found:
         notes = data[len(prefix):-len(".gcda")] + ".gcno"
         if not os.path.exists(notes):
             continue
@@ -143,7 +146,7 @@ def gcov(meta, directory):
                 continue
             report = json.loads(line)
             for source in report["files"]:
-                path = os.path.normpath(os.path.join(report["current_working_directory"], source["file"]))
+                path = os.path.realpath(os.path.join(report["current_working_directory"], source["file"]))
                 hits = counts.setdefault(path, {})
                 for record in source["lines"]:
                     hits[record["line_number"]] = hits.get(record["line_number"], 0) + record["count"]
