@@ -10,6 +10,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The C {@code Language_Server} launch plan: builds the rpcv2Cbor server that
@@ -131,11 +133,13 @@ public final class CLaunchPlan implements Launcher {
         // 2. Configure + build: the server Makefile's configure and build-server
         //    recipes, with the ambient CMAKE_PREFIX_PATH passed through.
         //    Skipped when the stamp shows this commit's binary is already built.
+        Optional<Path> coverage = Coverage.start(entry, sources, "gcov", Map.of());
         BuildStamp stamp = new BuildStamp(serverDir, product);
         if (!stamp.upToDate(server.commit(), server.dirty(),
                 List.of(buildDir.resolve(serverBinaryRelativePath)))) {
             runBuildStep(language, "cmake configure (BUILD_TEST_SERVER=ON)",
-                configureCommand(cmake, repoRoot, buildDir, System.getenv("CMAKE_PREFIX_PATH")),
+                configureCommand(cmake, repoRoot, buildDir, System.getenv("CMAKE_PREFIX_PATH"),
+                    coverage.isPresent()),
                 serverDir);
             runBuildStep(language, "cmake --build --target esdk-test-server",
                 buildCommand(cmake, buildDir), serverDir);
@@ -148,6 +152,13 @@ public final class CLaunchPlan implements Launcher {
         process.directory(serverDir.toFile());
         process.redirectErrorStream(true);
         process.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
+        // The server writes each object's .gcda file when it exits, under this
+        // directory followed by the object's absolute path, so the clone's build
+        // tree (which CI caches) keeps no run's counts.
+        coverage.ifPresent(dir -> {
+            process.environment().put("GCOV_PREFIX", dir.resolve("gcda").toString());
+            process.environment().put("GCOV_PREFIX_STRIP", "0");
+        });
         return subprocessLauncher.launch(language, entry.port(), process);
     }
 
@@ -157,17 +168,21 @@ public final class CLaunchPlan implements Launcher {
 
     /**
      * {@code cmake -S <repo root> -B <build dir> -DBUILD_TEST_SERVER=ON
-     * -DBUILD_AWS_ENC_SDK_CPP=OFF [-DCMAKE_PREFIX_PATH=<prefix path>]}. The
-     * prefix path is appended only when non-blank (the Makefile's
-     * {@code CMAKE_PREFIX_PATH} pass-through).
+     * -DBUILD_AWS_ENC_SDK_CPP=OFF [-DCMAKE_PREFIX_PATH=<prefix path>]
+     * [-DCODE_COVERAGE_ENABLE=ON]}. The prefix path is appended only when
+     * non-blank (the Makefile's {@code CMAKE_PREFIX_PATH} pass-through); the
+     * repository's coverage option builds everything with {@code --coverage}.
      */
     static List<String> configureCommand(String cmake, Path repoRoot, Path buildDir,
-            String cmakePrefixPath) {
+            String cmakePrefixPath, boolean coverage) {
         List<String> command = new ArrayList<>(List.of(
             cmake, "-S", repoRoot.toString(), "-B", buildDir.toString(),
             "-DBUILD_TEST_SERVER=ON", "-DBUILD_AWS_ENC_SDK_CPP=OFF"));
         if (cmakePrefixPath != null && !cmakePrefixPath.isBlank()) {
             command.add("-DCMAKE_PREFIX_PATH=" + cmakePrefixPath);
+        }
+        if (coverage) {
+            command.add("-DCODE_COVERAGE_ENABLE=ON");
         }
         return List.copyOf(command);
     }

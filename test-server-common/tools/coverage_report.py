@@ -19,6 +19,7 @@ coverage never fails the test run.
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 import traceback
@@ -108,12 +109,88 @@ def coverage_py(meta, directory):
     run(coverage + ["lcov", rcfile, "-o", lcov_path], cwd=meta["library"])
     with open(lcov_path) as f:
         return f.read()
+# c8 turns Node's raw V8 coverage into lcov.
+C8_VERSION = "10.1.3"
+
+
+def v8(meta, directory):
+    """Node.js servers run with NODE_V8_COVERAGE (NodeLaunchPlan).
+
+    c8 maps the compiled JavaScript back to the TypeScript sources through the
+    inline source maps the build emits. Only the library's own packages under
+    modules/ are kept, not the server or its dependencies.
+    """
+    data = os.path.join(directory, "v8")
+    if not glob.glob(os.path.join(data, "*.json")):
+        return None
+    report = os.path.join(directory, "lcov")
+    run(["npx", "--yes", "c8@" + C8_VERSION, "report", "--temp-directory", data,
+         "--reporter=lcov", "--report-dir", report, "--all=false"], cwd=meta["root"])
+    with open(os.path.join(report, "lcov.info")) as f:
+        lcov = f.read()
+    modules = os.path.join(os.path.realpath(meta["root"]), "modules") + "/"
+
+    def library_file(path):
+        path = os.path.realpath(os.path.join(meta["root"], path))
+        return path.startswith(modules) and "/node_modules/" not in path
+
+    return keep_files(lcov, library_file)
+
+
+def gcov(meta, directory):
+    """C servers built with --coverage (CLaunchPlan).
+
+    The server wrote each object's .gcda file under gcda/ followed by the
+    object's absolute path (GCOV_PREFIX). gcov reads it beside a copy of the
+    object's .gcno file from the build tree. A header's lines are counted in
+    every object that includes it, so their counts are summed.
+    """
+    prefix = os.path.join(directory, "gcda")
+    counts = {}
+    # os.walk, not glob: the build tree is test-server/.build, which glob skips.
+    found = [os.path.join(parent, name) for parent, _, names in os.walk(prefix)
+             for name in names if name.endswith(".gcda")]
+    for data in found:
+        notes = data[len(prefix):-len(".gcda")] + ".gcno"
+        if not os.path.exists(notes):
+            continue
+        shutil.copyfile(notes, data[:-len(".gcda")] + ".gcno")
+        out = run(["gcov", "--json-format", "--stdout", data], capture_output=True, text=True,
+                  cwd=os.path.dirname(data)).stdout
+        for line in out.splitlines():
+            if not line.startswith("{"):
+                continue
+            report = json.loads(line)
+            for source in report["files"]:
+                path = os.path.realpath(os.path.join(report["current_working_directory"], source["file"]))
+                hits = counts.setdefault(path, {})
+                for record in source["lines"]:
+                    hits[record["line_number"]] = hits.get(record["line_number"], 0) + record["count"]
+    out = []
+    for path in sorted(counts):
+        out.append("SF:%s\n" % path)
+        out.extend("DA:%d,%d\n" % (number, hits) for number, hits in sorted(counts[path].items()))
+        out.append("end_of_record\n")
+    return "".join(out)
+
+
+def keep_files(lcov, keep):
+    """The lcov records whose SF path satisfies keep(path)."""
+    out, keeping = [], False
+    for line in lcov.splitlines(keepends=True):
+        if line.startswith("SF:"):
+            keeping = keep(line[3:].strip())
+        if keeping:
+            out.append(line)
+    return "".join(out)
 
 
 CONVERTERS = {
     "llvm": llvm,
     "jacoco": jacoco,
     "coverage.py": coverage_py,
+    "v8": v8,
+    "gcov": gcov,
 }
 
 
