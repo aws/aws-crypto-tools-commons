@@ -528,7 +528,7 @@ function render() { renderHeader(); renderSummary(); renderMatrix(); renderSkips
 const loaded = {};
 const status = msg => { $("detail").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
 async function selectSuite(name) {
-  if (!localStorage.getItem("ghToken")) {
+  if (!localStorage.getItem("github-dashboard-token")) {
     $("matrix").innerHTML = ""; $("summary").innerHTML = "";
     status("Paste a GitHub token above (classic, repo scope, SSO-authorized for aws). It stays in this browser's localStorage.");
     return false;
@@ -560,8 +560,8 @@ $("source").onchange = e => {
   history.replaceState(null, "", "?" + q);
   show($("suite").value);
 };
-$("token").value = localStorage.getItem("ghToken") || "";
-$("token").onchange = e => { localStorage.setItem("ghToken", e.target.value.trim()); show($("suite").value); };
+$("token").value = localStorage.getItem("github-dashboard-token") || "";
+$("token").onchange = e => { localStorage.setItem("github-dashboard-token", e.target.value.trim()); show($("suite").value); };
 $("focus").onchange = e => { ui.focus = e.target.value; render(); };
 $("onlyProblems").onchange = e => { ui.onlyProblems = e.target.checked; render(); };
 $("split").onchange = e => { ui.split = e.target.checked; renderMatrix(); };

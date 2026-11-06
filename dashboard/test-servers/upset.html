@@ -164,7 +164,7 @@ function render() {
 
 async function show() {
   const name = $("suite").value;
-  if (!localStorage.getItem("ghToken")) { $("out").className = "empty"; $("out").textContent = "Paste a GitHub token above (classic, repo scope, SSO-authorized for aws)."; return; }
+  if (!localStorage.getItem("github-dashboard-token")) { $("out").className = "empty"; $("out").textContent = "Paste a GitHub token above (classic, repo scope, SSO-authorized for aws)."; return; }
   const key = name + "|" + ui.source;
   try {
     loaded[key] ??= await loadProduct(name, msg => { $("out").className = "empty"; $("out").textContent = msg; }, ui.source);
@@ -179,8 +179,8 @@ $("suite").onchange = show;
 $("unit").onchange = e => { ui.unit = e.target.value; if (D) render(); };
 $("source").value = ui.source;
 $("source").onchange = e => { ui.source = e.target.value.trim(); const q = new URLSearchParams(location.search); ui.source ? q.set("run", ui.source) : q.delete("run"); history.replaceState(null, "", "?" + q); show(); };
-$("token").value = localStorage.getItem("ghToken") || "";
-$("token").onchange = e => { localStorage.setItem("ghToken", e.target.value.trim()); show(); };
+$("token").value = localStorage.getItem("github-dashboard-token") || "";
+$("token").onchange = e => { localStorage.setItem("github-dashboard-token", e.target.value.trim()); show(); };
 show();
 </script>
 </body>

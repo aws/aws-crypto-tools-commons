@@ -202,7 +202,7 @@ async function renderDetail() {
 
 const status = msg => { $("left").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
 async function load() {
-  if (!localStorage.getItem("ghToken")) { status("Paste a GitHub token above (classic, repo scope, SSO-authorized for aws). It stays in this browser's localStorage."); return; }
+  if (!localStorage.getItem("github-dashboard-token")) { status("Paste a GitHub token above (classic, repo scope, SSO-authorized for aws). It stays in this browser's localStorage."); return; }
   const label = $("suite").value, product = PRODUCTS[label];
   try {
     status(`Finding the ${label} run…`);
@@ -229,8 +229,8 @@ $("source").onchange = e => {
   $("back").href = "index.html" + location.search;
   load();
 };
-$("token").value = localStorage.getItem("ghToken") || "";
-$("token").onchange = e => { localStorage.setItem("ghToken", e.target.value.trim()); load(); };
+$("token").value = localStorage.getItem("github-dashboard-token") || "";
+$("token").onchange = e => { localStorage.setItem("github-dashboard-token", e.target.value.trim()); load(); };
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); C && renderLeft(); }, 200); };
 $("left").addEventListener("click", e => {

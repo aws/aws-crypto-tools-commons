@@ -13,10 +13,7 @@ const COMMONS = "aws/aws-crypto-tools-commons";
 const PRODUCTS = { "ESDK":"esdk", "MPL":"mpl", "DB-ESDK":"dbesdk", "Primitives":"primitives" };
 
 // ---------- GitHub ----------
-// Reuse the token saved on the GitHub dashboard's Settings page, when there is one.
-if (!localStorage.getItem("ghToken") && localStorage.getItem("github-dashboard-token"))
-  localStorage.setItem("ghToken", localStorage.getItem("github-dashboard-token"));
-const token = () => localStorage.getItem("ghToken") || "";
+const token = () => localStorage.getItem("github-dashboard-token") || "";
 
 async function gh(path, accept = "application/vnd.github+json") {
   const res = await fetch("https://api.github.com/" + path, {
