@@ -92,9 +92,28 @@ def jacoco_xml_to_lcov(xml_path, sources):
     return "".join(out)
 
 
+def coverage_py(meta, directory):
+    """Python servers run under coverage.py (PythonLaunchPlan).
+
+    Each server process wrote its own .coverage.* data file; the lcov report
+    names files relative to the library directory.
+    """
+    directory = os.path.abspath(directory)
+    if not glob.glob(os.path.join(directory, ".coverage.*")):
+        return None
+    coverage = [meta["python"], "-m", "coverage"]
+    rcfile = "--rcfile=" + os.path.join(directory, "coveragerc")
+    run(coverage + ["combine", rcfile])
+    lcov_path = os.path.join(directory, "coverage.lcov")
+    run(coverage + ["lcov", rcfile, "-o", lcov_path], cwd=meta["library"])
+    with open(lcov_path) as f:
+        return f.read()
+
+
 CONVERTERS = {
     "llvm": llvm,
     "jacoco": jacoco,
+    "coverage.py": coverage_py,
 }
 
 

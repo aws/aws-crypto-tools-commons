@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -59,6 +60,12 @@ public final class PythonLaunchPlan implements Launcher {
      * launch-plan contract).
      */
     static final String CBOR2_REQUIREMENT = "cbor2>=5.6";
+
+    /**
+     * coverage.py for line coverage. 6.4 added the {@code sigterm} setting;
+     * from 7.6.2 the lcov report leaves out line checksums.
+     */
+    static final String COVERAGE_REQUIREMENT = "coverage==7.6.10";
 
     /** The interpreter used to create the venv (the Makefile's {@code PYTHON3 ?= python3}). */
     static final String DEFAULT_PYTHON3 = "python3";
@@ -167,10 +174,28 @@ public final class PythonLaunchPlan implements Launcher {
             stamp.write(language, commits, dirty);
         }
 
+        // Line coverage: the server runs under coverage.py, which saves its
+        // data when the orchestrator stops the server with SIGTERM.
+        Path rcFile = null;
+        Optional<Path> coverage = Coverage.start(entry, sources, "coverage.py",
+            Map.of("python", venvPython(venvDir).toString()));
+        if (coverage.isPresent()) {
+            runSetupStep(language, "pip install coverage", coverageInstallCommand(venvDir));
+            rcFile = coverage.get().resolve("coveragerc");
+            try {
+                Files.writeString(rcFile, coverageRc(coverage.get(), sourceDirectory(libraryDir)));
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    "failed to write the " + language + " coverage settings " + rcFile + ": "
+                        + e.getMessage(), e);
+            }
+        }
+
         // 3. Launch: <venv python> -m <product>_test_server <port> from the server
         //    directory (the Makefile's run-python-server), via the shared
         //    probe/spawn/readiness/teardown machinery.
-        ProcessBuilder server = new ProcessBuilder(serverCommand(venvDir, serverModule, entry.port()));
+        ProcessBuilder server = new ProcessBuilder(
+            serverCommand(venvDir, serverModule, entry.port(), rcFile));
         server.directory(serverDir.toFile());
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
@@ -241,9 +266,39 @@ public final class PythonLaunchPlan implements Launcher {
             "-e", serverDir.toString());
     }
 
-    /** {@code <venv python> -m <module> <port>}. */
-    static List<String> serverCommand(Path venvDir, String module, int port) {
-        return List.of(venvPython(venvDir).toString(), "-m", module, String.valueOf(port));
+    /**
+     * {@code <venv python> -m <module> <port>}, or, when {@code rcFile} is not
+     * null, {@code <venv python> -m coverage run --rcfile=<rcFile> -m <module> <port>}.
+     */
+    static List<String> serverCommand(Path venvDir, String module, int port, Path rcFile) {
+        if (rcFile == null) {
+            return List.of(venvPython(venvDir).toString(), "-m", module, String.valueOf(port));
+        }
+        return List.of(venvPython(venvDir).toString(), "-m", "coverage", "run",
+            "--rcfile=" + rcFile, "-m", module, String.valueOf(port));
+    }
+
+    /** {@code <venv>/bin/pip install --quiet coverage==<version>}. */
+    static List<String> coverageInstallCommand(Path venvDir) {
+        return List.of(venvPip(venvDir).toString(), "install", "--quiet", COVERAGE_REQUIREMENT);
+    }
+
+    /** The library's package directory: {@code <library>/src} when it exists. */
+    static Path sourceDirectory(Path libraryDir) {
+        Path src = libraryDir.resolve("src");
+        return (Files.isDirectory(src) ? src : libraryDir).toAbsolutePath().normalize();
+    }
+
+    /**
+     * coverage.py settings that measure only {@code source} and write one
+     * data file per process under {@code directory}, saved on SIGTERM.
+     */
+    static String coverageRc(Path directory, Path source) {
+        return "[run]\n"
+            + "data_file = " + directory.resolve(".coverage") + "\n"
+            + "parallel = true\n"
+            + "sigterm = true\n"
+            + "source = " + source + "\n";
     }
 
     // ------------------------------------------------------------------
