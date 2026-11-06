@@ -174,6 +174,105 @@ def gcov(meta, directory):
     return "".join(out)
 
 
+def gocover(meta, directory):
+    """Go servers built with -cover (GoLaunchPlan).
+
+    The server wrote its counters under gocover/ (GOCOVERDIR) when it exited.
+    covdata turns them into a text profile, which names each file by its
+    import path; meta["modules"] maps each module path to its directory.
+    """
+    counters = os.path.join(directory, "gocover")
+    if not glob.glob(os.path.join(counters, "covcounters.*")):
+        return None
+    profile = os.path.join(directory, "gocover.txt")
+    run(["go", "tool", "covdata", "textfmt", "-i=" + counters, "-o", profile])
+    with open(profile) as f:
+        return go_profile_to_lcov(f.read(), meta["modules"])
+
+
+def go_profile_to_lcov(profile, modules):
+    """lcov from a Go text profile: `<import path>:<l>.<c>,<l>.<c> <statements> <count>`.
+
+    A block counts on every line it spans, except a last line it only reaches
+    the indentation of (the line of the closing brace). A line in several
+    blocks keeps the highest count.
+    """
+    by_length = sorted(modules, key=len, reverse=True)
+    counts = {}
+    sources = {}
+    for record in profile.splitlines():
+        if not record or record.startswith("mode:"):
+            continue
+        location, _, count = record.rsplit(" ", 2)
+        name, span = location.rsplit(":", 1)
+        module = next((m for m in by_length if name.startswith(m + "/")), None)
+        if module is None:
+            continue
+        path = modules[module] + name[len(module):]
+        start, end = span.split(",")
+        start_line = int(start.split(".")[0])
+        end_line, end_column = (int(part) for part in end.split("."))
+        if end_line > start_line:
+            if path not in sources:
+                try:
+                    with open(path) as f:
+                        sources[path] = f.read().splitlines()
+                except OSError:
+                    sources[path] = []
+            lines = sources[path]
+            if end_line <= len(lines) and not lines[end_line - 1][:end_column - 1].strip():
+                end_line -= 1
+        hits = counts.setdefault(path, {})
+        for number in range(start_line, end_line + 1):
+            hits[number] = max(hits.get(number, 0), int(count))
+    return lines_to_lcov(counts)
+
+
+def dotnet_coverage(meta, directory):
+    """.NET servers run under dotnet-coverage collect (DotnetLaunchPlan).
+
+    Each server run wrote a .coverage file when it exited; dotnet-coverage
+    merges them into one Cobertura report.
+    """
+    data = sorted(glob.glob(os.path.join(directory, "*.coverage")))
+    if not data:
+        return None
+    xml_path = os.path.join(directory, "coverage.cobertura.xml")
+    run([meta["dotnet_coverage"], "merge", *data, "--output", xml_path, "--output-format", "cobertura"])
+    return cobertura_to_lcov(xml_path)
+
+
+def cobertura_to_lcov(xml_path):
+    """lcov from a Cobertura report. A line listed by several classes (a
+    method's compiler-generated classes) keeps the highest count."""
+    import xml.etree.ElementTree as ElementTree
+    root = ElementTree.parse(xml_path).getroot()
+    bases = [source.text for source in root.iter("source") if source.text]
+    counts = {}
+    for cls in root.iter("class"):
+        path = cls.get("filename")
+        if not os.path.isabs(path):
+            path = next((os.path.join(base, path) for base in bases
+                         if os.path.exists(os.path.join(base, path))), path)
+        hits = counts.setdefault(path, {})
+        for line in cls.iter("line"):
+            number = int(line.get("number"))
+            hits[number] = max(hits.get(number, 0), int(line.get("hits")))
+    return lines_to_lcov(counts)
+
+
+def lines_to_lcov(counts):
+    """lcov from {path: {line number: hits}}."""
+    out = []
+    for path in sorted(counts):
+        if not counts[path]:
+            continue
+        out.append("SF:%s\n" % path)
+        out.extend("DA:%d,%d\n" % (number, hits) for number, hits in sorted(counts[path].items()))
+        out.append("end_of_record\n")
+    return "".join(out)
+
+
 def keep_files(lcov, keep):
     """The lcov records whose SF path satisfies keep(path)."""
     out, keeping = [], False
@@ -191,6 +290,8 @@ CONVERTERS = {
     "coverage.py": coverage_py,
     "v8": v8,
     "gcov": gcov,
+    "gocover": gocover,
+    "dotnet-coverage": dotnet_coverage,
 }
 
 
