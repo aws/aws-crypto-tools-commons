@@ -255,22 +255,32 @@ structure CreateStaticKeyringResponse {
 // CreateAwsKmsKeyring shapes
 // ===========================================================================
 
-/// The server builds the keyring's KMS client itself, from the ambient AWS
-/// credentials and the region given here. kmsKeyId and grantTokens pass
-/// through to the MPL unchanged, so the MPL's own validation answers a bad
-/// value with MPLClientError.
+/// The server passes kmsKeyId and grantTokens to the MPL unchanged, and builds
+/// the KMS client from kmsClient. A missing kmsKeyId or kmsClient reaches the
+/// MPL as missing, so the MPL's own validation answers with MPLClientError.
 @input
 structure CreateAwsKmsKeyringRequest {
     /// A key ARN, key ID, alias name, or alias ARN.
-    @required
+    /// When absent, the server gives the MPL no key identifier.
     kmsKeyId: String
 
-    /// Region of the keyring's KMS client.
-    @required
-    kmsClientRegion: String
+    /// The keyring's KMS client.
+    /// When absent, the server gives the MPL no client.
+    kmsClient: KmsClientConfig
 
     /// Grant tokens sent with every KMS request.
     grantTokens: GrantTokenList
+}
+
+/// How the server builds a KMS client, from the ambient AWS credentials.
+structure KmsClientConfig {
+    /// Region of the client.
+    @required
+    region: String
+
+    /// URL the client sends its requests to, in place of the region's
+    /// endpoint. Tests set it to FakeKms's address.
+    endpoint: String
 }
 
 @output
@@ -721,4 +731,13 @@ structure GenericServerError {
 structure MPLClientError {
     @required
     message: String
+
+    /// The messages of the errors the MPL collected before it failed, in
+    /// order, such as one per encrypted data key a keyring tried.
+    /// Absent when the error collected none.
+    collectedErrors: ErrorMessageList
+}
+
+list ErrorMessageList {
+    member: String
 }
