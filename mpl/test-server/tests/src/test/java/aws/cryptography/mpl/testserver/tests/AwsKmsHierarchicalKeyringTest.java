@@ -59,7 +59,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * <p>These tests are online. Every server needs AWS credentials with DynamoDB
  * GetItem on the branch key store table, and KMS Decrypt on KMS_KEY_ARN, the
  * DISCOVERY_BRANCH_KEY_ID's KMS key, and the us-east-1 and us-west-2 replicas
- * of MRK_ID.
+ * of MRK_ID. The Tests themselves need DynamoDB GetItem on the table too, to
+ * load the records FakeDynamoDb serves.
  */
 public class AwsKmsHierarchicalKeyringTest {
 
@@ -455,6 +456,51 @@ public class AwsKmsHierarchicalKeyringTest {
     }
 
     // -----------------------------------------------------------------------
+    // A DynamoDB client that returns the wrong record
+    // (DDBKeystoreOperations.dfy GetActiveBranchKeyItem, GetVersionBranchKeyItem)
+    //
+    // The key store must reject a record whose branch-key-id or type is not
+    // the one it asked for. KMS would unwrap it, because KMS checks the record
+    // against its own attributes, not against the request. The key store's
+    // DynamoDB client points at FakeDynamoDb, which serves a real record from
+    // another slot.
+    // -----------------------------------------------------------------------
+
+    /** Asked for BRANCH_KEY_ID's active key, the client returns another branch key's. */
+    @ParameterizedTest(name = "[hierarchical] active key read rejects a record of another branch key {0}")
+    @MethodSource("targets")
+    void activeKeyReadRejectsOtherBranchKeysRecord(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("hierarchical"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+
+        try (FakeDynamoDb ddb = FakeDynamoDb.serving(KEY_STORE_REGION, KEY_STORE_TABLE_NAME,
+                BRANCH_KEY_ID_WITH_EC, "branch:ACTIVE")) {
+            assertOnEncryptFails(client, fakeDdbKeyring(client, ddb));
+        }
+    }
+
+    /** Asked for one version of BRANCH_KEY_ID, the client returns its active record. */
+    @ParameterizedTest(name = "[hierarchical] version read rejects a record of another type {0}")
+    @MethodSource("targets")
+    void versionReadRejectsRecordOfOtherType(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("hierarchical"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+        EncryptionMaterials encrypted = onEncrypt(client, hierarchyKeyring(client),
+            initializeEncryption(client, EC));
+
+        try (FakeDynamoDb ddb = FakeDynamoDb.serving(KEY_STORE_REGION, KEY_STORE_TABLE_NAME,
+                BRANCH_KEY_ID, "branch:ACTIVE")) {
+            String keyringId = fakeDdbKeyring(client, ddb);
+            DecryptionMaterials materials = initializeDecryption(client, EC);
+            assertThrows(MPLClientError.class, () -> client.onDecrypt(OnDecryptInput.builder()
+                .keyringId(keyringId)
+                .materials(materials)
+                .encryptedDataKeys(encrypted.getEncryptedDataKeys())
+                .build()));
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
@@ -532,6 +578,23 @@ public class AwsKmsHierarchicalKeyringTest {
                 .kmsClientRegion(kmsRegion)
                 .ddbClientRegion(KEY_STORE_REGION)
                 .build())).getKeyStoreId();
+    }
+
+    /** A BRANCH_KEY_ID keyring whose key store's DynamoDB client reaches {@code ddb}. */
+    private static String fakeDdbKeyring(MPLTestServerClient client, FakeDynamoDb ddb) {
+        String keyStoreId = MplTestServerClients.withRetry(() -> client.createKeyStoreClient(
+            CreateKeyStoreClientInput.builder()
+                .ddbTableName(KEY_STORE_TABLE_NAME)
+                .logicalKeyStoreName(LOGICAL_KEY_STORE_NAME)
+                .kmsConfiguration(kmsKeyArn(KMS_KEY_ARN))
+                .kmsClientRegion(KEY_STORE_REGION)
+                .ddbClientRegion(KEY_STORE_REGION)
+                .ddbEndpoint(ddb.endpoint())
+                .build())).getKeyStoreId();
+        return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+            .keyStoreId(keyStoreId)
+            .branchKeyId(BRANCH_KEY_ID)
+            .ttlSeconds(TTL_SECONDS));
     }
 
     private static String sharedCache(MPLTestServerClient client) {
