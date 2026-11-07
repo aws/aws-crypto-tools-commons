@@ -5,6 +5,7 @@ import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.TargetPair;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.esdk.testserver.client.model.DecryptOutput;
@@ -21,10 +22,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Asserts what the decryptor exposes on its response: the authenticated encryption context and
- * the algorithm suite it determined from the message header. A Language_Server that does not
- * surface its decrypt result leaves those fields null, in which case each test reports as skipped
- * (via {@link Assumptions}) rather than passing vacuously — so the report shows exactly which
- * servers expose decrypt introspection.
+ * the algorithm suite it determined from the message header. Every Language_Server returns both,
+ * so a missing field fails the test.
  */
 class DecryptResponseIntrospectionTests {
 
@@ -64,10 +63,10 @@ class DecryptResponseIntrospectionTests {
         DecryptOutput response =
             EsdkOps.decryptResponse(pair.decryptEndpoint(), config, ciphertext, Map.of());
 
-        Assumptions.assumeTrue(response.getAlgorithmSuiteId() != null,
-            "decryptor does not expose the algorithm suite id (" + pair + ")");
         assertEquals(suite, response.getAlgorithmSuiteId(),
             "decrypt response must expose the algorithm suite the message used (" + pair + ")");
+        assertNotNull(response.getEncryptionContext(),
+            "decrypt response must expose the encryption context (" + pair + ")");
         assertEquals("introspection", response.getEncryptionContext().get("purpose"),
             "decrypt response must expose the authenticated encryption context (" + pair + ")");
     }
@@ -88,9 +87,8 @@ class DecryptResponseIntrospectionTests {
         DecryptOutput response =
             EsdkOps.decryptResponse(pair.decryptEndpoint(), config, ciphertext, Map.of());
 
-        Assumptions.assumeTrue(
-            response.getEncryptionContext() != null && !response.getEncryptionContext().isEmpty(),
-            "decryptor does not expose the encryption context (" + pair + ")");
+        assertNotNull(response.getEncryptionContext(),
+            "decrypt response must expose the encryption context (" + pair + ")");
         assertTrue(response.getEncryptionContext().containsKey("aws-crypto-public-key"),
             "a signing suite's decrypt response must expose the reserved signature public key in the "
                 + "encryption context (" + pair + ")");
