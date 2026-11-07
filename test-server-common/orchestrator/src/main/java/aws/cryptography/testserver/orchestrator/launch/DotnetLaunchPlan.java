@@ -4,12 +4,20 @@ import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * The .NET {@code Language_Server} launch plan: builds the rpcv2Cbor server
@@ -47,7 +55,12 @@ import java.util.Optional;
  *       server directory.</li>
  *   <li><b>Launch.</b> {@code dotnet <server>/bin/Release/net8.0/
  *       EsdkTestServer.dll <port>} via the shared {@link SubprocessLauncher}
- *       (port probe, TCP readiness, process-tree teardown).</li>
+ *       (port probe, TCP readiness, process-tree teardown). With
+ *       {@link Coverage} on and {@value #DOTNET_COVERAGE_VARIABLE} naming
+ *       {@code dotnet-coverage}, the server runs under {@code dotnet-coverage
+ *       collect}, which instruments the library's and the server's assemblies
+ *       as they load and writes a {@code .coverage} file when the server exits
+ *       on SIGTERM.</li>
  * </ol>
  *
  * <p>Command construction is pure ({@code static} builders) so the exact
@@ -90,6 +103,9 @@ public final class DotnetLaunchPlan implements Launcher {
      * skipped. File name is {@code .<product>-build-stamp}.
      */
     private final String buildStampName;
+
+    /** The environment variable naming the dotnet-coverage executable; coverage needs it. */
+    static final String DOTNET_COVERAGE_VARIABLE = "TESTSERVER_DOTNET_COVERAGE";
 
     private static final String SERVER_LOG_NAME = "net-server.log";
 
@@ -219,7 +235,13 @@ public final class DotnetLaunchPlan implements Launcher {
 
         // 4. Launch: dotnet <server>/bin/Release/net8.0/<Product>TestServer.dll
         //    <port> via the shared probe/spawn/readiness/teardown.
-        ProcessBuilder process = new ProcessBuilder(serverCommand(dotnet, serverDir, entry.port(), serverDllRelativePath));
+        List<String> command = serverCommand(dotnet, serverDir, entry.port(), serverDllRelativePath);
+        Optional<Path> coverage = startCoverage(entry, sources, serverDir);
+        if (coverage.isPresent()) {
+            command = coverageCommand(System.getenv(DOTNET_COVERAGE_VARIABLE), coverage.get(),
+                "net-" + System.currentTimeMillis() + ".coverage", command);
+        }
+        ProcessBuilder process = new ProcessBuilder(command);
         process.directory(serverDir.toFile());
         process.redirectErrorStream(true);
         process.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
@@ -265,6 +287,110 @@ public final class DotnetLaunchPlan implements Launcher {
     static List<String> serverCommand(String dotnet, Path serverDir, int port, String serverDllRelativePath) {
         return List.of(dotnet, serverDir.resolve(serverDllRelativePath).toString(),
             String.valueOf(port));
+    }
+
+    // ------------------------------------------------------------------
+    // Line coverage (dotnet-coverage).
+    // ------------------------------------------------------------------
+
+    /**
+     * When coverage is on and {@value #DOTNET_COVERAGE_VARIABLE} is set,
+     * prepares the coverage directory and writes {@code coverage.settings.xml}
+     * there, which limits the instrumentation to the server's assembly and
+     * the library's (each {@code .csproj} under the library directory).
+     *
+     * @return the coverage directory, or empty when coverage is off
+     */
+    private Optional<Path> startCoverage(ConfigurationEntry entry, MaterializedSources sources,
+            Path serverDir) throws ServerLaunchException {
+        String tool = System.getenv(DOTNET_COVERAGE_VARIABLE);
+        if (tool == null || tool.isBlank() || Coverage.root().isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<Path> directory = Coverage.start(entry, sources, "dotnet-coverage",
+            Map.of("dotnet_coverage", tool));
+        if (directory.isEmpty()) {
+            return directory;
+        }
+        Collection<String> assemblies = new TreeSet<>(assemblyNames(serverDir));
+        sources.directoryOf(ComponentId.library(entry.language()))
+            .ifPresent(library -> assemblies.addAll(assemblyNames(library)));
+        Path settings = directory.get().resolve("coverage.settings.xml");
+        try {
+            Files.writeString(settings, coverageSettings(assemblies), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new ServerLaunchException(entry.language(), ServerLaunchException.Category.BUILD,
+                "failed to write the " + entry.language() + " coverage settings " + settings
+                    + ": " + e.getMessage(), e);
+        }
+        return directory;
+    }
+
+    /**
+     * {@code <dotnet-coverage> collect --settings <dir>/coverage.settings.xml
+     * --output <dir>/<output> -- <server command>}.
+     */
+    static List<String> coverageCommand(String tool, Path directory, String output, List<String> server) {
+        List<String> command = new ArrayList<>(List.of(tool, "collect",
+            "--settings", directory.resolve("coverage.settings.xml").toString(),
+            "--output", directory.resolve(output).toString(), "--"));
+        command.addAll(server);
+        return command;
+    }
+
+    private static final Pattern ASSEMBLY_NAME = Pattern.compile("<AssemblyName>\\s*([^<\\s]+)\\s*</AssemblyName>");
+
+    /**
+     * The assembly name of each {@code .csproj} directly in {@code directory}
+     * or up to two levels below it: its {@code <AssemblyName>}, else the
+     * project file's name.
+     */
+    static List<String> assemblyNames(Path directory) {
+        List<String> names = new ArrayList<>();
+        if (!Files.isDirectory(directory)) {
+            return names;
+        }
+        try (Stream<Path> files = Files.walk(directory, 3)) {
+            for (Path project : files.filter(f -> f.getFileName().toString().endsWith(".csproj")).sorted().toList()) {
+                String fileName = project.getFileName().toString();
+                String name = fileName.substring(0, fileName.length() - ".csproj".length());
+                try {
+                    Matcher matcher = ASSEMBLY_NAME.matcher(Files.readString(project, StandardCharsets.UTF_8));
+                    if (matcher.find()) {
+                        name = matcher.group(1);
+                    }
+                } catch (IOException e) {
+                    // Fall back to the project file's name.
+                }
+                names.add(name);
+            }
+        } catch (IOException | UncheckedIOException e) {
+            // No projects found: nothing is instrumented from here.
+        }
+        return names;
+    }
+
+    /** dotnet-coverage settings that instrument only {@code assemblies}. */
+    static String coverageSettings(Collection<String> assemblies) {
+        StringBuilder xml = new StringBuilder("""
+            <?xml version="1.0" encoding="utf-8"?>
+            <Configuration>
+              <CodeCoverage>
+                <ModulePaths>
+                  <Include>
+            """);
+        for (String assembly : assemblies) {
+            xml.append("          <ModulePath>.*[\\\\/]")
+                .append(assembly.replace(".", "\\."))
+                .append("\\.dll$</ModulePath>\n");
+        }
+        xml.append("""
+                  </Include>
+                </ModulePaths>
+              </CodeCoverage>
+            </Configuration>
+            """);
+        return xml.toString();
     }
 
     // ------------------------------------------------------------------

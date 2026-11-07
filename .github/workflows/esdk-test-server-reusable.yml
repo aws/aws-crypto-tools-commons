@@ -439,16 +439,18 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
-          emit rustdafny rust-dafny "$esdk_tip" \
+          emit rustdafny rust-dafny "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
-          emit go go "$esdk_tip" \
+          # "-coverage": built with line coverage on, so apart from older
+          # prebuilt servers built without it.
+          emit go go "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          emit rust rust "$(tip rust)" \
+          emit rust rust "$(tip rust)-coverage" \
             "$rust/esdk/test-server/target/release/esdk-test-server" \
             "$rust/esdk/test-server/.esdk-build-stamp"
-          emit rustcpp rust-cpp "$(tip rust-cpp)" \
+          emit rustcpp rust-cpp "$(tip rust-cpp)-coverage" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
@@ -741,6 +743,17 @@ jobs:
         working-directory: ${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny/codegen
         run: ./gradlew --version > /dev/null
 
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
         # are cleaned before saving, so every branch reuses the dependencies.
@@ -760,9 +773,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ needs.plan.outputs.platform }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-coverage-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ needs.plan.outputs.platform }}-go-
+            ${{ needs.plan.outputs.platform }}-go-coverage-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -833,7 +846,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ needs.plan.outputs.platform }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-coverage-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
@@ -891,6 +904,30 @@ jobs:
             "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
               || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
           fi
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Download the JaCoCo agent and command line
+        # The Java launch plan runs each Java server with the agent, and
+        # coverage_report.py turns the agent's data into lcov with the
+        # command line.
+        env:
+          JACOCO_VERSION: 0.8.13
+        run: |
+          dir="$RUNNER_TEMP/jacoco"
+          mkdir -p "$dir"
+          base=https://repo1.maven.org/maven2/org/jacoco
+          curl -sSfL -o "$dir/jacocoagent.jar" "$base/org.jacoco.agent/$JACOCO_VERSION/org.jacoco.agent-$JACOCO_VERSION-runtime.jar"
+          curl -sSfL -o "$dir/jacococli.jar" "$base/org.jacoco.cli/$JACOCO_VERSION/org.jacoco.cli-$JACOCO_VERSION-nodeps.jar"
+          printf '%s  %s\n' \
+            47e700ccb0fdb9e27c5241353f8161938f4e53c3561dd35e063c5fe88dc3349b jacocoagent.jar \
+            8f748683833d4dc4d72cea5d6b43f49344687b831e0582c97bcb9b984e3de0a3 jacococli.jar \
+            | (cd "$dir" && sha256sum -c -)
+          echo "TESTSERVER_JACOCO_AGENT=$dir/jacocoagent.jar" >> "$GITHUB_ENV"
+          echo "TESTSERVER_JACOCO_CLI=$dir/jacococli.jar" >> "$GITHUB_ENV"
+
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -974,7 +1011,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
-          components: rustfmt
+          # llvm-tools turns the rust server's coverage profile into a report.
+          components: rustfmt, llvm-tools-preview
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -1000,6 +1038,18 @@ jobs:
           set -euo pipefail
           printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
           dotnet --version
+
+      - name: Install dotnet-coverage
+        # The .NET launch plan runs each .NET server under dotnet-coverage
+        # collect, and coverage_report.py merges its data into a report.
+        env:
+          DOTNET_COVERAGE_VERSION: 18.12.0
+        run: |
+          dir="$RUNNER_TEMP/dotnet-coverage"
+          dotnet tool install dotnet-coverage --version "$DOTNET_COVERAGE_VERSION" --tool-path "$dir"
+          echo "TESTSERVER_DOTNET_COVERAGE=$dir/dotnet-coverage" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_NOLOGO=1" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator + Java server)
         # Gradle: the client-java/tests/orchestrator builds under
@@ -1144,7 +1194,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}-coverage
 
       - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
         # The clone carries the server's Gradle outputs, and the local Maven
@@ -1398,9 +1448,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-coverage-${{ github.run_id }}
           restore-keys: |
-            ${{ needs.plan.outputs.platform }}-ccache-
+            ${{ needs.plan.outputs.platform }}-ccache-coverage-
 
       - name: Build the java, python, javascript, and c servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
@@ -1521,6 +1571,13 @@ jobs:
           done
           make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
+        if: always()
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" esdk/test-server/build/coverage
+
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
         # the artifacts (including resolution-record.json, Requirement 5.3)
@@ -1537,6 +1594,7 @@ jobs:
           name: esdk-test-server-reports
           path: |
             esdk/test-server/build/resolution-record.json
+            esdk/test-server/build/coverage
             esdk/test-server/build/launch/*/*.log
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results
@@ -1585,7 +1643,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ needs.plan.outputs.platform }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-coverage-${{ github.run_id }}
 
       - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
@@ -1614,7 +1672,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}-coverage
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
