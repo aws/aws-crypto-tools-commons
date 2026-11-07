@@ -174,6 +174,7 @@ public final class TestServerOrchestratorMain {
         // language absent from this map aborts the run naming the language.
         // rust-dafny reuses RustLaunchPlan: its server is the same cargo
         // build/launch shape, delegating to the Dafny-generated aws-esdk crate.
+        // rust-native (the native DB-ESDK server) reuses it too.
         String product = set.product();
         LauncherFactory launchers = LauncherFactory.fromMap(Map.of(
             "java", (Launcher) new JavaLaunchPlan(
@@ -193,7 +194,9 @@ public final class TestServerOrchestratorMain {
             "rust-dafny", new RustLaunchPlan(
                 orchestratorBuildDir.resolve("launch/rust-dafny"), product),
             "go", new GoLaunchPlan(
-                orchestratorBuildDir.resolve("launch/go"), product)));
+                orchestratorBuildDir.resolve("launch/go"), product),
+            "rust-native", new RustLaunchPlan(
+                orchestratorBuildDir.resolve("launch/rust-native"), product)));
 
         // The reference implementation for single-sided Tests: the
         // referenceImplementation=<lang> argument, defaulting to java. The
