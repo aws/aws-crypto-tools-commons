@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Line Coverage · Test Server Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd; --srv:#a371f7; --loc:#3fb950;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  select, input[type=text], input[type=password] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  main { display:grid; grid-template-columns: minmax(0,var(--left,1fr)) 6px minmax(0,1fr); height:calc(100vh - 52px); }
+  section { overflow:auto; padding:16px 20px; }
+  #detail { background:var(--panel); }
+  #divider { cursor:col-resize; background:var(--line); }
+  #divider:hover, #divider.drag { background:var(--sel); }
+  body.resizing { user-select:none; cursor:col-resize; }
+  h2 { font-size:15px; margin:0 0 4px; }
+  h3 { font-size:13px; margin:18px 0 6px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:8px; }
+  .summary { display:flex; gap:10px; margin:8px 0 12px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:130px; }
+  .card b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
+  .card small { color:var(--dim); }
+  .card.srv b { color:var(--srv); } .card.loc b { color:var(--loc); }
+  table.files { border-collapse:collapse; width:100%; font-size:12px; }
+  .files th, .files td { border-bottom:1px solid var(--line); padding:3px 6px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .files th:first-child, .files td:first-child { text-align:left; }
+  .files thead th { position:sticky; top:0; background:var(--bg); cursor:pointer; color:var(--dim); font-weight:600; }
+  .files tbody tr { cursor:pointer; }
+  .files tbody tr:hover { background:var(--panel); }
+  .files tbody tr.selected { outline:1px solid var(--sel); }
+  .files td.path { font-family:ui-monospace,monospace; }
+  .files tr.dir td { color:var(--dim); font-weight:600; cursor:default; background:var(--bg); }
+  .bar { display:inline-block; width:60px; height:8px; background:var(--line); border-radius:2px; vertical-align:middle; margin-left:6px; overflow:hidden; }
+  .bar i { display:block; height:100%; }
+  .p-hi { color:#56d364; } .p-mid { color:#e3b341; } .p-lo { color:#ffa198; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin:6px 0 10px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .c-both { background:color-mix(in srgb,var(--pass) 30%,transparent); }
+  .c-srv { background:color-mix(in srgb,var(--srv) 35%,transparent); }
+  .c-loc { background:color-mix(in srgb,var(--loc) 18%,transparent); }
+  .c-miss { background:color-mix(in srgb,var(--fail) 35%,transparent); }
+  pre.src { margin:0; font:12px/1.45 ui-monospace,monospace; counter-reset:none; }
+  pre.src div { display:grid; grid-template-columns: 48px 56px 56px 1fr; white-space:pre; }
+  pre.src .n { color:var(--dim); text-align:right; padding-right:8px; user-select:none; }
+  pre.src .h { color:var(--dim); text-align:right; padding-right:8px; user-select:none; font-size:11px; }
+  pre.src .code { padding-left:6px; }
+  .srchead { display:grid; grid-template-columns: 48px 56px 56px 1fr; font-size:11px; color:var(--dim); position:sticky; top:-16px; background:var(--panel); padding:4px 0; }
+  .srchead span { text-align:right; padding-right:8px; }
+  .empty { color:var(--dim); padding:40px 0; text-align:center; }
+  .tabs { display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap; }
+  .tabs button { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; }
+  .tabs button.on { border-color:var(--sel); color:var(--sel); }
+  .note { color:#e3b341; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Line Coverage</h1>
+  <a href="index.html" id="back" class="small">← test results</a>
+  <label>Test server <select id="suite"></select></label>
+  <label title="Empty: newest passing run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run.">PR / commit <input type="text" id="source" size="34" placeholder="newest passing run on commons main"></label>
+  <label>Find file <input type="text" id="search" placeholder="e.g. decrypt"></label>
+  <span class="run" id="run"></span>
+</header>
+<main>
+  <section id="left"><div class="empty">Loading…</div></section>
+  <div id="divider" title="Drag to resize; double-click to reset"></div>
+  <section id="detail"><div class="empty">Click a file to see its lines.</div></section>
+</main>
+
+<script src="loader.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const ui = { source:new URLSearchParams(location.search).get("run") || "", lang:null, file:null, sort:"both", search:"" };
+let C = null;       // [{ language, repository, commit, server, local, files }]
+let RUN = null;
+
+// A file belongs to the test server, not the library, when its path has a
+// test-server directory in it.
+const isServerCode = f => /(^|\/)test-server\//.test(f);
+
+// Per file: the line numbers either build instrumented, and which of them
+// each side ran. A line counts as covered by both when either side ran it.
+function mergeFiles(cov) {
+  const local = cov.local ? cov.local.files : new Map();
+  const names = new Set([...cov.server.keys(), ...local.keys()]);
+  return [...names].map(f => {
+    const s = cov.server.get(f) || new Map(), l = local.get(f) || new Map();
+    const lines = new Set([...s.keys(), ...l.keys()]);
+    let sh = 0, lh = 0, bh = 0;
+    for (const n of lines) {
+      const a = s.get(n) > 0, b = l.get(n) > 0;
+      sh += a; lh += b; bh += a || b;
+    }
+    return { f, total:lines.size, s:sh, l:lh, b:bh, server:s, local:l, code:isServerCode(f) };
+  }).filter(x => x.total);
+}
+
+function totals(files) {
+  const t = { total:0, s:0, l:0, b:0 };
+  for (const x of files) for (const k in t) t[k] += x[k];
+  return t;
+}
+const pct = (n, d) => d ? 100 * n / d : 0;
+const pctText = (n, d) => d ? pct(n, d).toFixed(1) + "%" : "–";
+const pclass = p => p >= 80 ? "p-hi" : p >= 50 ? "p-mid" : "p-lo";
+function pctCell(n, d, color) {
+  const p = pct(n, d);
+  return `<td><span class="${pclass(p)}">${pctText(n, d)}</span><span class="bar"><i style="width:${p}%;background:${color}"></i></span></td>`;
+}
+
+function card(label, cls, n, d, sub) {
+  return `<div class="card ${cls}"><small>${label}</small><b>${pctText(n, d)}</b><small>${n.toLocaleString()} / ${d.toLocaleString()} lines${sub ? " · " + sub : ""}</small></div>`;
+}
+
+function renderLeft() {
+  const left = $("left");
+  if (!C.length) {
+    left.innerHTML = `<div class="empty">This run has no line coverage. Coverage comes from runs made after the coverage change landed.</div>`;
+    return;
+  }
+  const cov = C.find(c => c.language === ui.lang) || C[0];
+  ui.lang = cov.language;
+  const lib = cov.files.filter(x => !x.code), srv = cov.files.filter(x => x.code);
+  const t = totals(lib), ts = totals(srv);
+  const tabs = C.length > 1 ? `<div class="tabs">${C.map(c => `<button data-lang="${c.language}" class="${c.language === ui.lang ? "on" : ""}">${c.language}</button>`).join("")}</div>` : "";
+  const localNote = cov.local
+    ? `local tests from <a href="${esc(cov.local.from)}" target="_blank">this run</a> (${cov.local.artifacts.join(", ")})`
+    : `<span class="note">no local coverage found for ${cov.commit.slice(0, 7)} in ${esc(cov.repository)} yet, so "both" is the test server alone</span>`;
+  let h = `${tabs}<h2>${esc(cov.language)} library · <a href="https://github.com/${cov.repository}/tree/${cov.commit}" target="_blank">${esc(cov.repository)}@${cov.commit.slice(0, 7)}</a></h2>
+    <div class="sub">${localNote}</div>
+    <div class="summary">
+      ${card("Test server", "srv", t.s, t.total)}
+      ${card("Local tests", "loc", t.l, t.total)}
+      ${card("Both", "", t.b, t.total, "line by line")}
+    </div>
+    <div class="sub">Each number counts the lines either build can run. A line counts for "both" when either one ran it.
+    ${srv.length ? `The test server's own code is listed apart: the test server ran ${pctText(ts.s, ts.total)} of its ${ts.total.toLocaleString()} lines.` : ""}</div>`;
+  const q = ui.search.toLowerCase();
+  const keyOf = { file:x => x.f, lines:x => -x.total, server:x => pct(x.s, x.total), local:x => pct(x.l, x.total), both:x => pct(x.b, x.total), gap:x => -(x.b - x.s) };
+  const sorted = list => list.filter(x => !q || x.f.toLowerCase().includes(q)).sort((a, b) => {
+    const k = keyOf[ui.sort], va = k(a), vb = k(b);
+    return va < vb ? -1 : va > vb ? 1 : a.f.localeCompare(b.f);
+  });
+  const rows = (title, list) => {
+    const shown = sorted(list);
+    if (!shown.length) return "";
+    const tt = totals(shown);
+    return `<tr class="dir"><td>${title}</td><td>${tt.total.toLocaleString()}</td>${["s", "l", "b"].map(k => `<td>${pctText(tt[k], tt.total)}</td>`).join("")}<td></td></tr>` +
+      shown.map(x => `<tr data-file="${esc(x.f)}" class="${x.f === ui.file ? "selected" : ""}"><td class="path">${esc(x.f)}</td><td>${x.total}</td>${pctCell(x.s, x.total, "var(--srv)")}${pctCell(x.l, x.total, "var(--loc)")}${pctCell(x.b, x.total, "var(--pass)")}<td>${x.b - x.s || ""}</td></tr>`).join("");
+  };
+  const head = [["file", "File"], ["lines", "Lines"], ["server", "Test server"], ["local", "Local tests"], ["both", "Both"], ["gap", "Only local"]]
+    .map(([k, n]) => `<th data-sort="${k}" title="Sort">${n}${ui.sort === k ? " ▴" : ""}</th>`).join("");
+  h += `<h3>Files</h3><table class="files"><thead><tr>${head}</tr></thead><tbody>${rows("Library", lib)}${rows("Test server code", srv)}</tbody></table>`;
+  left.innerHTML = h;
+}
+
+const srcCache = new Map();
+async function renderDetail() {
+  const d = $("detail");
+  const cov = C && C.find(c => c.language === ui.lang);
+  const x = cov && cov.files.find(x => x.f === ui.file);
+  if (!x) { d.innerHTML = `<div class="empty">Click a file to see its lines.</div>`; return; }
+  const k = cov.repository + "@" + cov.commit + ":" + x.f;
+  if (!srcCache.has(k)) {
+    d.innerHTML = `<div class="empty">Loading ${esc(x.f)}…</div>`;
+    try { srcCache.set(k, await ghRaw(cov.repository, x.f, cov.commit)); }
+    catch (err) { d.innerHTML = `<div class="empty">Could not read ${esc(x.f)}: ${esc(err.message || err)}</div>`; return; }
+  }
+  if (ui.file !== x.f) return;
+  const text = srcCache.get(k).split("\n");
+  const hits = (m, n) => m.has(n) ? (m.get(n) > 0 ? m.get(n).toLocaleString() : "0") : "";
+  const body = text.map((line, i) => {
+    const n = i + 1, inS = x.server.has(n), inL = x.local.has(n);
+    const a = x.server.get(n) > 0, b = x.local.get(n) > 0;
+    const cls = !inS && !inL ? "" : a && b ? "c-both" : a ? "c-srv" : b ? "c-loc" : "c-miss";
+    return `<div class="${cls}" id="L${n}"><span class="n">${n}</span><span class="h">${hits(x.server, n)}</span><span class="h">${hits(x.local, n)}</span><span class="code">${esc(line) || " "}</span></div>`;
+  }).join("");
+  d.innerHTML = `<h2><a href="https://github.com/${cov.repository}/blob/${cov.commit}/${x.f}" target="_blank">${esc(x.f)}</a></h2>
+    <div class="sub">test server ${pctText(x.s, x.total)} · local tests ${pctText(x.l, x.total)} · both ${pctText(x.b, x.total)} of ${x.total} lines</div>
+    <div class="legend">
+      <span><i class="sw c-both"></i>both ran it</span>
+      <span><i class="sw c-srv"></i>only the test server</span>
+      <span><i class="sw c-loc"></i>only local tests</span>
+      <span><i class="sw c-miss"></i>neither</span>
+    </div>
+    <div class="srchead"><span>line</span><span>server</span><span>local</span><span></span></div>
+    <pre class="src">${body}</pre>`;
+}
+
+const status = msg => { $("left").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
+async function load() {
+  if (!localStorage.getItem("github-dashboard-token")) { status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."); return; }
+  const label = $("suite").value, product = PRODUCTS[label];
+  try {
+    status(`Finding the ${label} run…`);
+    RUN = ui.source ? await resolveRun(product, ui.source) : await latestGreenRun(product);
+    if (!RUN) throw new Error(`no successful ${product}-test-server.yml run on main`);
+    $("run").innerHTML = `<a href="${RUN.url}" target="_blank">${esc(RUN.repo.split("/")[1])} run ${RUN.databaseId}</a> · ${esc(RUN.branch)} @ ${RUN.headSha.slice(0, 7)} · ${esc(RUN.conclusion)}${RUN.note ? " · " + esc(RUN.note) : ""}`;
+    const raw = await fetchCoverage(product, RUN, status);
+    C = raw.map(c => ({ ...c, files:mergeFiles(c) }));
+  } catch (err) { status("Load failed: " + (err.message || err)); return; }
+  if (!C.some(c => c.language === ui.lang)) ui.lang = C[0] && C[0].language;
+  ui.file = null;
+  renderLeft(); renderDetail();
+}
+
+$("suite").innerHTML = Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
+$("suite").onchange = load;
+$("source").value = ui.source;
+$("back").href = "index.html" + location.search;
+$("source").onchange = e => {
+  ui.source = e.target.value.trim();
+  const q = new URLSearchParams(location.search);
+  ui.source ? q.set("run", ui.source) : q.delete("run");
+  history.replaceState(null, "", "?" + q);
+  $("back").href = "index.html" + location.search;
+  load();
+};
+let searchTimer;
+$("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); C && renderLeft(); }, 200); };
+$("left").addEventListener("click", e => {
+  const tab = e.target.closest("[data-lang]");
+  if (tab) { ui.lang = tab.dataset.lang; ui.file = null; renderLeft(); renderDetail(); return; }
+  const th = e.target.closest("[data-sort]");
+  if (th) { ui.sort = th.dataset.sort; renderLeft(); return; }
+  const tr = e.target.closest("tr[data-file]");
+  if (tr) { ui.file = tr.dataset.file; renderLeft(); renderDetail(); $("detail").scrollTop = 0; }
+});
+// Drag the divider to resize the two panes; shares the results page's width.
+(() => {
+  const main = document.querySelector("main"), div = $("divider");
+  const set = px => main.style.setProperty("--left", px ? px + "px" : "1fr");
+  set(+localStorage.getItem("leftPane") || 0);
+  div.addEventListener("mousedown", e => {
+    e.preventDefault(); div.classList.add("drag"); document.body.classList.add("resizing");
+    const move = ev => {
+      const px = Math.min(Math.max(ev.clientX - main.getBoundingClientRect().left, 240), main.clientWidth - 240);
+      set(px); localStorage.setItem("leftPane", Math.round(px));
+    };
+    const up = () => { div.classList.remove("drag"); document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  });
+  div.addEventListener("dblclick", () => { localStorage.removeItem("leftPane"); set(0); });
+})();
+
+load();
+</script>
+</body>
+</html>
