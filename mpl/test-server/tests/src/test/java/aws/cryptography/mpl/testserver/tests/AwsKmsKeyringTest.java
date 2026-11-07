@@ -723,6 +723,31 @@ public class AwsKmsKeyringTest {
         assertOnlyMatchingEdkSentToKms(client, other);
     }
 
+    /** Every EDK is for another provider or another key, so none may reach KMS. */
+    @ParameterizedTest(name = "[aws-kms] OnDecrypt with no EDK for its key fails {0}")
+    @MethodSource("targets")
+    void onDecryptWithNoMatchingEdkFails(LanguageServerTarget target) {
+        FeatureGate.require(Set.of(FEATURE), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+
+        try (FakeKms kms = new FakeKms()) {
+            String keyringId = fakeKmsKeyring(client, kms, KMS_KEY_ARN);
+            List<EncryptedDataKey> others = List.of(
+                edk(1).toBuilder().keyProviderId("raw-aes").build(),
+                withProviderInfo(edk(2), OTHER_KEY_ARN.getBytes(StandardCharsets.UTF_8)));
+
+            //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
+            //= type=test
+            //# If OnDecrypt fails to successfully decrypt any [encrypted data key](../structures.md#encrypted-data-key),
+            //# then it MUST yield an error that includes all the collected errors.
+            assertOnDecryptFails(client, keyringId, others);
+            //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
+            //= type=test
+            //# The set of encrypted data keys MUST first be filtered to match this keyring’s configuration.
+            assertDecryptCiphertexts(kms);
+        }
+    }
+
     /** An aws-kms EDK whose provider info is not a key ARN, by name. */
     record ProviderInfo(String name, byte[] bytes) {
         @Override
