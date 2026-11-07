@@ -405,7 +405,9 @@ async function localCoverage(repo, commit, run, progress) {
 }
 
 // -> [{ language, repository, commit, server: Map, local: {files, from} | null }]
-async function fetchCoverage(product, run, progress) {
+// update(list), when given, sees the list as it fills in: first with every
+// server's report and local undefined (still loading), then after each local fetch.
+async function fetchCoverage(product, run, progress, update = () => {}) {
   const art = await reportArtifact(run.repo, run.databaseId, product);
   if (!art) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
   const reports = await cachedArtifact(run.repo, art, progress, async (zip, entries) => {
@@ -416,11 +418,12 @@ async function fetchCoverage(product, run, progress) {
     }
     return out;
   });
-  const out = [];
-  for (const { meta, server } of reports) {
-    progress(`Finding ${meta.repository} local coverage for ${meta.commit.slice(0, 7)}…`);
-    const local = await localCoverage(meta.repository, meta.commit, run, progress);
-    out.push({ ...meta, server, local });
+  const out = reports.map(({ meta, server }) => ({ ...meta, server, local:undefined }));
+  update(out);
+  for (const c of out) {
+    progress(`Finding ${c.repository} local coverage for ${c.commit.slice(0, 7)}…`);
+    c.local = await localCoverage(c.repository, c.commit, run, progress);
+    update(out);
   }
   return out;
 }

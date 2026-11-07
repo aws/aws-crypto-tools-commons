@@ -69,8 +69,26 @@
   .matrix td.cov small { color:var(--dim); font-size:10px; }
   .matrix td.cov:hover { outline:2px solid var(--sel); outline-offset:-2px; }
   .matrix td.selected { outline:2px solid #fff; outline-offset:-2px; }
-  .matrix td.nocov { color:var(--dim); }
-  .matrix td.na { background:var(--bg); }
+  .matrix td.cov { background:color-mix(in srgb,var(--tint) 30%,transparent); }
+  .rowstate { font-weight:400; font-size:11px; color:var(--dim); margin-top:2px; }
+  .st-loading-text { color:var(--sel); } .st-error-text { color:#ffa198; white-space:normal; max-width:260px; }
+  .st-done-text { color:#56d364; } .st-none-text { color:var(--dim); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes pulse { 50% { opacity:.45; } }
+  .spin { display:inline-block; width:9px; height:9px; margin-right:5px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; }
+  .matrix td.st-queued, .sw.st-queued { color:var(--dim); background:var(--bg); border:1px dotted var(--line); }
+  .matrix td.st-loading, .sw.st-loading { color:var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); animation:pulse 1.4s ease-in-out infinite; }
+  .matrix td.st-local small { color:var(--sel); }
+  .sw.st-local { background:linear-gradient(90deg,color-mix(in srgb,var(--pass) 35%,transparent) 50%,color-mix(in srgb,var(--sel) 30%,transparent) 50%); }
+  .matrix td.st-error, .sw.st-error { color:#ffa198; background:color-mix(in srgb,var(--fail) 25%,transparent); }
+  .matrix td.st-none, .sw.st-none { color:var(--dim); border:1px dashed var(--dim); background:transparent; }
+  .matrix td.st-nolib, .sw.st-nolib { color:var(--dim); background:repeating-linear-gradient(45deg,var(--line) 0 4px,transparent 4px 9px); }
+  .matrix td.st-nolocal { box-shadow:inset 0 -3px 0 var(--part); }
+  .matrix td.st-nolocal small { color:#e3b341; }
+  .sw.st-nolocal { background:color-mix(in srgb,var(--pass) 35%,transparent); box-shadow:inset 0 -3px 0 var(--part); }
+  .sw.st-ok { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .matrix td.st-na, .sw.st-na { background:var(--bg); }
+  .sw.st-na { border:1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -143,28 +161,68 @@ function card(label, cls, n, d, sub) {
 // Rows: libraries. Columns: every server any library lists. A cell is the
 // library's line coverage from that server's test server run plus the
 // library's local tests, line by line; the small number is the test server alone.
+// Every state a row or cell can be in, each with its own look. The legend
+// under the matrix is built from this list.
+const STATES = {
+  queued:   { cls:"st-queued",   label:"waiting",          tip:"Waiting for the libraries above to finish loading." },
+  loading:  { cls:"st-loading",  label:"loading",          tip:"Downloading and reading this run's reports." },
+  local:    { cls:"st-local",    label:"local loading",    tip:"Test server numbers are in; the library's own test coverage is still loading." },
+  error:    { cls:"st-error",    label:"failed",           tip:"Loading failed. The row says why." },
+  none:     { cls:"st-none",     label:"no coverage",      tip:"This server wrote no coverage in this run. The run may predate coverage, or the server's coverage step failed." },
+  nolib:    { cls:"st-nolib",    label:"no library code",  tip:"The run covered none of the library's own files. The server may use a published package." },
+  nolocal:  { cls:"st-nolocal",  label:"no local tests",   tip:"No local test coverage was found for this commit, so Both is the test server alone." },
+  ok:       { cls:"st-ok",       label:"merged",           tip:"Test server and local tests, merged line by line." },
+  na:       { cls:"st-na",       label:"not a server",     tip:"This library has no server for this language." },
+};
+const spinner = `<i class="spin"></i>`;
+const stateCell = (st, text, attrs = "", on = "") =>
+  `<td class="${STATES[st].cls}${on}" ${attrs} title="${esc(STATES[st].tip)}">${st === "loading" ? spinner : ""}${text}</td>`;
+
 function renderMatrix() {
   const langs = [...new Set(Object.values(ALL).flatMap(a => a.servers || []))];
+  const span = Math.max(langs.length, 1);
   const cell = (label, lang) => {
     const a = ALL[label];
-    if (!a || !(a.servers || []).includes(lang)) return `<td class="na"></td>`;
-    const cov = (a.covs || []).find(c => c.language === lang);
+    if (!(a.servers || []).includes(lang)) return stateCell("na", "");
     const on = ui.lib === label && ui.lang === lang ? " selected" : "";
-    if (!cov) return `<td class="nocov${on}" title="no coverage from this server yet">–</td>`;
+    if (a.phase === "error") return stateCell("error", "✗");
+    const cov = (a.covs || []).find(c => c.language === lang);
+    if (!cov) return a.phase === "done" ? stateCell("none", "no coverage") : stateCell("loading", "");
+    const click = `data-lib="${label}" data-lang="${lang}"`;
     const t = totals(cov.files.filter(x => !x.code)), p = pct(t.b, t.total);
-    if (!t.total) return `<td class="cov nocov${on}" data-lib="${label}" data-lang="${lang}" title="The run covered none of the library's own files. The server may use a published package.">no library code</td>`;
+    if (!t.total) return stateCell("nolib", "no library code", click, " cov" + on);
     const tint = p >= 80 ? "var(--pass)" : p >= 50 ? "var(--part)" : "var(--fail)";
-    return `<td class="cov${on}" data-lib="${label}" data-lang="${lang}" style="background:color-mix(in srgb,${tint} 30%,transparent)">
-      <b>${pctText(t.b, t.total)}</b><small>server ${pctText(t.s, t.total)}${cov.local ? "" : " · no local"}</small></td>`;
+    const st = cov.pendingLocal ? "local" : cov.local ? "ok" : "nolocal";
+    const foot = cov.pendingLocal ? `${spinner}local…` : cov.local ? `server ${pctText(t.s, t.total)}` : `⚠ no local · server ${pctText(t.s, t.total)}`;
+    return `<td class="cov ${STATES[st].cls}${on}" ${click} title="${esc(STATES[st].tip)}" style="--tint:${tint}">
+      <b>${pctText(t.b, t.total)}</b><small>${foot}</small></td>`;
   };
   const rows = Object.keys(PRODUCTS).map(label => {
-    const a = ALL[label] || {};
+    const a = ALL[label] || { phase:"queued" };
     const run = a.run ? ` <a class="small" href="${a.run.url}" target="_blank" title="${esc(a.run.branch)} @ ${a.run.headSha.slice(0, 7)} · ${esc(a.run.conclusion)}">run</a>` : "";
-    const err = a.error ? `<div class="note">${esc(a.error).slice(0, 120)}</div>` : !a.run && !a.error ? `<div class="sub">loading…</div>` : "";
-    return `<tr><th>${label}${run}${err}</th>${langs.map(l => cell(label, l)).join("")}</tr>`;
+    const step = a.phase === "error" ? `<div class="rowstate st-error-text">✗ ${esc(a.error).slice(0, 140)}</div>`
+      : a.phase === "done" ? (a.covs && a.covs.length ? `<div class="rowstate st-done-text">✓ loaded</div>` : `<div class="rowstate st-none-text">○ this run has no coverage</div>`)
+      : a.phase === "queued" ? `<div class="rowstate">… waiting</div>`
+      : `<div class="rowstate st-loading-text">${spinner}${esc(a.step || "loading")}</div>`;
+    const head = `<th>${label}${run}${step}</th>`;
+    if (!a.servers) {
+      const st = a.phase === "error" ? "error" : a.phase === "queued" ? "queued" : "loading";
+      return `<tr>${head}${stateCell(st, STATES[st].label, `colspan="${span}"`)}</tr>`;
+    }
+    return `<tr>${head}${langs.map(l => cell(label, l)).join("")}</tr>`;
   }).join("");
+  const legend = Object.values(STATES).map(st => `<span title="${esc(st.tip)}"><i class="sw ${st.cls}"></i>${st.label}</span>`).join("");
   return `<table class="matrix"><thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
-    <div class="sub">Big number: library lines run by the test server or by the library's own tests. Small: the test server alone. – means that server does not report coverage yet. Click a cell for its files.</div>`;
+    <div class="legend">${legend}</div>
+    <div class="sub">Big number: library lines run by the test server or by the library's own tests. Small: the test server alone. Hover any cell or legend entry for what it means. Click a cell for its files.</div>`;
+}
+
+// Progress messages arrive often; draw at most once a frame.
+let drawQueued = false;
+function redraw() {
+  if (drawQueued) return;
+  drawQueued = true;
+  requestAnimationFrame(() => { drawQueued = false; renderLeft(); });
 }
 
 function renderLeft() {
@@ -175,7 +233,9 @@ function renderLeft() {
   if (!cov) { left.innerHTML = matrix; return; }
   const lib = cov.files.filter(x => !x.code), srv = cov.files.filter(x => x.code);
   const t = totals(lib), ts = totals(srv);
-  const localNote = cov.local
+  const localNote = cov.pendingLocal
+    ? `<span class="st-loading-text">${spinner}loading the library's local test coverage…</span>`
+    : cov.local
     ? `local tests from <a href="${esc(cov.local.from)}" target="_blank">this run</a> (${cov.local.artifacts.join(", ")})`
     : `<span class="note">no local coverage found for ${cov.commit.slice(0, 7)} in ${esc(cov.repository)} yet, so "both" is the test server alone</span>`;
   let h = `${matrix}<h2 style="margin-top:18px">${esc(ui.lib)} · ${esc(cov.language)} server · <a href="https://github.com/${cov.repository}/tree/${cov.commit}" target="_blank">${esc(cov.repository)}@${cov.commit.slice(0, 7)}</a></h2>
@@ -241,9 +301,10 @@ async function renderDetail() {
 
 const status = msg => { $("left").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
 async function loadLibrary(label) {
-  const product = PRODUCTS[label], a = ALL[label] = {};
-  const note = msg => { a.status = msg; };
+  const product = PRODUCTS[label], a = ALL[label];
+  const note = msg => { a.step = msg; redraw(); };
   try {
+    a.phase = "loading"; note("finding the run…");
     a.run = ui.source ? await resolveRun(product, ui.source) : await latestGreenRun(product);
     if (!a.run) throw new Error(`no successful ${product}-test-server.yml run on main`);
     const ref = a.run.repo === COMMONS ? a.run.headSha : "main";
@@ -259,15 +320,18 @@ async function loadLibrary(label) {
       .filter(o => o !== e && repoOf(o) === repoOf(e))
       .map(libraryPath)
       .filter(p => p && p !== libraryPath(e) && (!libraryPath(e) || p.startsWith(libraryPath(e) + "/")))]));
-    renderLeft();
-    a.covs = (await fetchCoverage(product, a.run, note))
-      .map(c => ({ ...c, files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
-  } catch (err) { a.error = "Load failed: " + (err.message || err); }
+    note("reading the server list…");
+    const merge = list => list.map(c => ({ ...c, pendingLocal:c.local === undefined,
+      files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
+    await fetchCoverage(product, a.run, note, list => { a.covs = merge(list); redraw(); });
+    a.phase = "done";
+  } catch (err) { a.phase = "error"; a.error = err.message || String(err); }
   renderLeft();
 }
 async function load() {
   if (!localStorage.getItem("github-dashboard-token")) { status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."); return; }
   for (const k in ALL) delete ALL[k];
+  for (const label of Object.keys(PRODUCTS)) ALL[label] = { phase:"queued" };
   ui.file = null;
   renderLeft(); renderDetail();
   // One library at a time: each report zip is tens of MB.
