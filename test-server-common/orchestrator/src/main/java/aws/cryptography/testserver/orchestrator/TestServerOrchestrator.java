@@ -30,6 +30,7 @@ import aws.cryptography.testserver.orchestrator.source.ResolvedComponentPlan;
 import aws.cryptography.testserver.orchestrator.source.RunContext;
 import aws.cryptography.testserver.orchestrator.source.SourceResolver;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -135,7 +136,11 @@ public final class TestServerOrchestrator {
     private StopAfter stopAfter = StopAfter.NONE;
     private Set<String> focus = Set.of();
     private Set<String> overlayLanguages = Set.of();
+    private boolean dryRun = false;
     private final ResultReporter reporter;
+
+    /** The endpoint every Target gets in a dry run; nothing listens on it. */
+    public static final URI DRY_RUN_ENDPOINT = URI.create("http://dry-run.invalid:1");
 
     /**
      * Per-repository working-tree overlays: repository-name → local working-
@@ -246,6 +251,20 @@ public final class TestServerOrchestrator {
      */
     public TestServerOrchestrator withFocus(Set<String> languages) {
         this.focus = languages == null ? Set.of() : Set.copyOf(languages);
+        return this;
+    }
+
+    /**
+     * Run the Tests as a dry run for the one language in
+     * {@link #withLanguages}: build and launch no server, and point the Tests
+     * at {@link #DRY_RUN_ENDPOINT}. Each Test stops at its first server call,
+     * so the feature-gate log lists the Tests that would run for that
+     * language. The Tests' pass or fail results mean nothing in a dry run.
+     *
+     * @return this orchestrator, for chaining
+     */
+    public TestServerOrchestrator withDryRun(boolean dryRun) {
+        this.dryRun = dryRun;
         return this;
     }
 
@@ -380,6 +399,10 @@ public final class TestServerOrchestrator {
             effectiveEntries = effectiveEntries.stream()
                 .filter(entry -> languages.contains(entry.language()))
                 .toList();
+        }
+        if (dryRun && languages.size() != 1) {
+            return PipelineOutcome.aborted(
+                "dryRun needs exactly one language in languages=, got " + languages);
         }
         Set<String> launching = new LinkedHashSet<>();
         effectiveEntries.forEach(entry -> launching.add(entry.language()));
@@ -550,6 +573,20 @@ public final class TestServerOrchestrator {
                     carried.rawRsaPaddingSchemes(), carried.bugIds()));
         }
 
+        if (dryRun) {
+            Map<String, URI> endpoints = new LinkedHashMap<>();
+            effectiveEntries.forEach(entry -> endpoints.put(entry.language(), DRY_RUN_ENDPOINT));
+            TestRunInput input = testRunInput(effectiveEntries, endpoints, declarations, true);
+            try {
+                testRunner.run(input);
+            } catch (MissingRuntimeConfigException e) {
+                return PipelineOutcome.aborted(e.getMessage());
+            }
+            return new PipelineOutcome(null, Result.success(
+                "dry run (no servers launched): see the feature-gate log",
+                List.copyOf(endpoints.keySet())), null, null);
+        }
+
         // ---- Stage 5: build + launch every server as a subprocess on its
         // configured port, concurrently — each launch() runs
         // on its own thread and returns only when its server is reachable. A
@@ -636,7 +673,9 @@ public final class TestServerOrchestrator {
         // runtime configuration only, with every
         // language's Feature_Declaration — inline, own working tree, and
         // cross-repo alike — flattened for the FeatureGate. ----
-        TestRunInput input = testRunInput(effectiveEntries, launched, declarations);
+        Map<String, URI> endpoints = new LinkedHashMap<>();
+        launched.forEach(server -> endpoints.put(server.language(), server.endpoint()));
+        TestRunInput input = testRunInput(effectiveEntries, endpoints, declarations, false);
         List<TestExecution> executions;
         Instant testsStartedAt = Instant.now();
         try {
@@ -657,28 +696,29 @@ public final class TestServerOrchestrator {
     // ------------------------------------------------------------------
 
     /**
-     * Assemble the {@link TestRunInput} from the launched servers, the
-     * run-effective entries, and every validated Feature_Declaration: the
-     * launched Targets, each declaration flattened to
-     * booleans, and the Feature_Catalog verbatim.
+     * Assemble the {@link TestRunInput} from each Target's endpoint (language →
+     * endpoint, in launch order), the run-effective entries, and every
+     * validated Feature_Declaration: the Targets, each declaration flattened
+     * to booleans, and the Feature_Catalog verbatim.
      */
     private TestRunInput testRunInput(
             List<ConfigurationEntry> effectiveEntries,
-            List<LaunchedServer> launched,
-            Map<String, Declaration> declarations) {
+            Map<String, URI> endpoints,
+            Map<String, Declaration> declarations,
+            boolean dryRunInput) {
         Map<String, ConfigurationEntry> entryByLanguage = new LinkedHashMap<>();
         for (ConfigurationEntry entry : effectiveEntries) {
             entryByLanguage.put(entry.language(), entry);
         }
 
         List<TestTarget> targets = new ArrayList<>();
-        for (LaunchedServer server : launched) {
-            ConfigurationEntry entry = entryByLanguage.get(server.language());
+        for (Map.Entry<String, URI> endpoint : endpoints.entrySet()) {
+            ConfigurationEntry entry = entryByLanguage.get(endpoint.getKey());
             int majorVersion = entry != null && entry.majorVersion() != null
                 ? entry.majorVersion() : 0;
             String repo = entry != null && entry.repository() != null
                 ? entry.repository() : "unknown";
-            targets.add(new TestTarget(server.language(), majorVersion, repo, server.endpoint()));
+            targets.add(new TestTarget(endpoint.getKey(), majorVersion, repo, endpoint.getValue()));
         }
 
         List<String> catalog = commonsConfiguration.features() == null
@@ -721,8 +761,8 @@ public final class TestServerOrchestrator {
                 knownBugs.put(sourceKey, exhibited);
             }
         }
-        return new TestRunInput(
-            targets, features, catalog, rawRsaPaddingSchemes, referenceImplementation, knownBugs);
+        return new TestRunInput(targets, features, catalog, rawRsaPaddingSchemes,
+            referenceImplementation, knownBugs, dryRunInput);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

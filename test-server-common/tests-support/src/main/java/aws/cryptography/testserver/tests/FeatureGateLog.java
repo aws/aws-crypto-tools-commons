@@ -26,7 +26,9 @@ import org.junit.platform.launcher.TestPlan;
  * <p>Each line is {@code {"id", "name", "targets", "features", "result"}}:
  * the JUnit unique id and display name of the running test, the labels of the
  * targets the call gated, the Features it required, and {@code run},
- * {@code skipped} or {@code error}. The display name matches the
+ * {@code skipped} or {@code error}. A {@link DryRun} adds a
+ * {@value DryRun#WOULD_RUN} line, with no targets or Features, when a test
+ * reaches its first server call. The display name matches the
  * {@code testcase name} in the JUnit XML, and the unique id names the test
  * class, so the two files join on (class, name).
  *

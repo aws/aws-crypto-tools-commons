@@ -271,6 +271,10 @@ class EncryptionContextBehaviorTests {
         ESDKClientConfig config = configFor(new TargetPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
+        //= spec/client-apis/encrypt.md#encryption-context
+        //= type=test
+        //# If the input encryption context contains any entries with a key beginning with `aws-crypto-`,
+        //# the encryption operation MUST fail.
         KnownBugGate.gateDeclared("encrypt-accepts-reserved-prefix-encryption-context-key", target,
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),

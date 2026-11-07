@@ -46,8 +46,15 @@ public final class TestServerClientCache<TClient> {
         this.builder = Objects.requireNonNull(builder, "builder");
     }
 
-    /** @return a shared, reused Test_Client targeting {@code endpoint}. */
+    /**
+     * @return a shared, reused Test_Client targeting {@code endpoint}
+     * @throws org.opentest4j.TestAbortedException in a {@link DryRun}, where
+     *     the first client a test asks for marks it as one that would run
+     */
     public TClient forEndpoint(URI endpoint) {
+        if (DryRun.enabled()) {
+            DryRun.stopAsWouldRun();
+        }
         return clients.computeIfAbsent(endpoint, builder);
     }
 
