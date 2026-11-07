@@ -21,6 +21,7 @@ repositories {
 val smithyJavaVersion: String by project
 val jqwikVersion: String by project
 val junitVersion: String by project
+val junitPlatformVersion: String by project
 
 dependencies {
     // TestServerClientCache.withRetry catches software.amazon.smithy.java's
@@ -43,7 +44,13 @@ dependencies {
     // Executable through their own JUnit dep, not by transit from us.
     implementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 
+    // FeatureGateLog is a launcher TestExecutionListener. The launcher that
+    // loads it is always on the test runtime classpath (Gradle supplies it),
+    // so the API is needed here only to compile.
+    compileOnly("org.junit.platform:junit-platform-launcher:$junitPlatformVersion")
+
     // Self-tests only.
+    testImplementation("org.junit.platform:junit-platform-launcher:$junitPlatformVersion")
     testImplementation("net.jqwik:jqwik:$jqwikVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
@@ -53,6 +60,8 @@ dependencies {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform {
         includeEngines("jqwik", "junit-jupiter")
+        // FeatureGateLogTest runs these through its own launcher.
+        excludeTags("feature-gate-log-fixture")
     }
     testLogging {
         events("passed", "skipped", "failed")
