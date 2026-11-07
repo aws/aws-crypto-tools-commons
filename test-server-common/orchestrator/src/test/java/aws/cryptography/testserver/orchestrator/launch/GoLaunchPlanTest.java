@@ -7,9 +7,13 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +40,34 @@ class GoLaunchPlanTest {
     void build() {
         assertEquals(List.of("go", "build", "-buildvcs=false", "-o", "esdk-test-server", "."),
             GoLaunchPlan.buildCommand("go", "esdk-test-server"));
+    }
+
+    @Test
+    @DisplayName("a coverage build counts the statements of every package of the given modules")
+    void coverageBuild() {
+        assertEquals(List.of("go", "build", "-buildvcs=false", "-cover",
+                "-coverpkg=example.com/lib/...,example.com/server/...", "-o", "esdk-test-server", "."),
+            GoLaunchPlan.coverageBuildCommand("go", "esdk-test-server",
+                List.of("example.com/lib", "example.com/server")));
+    }
+
+    @Test
+    @DisplayName("coverage reports the server's module and each module under the library directory")
+    void coverageModules(@TempDir Path tempDir) throws IOException {
+        Path server = tempDir.resolve("server");
+        Path library = tempDir.resolve("runtimes/go");
+        Files.createDirectories(server);
+        Files.createDirectories(library.resolve("ImplementationFromDafny-go"));
+        Files.writeString(server.resolve("go.mod"), "module example.com/server\n\ngo 1.24\n");
+        Files.writeString(library.resolve("ImplementationFromDafny-go/go.mod"),
+            "// generated\nmodule \"example.com/lib\"\n\ngo 1.24\n");
+
+        assertEquals(Map.of(
+                "example.com/server", server.toAbsolutePath().normalize().toString(),
+                "example.com/lib", library.resolve("ImplementationFromDafny-go").toAbsolutePath().normalize().toString()),
+            GoLaunchPlan.coverageModules(server, Optional.of(library)));
+        assertEquals(Map.of("example.com/server", server.toAbsolutePath().normalize().toString()),
+            GoLaunchPlan.coverageModules(server, Optional.empty()));
     }
 
     @Test

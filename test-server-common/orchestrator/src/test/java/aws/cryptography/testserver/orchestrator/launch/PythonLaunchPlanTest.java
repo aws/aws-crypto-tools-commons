@@ -9,6 +9,7 @@ import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
 import aws.cryptography.testserver.orchestrator.source.ResolutionReason;
 import aws.cryptography.testserver.orchestrator.source.SourcePlan;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -88,7 +89,38 @@ class PythonLaunchPlanTest {
         assertEquals(
             List.of(VENV.resolve("bin").resolve("python").toString(),
                 "-m", "esdk_test_server", "8092"),
-            PythonLaunchPlan.serverCommand(VENV, "esdk_test_server", 8092));
+            PythonLaunchPlan.serverCommand(VENV, "esdk_test_server", 8092, null));
+    }
+
+    @Test
+    @DisplayName("with coverage on, the server runs under coverage.py with the generated settings")
+    void serverCommandWithCoverage() {
+        assertEquals(
+            List.of(VENV.resolve("bin").resolve("python").toString(),
+                "-m", "coverage", "run", "--rcfile=/coverage/python/coveragerc",
+                "-m", "esdk_test_server", "8092"),
+            PythonLaunchPlan.serverCommand(VENV, "esdk_test_server", 8092,
+                Path.of("/coverage/python/coveragerc")));
+    }
+
+    @Test
+    @DisplayName("the coverage settings measure the library's sources and save on SIGTERM")
+    void coverageRc() {
+        assertEquals("[run]\n"
+                + "data_file = /coverage/python/.coverage\n"
+                + "parallel = true\n"
+                + "sigterm = true\n"
+                + "source = /scratch/clones/aws-encryption-sdk-python/src\n",
+            PythonLaunchPlan.coverageRc(Path.of("/coverage/python"), LIBRARY.resolve("src")));
+    }
+
+    @Test
+    @DisplayName("the measured sources are <library>/src when it exists, else the library")
+    void sourceDirectory(@TempDir Path tempDir) throws Exception {
+        assertEquals(tempDir.toAbsolutePath().normalize(), PythonLaunchPlan.sourceDirectory(tempDir));
+        Files.createDirectory(tempDir.resolve("src"));
+        assertEquals(tempDir.resolve("src").toAbsolutePath().normalize(),
+            PythonLaunchPlan.sourceDirectory(tempDir));
     }
 
     // ------------------------------------------------------------------
