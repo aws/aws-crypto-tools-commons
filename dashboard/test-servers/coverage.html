@@ -71,7 +71,9 @@
   .matrix td.selected { outline:2px solid #fff; outline-offset:-2px; }
   .matrix td.cov { background:color-mix(in srgb,var(--tint) 30%,transparent); }
   .rowstate { font-weight:400; font-size:11px; color:var(--dim); margin-top:2px; }
-  .st-loading-text { color:var(--sel); } .st-error-text { color:#ffa198; white-space:normal; max-width:260px; }
+  .st-loading-text { color:var(--sel); } .st-error-text { color:#ffa198; cursor:help; }
+  .matrix tbody th { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+  .rowstate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .st-done-text { color:#56d364; } .st-none-text { color:var(--dim); }
   @keyframes spin { to { transform:rotate(360deg); } }
   @keyframes pulse { 50% { opacity:.45; } }
@@ -80,6 +82,7 @@
   .matrix td.st-loading, .sw.st-loading { color:var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); animation:pulse 1.4s ease-in-out infinite; }
   .matrix td.st-local small { color:var(--sel); }
   .sw.st-local { background:linear-gradient(90deg,color-mix(in srgb,var(--pass) 35%,transparent) 50%,color-mix(in srgb,var(--sel) 30%,transparent) 50%); }
+  .matrix td.st-norun, .sw.st-norun { color:var(--dim); background:var(--bg); border:1px dashed var(--line); }
   .matrix td.st-error, .sw.st-error { color:#ffa198; background:color-mix(in srgb,var(--fail) 25%,transparent); }
   .matrix td.st-none, .sw.st-none { color:var(--dim); border:1px dashed var(--dim); background:transparent; }
   .matrix td.st-nolib, .sw.st-nolib { color:var(--dim); background:repeating-linear-gradient(45deg,var(--line) 0 4px,transparent 4px 9px); }
@@ -167,6 +170,7 @@ const STATES = {
   queued:   { cls:"st-queued",   label:"waiting",          tip:"Waiting for the libraries above to finish loading." },
   loading:  { cls:"st-loading",  label:"loading",          tip:"Downloading and reading this run's reports." },
   local:    { cls:"st-local",    label:"local loading",    tip:"Test server numbers are in; the library's own test coverage is still loading." },
+  norun:    { cls:"st-norun",    label:"no run",           tip:"No finished test server run with reports for this PR or commit yet. Normal while CI is still running." },
   error:    { cls:"st-error",    label:"failed",           tip:"Loading failed. The row says why." },
   none:     { cls:"st-none",     label:"no coverage",      tip:"This server wrote no coverage in this run. The run may predate coverage, or the server's coverage step failed." },
   nolib:    { cls:"st-nolib",    label:"no library code",  tip:"The run covered none of the library's own files. The server may use a published package." },
@@ -186,6 +190,7 @@ function renderMatrix() {
     if (!(a.servers || []).includes(lang)) return stateCell("na", "");
     const on = ui.lib === label && ui.lang === lang ? " selected" : "";
     if (a.phase === "error") return stateCell("error", "✗");
+    if (a.phase === "norun") return stateCell("norun", "");
     const cov = (a.covs || []).find(c => c.language === lang);
     if (!cov) return a.phase === "done" ? stateCell("none", "no coverage") : stateCell("loading", "");
     const click = `data-lib="${label}" data-lang="${lang}"`;
@@ -200,13 +205,14 @@ function renderMatrix() {
   const rows = Object.keys(PRODUCTS).map(label => {
     const a = ALL[label] || { phase:"queued" };
     const run = a.run ? ` <a class="small" href="${a.run.url}" target="_blank" title="${esc(a.run.branch)} @ ${a.run.headSha.slice(0, 7)} · ${esc(a.run.conclusion)}">run</a>` : "";
-    const step = a.phase === "error" ? `<div class="rowstate st-error-text">✗ ${esc(a.error).slice(0, 140)}</div>`
+    const step = a.phase === "error" ? `<div class="rowstate st-error-text" title="${esc(a.error)}">✗ failed (hover)</div>`
+      : a.phase === "norun" ? `<div class="rowstate st-none-text" title="${esc(a.error)}">○ no run yet</div>`
       : a.phase === "done" ? (a.covs && a.covs.length ? `<div class="rowstate st-done-text">✓ loaded</div>` : `<div class="rowstate st-none-text">○ this run has no coverage</div>`)
       : a.phase === "queued" ? `<div class="rowstate">… waiting</div>`
       : `<div class="rowstate st-loading-text">${spinner}${esc(a.step || "loading")}</div>`;
     const head = `<th>${label}${run}${step}</th>`;
     if (!a.servers) {
-      const st = a.phase === "error" ? "error" : a.phase === "queued" ? "queued" : "loading";
+      const st = ["error", "norun", "queued"].includes(a.phase) ? a.phase : "loading";
       return `<tr>${head}${stateCell(st, STATES[st].label, `colspan="${span}"`)}</tr>`;
     }
     return `<tr>${head}${langs.map(l => cell(label, l)).join("")}</tr>`;
@@ -325,7 +331,11 @@ async function loadLibrary(label) {
       files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
     await fetchCoverage(product, a.run, note, list => { a.covs = merge(list); redraw(); });
     a.phase = "done";
-  } catch (err) { a.phase = "error"; a.error = err.message || String(err); }
+  } catch (err) {
+    a.error = err.message || String(err);
+    // No run yet is expected (CI still going, or nothing ran for this commit).
+    a.phase = /^no (finished|successful) run/.test(a.error) ? "norun" : "error";
+  }
   renderLeft();
 }
 async function load() {
