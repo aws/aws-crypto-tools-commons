@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
@@ -24,10 +25,12 @@ import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -220,6 +223,37 @@ public class RawAesKeyringTest {
             .materials(initial)
             .encryptedDataKeys(List.of())
             .build()));
+    }
+
+    /**
+     * A message can list up to 65,535 encrypted data keys, and none of them has to be for this keyring.
+     * Here no key is for the keyring, so OnDecrypt must fail with the usual error.
+     * A keyring that keeps a copy of the whole key list for each key needs about 70 GB for 32,768 keys,
+     * so its server runs out of memory or misses the timeout.
+     * 32,768 keys keeps the request under the Rust server's 2 MB request limit.
+     */
+    @ParameterizedTest(name = "[raw-aes] 32768 EDKs for another keyring, fails {0}")
+    @MethodSource("targets")
+    void onDecryptWithManyEdksForAnotherKeyringFails(LanguageServerTarget target) {
+        FeatureGate.require(Set.of("raw-aes"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+        AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
+
+        String keyring = createKeyring(client, KEY_NAME, wrappingKey(alg, 0), alg);
+        DecryptionMaterials initial = initializeDecryption(client);
+        List<EncryptedDataKey> edks = IntStream.range(0, 32_768)
+            .mapToObj(i -> EncryptedDataKey.builder()
+                .keyProviderId("another-keyring")
+                .keyProviderInfo(ByteBuffer.wrap(new byte[] {0}))
+                .ciphertext(ByteBuffer.wrap(new byte[] {0}))
+                .build())
+            .toList();
+        assertTimeoutPreemptively(Duration.ofSeconds(60), () ->
+            assertThrows(MPLClientError.class, () -> client.onDecrypt(OnDecryptInput.builder()
+                .keyringId(keyring)
+                .materials(initial)
+                .encryptedDataKeys(edks)
+                .build())));
     }
 
     /**
