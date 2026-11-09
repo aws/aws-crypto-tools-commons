@@ -48,14 +48,15 @@
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:12px; }
   .legend span { display:flex; align-items:center; gap:5px; }
   .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
-  table.matrix { border-collapse:collapse; width:100%; }
+  table.matrix { border-collapse:collapse; }
+  .matrix td { min-width:84px; }
   .matrix th, .matrix td { border:1px solid var(--line); padding:0; text-align:center; }
   .matrix thead th { padding:6px 4px; font-weight:600; font-size:12px; cursor:pointer; position:sticky; top:-16px; background:var(--bg); z-index:1; }
   .matrix thead th.focus { color:var(--sel); }
   .matrix tbody th { text-align:left; padding:6px 10px; font-weight:500; white-space:nowrap; cursor:pointer; }
   .matrix tbody th:hover { color:var(--sel); }
   .matrix tbody th.bucket { color:var(--dim); font-style:italic; }
-  .cell { display:block; padding:7px 4px; cursor:pointer; font-size:12px; font-variant-numeric:tabular-nums; }
+  .cell { display:block; padding:5px 6px; cursor:pointer; font-size:14px; line-height:1.2; font-variant-numeric:tabular-nums; }
   .cell:hover { outline:2px solid var(--sel); outline-offset:-2px; }
   .cell.selected { outline:2px solid #fff; outline-offset:-2px; }
   .s-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
@@ -65,6 +66,7 @@
   .s-zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
   .s-undecl { color:var(--dim); }
   .small { font-size:12px; font-weight:400; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:6px; }
   .cell small { display:block; font-size:10px; color:var(--dim); }
   .matrix td.selected > .cell { outline:2px solid #fff; outline-offset:-2px; }
   .matrix thead th.role { font-weight:400; font-size:10px; color:var(--dim); padding:2px; }
@@ -135,7 +137,6 @@
     <label title="Hide grid rows with no problem cells, and tree tests the focus server passed"><input type="checkbox" id="onlyProblems"> Only problems</label>
     <label title="Split each server into encrypting and decrypting columns"><input type="checkbox" id="split"> Split enc/dec</label>
     <a href="upset.html" id="upsetLink" class="small">UpSet view</a>
-    <a href="coverage.html" id="coverageLink" class="small">Line coverage</a>
   </div></details>
   <span class="run" id="run"></span>
 </header>
@@ -252,6 +253,7 @@ function renderHeader() {
 
 function renderSummary() {
   const s = ui.focus, unit = s ? "features" : "pairs";
+  const units = n => `${n} ${n === 1 ? unit.slice(0, -1) : unit}`;
   const st = S.features.filter(f => f !== NONE).flatMap(f => (s ? [s] : S.servers).map(srv => cellStats(srv, f)));
   const supported = st.filter(c => c.state === "supported");
   const n = cls => supported.filter(c => c.cls === cls).length;
@@ -260,9 +262,9 @@ function renderSummary() {
   const bad = failing + zero;
   $("verdict").className = "verdict " + (bad ? "bad" : "good");
   $("verdict").innerHTML = bad
-    ? `✗ ${bad} supported ${unit} fail${s ? ` on ${esc(s)}` : ""}`
+    ? `✗ ${units(bad)} ${bad === 1 ? "fails" : "fail"}${s ? ` on ${esc(s)}` : ""}`
     : `✓ Every supported test that ran passed${s ? ` on ${esc(s)}` : ""}` +
-      (skipped ? ` <small>· ${skipped} ${unit} have skips (${all[4].toLocaleString()} runs)</small>` : "");
+      (skipped ? ` <small>· ${units(skipped)} ${skipped === 1 ? "has" : "have"} skips (${all[4].toLocaleString()} runs)</small>` : "");
   const card = (label, value, sub, tip, color = "") =>
     `<div class="card" title="${tip}"><small>${label}</small><b style="color:${color}">${value}</b><small>${sub}</small></div>`;
   $("summary").innerHTML =
@@ -662,7 +664,6 @@ $("focus").onchange = e => { ui.focus = e.target.value; render(); };
 $("onlyProblems").onchange = e => { ui.onlyProblems = e.target.checked; render(); };
 $("split").onchange = e => { ui.split = e.target.checked; renderMatrix(); };
 $("upsetLink").onclick = () => { $("upsetLink").href = "upset.html?run=" + encodeURIComponent(ui.source); };
-$("coverageLink").onclick = () => { $("coverageLink").href = "coverage.html?run=" + encodeURIComponent(ui.source); };
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); ui.open.clear(); renderDetail(); }, 250); };
 $("matrix").onclick = e => {

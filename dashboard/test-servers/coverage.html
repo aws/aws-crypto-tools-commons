@@ -6,7 +6,7 @@
 <style>
   :root {
     --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
-    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd; --srv:#a371f7; --loc:#3fb950;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd; --srv:#a371f7; --loc:#39c5cf;
   }
   * { box-sizing:border-box; }
   body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
@@ -16,9 +16,19 @@
   select, input[type=text], input[type=password] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
   label { color:var(--dim); display:flex; gap:6px; align-items:center; }
   .run { color:var(--dim); margin-left:auto; font-size:12px; }
-  main { display:grid; grid-template-columns: minmax(0,var(--left,1fr)) 6px minmax(0,1fr); height:calc(100vh - 52px); }
+  main { display:grid; grid-template-columns: minmax(0,1fr); height:calc(100vh - 52px); }
+  main.open { grid-template-columns: minmax(0,var(--left,1fr)) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
   section { overflow:auto; padding:16px 20px; }
   #detail { background:var(--panel); }
+  #detail .close { position:sticky; top:-16px; float:right; z-index:2; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; }
+  #detail .close:hover { color:var(--text); border-color:var(--sel); }
+  .jump { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:3px 9px; cursor:pointer; font-size:12px; margin-right:6px; }
+  .jump:hover { border-color:var(--sel); }
+  .jump:disabled { color:var(--dim); cursor:default; border-color:var(--line); }
+  .tag { font-size:10px; padding:0 6px; margin-left:6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); font-family:system-ui, sans-serif; }
+  .files tr.dir.toggle td { cursor:pointer; }
+  .files tr.dir.toggle:hover td { color:var(--text); }
   #divider { cursor:col-resize; background:var(--line); }
   #divider:hover, #divider.drag { background:var(--sel); }
   body.resizing { user-select:none; cursor:col-resize; }
@@ -29,7 +39,7 @@
   .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:130px; }
   .card b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
   .card small { color:var(--dim); }
-  .card.srv b { color:var(--srv); } .card.loc b { color:var(--loc); }
+  .card.srv b { color:var(--srv); } .card.loc b { color:var(--loc); } .card.both b { color:#56d364; }
   table.files { border-collapse:collapse; width:100%; font-size:12px; }
   .files th, .files td { border-bottom:1px solid var(--line); padding:3px 6px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .files th:first-child, .files td:first-child { text-align:left; }
@@ -41,13 +51,12 @@
   .files tr.dir td { color:var(--dim); font-weight:600; cursor:default; background:var(--bg); }
   .bar { display:inline-block; width:60px; height:8px; background:var(--line); border-radius:2px; vertical-align:middle; margin-left:6px; overflow:hidden; }
   .bar i { display:block; height:100%; }
-  .p-hi { color:#56d364; } .p-mid { color:#e3b341; } .p-lo { color:#ffa198; }
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin:6px 0 10px; }
   .legend span { display:flex; align-items:center; gap:5px; }
   .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
   .c-both { background:color-mix(in srgb,var(--pass) 30%,transparent); }
   .c-srv { background:color-mix(in srgb,var(--srv) 35%,transparent); }
-  .c-loc { background:color-mix(in srgb,var(--loc) 18%,transparent); }
+  .c-loc { background:color-mix(in srgb,var(--loc) 30%,transparent); }
   .c-miss { background:color-mix(in srgb,var(--fail) 35%,transparent); }
   pre.src { margin:0; font:12px/1.45 ui-monospace,monospace; counter-reset:none; }
   pre.src div { display:grid; grid-template-columns: 48px 56px 56px 1fr; white-space:pre; }
@@ -69,7 +78,7 @@
   .matrix td.cov small { color:var(--dim); font-size:10px; }
   .matrix td.cov:hover { outline:2px solid var(--sel); outline-offset:-2px; }
   .matrix td.selected { outline:2px solid #fff; outline-offset:-2px; }
-  .matrix td.cov { background:color-mix(in srgb,var(--tint) 30%,transparent); }
+  .matrix td.cov { background:var(--tint); }
   .rowstate { font-weight:400; font-size:11px; color:var(--dim); margin-top:2px; }
   .st-loading-text { color:var(--sel); } .st-error-text { color:#ffa198; cursor:help; }
   .matrix tbody th { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
@@ -97,7 +106,6 @@
 <body>
 <header>
   <h1>Line Coverage</h1>
-  <a href="index.html" id="back" class="small">← test results</a>
   <label title="Empty: newest passing run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run.">PR / commit <input type="text" id="source" size="34" placeholder="newest passing run on commons main"></label>
   <label>Find file <input type="text" id="search" placeholder="e.g. decrypt"></label>
   <span class="run" id="run"></span>
@@ -112,7 +120,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
-const ui = { source:new URLSearchParams(location.search).get("run") || "", lang:null, file:null, sort:"both", search:"" };
+const ui = { source:readSource(), lang:null, file:null, sort:"gap", search:"", serverCode:false };
 // label -> { run, servers:[language], covs:[{ language, repository, commit, server, local, files }], error }
 const ALL = {};
 let C = null;       // the selected library's covs
@@ -151,11 +159,13 @@ function totals(files) {
 }
 const pct = (n, d) => d ? 100 * n / d : 0;
 const pctText = (n, d) => d ? pct(n, d).toFixed(1) + "%" : "–";
-const pclass = p => p >= 80 ? "p-hi" : p >= 50 ? "p-mid" : "p-lo";
 function pctCell(n, d, color) {
   const p = pct(n, d);
-  return `<td><span class="${pclass(p)}">${pctText(n, d)}</span><span class="bar"><i style="width:${p}%;background:${color}"></i></span></td>`;
+  return `<td>${pctText(n, d)}<span class="bar"><i style="width:${p}%;background:${color}"></i></span></td>`;
 }
+// Generated code is counted like any other file, but tagged so a big
+// generated file does not look like hand-written code with a gap.
+const isGenerated = f => /(^|\/|_)generated\b/i.test(f);
 
 function card(label, cls, n, d, sub) {
   return `<div class="card ${cls}"><small>${label}</small><b>${pctText(n, d)}</b><small>${n.toLocaleString()} / ${d.toLocaleString()} lines${sub ? " · " + sub : ""}</small></div>`;
@@ -183,7 +193,7 @@ const stateCell = (st, text, attrs = "", on = "") =>
   `<td class="${STATES[st].cls}${on}" ${attrs} title="${esc(STATES[st].tip)}">${st === "loading" ? spinner : ""}${text}</td>`;
 
 function renderMatrix() {
-  const langs = [...new Set(Object.values(ALL).flatMap(a => a.servers || []))];
+  const langs = sortLangs(new Set(Object.values(ALL).flatMap(a => a.servers || [])));
   const span = Math.max(langs.length, 1);
   const cell = (label, lang) => {
     const a = ALL[label];
@@ -196,7 +206,9 @@ function renderMatrix() {
     const click = `data-lib="${label}" data-lang="${lang}"`;
     const t = totals(cov.files.filter(x => !x.code)), p = pct(t.b, t.total);
     if (!t.total) return stateCell("nolib", "no library code", click, " cov" + on);
-    const tint = p >= 80 ? "var(--pass)" : p >= 50 ? "var(--part)" : "var(--fail)";
+    // One green, brighter for more coverage: low coverage is a gap to fill,
+    // not a failure, so it is not red.
+    const tint = `color-mix(in srgb,var(--pass) ${Math.round(8 + p * 0.5)}%,transparent)`;
     const st = cov.pendingLocal ? "local" : cov.local ? "ok" : "nolocal";
     const foot = cov.pendingLocal ? `${spinner}local…` : cov.local ? `server ${pctText(t.s, t.total)}` : `⚠ no local · server ${pctText(t.s, t.total)}`;
     return `<td class="cov ${STATES[st].cls}${on}" ${click} title="${esc(STATES[st].tip)}" style="--tint:${tint}">
@@ -220,7 +232,7 @@ function renderMatrix() {
   const legend = Object.values(STATES).map(st => `<span title="${esc(st.tip)}"><i class="sw ${st.cls}"></i>${st.label}</span>`).join("");
   return `<table class="matrix"><thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
     <div class="legend">${legend}</div>
-    <div class="sub">Big number: library lines run by the test server or by the library's own tests. Small: the test server alone. Hover any cell or legend entry for what it means. Click a cell for its files.</div>`;
+    <div class="sub">Big number: library lines run by the test server or by the library's own tests. Small: the test server alone. Click a cell for its files.</div>`;
 }
 
 // Progress messages arrive often; draw at most once a frame.
@@ -228,7 +240,12 @@ let drawQueued = false;
 function redraw() {
   if (drawQueued) return;
   drawQueued = true;
-  requestAnimationFrame(() => { drawQueued = false; renderLeft(); });
+  requestAnimationFrame(() => {
+    drawQueued = false; renderLeft();
+    // Local coverage can arrive after a file is open: redraw its lines then.
+    const cov = C && C.find(c => c.language === ui.lang);
+    if (ui.file && cov && cov.files.find(x => x.f === ui.file) !== shownFile) renderDetail();
+  });
 }
 
 function renderLeft() {
@@ -242,42 +259,45 @@ function renderLeft() {
   const localNote = cov.pendingLocal
     ? `<span class="st-loading-text">${spinner}loading the library's local test coverage…</span>`
     : cov.local
-    ? `local tests from <a href="${esc(cov.local.from)}" target="_blank">this run</a> (${cov.local.artifacts.join(", ")})`
-    : `<span class="note">no local coverage found for ${cov.commit.slice(0, 7)} in ${esc(cov.repository)} yet, so "both" is the test server alone</span>`;
+    ? `Local tests: <a href="${esc(cov.local.from)}" target="_blank" title="${esc(cov.local.artifacts.join(", "))}">${esc(cov.repository)} CI run</a>`
+    : `<span class="note">No local test coverage found for ${cov.commit.slice(0, 7)} yet, so Both is the test server alone.</span>`;
   let h = `${matrix}<h2 style="margin-top:18px">${esc(ui.lib)} · ${esc(cov.language)} server · <a href="https://github.com/${cov.repository}/tree/${cov.commit}" target="_blank">${esc(cov.repository)}@${cov.commit.slice(0, 7)}</a></h2>
     <div class="sub">${localNote}</div>
     <div class="summary">
       ${card("Test server", "srv", t.s, t.total)}
       ${card("Local tests", "loc", t.l, t.total)}
-      ${card("Both", "", t.b, t.total, "line by line")}
-    </div>
-    <div class="sub">Each number counts the lines either build can run. A line counts for "both" when either one ran it.
-    ${srv.length ? `The test server's own code is listed apart: the test server ran ${pctText(ts.s, ts.total)} of its ${ts.total.toLocaleString()} lines.` : ""}</div>`;
+      ${card("Both", "both", t.b, t.total, "either one ran it")}
+    </div>`;
   const q = ui.search.toLowerCase();
-  const keyOf = { file:x => x.f, lines:x => -x.total, server:x => pct(x.s, x.total), local:x => pct(x.l, x.total), both:x => pct(x.b, x.total), gap:x => -(x.b - x.s) };
+  const keyOf = { file:x => x.f, lines:x => -x.total, server:x => pct(x.s, x.total), local:x => pct(x.l, x.total), both:x => pct(x.b, x.total), gap:x => -(x.b - x.s), srvonly:x => -(x.b - x.l) };
   const sorted = list => list.filter(x => !q || x.f.toLowerCase().includes(q)).sort((a, b) => {
     const k = keyOf[ui.sort], va = k(a), vb = k(b);
     return va < vb ? -1 : va > vb ? 1 : a.f.localeCompare(b.f);
   });
-  const rows = (title, list) => {
-    const shown = sorted(list);
-    if (!shown.length) return "";
-    const tt = totals(shown);
-    return `<tr class="dir"><td>${title}</td><td>${tt.total.toLocaleString()}</td>${["s", "l", "b"].map(k => `<td>${pctText(tt[k], tt.total)}</td>`).join("")}<td></td></tr>` +
-      shown.map(x => `<tr data-file="${esc(x.f)}" class="${x.f === ui.file ? "selected" : ""}"><td class="path">${esc(x.f)}</td><td>${x.total}</td>${pctCell(x.s, x.total, "var(--srv)")}${pctCell(x.l, x.total, "var(--loc)")}${pctCell(x.b, x.total, "var(--pass)")}<td>${x.b - x.s || ""}</td></tr>`).join("");
-  };
-  const head = [["file", "File"], ["lines", "Lines"], ["server", "Test server"], ["local", "Local tests"], ["both", "Both"], ["gap", "Only local"]]
-    .map(([k, n]) => `<th data-sort="${k}" title="Sort">${n}${ui.sort === k ? " ▴" : ""}</th>`).join("");
-  h += `<h3>Files</h3><table class="files"><thead><tr>${head}</tr></thead><tbody>${rows("Library", lib)}${rows("Test server code", srv)}</tbody></table>`;
+  const fileRow = x => `<tr data-file="${esc(x.f)}" class="${x.f === ui.file ? "selected" : ""}"><td class="path">${esc(x.f)}${isGenerated(x.f) ? `<span class="tag">generated</span>` : ""}</td><td>${x.total}</td>${pctCell(x.s, x.total, "var(--srv)")}${pctCell(x.l, x.total, "var(--loc)")}${pctCell(x.b, x.total, "var(--pass)")}<td>${x.b - x.s || ""}</td><td>${x.b - x.l || ""}</td></tr>`;
+  const sumRow = (title, tt, attrs = "") => `<tr class="dir${attrs ? " toggle" : ""}" ${attrs}><td>${title}</td><td>${tt.total.toLocaleString()}</td>${["s", "l", "b"].map(k => `<td>${pctText(tt[k], tt.total)}</td>`).join("")}<td>${(tt.b - tt.s).toLocaleString()}</td><td>${(tt.b - tt.l).toLocaleString()}</td></tr>`;
+  const libShown = sorted(lib), srvShown = sorted(srv);
+  let body = libShown.length ? sumRow("Library", totals(libShown)) + libShown.map(fileRow).join("") : "";
+  // The test server's own code is folded away: it is not library coverage.
+  if (srvShown.length)
+    body += sumRow(`${ui.serverCode ? "▾" : "▸"} Test server's own code (not counted above)`, totals(srvShown), `data-toggle="serverCode"`)
+      + (ui.serverCode ? srvShown.map(fileRow).join("") : "");
+  const head = [["file", "File"], ["lines", "Lines"], ["server", "Test server"], ["local", "Local tests"], ["both", "Both"],
+    ["gap", "Only local", "Lines only local tests run: the ones to cover from the test server"], ["srvonly", "Only server", "Lines only the test server runs"]]
+    .map(([k, n, tip]) => `<th data-sort="${k}" title="${tip || "Sort"}">${n}${ui.sort === k ? " ▾" : ""}</th>`).join("");
+  h += `<h3>Files</h3><table class="files"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   left.innerHTML = h;
 }
 
 const srcCache = new Map();
+let shownFile = null; // the file object the line pane last drew
 async function renderDetail() {
   const d = $("detail");
   const cov = C && C.find(c => c.language === ui.lang);
   const x = cov && cov.files.find(x => x.f === ui.file);
-  if (!x) { d.innerHTML = `<div class="empty">Click a file to see its lines.</div>`; return; }
+  // The line pane only takes space once a file is picked.
+  document.querySelector("main").classList.toggle("open", !!x);
+  if (!x) { d.innerHTML = ""; return; }
   const k = cov.repository + "@" + cov.commit + ":" + x.f;
   if (!srcCache.has(k)) {
     d.innerHTML = `<div class="empty">Loading ${esc(x.f)}…</div>`;
@@ -285,6 +305,7 @@ async function renderDetail() {
     catch (err) { d.innerHTML = `<div class="empty">Could not read ${esc(x.f)}: ${esc(err.message || err)}</div>`; return; }
   }
   if (ui.file !== x.f) return;
+  shownFile = x;
   const text = srcCache.get(k).split("\n");
   const hits = (m, n) => m.has(n) ? (m.get(n) > 0 ? m.get(n).toLocaleString() : "0") : "";
   const body = text.map((line, i) => {
@@ -293,7 +314,9 @@ async function renderDetail() {
     const cls = !inS && !inL ? "" : a && b ? "c-both" : a ? "c-srv" : b ? "c-loc" : "c-miss";
     return `<div class="${cls}" id="L${n}"><span class="n">${n}</span><span class="h">${hits(x.server, n)}</span><span class="h">${hits(x.local, n)}</span><span class="code">${esc(line) || " "}</span></div>`;
   }).join("");
-  d.innerHTML = `<h2><a href="https://github.com/${cov.repository}/blob/${cov.commit}/${x.f}" target="_blank">${esc(x.f)}</a></h2>
+  const has = cls => body.includes(`class="${cls}"`) ? "" : "disabled";
+  d.innerHTML = `<button class="close" data-close title="Close">×</button>
+    <h2><a href="https://github.com/${cov.repository}/blob/${cov.commit}/${x.f}" target="_blank">${esc(x.f)}</a></h2>
     <div class="sub">test server ${pctText(x.s, x.total)} · local tests ${pctText(x.l, x.total)} · both ${pctText(x.b, x.total)} of ${x.total} lines</div>
     <div class="legend">
       <span><i class="sw c-both"></i>both ran it</span>
@@ -301,6 +324,7 @@ async function renderDetail() {
       <span><i class="sw c-loc"></i>only local tests</span>
       <span><i class="sw c-miss"></i>neither</span>
     </div>
+    <div style="margin-bottom:8px"><button class="jump" data-jump="c-loc" ${has("c-loc")}>Next local-only line ↓</button><button class="jump" data-jump="c-miss" ${has("c-miss")}>Next uncovered line ↓</button></div>
     <div class="srchead"><span>line</span><span>server</span><span>local</span><span></span></div>
     <pre class="src">${body}</pre>`;
 }
@@ -331,38 +355,53 @@ async function loadLibrary(label) {
       files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
     await fetchCoverage(product, a.run, note, list => { a.covs = merge(list); redraw(); });
     a.phase = "done";
+    // Open the first cell with library code, so the page is never just a grid.
+    if (!ui.lib) {
+      const first = sortLangs((a.covs || []).map(c => c.language))
+        .map(l => a.covs.find(c => c.language === l)).find(c => c.files.some(x => !x.code));
+      if (first) { ui.lib = label; ui.lang = first.language; }
+    }
   } catch (err) {
     a.error = err.message || String(err);
     // No run yet is expected (CI still going, or nothing ran for this commit).
     a.phase = /^no (finished|successful) run/.test(a.error) ? "norun" : "error";
   }
-  renderLeft();
+  redraw();
 }
 async function load() {
   if (!localStorage.getItem("github-dashboard-token")) { status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."); return; }
   for (const k in ALL) delete ALL[k];
   for (const label of Object.keys(PRODUCTS)) ALL[label] = { phase:"queued" };
-  ui.file = null;
+  ui.file = null; ui.lib = null; ui.lang = null;
   renderLeft(); renderDetail();
   // One library at a time: each report zip is tens of MB.
   for (const label of Object.keys(PRODUCTS)) await loadLibrary(label);
 }
 
 $("source").value = ui.source;
-$("back").href = "index.html" + location.search;
 $("source").onchange = e => {
   ui.source = e.target.value.trim();
-  const q = new URLSearchParams(location.search);
-  ui.source ? q.set("run", ui.source) : q.delete("run");
-  history.replaceState(null, "", "?" + q);
-  $("back").href = "index.html" + location.search;
+  writeSource(ui.source);
   load();
 };
+// Jump to the next line of one color below the top of the line pane.
+$("detail").addEventListener("click", e => {
+  if (e.target.closest("[data-close]")) { ui.file = null; renderLeft(); renderDetail(); return; }
+  const j = e.target.closest("[data-jump]");
+  if (!j) return;
+  const d = $("detail"), top = d.getBoundingClientRect().top + 90;
+  // Only the first line of each block counts, so each press finds a new block.
+  const starts = [...d.querySelectorAll("pre.src > div." + j.dataset.jump)]
+    .filter(el => !el.previousElementSibling || !el.previousElementSibling.classList.contains(j.dataset.jump));
+  const next = starts.find(el => el.getBoundingClientRect().top > top + 1) || starts[0];
+  if (next) next.scrollIntoView({ block:"center" });
+});
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); C && renderLeft(); }, 200); };
 $("left").addEventListener("click", e => {
   const cellEl = e.target.closest("td[data-lib]");
   if (cellEl) { ui.lib = cellEl.dataset.lib; ui.lang = cellEl.dataset.lang; ui.file = null; renderLeft(); renderDetail(); return; }
+  if (e.target.closest("[data-toggle]")) { ui.serverCode = !ui.serverCode; renderLeft(); return; }
   const th = e.target.closest("[data-sort]");
   if (th) { ui.sort = th.dataset.sort; renderLeft(); return; }
   const tr = e.target.closest("tr[data-file]");
