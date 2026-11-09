@@ -56,9 +56,47 @@ async function fetchDeclarations(product, run) {
 const runInfo = (repo, run) => ({ repo, databaseId:run.id, headSha:run.head_sha, createdAt:run.created_at,
   url:run.html_url, branch:run.head_branch, conclusion:run.conclusion || run.status, name:run.name });
 
+// The newest passing run on main. When a newer run on main failed, the run
+// carries a note saying so, because the page is then showing older results.
 async function latestGreenRun(product) {
-  const r = await ghJson(`repos/${COMMONS}/actions/workflows/${product}-test-server.yml/runs?branch=main&status=success&per_page=1`);
-  return r.workflow_runs[0] && runInfo(COMMONS, r.workflow_runs[0]);
+  const runs = `repos/${COMMONS}/actions/workflows/${product}-test-server.yml/runs?branch=main&per_page=1`;
+  const [green, newest] = await Promise.all([ghJson(runs + "&status=success"), ghJson(runs + "&status=completed")]);
+  const run = green.workflow_runs[0] && runInfo(COMMONS, green.workflow_runs[0]);
+  const last = newest.workflow_runs[0];
+  if (run && last && last.id !== run.databaseId)
+    run.note = `newest main run: ${last.conclusion} (${last.head_sha.slice(0, 7)}), so this is the last passing one`;
+  return run;
+}
+
+// The PR / commit box is shared by every test server page in this browser
+// tab. The URL's ?run= wins; else the last value typed on any of the pages.
+const SOURCE_KEY = "testServerSource";
+function readSource() {
+  const q = new URLSearchParams(location.search).get("run");
+  return q !== null ? q : sessionStorage.getItem(SOURCE_KEY) || "";
+}
+function writeSource(value) {
+  value ? sessionStorage.setItem(SOURCE_KEY, value) : sessionStorage.removeItem(SOURCE_KEY);
+  const q = new URLSearchParams(location.search);
+  value ? q.set("run", value) : q.delete("run");
+  history.replaceState(null, "", "?" + q);
+}
+
+// Every page lists servers in the same order.
+const sortLangs = langs => [...langs].sort();
+
+const ago = iso => {
+  const min = (Date.now() - Date.parse(iso)) / 6e4;
+  return min < 60 ? `${Math.max(1, Math.round(min))} min ago` : min < 2880 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} days ago`;
+};
+const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+
+// One line naming the run a page shows: where, what commit, how it ended, when.
+function runLine(r) {
+  const ended = r.conclusion === "success" ? "passed" : `<b class="warn">${escHtml(r.conclusion)}</b>`;
+  return `<a href="${r.url}" target="_blank" title="${escHtml(r.name || "run")} ${r.databaseId}">${escHtml(r.repo.split("/")[1])}@${escHtml(r.branch || "")} · ${r.headSha.slice(0, 7)}</a>`
+    + ` · ${ended} · <span title="${r.createdAt.replace("T", " ").slice(0, 16)} UTC">${ago(r.createdAt)}</span>`
+    + (r.note ? ` · <b class="warn">${escHtml(r.note)}</b>` : "");
 }
 
 async function reportArtifact(repo, runId, product) {
@@ -296,7 +334,8 @@ async function fetchResults(product, run, progress) {
   // Bump the prefix when the stored shape changes, so old caches are ignored.
   const key = `v4:${run.repo}:${product}:${run.databaseId}`;
   const hit = await cacheGet(key);
-  if (hit) return hit;
+  // The cached run would carry the note from when it was cached.
+  if (hit) return { ...hit, run };
   const art = await reportArtifact(run.repo, run.databaseId, product);
   if (!art) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
   progress(`Downloading ${product} reports (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);

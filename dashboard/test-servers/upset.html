@@ -79,12 +79,12 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
-const ui = { source:new URLSearchParams(location.search).get("run") || "", filter:new Set(), open:null, unit:"cases" };
+const ui = { source:readSource(), filter:new Set(), open:null, unit:"cases" };
 const loaded = {};
 let D;
 
 function build(decl, results) {
-  const servers = decl.servers.map(s => s.language);
+  const servers = sortLangs(decl.servers.map(s => s.language));
   const li = Object.fromEntries(results.langs.map((l, i) => [l, i]));
   const sup = {};
   decl.servers.forEach(s => sup[s.language] = new Set(s.supported));
@@ -177,7 +177,7 @@ $("suite").innerHTML = Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).j
 $("suite").onchange = show;
 $("unit").onchange = e => { ui.unit = e.target.value; if (D) render(); };
 $("source").value = ui.source;
-$("source").onchange = e => { ui.source = e.target.value.trim(); const q = new URLSearchParams(location.search); ui.source ? q.set("run", ui.source) : q.delete("run"); history.replaceState(null, "", "?" + q); show(); };
+$("source").onchange = e => { ui.source = e.target.value.trim(); writeSource(ui.source); show(); };
 show();
 </script>
 </body>
