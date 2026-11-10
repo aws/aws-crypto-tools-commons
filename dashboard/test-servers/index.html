@@ -63,7 +63,7 @@
   .s-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
   .s-part { background:color-mix(in srgb,var(--part) 35%,transparent); }
   .s-fail { background:color-mix(in srgb,var(--fail) 40%,transparent); }
-  .s-none { color:var(--dim); border:1px dashed var(--line); }
+  .s-none { color:var(--dim); border:1px dashed var(--line); font-size:11px; }
   .s-zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
   .s-undecl { color:var(--dim); }
   .small { font-size:12px; font-weight:400; }
@@ -296,7 +296,9 @@ function verdictCell(c, attrs, compact) {
   const small = t => compact ? "" : `<small>${t}</small>`;
   if (c.state === "missing") return `<span class="cell s-missing" ${attrs}>?${small("neither list")}</span>`;
   if (c.state === "unsupported") return `<span class="cell s-undecl" ${attrs}>—</span>`;
-  if (c.ran === 0) return `<span class="cell s-none" ${attrs}>no runs</span>`;
+  // In a focus run, a pair with no focus server that supports the feature
+  // never runs. That is the run's scope, not a gap in the server.
+  if (c.ran === 0) return `<span class="cell s-none" ${attrs}>${S.focusRun ? "not in this run" : "no runs"}</span>`;
   if (c.pass === 0) return `<span class="cell s-zero" ${attrs}>0 passed${small(`${c.ran.toLocaleString()} ran`)}</span>`;
   if (c.fail) return `<span class="cell s-fail" ${attrs}>✗${small(`${c.fail.toLocaleString()} failed`)}</span>`;
   if (c.skip) return `<span class="cell s-part" ${attrs}>✓${small(`${c.skip.toLocaleString()} skipped`)}</span>`;
