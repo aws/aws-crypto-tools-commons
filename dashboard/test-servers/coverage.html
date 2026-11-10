@@ -355,12 +355,6 @@ async function loadLibrary(label) {
       files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
     await fetchCoverage(product, a.run, note, list => { a.covs = merge(list); redraw(); });
     a.phase = "done";
-    // Open the first cell with library code, so the page is never just a grid.
-    if (!ui.lib) {
-      const first = sortLangs((a.covs || []).map(c => c.language))
-        .map(l => a.covs.find(c => c.language === l)).find(c => c.files.some(x => !x.code));
-      if (first) { ui.lib = label; ui.lang = first.language; }
-    }
   } catch (err) {
     a.error = err.message || String(err);
     // No run yet is expected (CI still going, or nothing ran for this commit).
