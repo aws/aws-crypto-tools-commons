@@ -160,12 +160,26 @@
   .matrix th[data-spec] { cursor:pointer; } .matrix th[data-spec]:hover { color:var(--sel); }
   .loadtxt { color:var(--sel); }
   .empty { color:var(--dim); padding:20px; text-align:center; }
+  .prtag { display:inline-block; font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--sel); color:var(--sel); }
+  .matrix small.prtag { display:inline-block; margin-top:2px; }
+  #prline { font-size:12px; color:var(--dim); margin:0 0 10px; } #prline:empty { display:none; }
+  .warnb { color:#e3b341; }
+  a.pick { cursor:pointer; text-decoration:underline dotted; }
+  b.up { color:#56d364; font-size:11px; } b.down { color:#e3b341; font-size:11px; }
+  .reqm td.rm.chg { outline:2px solid var(--sel); outline-offset:-2px; }
+  .reqm td.rm.chg-lost, .reqm td.rm.chg-removed { outline-color:#e3b341; }
+  .chgbadge { font-size:10px; padding:0 6px; border-radius:8px; margin-right:4px; border:1px solid var(--sel); color:var(--sel); white-space:nowrap; float:left; margin-top:1px; }
+  .list .chgbadge { float:none; }
+  .chgbadge.chg-lost, .chgbadge.chg-removed { border-color:#e3b341; color:#e3b341; }
+  .chgline { font-size:12px; color:var(--sel); margin:2px 0 4px 16px; }
+  .chgline.chg-lost, .chgline.chg-removed { color:#e3b341; }
 </style>
 </head>
 <body>
 <header>
   <h1>Duvet Coverage</h1>
   <label>Library <select id="lib"></select></label>
+  <label title="Paste a PR in a duvet repo to see its reports against main. A commons PR shows the reports of the PRs whose Test-Server-Override names it.">PR <input type="text" id="source" size="34" placeholder="main; or paste a PR to compare"></label>
   <label>Find requirement <input type="text" id="search" placeholder="e.g. frame length"></label>
   <label><input type="checkbox" id="mustOnly"> MUST only</label>
   <span class="run">newest report each repo uploaded from its default branch</span>
@@ -173,6 +187,7 @@
 <main>
   <section id="left">
     <div class="verdict" id="verdict"></div>
+    <div id="prline"></div>
     <div class="legend" id="legend">
       <span>% = requirements with code and a test, implied, or an exception</span>
       <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 50%,transparent)"></i>✓ all</span>
@@ -222,6 +237,7 @@ const SOURCES = [
   { lib:"ESDK shim", lang:"c++", repo:RUST, artifact:"aws-esdk-cpp-duvet-report", dir:"esdk/shims/aws-esdk-cpp" },
 ].map(s => ({ ...s, key:s.lib + "|" + s.lang, state:s.artifact ? "queued" : "none" }));
 const LANGS = [...new Set(SOURCES.map(s => s.lang))];
+const DUVET_REPOS = [...new Set(SOURCES.filter(s => s.artifact).map(s => s.repo))];
 
 // ---------- loading ----------
 // duvet's HTML report carries its whole result as JSON in one script tag.
@@ -252,39 +268,124 @@ async function entryText(zip, e) {
   for (;;) { const { value, done } = await reader.read(); if (done) return text; text += value; }
 }
 
+// The newest unexpired artifact of one name that matches, reading up to
+// 500 of the newest artifacts of that name.
+async function findArtifact(repo, name, match) {
+  for (let page = 1; page <= 5; page++) {
+    const arts = (await ghJson(`repos/${repo}/actions/artifacts?name=${name}&per_page=100&page=${page}`)).artifacts;
+    const hit = arts.filter(a => !a.expired && a.workflow_run && match(a.workflow_run))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    if (hit || arts.length < 100) return hit || null;
+  }
+  return null;
+}
+
+async function readArtifact(src, art) {
+  const key = `duvet1:${src.repo}:${src.lib}:${art.id}`;
+  let specs = await cacheGet(key);
+  if (!specs) {
+    const zip = await (await gh(`repos/${src.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+    const e = zipEntries(zip).find(x => x.name.endsWith(".html"));
+    if (!e) throw new Error("the artifact has no HTML report");
+    specs = readReport(await entryText(zip, e), src);
+    await cachePut(key, specs);
+  }
+  return { specs, branch:art.workflow_run.head_branch, ref:art.workflow_run.head_sha, created:art.created_at,
+    run:`https://github.com/${src.repo}/actions/runs/${art.workflow_run.id}` };
+}
+
 const defaultBranch = {};
-async function loadSource(src) {
+async function loadMain(src) {
   try {
     src.state = "loading"; draw();
     const branch = defaultBranch[src.repo] ??= (await ghJson(`repos/${src.repo}`)).default_branch;
-    const arts = (await ghJson(`repos/${src.repo}/actions/artifacts?name=${src.artifact}&per_page=100`)).artifacts.filter(a => !a.expired);
-    const art = arts.filter(a => a.workflow_run && a.workflow_run.head_branch === branch)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    const art = await findArtifact(src.repo, src.artifact, r => r.head_branch === branch);
     if (!art) {
       src.state = "none";
-      src.why = `No ${src.artifact} from ${branch} in ${src.repo}` + (arts.length ? ", only from other branches." : ".") + (src.note ? " " + src.note : "");
+      src.why = `No ${src.artifact} from ${branch} in ${src.repo}.` + (src.note ? " " + src.note : "");
       return;
     }
-    const key = `duvet1:${src.repo}:${src.lib}:${art.id}`;
-    let specs = await cacheGet(key);
-    if (!specs) {
-      const zip = await (await gh(`repos/${src.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
-      const e = zipEntries(zip).find(x => x.name.endsWith(".html"));
-      if (!e) throw new Error("the artifact has no HTML report");
-      specs = readReport(await entryText(zip, e), src);
-      await cachePut(key, specs);
-    }
-    Object.assign(src, { state:"done", specs, branch, ref:art.workflow_run.head_sha, created:art.created_at,
-      run:`https://github.com/${src.repo}/actions/runs/${art.workflow_run.id}` });
+    src.main = await readArtifact(src, art);
+    src.state = "done";
   } catch (err) {
     src.state = "error"; src.why = "Could not load: " + (err.message || err);
   } finally { draw(); }
 }
 
+// ---------- a PR ----------
+// A PR in a duvet repo replaces that repo's columns with the reports from
+// the PR's CI. A commons PR makes no duvet report itself: its tests reach a
+// report through a language repo PR whose Test-Server-Override names it, so
+// those PRs are used instead.
+const pr = { text:"", state:"", note:"", pairs:[] };
+function parsePR(text) {
+  const m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/);
+  return m && { repo:m[1] || COMMONS, n:+m[2] };
+}
+async function loadPR(text) {
+  for (const s of SOURCES) { delete s.pr; delete s.prState; }
+  Object.assign(pr, { text, state:"", note:"", pairs:[], pick:{} });
+  if (!text) return draw();
+  const want = parsePR(text);
+  if (!want) { pr.state = "error"; pr.note = "Paste a pull request: a URL, owner/repo#N, or #N for commons."; return draw(); }
+  pr.state = "loading"; draw();
+  try {
+    const head = await ghJson(`repos/${want.repo}/pulls/${want.n}`);
+    pr.title = head.title; pr.url = head.html_url; pr.repo = want.repo; pr.n = want.n;
+    if (DUVET_REPOS.includes(want.repo)) pr.pairs = [{ repo:want.repo, n:want.n, head }];
+    else if (want.repo === COMMONS) {
+      const q = `"${COMMONS}#${want.n}" in:body is:pr is:open ` + DUVET_REPOS.map(r => "repo:" + r).join(" ");
+      const found = (await ghJson(`search/issues?q=${encodeURIComponent(q)}&per_page=20`)).items;
+      for (const it of found) {
+        const repo = it.repository_url.replace(/^.*\/repos\//, "");
+        pr.pairs.push({ repo, n:it.number, head:await ghJson(`repos/${repo}/pulls/${it.number}`) });
+      }
+      if (!pr.pairs.length) pr.note = `No open PR in a duvet repo has Test-Server-Override: ${COMMONS}#${want.n} yet, so no report shows this PR's tests.`;
+    } else pr.note = `${want.repo} uploads no duvet report.`;
+    // One PR per repo feeds its columns. With several (a stack), the lowest
+    // number is used first; the PR line lets you switch.
+    pr.pairs.sort((a, b) => a.n - b.n);
+
+    for (const p of pr.pairs) pr.pick[p.repo] ??= p.n;
+    draw();
+    await loadPicked();
+    pr.state = "done";
+  } catch (err) {
+    pr.state = "error"; pr.note = "Could not load the PR: " + (err.message || err);
+  }
+  draw();
+}
+function loadPicked(repo) {
+  return Promise.all(pr.pairs.filter(p => pr.pick[p.repo] === p.n && (!repo || p.repo === repo))
+    .flatMap(p => SOURCES.filter(s => s.repo === p.repo && s.artifact).map(s => loadPRSource(s, p))));
+}
+async function loadPRSource(src, p) {
+  delete src.pr;
+  src.prState = "loading"; draw();
+  try {
+    const sha = p.head.head.sha, branch = p.head.head.ref;
+    const art = await findArtifact(src.repo, src.artifact, r => r.head_sha === sha)
+      || await findArtifact(src.repo, src.artifact, r => r.head_branch === branch);
+    if (!art) { src.prState = "none"; return; }
+    src.pr = { ...await readArtifact(src, art), n:p.n, url:p.head.html_url,
+      older:art.workflow_run.head_sha !== sha };
+    src.prState = "done";
+  } catch (err) {
+    src.prState = "error"; src.prWhy = err.message || String(err);
+  } finally { draw(); }
+}
+
 // ---------- shared helpers ----------
-const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false };
-// Columns of the open library: a loaded report has r (its key) and specs.
-const cols = () => SOURCES.filter(s => s.lib === ui.lib).map(s => s.state === "done" ? Object.assign(s, { r:s.key }) : s);
+const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false, changedOnly:false };
+// Columns of the open library. A shown report has r (its key), specs, and
+// base: the main report when a PR report replaces it.
+function view(s) {
+  const d = s.pr || s.main;
+  if (!d) return s;
+  return { ...s, ...d, r:s.key, base:s.pr && s.main ? s.main : null, isPR:!!s.pr };
+}
+const cols = () => SOURCES.filter(s => s.lib === ui.lib).map(view);
+const prMode = () => SOURCES.some(s => s.pr);
 
 // What one requirement still needs. An implication or exception counts as done.
 function state(r) {
@@ -303,26 +404,48 @@ const keep = r => !ui.mustOnly || r.lvl === "MUST";
 // The same requirement in two reports: same spec, section and quote.
 const rkey = (s, r) => s + "|" + r.sec + "|" + r.q;
 const link = (c, f, n) => `https://github.com/${c.repo}/blob/${c.ref}/${c.dir ? c.dir + "/" : ""}${f}#L${n}`;
-const specsAll = () => [...new Set(cols().flatMap(c => Object.keys(c.specs || {})))].sort();
-const hasSpecs = c => c.r && Object.keys(c.specs).length > 0;
-function index(c) { // rkey -> requirement, per report
-  if (!c.specs) return new Map();
-  return c._idx ??= new Map(Object.entries(c.specs).flatMap(([s, sp]) => sp.reqs.map(r => [rkey(s, r), r])));
+const specKeys = c => [...Object.keys(c.specs || {}), ...Object.keys(c.base?.specs || {})];
+const specsAll = () => [...new Set(cols().flatMap(specKeys))].sort();
+const hasSpecs = c => c.r && specKeys(c).length > 0;
+const IDX = new WeakMap();
+function indexOf(specs) { // rkey -> requirement
+  if (!specs) return new Map();
+  if (!IDX.has(specs)) IDX.set(specs, new Map(Object.entries(specs).flatMap(([s, sp]) => sp.reqs.map(r => [rkey(s, r), r]))));
+  return IDX.get(specs);
 }
-// Every requirement in the library, once, in spec order.
+const index = c => indexOf(c.specs);
+// Every requirement in the library, once, in spec order. A PR's removed
+// requirements stay listed, so the change shows.
 function reqsOf(s) {
   const seen = new Map();
-  for (const c of cols()) for (const r of c.specs?.[s]?.reqs || []) if (keep(r) && !seen.has(rkey(s, r))) seen.set(rkey(s, r), r);
+  for (const c of cols()) for (const sp of [c.specs, c.base?.specs]) for (const r of sp?.[s]?.reqs || [])
+    if (keep(r) && !seen.has(rkey(s, r))) seen.set(rkey(s, r), r);
   return [...seen.values()];
 }
-const titleOf = s => cols().map(c => c.specs?.[s]?.title).find(Boolean);
-function stats(c, s) {
-  const rs = (c.specs?.[s]?.reqs || []).filter(keep), sts = rs.map(state);
+const titleOf = s => cols().map(c => c.specs?.[s]?.title || c.base?.specs?.[s]?.title).find(Boolean);
+function statsOf(specs, s) {
+  const rs = (specs?.[s]?.reqs || []).filter(keep), sts = rs.map(state);
   return { n:rs.length, done:sts.filter(isDone).length, exc:sts.filter(x => x === "exception").length };
 }
-function totals(c) {
-  return Object.keys(c.specs || {}).reduce((a, s) => { const x = stats(c, s); return { n:a.n + x.n, done:a.done + x.done }; }, { n:0, done:0 });
+const stats = (c, s) => statsOf(c.specs, s);
+function totalsOf(specs) {
+  return Object.keys(specs || {}).reduce((a, s) => { const x = statsOf(specs, s); return { n:a.n + x.n, done:a.done + x.done }; }, { n:0, done:0 });
 }
+// How one requirement changed from main to the PR, in one column.
+function change(c, k) {
+  if (!c.base) return null;
+  const b = indexOf(c.base.specs).get(k), x = index(c).get(k);
+  if (x && !b) return "new";
+  if (b && !x) return "removed";
+  if (!x) return null;
+  const was = isDone(state(b)), now = isDone(state(x));
+  if (now && !was) return "gained";
+  if (was && !now) return "lost";
+  return letters(b) !== letters(x) ? "changed" : null;
+}
+const CHANGE = { new:"new requirement", removed:"removed requirement", gained:"done in this PR", lost:"no longer done", changed:"annotations changed" };
+// "+3 vs main" for a cell whose done count moved.
+const delta = (now, was) => !was || now.done === was.done ? "" : ` <b class="${now.done > was.done ? "up" : "down"}">${now.done > was.done ? "▲" : "▼"}${Math.abs(now.done - was.done)}</b>`;
 // One green, brighter for more done. Not done yet is a heads-up, not a failure.
 const shade = p => `background:color-mix(in srgb,var(--pass) ${Math.round(6 + p * 44)}%,transparent)`;
 const spinner = `<i class="spin"></i>`;
@@ -337,45 +460,68 @@ function emptyHead(c) {
   const sub = c.state === "error" ? "failed to load" : c.state === "none" ? "no report on main" : "loading…";
   return `<th class="nr" title="${esc(c.why || "")}">${c.lang}<small>${sub}</small></th>`;
 }
+// Which report a column shows: the PR's, or main's (and why not the PR's).
+function srcTag(s) {
+  if (s.pr) return `<small class="prtag" title="${s.pr.older ? "From an older commit on the PR: the newest commit has no report yet" : ""}">PR #${s.pr.n}${s.pr.older ? " (older commit)" : ""}</small>`;
+  if (s.prState === "loading") return `<small class="loadtxt">${spinner}PR…</small>`;
+  if (s.prState === "none") return `<small title="This PR's CI uploaded no ${esc(s.artifact)}">main (no PR report)</small>`;
+  return "";
+}
 
 // ---------- overview: library × language ----------
 function renderOverview() {
-  const langs = LANGS.filter(l => SOURCES.some(s => s.lang === l));
-  let h = `<thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  let h = `<thead><tr><th></th>${LANGS.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
   for (const lib of Object.keys(LIBRARIES)) {
     h += `<tr><th data-lib="${esc(lib)}" class="libname">${lib}</th>`;
-    for (const l of langs) {
-      const c = SOURCES.find(s => s.lib === lib && s.lang === l);
-      if (!c) { h += `<td><span class="cell s-na">—</span></td>`; continue; }
-      if (c.state !== "done") { h += emptyCell(c); continue; }
-      const t = totals(c), p = t.n ? t.done / t.n : 0;
-      h += `<td><span class="cell" style="${shade(p)}" data-lib="${esc(lib)}" data-c="${esc(c.key)}" title="${t.done}/${t.n} requirements done">`
-        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small></span></td>`;
+    for (const l of LANGS) {
+      const s = SOURCES.find(x => x.lib === lib && x.lang === l);
+      if (!s) { h += `<td><span class="cell s-na">—</span></td>`; continue; }
+      const c = view(s);
+      if (!c.r) { h += emptyCell(c); continue; }
+      const t = totalsOf(c.specs), p = t.n ? t.done / t.n : 0, was = c.base && totalsOf(c.base.specs);
+      h += `<td><span class="cell${c.isPR ? " pr" : ""}" style="${shade(p)}" data-lib="${esc(lib)}" data-c="${esc(c.key)}" title="${t.done}/${t.n} requirements done${was ? ` (main: ${was.done}/${was.n})` : ""}">`
+        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}${delta(t, was)}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small>${srcTag(s)}</span></td>`;
     }
     h += `</tr>`;
   }
   $("matrix").innerHTML = h + `</tbody>`;
-  const loaded = SOURCES.filter(s => s.state === "done").length, going = SOURCES.filter(s => s.state === "loading" || s.state === "queued").length;
+  const loaded = SOURCES.filter(s => s.main).length, going = SOURCES.filter(s => s.state === "loading" || s.state === "queued").length;
   $("verdict").className = "line";
   $("verdict").innerHTML = `<b>${loaded}</b> duvet reports on main, over ${Object.keys(LIBRARIES).length} libraries`
     + (going ? ` · <span class="loadtxt">${spinner}loading ${going}…</span>` : "") + ` · click a cell to open its library`;
   $("lists").innerHTML = "";
 }
 
+// What the PR box is showing, in one line.
+function renderPRLine() {
+  if (!pr.text) { $("prline").innerHTML = ""; return; }
+  const shown = SOURCES.filter(s => s.pr);
+  let h = pr.url ? `<a href="${pr.url}" target="_blank">${esc(pr.repo)}#${pr.n}</a> ${esc(pr.title || "")}` : esc(pr.text);
+  if (pr.state === "loading") h += ` · <span class="loadtxt">${spinner}loading…</span>`;
+  if (pr.repo === COMMONS && pr.pairs.length)
+    h += ` · PRs that override to it: ${pr.pairs.map(p => pr.pick[p.repo] === p.n
+      ? `<b>${esc(p.repo.split("/")[1])}#${p.n}</b> <a href="${p.head.html_url}" target="_blank">↗</a>`
+      : `<a class="pick" data-pick="${esc(p.repo)}|${p.n}" title="Use this PR for ${esc(p.repo)}">${esc(p.repo.split("/")[1])}#${p.n}</a>`).join(", ")}`;
+  if (shown.length) h += ` · <span class="prtag">PR</span> columns show the PR's report, with ▲▼ against main; the rest show main`;
+  else if (pr.state === "done" && !pr.note) h += ` · this PR's CI uploaded no duvet report yet`;
+  if (pr.note) h += ` · <span class="warnb">${esc(pr.note)}</span>`;
+  $("prline").innerHTML = h;
+}
+
 // ---------- one library: spec × language ----------
 function cellHtml(c, s) {
   if (!c.r) return emptyCell(c);
-  if (!c.specs[s]) return `<td><span class="cell s-na">—</span></td>`;
-  const t = stats(c, s), p = t.n ? t.done / t.n : 0, all = t.done === t.n;
+  if (!c.specs[s] && !c.base?.specs?.[s]) return `<td><span class="cell s-na">—</span></td>`;
+  const t = stats(c, s), p = t.n ? t.done / t.n : 0, all = t.n && t.done === t.n, was = c.base && statsOf(c.base.specs, s);
   const on = ui.sel && ui.sel.s === s && ui.sel.c === c.r ? "sel" : "";
-  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}">${all ? "✓" : Math.floor(100 * p) + "%"}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
+  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}${was ? ` (main: ${was.done}/${was.n})` : ""}">${all ? "✓" : t.n ? Math.floor(100 * p) + "%" : "removed"}${delta(t, was)}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
 }
 
 function renderMatrix() {
   const C = cols(), specs = specsAll(), group = s => s.split("/")[0];
   const groups = [...new Set(specs.map(group))];
   const head = c => c.r
-    ? `<th><a href="${c.run}" target="_blank" title="CI run, ${c.created.slice(0, 10)}">${c.lang}</a><small>${c.repo.split("/")[1]}${c.dir ? "/" + c.dir : ""}</small><small>${esc(c.branch)} · ${c.ref.slice(0, 7)}</small></th>`
+    ? `<th><a href="${c.run}" target="_blank" title="CI run, ${c.created.slice(0, 10)}">${c.lang}</a><small>${c.repo.split("/")[1]}${c.dir ? "/" + c.dir : ""}</small><small>${esc(c.branch)} · ${c.ref.slice(0, 7)}</small>${srcTag(SOURCES.find(s => s.key === c.key))}</th>`
     : emptyHead(c);
   let h = `<thead><tr><th></th>${C.map(head).join("")}</tr></thead><tbody>`;
   if (!specs.length) h += `<tr><td colspan="${C.length + 1}" class="empty">${C.some(c => c.state === "loading" || c.state === "queued") ? "Loading reports…" : "No language has a report for this library on main."}</td></tr>`;
@@ -386,8 +532,8 @@ function renderMatrix() {
   }
   const total = c => {
     if (!hasSpecs(c)) return `<td class="nr"></td>`;
-    const t = totals(c);
-    return `<td><span class="cell s-na">${t.n ? Math.floor(100 * t.done / t.n) + "%" : ""}<small>${t.done}/${t.n}</small></span></td>`;
+    const t = totalsOf(c.specs);
+    return `<td><span class="cell s-na">${t.n ? Math.floor(100 * t.done / t.n) + "%" : ""}${delta(t, c.base && totalsOf(c.base.specs))}<small>${t.done}/${t.n}</small></span></td>`;
   };
   if (specs.length) h += `</tbody><tfoot><tr><th>All specs</th>${C.map(total).join("")}</tr></tfoot>`;
   $("matrix").innerHTML = h;
@@ -416,6 +562,13 @@ function annLines(c, r) {
     + (k === "T" && fromServer(f) ? ` <span class="pill">test server</span>` : "")
     + (why ? ` <span class="why">${esc(why)}</span>` : "") + `</div>`).join("") + `</div>`;
 }
+// What a PR changed for one requirement in one column, as a short line.
+function changeLine(c, k) {
+  const ch = change(c, k);
+  if (!ch) return "";
+  const b = indexOf(c.base.specs).get(k);
+  return `<div class="chgline chg-${ch}">PR: ${CHANGE[ch]}${b ? ` · main had ${letters(b) || "nothing"}` : ""}</div>`;
+}
 
 // One requirement, side by side in every language.
 function compareView(s, r) {
@@ -426,7 +579,7 @@ function compareView(s, r) {
   for (const c of cols()) {
     if (!c.r) { h += `<div class="lang"><h4>${c.lang} <span class="st none">no report</span></h4><div class="why">${esc(c.why || "")}</div></div>`; continue; }
     const x = index(c).get(k), st = state(x);
-    h += `<div class="lang"><h4>${c.lang} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>`
+    h += `<div class="lang"><h4>${c.lang}${c.isPR ? ` <span class="prtag">PR #${c.n}</span>` : ""} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>${changeLine(c, k)}`
       + (x ? annLines(c, x) : `<div class="why">${hasSpecs(c) ? "This report does not list this requirement." : esc(c.why || "")}</div>`) + `</div>`;
   }
   return h;
@@ -437,13 +590,13 @@ const letters = r => r ? [...new Set(r.ann.map(a => a[0]))].sort((x, y) => "CTIE
 function rmCell(c, s, r) {
   const on = c.r && c.r === ui.lang ? " on" : "";
   if (!c.r) return `<td class="rm none${on}" title="${c.lang}: no report on main"></td>`;
-  const x = index(c).get(rkey(s, r)), st = state(x);
-  return `<td class="rm ${st}${on}" title="${c.lang}: ${STATE_LABEL[st]}">${letters(x)}</td>`;
+  const k = rkey(s, r), x = index(c).get(k), st = state(x), ch = change(c, k);
+  return `<td class="rm ${st}${on}${ch ? " chg chg-" + ch : ""}" title="${c.lang}: ${STATE_LABEL[st]}${ch ? " · PR: " + CHANGE[ch] : ""}">${letters(x)}</td>`;
 }
 // Section header: how much of the section each language has done.
 function secCell(c, s, list) {
   const on = c.r && c.r === ui.lang ? " on" : "";
-  if (!hasSpecs(c) || !c.specs[s]) return `<td class="rm none${on}"></td>`;
+  if (!hasSpecs(c) || (!c.specs[s] && !c.base?.specs?.[s])) return `<td class="rm none${on}"></td>`;
   const xs = list.map(r => state(index(c).get(rkey(s, r)))).filter(x => x !== "na");
   if (!xs.length) return `<td class="rm na${on}"></td>`;
   const d = xs.filter(isDone).length;
@@ -451,30 +604,34 @@ function secCell(c, s, list) {
 }
 // The open row: what the chosen language has, with tabs for the others.
 function rowDetail(s, r) {
-  const C = cols(), withR = C.filter(c => c.r);
+  const C = cols(), withR = C.filter(c => c.r), k = rkey(s, r);
   const c = withR.find(x => x.r === ui.lang) || withR[0];
   const tabs = C.map(o => o.r
-    ? `<span class="tab${o === c ? " on" : ""}" data-lang="${esc(o.r)}"><i class="ld ${state(index(o).get(rkey(s, r)))}"></i>${o.lang}</span>`
+    ? `<span class="tab${o === c ? " on" : ""}" data-lang="${esc(o.r)}"><i class="ld ${state(index(o).get(k))}"></i>${o.lang}</span>`
     : `<span class="tab off" title="${esc(o.why || "")}"><i class="ld none"></i>${o.lang}</span>`).join("");
-  const x = c && index(c).get(rkey(s, r));
-  const body = !c ? "" : x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`;
+  const x = c && index(c).get(k);
+  const body = !c ? "" : changeLine(c, k) + (x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`);
   return `<tr class="open"><td colspan="${C.length + 1}"><div class="quote">${esc(plain(r.q))}</div>
-    <div class="tabs">${tabs}<span class="tab cmp" data-req="${esc(rkey(s, r))}">Compare all languages ⤢</span></div>${body}</td></tr>`;
+    <div class="tabs">${tabs}<span class="tab cmp" data-req="${esc(k)}">Compare all languages ⤢</span></div>${body}</td></tr>`;
 }
 function specView(s) {
   const C = cols(), rs = reqsOf(s);
   const gap = r => C.some(c => { const st = hasSpecs(c) && c.specs[s] ? state(index(c).get(rkey(s, r))) : "na"; return st !== "na" && !isDone(st); });
-  const shown = ui.gapsOnly ? rs.filter(gap) : rs;
+  const changed = r => C.some(c => change(c, rkey(s, r)));
+  const shown = rs.filter(r => (!ui.gapsOnly || gap(r)) && (!ui.changedOnly || changed(r)));
+  const anyPR = C.some(c => c.base);
   let h = `<h2>${esc(titleOf(s))}</h2><div class="sub">${esc(s)} · ${rs.length} requirements · click a row for details
-    <label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="gapsOnly" ${ui.gapsOnly ? "checked" : ""}> Only gaps</label></div>
-    <table class="reqm"><thead><tr><th></th>${C.map(c => `<th class="${c.r && c.r === ui.lang ? "on" : ""}" ${c.r ? `data-lang="${esc(c.r)}"` : ""}>${c.lang}</th>`).join("")}</tr></thead><tbody>`;
+    <label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="gapsOnly" ${ui.gapsOnly ? "checked" : ""}> Only gaps</label>
+    ${anyPR ? `<label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="changedOnly" ${ui.changedOnly ? "checked" : ""}> Only what the PR changed (${rs.filter(changed).length})</label>` : ""}</div>
+    <table class="reqm"><thead><tr><th></th>${C.map(c => `<th class="${c.r && c.r === ui.lang ? "on" : ""}" ${c.r ? `data-lang="${esc(c.r)}"` : ""}>${c.lang}${c.isPR ? `<br><span class="prtag">PR</span>` : ""}</th>`).join("")}</tr></thead><tbody>`;
   for (const sec of [...new Set(rs.map(r => r.sec))]) {
     const all = rs.filter(r => r.sec === sec), list = shown.filter(r => r.sec === sec);
     if (!list.length) continue;
     h += `<tr class="secrow"><th>${esc(sec)}</th>${C.map(c => secCell(c, s, all)).join("")}</tr>`;
     for (const r of list) {
-      const k = rkey(s, r);
-      h += `<tr class="rrow${ui.open === k ? " opened" : ""}" data-row="${esc(k)}"><th><span class="pill ${r.lvl}">${r.lvl ? r.lvl[0] : "—"}</span> <span class="q">${esc(plain(r.q))}</span></th>${C.map(c => rmCell(c, s, r)).join("")}</tr>`;
+      const k = rkey(s, r), chs = [...new Set(C.map(c => change(c, k)).filter(Boolean))];
+      const badge = chs.map(ch => `<span class="chgbadge chg-${ch}">${CHANGE[ch]}</span>`).join("");
+      h += `<tr class="rrow${ui.open === k ? " opened" : ""}" data-row="${esc(k)}"><th><span class="pill ${r.lvl}">${r.lvl ? r.lvl[0] : "—"}</span> ${badge}<span class="q">${esc(plain(r.q))}</span></th>${C.map(c => rmCell(c, s, r)).join("")}</tr>`;
       if (ui.open === k) h += rowDetail(s, r);
     }
   }
@@ -500,8 +657,16 @@ function renderDetail() {
 
 function renderLists() {
   const C = cols().filter(hasSpecs);
+  // Every requirement a PR changed, over the whole library.
+  const prRows = C.filter(c => c.base).flatMap(c => {
+    const keys = new Set([...index(c).keys(), ...indexOf(c.base.specs).keys()]);
+    return [...keys].map(k => ({ c, k, ch:change(c, k), r:index(c).get(k) || indexOf(c.base.specs).get(k) })).filter(x => x.ch && keep(x.r));
+  });
+  let h = "";
+  if (prRows.length) h += `<details class="fold" open><summary>What the PR changed <small>· ${prRows.length} requirements</small></summary><table class="list"><tr><th>Language</th><th>Change</th><th>Section</th><th>Requirement</th></tr>${prRows.map(x =>
+    `<tr data-req="${esc(x.k)}" style="cursor:pointer"><td>${x.c.lang}</td><td><span class="chgbadge chg-${x.ch}">${CHANGE[x.ch]}</span></td><td>${esc(x.r.sec)}</td><td>${esc(plain(x.r.q))}</td></tr>`).join("")}</table></details>`;
   const exc = C.flatMap(c => [...index(c)].filter(([, r]) => state(r) === "exception" && keep(r)).map(([k, r]) => ({ c, k, r })));
-  let h = `<details class="fold"><summary>Exceptions <small>· ${exc.length} across languages</small></summary><table class="list"><tr><th>Language</th><th>Section</th><th>Requirement</th><th>Why</th></tr>${exc.map(x =>
+  h += `<details class="fold"><summary>Exceptions <small>· ${exc.length} across languages</small></summary><table class="list"><tr><th>Language</th><th>Section</th><th>Requirement</th><th>Why</th></tr>${exc.map(x =>
     `<tr data-req="${esc(x.k)}" style="cursor:pointer"><td>${x.c.lang}</td><td>${esc(x.r.sec)}</td><td>${esc(plain(x.r.q))}</td><td class="why">${esc(x.r.ann.find(a => a[0] === "E")[3])}</td></tr>`).join("")}</table></details>`;
   const files = {};
   for (const c of C) for (const r of index(c).values()) for (const [k, f] of r.ann) if (k === "T") { const t = files[c.r + "|" + f] ??= { c, f, n:0 }; t.n++; }
@@ -520,7 +685,7 @@ function draw() {
 }
 function render() {
   $("search").disabled = !ui.lib;
-  $("legend").style.display = "";
+  renderPRLine();
   if (!ui.lib) { renderOverview(); renderDetail(); return; }
   renderTop(); renderMatrix(); renderLists(); renderDetail();
 }
@@ -545,6 +710,8 @@ $("matrix").onclick = e => {
   ui.sel = { s, c:c && c.dataset.c }; ui.lang = c ? c.dataset.c : ui.lang; ui.open = null; ui.req = null; ui.search = ""; $("search").value = ""; render();
 };
 document.body.addEventListener("click", e => {
+  const pk = e.target.closest("[data-pick]");
+  if (pk) { const [repo, n] = pk.dataset.pick.split("|"); pr.pick[repo] = +n; draw(); loadPicked(repo); return; }
   if (e.target.closest("[data-home]")) { openLib(""); return; }
   if (e.target.closest("[data-close]")) { ui.sel = ui.req = null; ui.search = ""; $("search").value = ""; render(); return; }
   if (e.target.closest("[data-back]")) {
@@ -559,9 +726,15 @@ document.body.addEventListener("click", e => {
   const rq = e.target.closest("[data-req]");
   if (rq) { ui.req = rq.dataset.req; renderDetail(); $("detail").scrollTop = 0; }
 });
-document.body.addEventListener("change", e => { if (e.target.id === "gapsOnly") { ui.gapsOnly = e.target.checked; renderDetail(); } });
+document.body.addEventListener("change", e => {
+  if (e.target.id === "gapsOnly") { ui.gapsOnly = e.target.checked; renderDetail(); }
+  if (e.target.id === "changedOnly") { ui.changedOnly = e.target.checked; renderDetail(); }
+});
 let t; $("search").oninput = e => { clearTimeout(t); t = setTimeout(() => { ui.search = e.target.value.trim(); ui.req = null; renderDetail(); }, 200); };
 $("mustOnly").onchange = e => { ui.mustOnly = e.target.checked; render(); };
+// The PR box is shared with the test server pages. Anything that is not a
+// pull request (a commit or a run) is for those pages and is ignored here.
+$("source").onchange = e => { const v = e.target.value.trim(); writeSource(v); loadPR(parsePR(v) ? v : ""); };
 
 if (!localStorage.getItem("github-dashboard-token")) {
   $("verdict").innerHTML = "Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).";
@@ -569,7 +742,10 @@ if (!localStorage.getItem("github-dashboard-token")) {
   const lib = new URLSearchParams(location.search).get("lib") || "";
   openLib(LIBRARIES[lib] ? lib : "");
   // Reports are a few hundred KB each, so load them all at once.
-  SOURCES.filter(s => s.artifact).forEach(loadSource);
+  SOURCES.filter(s => s.artifact).forEach(loadMain);
+  const start = readSource();
+  $("source").value = start;
+  if (parsePR(start)) loadPR(start);
 }
 </script>
 </body>
