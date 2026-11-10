@@ -35,6 +35,7 @@
   .verdict { font-size:15px; font-weight:600; margin:0 0 10px; }
   .verdict.bad { color:#ffa198; } .verdict.good { color:#56d364; }
   .verdict small { color:var(--dim); font-weight:400; font-size:13px; }
+  .verdict a { color:inherit; cursor:pointer; text-decoration:underline dotted; }
   .matrix tr.group th { text-align:left; padding:10px 10px 4px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); cursor:default; border-left:0; border-right:0; background:var(--bg); }
   .matrix tr.group th:hover { color:var(--dim); }
   .info { cursor:help; color:var(--dim); border:1px solid var(--line); border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
@@ -48,14 +49,15 @@
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:12px; }
   .legend span { display:flex; align-items:center; gap:5px; }
   .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
-  table.matrix { border-collapse:collapse; width:100%; }
+  table.matrix { border-collapse:collapse; }
+  .matrix td { min-width:84px; }
   .matrix th, .matrix td { border:1px solid var(--line); padding:0; text-align:center; }
   .matrix thead th { padding:6px 4px; font-weight:600; font-size:12px; cursor:pointer; position:sticky; top:-16px; background:var(--bg); z-index:1; }
   .matrix thead th.focus { color:var(--sel); }
   .matrix tbody th { text-align:left; padding:6px 10px; font-weight:500; white-space:nowrap; cursor:pointer; }
   .matrix tbody th:hover { color:var(--sel); }
   .matrix tbody th.bucket { color:var(--dim); font-style:italic; }
-  .cell { display:block; padding:7px 4px; cursor:pointer; font-size:12px; font-variant-numeric:tabular-nums; }
+  .cell { display:block; padding:5px 6px; cursor:pointer; font-size:14px; line-height:1.2; font-variant-numeric:tabular-nums; }
   .cell:hover { outline:2px solid var(--sel); outline-offset:-2px; }
   .cell.selected { outline:2px solid #fff; outline-offset:-2px; }
   .s-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
@@ -65,6 +67,7 @@
   .s-zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
   .s-undecl { color:var(--dim); }
   .small { font-size:12px; font-weight:400; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:6px; }
   .cell small { display:block; font-size:10px; color:var(--dim); }
   .matrix td.selected > .cell { outline:2px solid #fff; outline-offset:-2px; }
   .matrix thead th.role { font-weight:400; font-size:10px; color:var(--dim); padding:2px; }
@@ -143,6 +146,7 @@
   <section id="left">
     <div id="status"></div>
     <div class="verdict" id="verdict"></div>
+    <div class="sub" id="focusNote"></div>
     <div class="summary" id="summary"></div>
     <div class="legend">
       <span><i class="sw s-pass"></i>✓ all pass</span>
@@ -198,7 +202,15 @@ function loadSuite(name, d, r) {
     const none = !c.f.length || (c.lf && Object.values(c.lf).some(m => Object.keys(m).some(k => k.endsWith("|"))));
     [...c.f, ...(none ? [NONE] : [])].forEach(f => (byFeature[f] ??= []).push(c));
   });
-  S = { gateLog:!!r.gateLog, bugCatalog:d.bugCatalog || {}, name, servers, li, decl, src, features, byFeature, run:r.run, cases:r.cases, langs:r.langs };
+  // A language repository's CI runs only the pairs that involve its own
+  // servers. Those are the servers paired with every other server.
+  const partners = {};
+  for (const c of r.cases) for (const k of Object.keys(c.p || {})) {
+    const [e, dd] = k.split(">");
+    (partners[e] ??= new Set()).add(dd); (partners[dd] ??= new Set()).add(e);
+  }
+  const focusRun = servers.filter(s => servers.every(o => o === s || partners[s]?.has(o)));
+  S = { focusRun:focusRun.length && focusRun.length < servers.length ? focusRun : null, gateLog:!!r.gateLog, bugCatalog:d.bugCatalog || {}, name, servers, li, decl, src, features, byFeature, run:r.run, cases:r.cases, langs:r.langs };
 }
 
 const declState = (s, f) => f === NONE ? "n/a" : S.decl[s + "|" + f] || "missing";
@@ -248,10 +260,13 @@ function renderHeader() {
   $("linkNote").innerHTML = S.gateLog ? ""
     : `<b style="color:#e3b341">This run has no feature-gate log</b> (it predates <a href="https://github.com/aws/aws-crypto-tools-commons/pull/69" target="_blank">commons #69</a>). Only feature-gate skips name a feature, so most passing tests show under "${NONE}".`;
   $("run").innerHTML = runLine(r);
+  $("focusNote").textContent = S.focusRun
+    ? `This run only tested pairs that involve ${S.focusRun.join(" and ")}, so the other servers show fewer runs than on commons main.` : "";
 }
 
 function renderSummary() {
   const s = ui.focus, unit = s ? "features" : "pairs";
+  const units = n => `${n} ${n === 1 ? unit.slice(0, -1) : unit}`;
   const st = S.features.filter(f => f !== NONE).flatMap(f => (s ? [s] : S.servers).map(srv => cellStats(srv, f)));
   const supported = st.filter(c => c.state === "supported");
   const n = cls => supported.filter(c => c.cls === cls).length;
@@ -260,9 +275,9 @@ function renderSummary() {
   const bad = failing + zero;
   $("verdict").className = "verdict " + (bad ? "bad" : "good");
   $("verdict").innerHTML = bad
-    ? `✗ ${bad} supported ${unit} fail${s ? ` on ${esc(s)}` : ""}`
+    ? `<a data-problems="1" title="Show what fails">✗ ${units(bad)} ${bad === 1 ? "fails" : "fail"}${s ? ` on ${esc(s)}` : ""}</a>`
     : `✓ Every supported test that ran passed${s ? ` on ${esc(s)}` : ""}` +
-      (skipped ? ` <small>· ${skipped} ${unit} have skips (${all[4].toLocaleString()} runs)</small>` : "");
+      (skipped ? ` <small>· ${units(skipped)} ${skipped === 1 ? "has" : "have"} skips (${all[4].toLocaleString()} runs)</small>` : "");
   const card = (label, value, sub, tip, color = "") =>
     `<div class="card" title="${tip}"><small>${label}</small><b style="color:${color}">${value}</b><small>${sub}</small></div>`;
   $("summary").innerHTML =
@@ -468,6 +483,17 @@ function renderTree(cases, keyPrefix) {
   }
   return h || '<div class="empty">Nothing here.</div>';
 }
+
+// The failing verdict opens the one failing cell, or lists every row with a problem.
+$("verdict").addEventListener("click", e => {
+  if (!e.target.closest("[data-problems]")) return;
+  const bad = S.features.filter(f => f !== NONE).flatMap(f => (ui.focus ? [ui.focus] : S.servers).map(s => ({ f, s, c:cellStats(s, f) })))
+    .filter(x => x.c.state === "supported" && (x.c.cls === "s-fail" || x.c.cls === "s-zero"));
+  if (bad.length === 1) { ui.sel = { f:bad[0].f, s:bad[0].s }; ui.focus = bad[0].s; $("focus").value = ui.focus; }
+  else { ui.onlyProblems = true; $("onlyProblems").checked = true; }
+  ui.search = ""; ui.reason = null; ui.openCase = null; ui.open.clear(); ui.shown = {};
+  render();
+});
 
 // The detail pane only takes space once something is picked.
 function renderDetail() {

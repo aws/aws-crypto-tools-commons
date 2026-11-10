@@ -99,11 +99,15 @@ function runLine(r) {
     + (r.note ? ` · <b class="warn">${escHtml(r.note)}</b>` : "");
 }
 
-async function reportArtifact(repo, runId, product) {
+// A run can upload one report artifact per job under the same name: the Rust
+// repository runs the ESDK test server once with focus rust and once with
+// focus rust-cpp. Every one of them is part of the run's results.
+async function reportArtifacts(repo, runId, product) {
   const arts = await ghJson(`repos/${repo}/actions/runs/${runId}/artifacts?per_page=100`);
   return arts.artifacts.filter(a => a.name === `${product}-test-server-reports` && !a.expired)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
+const reportArtifact = async (repo, runId, product) => (await reportArtifacts(repo, runId, product))[0];
 
 // Turns what the user typed into the newest finished run (passed or failed)
 // that uploaded this product's reports:
@@ -274,8 +278,9 @@ function addTestcase(cases, attrs, body, gateLog) {
   const status = sk ? 2 : fl ? 1 : 0;
   const msg = sk ? attr(sk[1], "message") || "" : "";
   const blamed = new Set(msg.match(LABEL) || []);
-  const gated = msg.startsWith("feature-gated");
-  if (gated) featuresIn(msg).forEach(f => c.f.add(f));
+  // A padding gate skip is a missing capability too, like a feature gate skip.
+  const gated = msg.startsWith("feature-gated") || msg.startsWith("padding-gated");
+  if (msg.startsWith("feature-gated")) featuresIn(msg).forEach(f => c.f.add(f));
   for (const lab of labels.length ? labels : ["(none)"]) {
     const l = langOf(lab), r = c.langs[l] ??= [0, 0, 0, 0, 0];
     const idx = status !== 2 ? status : blamed.size && !blamed.has(lab) ? 3 : gated ? 2 : 4;
@@ -332,26 +337,31 @@ async function scanXml(stream, cases, gateLog) {
 
 async function fetchResults(product, run, progress) {
   // Bump the prefix when the stored shape changes, so old caches are ignored.
-  const key = `v4:${run.repo}:${product}:${run.databaseId}`;
+  const key = `v5:${run.repo}:${product}:${run.databaseId}`;
   const hit = await cacheGet(key);
   // The cached run would carry the note from when it was cached.
   if (hit) return { ...hit, run };
-  const art = await reportArtifact(run.repo, run.databaseId, product);
-  if (!art) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
-  progress(`Downloading ${product} reports (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);
-  const zip = await (await gh(`repos/${run.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
-  const entries = zipEntries(zip);
-  const xmls = entries.filter(e => /test-results\/.*TEST-[^/]*\.xml$/.test(e.name));
-  const logEntry = entries.find(e => /test-results\/feature-gate-log\.jsonl$/.test(e.name));
-  let gateLog = null;
-  if (logEntry) {
-    progress(`Reading ${product} feature-gate log…`);
-    gateLog = await readGateLog(entryStream(zip, logEntry));
-  }
+  const arts = await reportArtifacts(run.repo, run.databaseId, product);
+  if (!arts.length) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
   const cases = new Map();
-  for (const [i, e] of xmls.entries()) {
-    progress(`Reading ${product} results ${i + 1}/${xmls.length}: ${e.name.split("/").pop()}`);
-    await scanXml(entryStream(zip, e), cases, gateLog);
+  let gateLog = null;
+  for (const [n, art] of arts.entries()) {
+    const of = arts.length > 1 ? ` ${n + 1}/${arts.length}` : "";
+    progress(`Downloading ${product} reports${of} (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);
+    const zip = await (await gh(`repos/${run.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+    const entries = zipEntries(zip);
+    const xmls = entries.filter(e => /test-results\/.*TEST-[^/]*\.xml$/.test(e.name));
+    const logEntry = entries.find(e => /test-results\/feature-gate-log\.jsonl$/.test(e.name));
+    // Each artifact's gate log names the runs in that artifact's XML.
+    let log = null;
+    if (logEntry) {
+      progress(`Reading ${product} feature-gate log${of}…`);
+      log = gateLog = await readGateLog(entryStream(zip, logEntry));
+    }
+    for (const [i, e] of xmls.entries()) {
+      progress(`Reading ${product} results${of}, file ${i + 1}/${xmls.length}: ${e.name.split("/").pop()}`);
+      await scanXml(entryStream(zip, e), cases, log);
+    }
   }
   const langs = [...new Set([...cases.values()].flatMap(c => Object.keys(c.langs)))].sort();
   // src: "log" = features from the gate log; "g" = only from gate skip
