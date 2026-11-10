@@ -242,7 +242,9 @@ class GitHubDashboard {
         }
 
         if (section === 'duvet') {
-            // Duvet section is static, no data loading needed
+            // The duvet page fetches its own reports, so load the frame once.
+            const frame = document.getElementById('duvetFrame');
+            if (!frame.getAttribute('src')) frame.src = 'duvet/index.html';
             return;
         }
 

@@ -125,6 +125,9 @@
   .pill.bad { color:#ffa198; border-color:var(--fail); }
   .pill.warn { color:#e3b341; border-color:var(--part); }
   .more { padding:4px 24px; color:var(--sel); cursor:pointer; font-size:12px; }
+  .matrix th.libname { cursor:pointer; font-weight:600; } .matrix th.libname:hover { color:var(--sel); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spin { display:inline-block; width:9px; height:9px; margin-right:5px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; }
 </style>
 </head>
 <body>
@@ -147,7 +150,7 @@
     <div class="verdict" id="verdict"></div>
     <div class="sub" id="focusNote"></div>
     <div class="summary" id="summary"></div>
-    <div class="legend">
+    <div class="legend" id="legend">
       <span><i class="sw s-pass"></i>✓ all pass</span>
       <span><i class="sw s-part"></i>✓ some skipped</span>
       <span><i class="sw s-fail"></i>✗ some fail</span>
@@ -675,9 +678,98 @@ async function selectSuite(name) {
   if (bad.length) console.warn("feature-config.json not readable for", bad.map(s => `${s}: ${S.src[s].error}`));
   return true;
 }
-const show = async name => { if (await selectSuite(name)) render(); };
+const show = async name => {
+  if (!name) return showOverview();
+  $("legend").style.display = ""; $("detail").style.display = "";
+  if (await selectSuite(name)) render();
+};
 
-$("suite").innerHTML = Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
+// ---- overview: every library × every server ----
+// One cell per library and server: that server's runs in the library's test
+// server run, over every feature. Libraries load one at a time, since each
+// report zip is tens of MB.
+const OVERVIEW = {};
+async function showOverview() {
+  $("legend").style.display = "none";
+  ui.sel = null; renderDetail();
+  if (!localStorage.getItem("github-dashboard-token")) {
+    status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).");
+    return;
+  }
+  const draw = () => { if (!$("suite").value) renderOverview(); };
+  for (const name of Object.keys(PRODUCTS)) OVERVIEW[name] ??= { state:"queued" };
+  draw();
+  for (const name of Object.keys(PRODUCTS)) {
+    const o = OVERVIEW[name], key = name + "|" + ui.source;
+    if (o.state === "done" && o.source === ui.source) continue;
+    o.state = "loading"; o.source = ui.source; draw();
+    try {
+      loaded[key] ??= await loadProduct(name, msg => { o.step = msg; draw(); }, ui.source);
+      const r = loaded[key].results;
+      o.run = r.run;
+      o.servers = Object.fromEntries(r.langs.filter(l => l !== "(none)").map((l, i) => {
+        const t = [0, 0, 0, 0, 0], li = r.langs.indexOf(l);
+        for (const c of r.cases) for (let k = 0; k < 5; k++) t[k] += c.r[li][k];
+        return [l, t];
+      }));
+      o.state = "done";
+    } catch (err) {
+      delete loaded[key];
+      o.error = err.message || String(err);
+      o.state = /^no (finished|successful) run/.test(o.error) ? "norun" : "error";
+    }
+    draw();
+  }
+}
+
+function renderOverview() {
+  status("");
+  $("summary").innerHTML = ""; $("focusNote").innerHTML = ""; $("linkNote").innerHTML = ""; $("skips").innerHTML = "";
+  const names = Object.keys(PRODUCTS);
+  const langs = sortLangs(new Set(names.flatMap(n => Object.keys(OVERVIEW[n]?.servers || {}))));
+  const done = names.filter(n => OVERVIEW[n]?.state === "done");
+  const failing = done.flatMap(n => Object.entries(OVERVIEW[n].servers).filter(([, t]) => t[1]).map(([l]) => `${n} ${l}`));
+  $("verdict").className = "verdict " + (failing.length ? "bad" : "good");
+  $("verdict").innerHTML = !done.length ? "" : failing.length
+    ? `✗ ${failing.length} failing: ${failing.map(esc).join(", ")}`
+    : `✓ Every test that ran passed <small>· ${done.length} of ${names.length} libraries loaded</small>`;
+  let h = `<thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const n of names) {
+    const o = OVERVIEW[n] || { state:"queued" };
+    const run = o.run ? ` <a class="small" href="${o.run.url}" target="_blank" title="${esc(o.run.branch || "")} · ${o.run.headSha.slice(0, 7)}">run</a>` : "";
+    h += `<tr><th data-lib="${esc(n)}" class="libname">${n}${run}</th>`;
+    if (o.state !== "done") {
+      const text = o.state === "loading" ? `<span class="spin"></span>${esc(o.step || "loading")}`
+        : o.state === "queued" ? "waiting" : o.state === "norun" ? "no run yet" : "failed";
+      h += `<td colspan="${Math.max(langs.length, 1)}"><span class="cell s-none" title="${esc(o.error || "")}">${text}</span></td></tr>`;
+      continue;
+    }
+    for (const l of langs) {
+      const t = o.servers[l];
+      if (!t) { h += `<td><span class="cell s-undecl">—</span></td>`; continue; }
+      const [p, f, , , k] = t, ran = p + f + k;
+      const cls = !ran ? "s-none" : f ? "s-fail" : k ? "s-part" : "s-pass";
+      const big = !ran ? "no runs" : f ? "✗" : "✓";
+      const small = f ? `${f.toLocaleString()} failed` : k ? `${k.toLocaleString()} skipped` : p.toLocaleString();
+      h += `<td><span class="cell ${cls}" data-lib="${esc(n)}" data-s="${l}" title="${p.toLocaleString()} passed · ${f} failed · ${k.toLocaleString()} skipped · ${t[2].toLocaleString()} not supported">${big}<small>${small}</small></span></td>`;
+    }
+    h += `</tr>`;
+  }
+  $("matrix").innerHTML = h + `</tbody>`;
+  $("run").innerHTML = "";
+}
+
+// Opening a library from the overview focuses the clicked server.
+async function openLibrary(name, server) {
+  $("suite").value = name;
+  if (await selectSuite(name)) {
+    if (server && S.servers.includes(server)) { ui.focus = server; $("focus").value = server; }
+    $("legend").style.display = "";
+    render();
+  }
+}
+
+$("suite").innerHTML = `<option value="">All libraries</option>` + Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
 $("suite").onchange = e => show(e.target.value);
 $("source").value = ui.source;
 $("source").onchange = e => {
@@ -692,6 +784,11 @@ $("upsetLink").onclick = () => { $("upsetLink").href = "upset.html?run=" + encod
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); ui.open.clear(); renderDetail(); }, 250); };
 $("matrix").onclick = e => {
+  if (!$("suite").value) {
+    const t = e.target.closest("[data-lib]");
+    if (t && !e.target.closest("a")) openLibrary(t.dataset.lib, t.dataset.s);
+    return;
+  }
   const c = e.target.closest(".cell"), fh = e.target.closest("tbody th[data-feature]"), sh = e.target.closest("thead th[data-server]");
   if (c) { ui.sel = { f:c.dataset.f, s:c.dataset.s }; ui.focus = c.dataset.s; }
   else if (fh) ui.sel = { f:fh.dataset.feature };

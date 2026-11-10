@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Duvet Coverage</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd; --impl:#a371f7; --test:#39c5cf; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  input[type=text], select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  .mock { color:#e3b341; font-size:11px; border:1px solid var(--part); border-radius:8px; padding:0 6px; }
+  main { display:grid; grid-template-columns:minmax(0,1fr); height:calc(100vh - 52px); }
+  main.open { grid-template-columns:minmax(0,1fr) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
+  section { overflow:auto; padding:16px 20px; }
+  #detail { background:var(--panel); }
+  #divider { background:var(--line); }
+  .close { position:sticky; top:-16px; float:right; z-index:2; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; }
+  .verdict { font-size:15px; font-weight:600; margin:0 0 10px; color:#56d364; }
+  .verdict.bad { color:#ffa198; } .verdict small { color:var(--dim); font-weight:400; font-size:13px; }
+  .summary { display:flex; gap:10px; margin:0 0 12px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:110px; }
+  .card b { display:block; font-size:18px; } .card small { color:var(--dim); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:10px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  table.matrix { border-collapse:collapse; }
+  .matrix th, .matrix td { border:1px solid var(--line); padding:0; text-align:center; }
+  .matrix thead th { padding:6px 10px; font-size:12px; position:sticky; top:-16px; background:var(--bg); z-index:1; }
+  .matrix thead th small { display:block; color:var(--dim); font-weight:400; font-size:10px; }
+  .matrix tbody th { text-align:left; padding:6px 10px; font-weight:500; white-space:nowrap; }
+  .matrix tbody th small { color:var(--dim); font-weight:400; margin-left:6px; }
+  .matrix tr.group th { padding:10px 10px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); border-left:0; border-right:0; }
+  .matrix td { min-width:110px; }
+  .cell { display:block; padding:5px 8px; cursor:pointer; font-size:14px; line-height:1.2; font-variant-numeric:tabular-nums; }
+  .cell small { display:block; font-size:10px; color:var(--dim); }
+  .cell:hover { outline:2px solid var(--sel); outline-offset:-2px; }
+  .sel .cell { outline:2px solid #fff; outline-offset:-2px; }
+  .s-done { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .s-gap { background:color-mix(in srgb,var(--part) 35%,transparent); }
+  .s-miss { background:color-mix(in srgb,var(--fail) 40%,transparent); }
+  .s-na { color:var(--dim); cursor:default; } .s-na:hover { outline:none; }
+  .s-none { color:var(--dim); border:1px dashed var(--line); font-size:11px; cursor:default; }
+  h2 { font-size:16px; margin:0 0 4px; } h3 { font-size:13px; margin:18px 0 6px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:6px; }
+  table.list { border-collapse:collapse; font-size:12px; width:100%; }
+  .list th, .list td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+  .list th { color:var(--dim); font-weight:600; }
+  .pill { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+  .pill.MUST { color:#ffa198; border-color:var(--fail); } .pill.SHOULD { color:#e3b341; border-color:var(--part); }
+  .req { border-bottom:1px solid var(--line); padding:6px 0; }
+  .req > summary { list-style:none; cursor:pointer; display:flex; gap:8px; align-items:flex-start; }
+  .req > summary::-webkit-details-marker { display:none; }
+  .req .q { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .req[open] .q { white-space:normal; }
+  .dots { display:flex; gap:3px; flex:none; }
+  .dot { font-size:10px; padding:0 5px; border-radius:6px; }
+  .d-C { background:color-mix(in srgb,var(--impl) 40%,transparent); }
+  .d-T { background:color-mix(in srgb,var(--test) 35%,transparent); }
+  .d-I { background:color-mix(in srgb,var(--pass) 40%,transparent); }
+  .d-E { background:color-mix(in srgb,var(--part) 45%,transparent); }
+  .d-x { background:color-mix(in srgb,var(--fail) 45%,transparent); }
+  .ann { margin:6px 0 2px 16px; font-size:12px; }
+  .ann div { display:flex; gap:8px; padding:1px 0; }
+  .ann code { font-family:ui-monospace,monospace; }
+  .why { color:var(--dim); }
+  details.sec > summary { cursor:pointer; font-weight:600; font-size:13px; padding:6px 0; }
+  details.sec > summary small { color:var(--dim); font-weight:400; }
+  details.fold > summary { cursor:pointer; font-size:13px; font-weight:600; margin-top:18px; }
+  details.fold > summary small { color:var(--dim); font-weight:400; }
+  .empty { color:var(--dim); padding:20px 0; }
+  .matrix tfoot th, .matrix tfoot td { border-top:2px solid var(--line); }
+  .matrix thead th a { color:var(--text); }
+  .warnb { color:#e3b341; }
+  .s-noext { color:var(--dim); border:1px dashed var(--part); font-size:11px; cursor:help; }
+  .s-norep { color:var(--dim); border:1px dashed var(--line); font-size:11px; cursor:help; }
+  .ldots { display:flex; gap:3px; flex:none; }
+  .ld { width:14px; height:14px; border-radius:3px; display:inline-block; }
+  .ld.done { background:var(--pass); } .ld.exception { background:var(--part); } .ld.part { background:linear-gradient(135deg,var(--pass) 50%,var(--fail) 50%); }
+  .ld.missing { background:var(--fail); } .ld.none { border:1px dashed var(--line); } .ld.na { background:transparent; }
+  .ldhead { display:flex; gap:3px; justify-content:flex-end; font-size:10px; color:var(--dim); }
+  .ldhead span { width:14px; writing-mode:vertical-rl; transform:rotate(180deg); height:56px; }
+  .rq { display:flex; gap:8px; align-items:center; padding:4px 6px; border-radius:4px; cursor:pointer; }
+  .rq:hover { background:var(--bg); }
+  .rq .q { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+  .quote { background:var(--bg); border-left:3px solid var(--sel); padding:8px 12px; margin:8px 0 14px; font-size:13px; }
+  .lang { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-bottom:8px; background:var(--bg); }
+  .lang h4 { margin:0 0 4px; font-size:13px; display:flex; gap:8px; align-items:center; }
+  .lang .ann { margin-left:0; }
+  .st { font-size:11px; padding:0 7px; border-radius:8px; }
+  .st.done { background:color-mix(in srgb,var(--pass) 40%,transparent); } .st.exception { background:color-mix(in srgb,var(--part) 45%,transparent); }
+  .st.part { background:color-mix(in srgb,var(--part) 35%,transparent); } .st.missing { background:color-mix(in srgb,var(--fail) 45%,transparent); }
+  .st.none { border:1px dashed var(--line); color:var(--dim); }
+  .back { cursor:pointer; color:var(--sel); font-size:12px; }
+  table.reqm { border-collapse:collapse; width:100%; font-size:12px; table-layout:fixed; }
+  .reqm th, .reqm td { border:1px solid var(--line); padding:3px 6px; }
+  .reqm thead th { position:sticky; top:-16px; background:var(--panel); z-index:1; width:64px; font-size:11px; cursor:pointer; }
+  .reqm thead th:first-child { width:auto; cursor:default; }
+  .reqm thead th.on { color:var(--sel); }
+  .reqm tbody th { text-align:left; font-weight:400; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .reqm tr.rrow { cursor:pointer; } .reqm tr.rrow:hover th { background:var(--bg); }
+  .reqm tr.opened th { background:var(--bg); color:var(--sel); }
+  .reqm tr.secrow th { font-weight:600; padding-top:8px; background:var(--panel); }
+  .reqm td.rm { text-align:center; font-family:ui-monospace,monospace; font-size:10px; width:64px; }
+  .reqm td.rm.sec { font-family:system-ui,sans-serif; font-size:11px; font-weight:600; }
+  .rm.done { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .rm.exception { background:color-mix(in srgb,var(--part) 45%,transparent); }
+  .rm.part { background:color-mix(in srgb,var(--part) 30%,transparent); }
+  .rm.todo { background:color-mix(in srgb,var(--part) 18%,transparent); }
+  .rm.missing { background:color-mix(in srgb,var(--fail) 40%,transparent); }
+  .rm.none { background:repeating-linear-gradient(45deg,var(--line) 0 2px,transparent 2px 7px); }
+  .rm.na { color:var(--dim); }
+  .rm.on { box-shadow:inset 2px 0 0 var(--sel), inset -2px 0 0 var(--sel); }
+  .reqm tr.open td { background:var(--bg); padding:8px 10px 10px; }
+  .reqm tr.open .quote { margin:0 0 8px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .tab { display:inline-flex; gap:5px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:2px 8px; cursor:pointer; font-size:12px; }
+  .tab.on { border-color:var(--sel); color:var(--sel); } .tab.off { color:var(--dim); cursor:help; }
+  .tab.cmp { margin-left:auto; color:var(--sel); }
+  .ld.todo { background:color-mix(in srgb,var(--part) 50%,transparent); }
+  .d-D { background:color-mix(in srgb,var(--part) 25%,transparent); }
+  .line { color:var(--dim); font-size:13px; margin:0 0 12px; } .line b { color:var(--text); }
+  .matrix td.nr, .nrsw { background:repeating-linear-gradient(45deg,var(--line) 0 2px,transparent 2px 8px); min-width:56px; }
+  .matrix thead th.nr { color:var(--dim); font-weight:400; cursor:help; }
+  main.open { grid-template-columns:minmax(0,4fr) 6px minmax(0,6fr); }
+  /* With the pane open, the grid fills its side so names wrap only when they must. */
+  main.open table.matrix { width:100%; }
+  main.open .matrix tbody th { white-space:normal; }
+  main.open .matrix tbody th small { display:none; }
+  main.open .matrix td { min-width:56px; }
+  .reqm tbody tr.rrow th { padding:5px 8px; }
+  .reqm tbody tr.rrow .q { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; white-space:normal; overflow:hidden; line-height:1.35; }
+  .reqm tbody th { white-space:normal; }
+  .reqm td.rm { width:58px; }
+  .rm.done { background:color-mix(in srgb,var(--pass) 45%,transparent); }
+  .rm.exception { background:color-mix(in srgb,var(--sel) 25%,transparent); }
+  .rm.part { background:color-mix(in srgb,var(--part) 30%,transparent); }
+  .rm.todo { background:color-mix(in srgb,var(--part) 15%,transparent); }
+  .rm.missing { background:transparent; color:var(--dim); }
+  .rm.progress { background:color-mix(in srgb,var(--pass) 15%,transparent); }
+  .ld.missing { background:var(--line); } .ld.part { background:var(--part); } .ld.exception { background:color-mix(in srgb,var(--sel) 60%,transparent); }
+  .st.missing { background:transparent; border:1px solid var(--line); color:var(--dim); }
+  .st.exception { background:color-mix(in srgb,var(--sel) 30%,transparent); }
+  .pill.MUST { color:var(--dim); border-color:var(--line); }
+  .reqm .rrow .pill { float:left; margin:1px 6px 0 0; }
+  /* The colored cell fills its whole box, even when a long spec name makes the row taller. */
+  .matrix tbody td { height:1px; }
+  .matrix tbody td > .cell { height:100%; display:flex; flex-direction:column; justify-content:center; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spin { display:inline-block; width:10px; height:10px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; margin-right:4px; }
+  .s-load { color:var(--sel); border:1px dotted var(--line); cursor:default; }
+  .s-err { color:#ffa198; cursor:help; }
+  .matrix th.libname { cursor:pointer; font-weight:600; } .matrix th.libname:hover { color:var(--sel); }
+  .matrix th[data-spec] { cursor:pointer; } .matrix th[data-spec]:hover { color:var(--sel); }
+  .loadtxt { color:var(--sel); }
+  .empty { color:var(--dim); padding:20px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Duvet Coverage</h1>
+  <label>Library <select id="lib"></select></label>
+  <label>Find requirement <input type="text" id="search" placeholder="e.g. frame length"></label>
+  <label><input type="checkbox" id="mustOnly"> MUST only</label>
+  <span class="run">newest report each repo uploaded from its default branch</span>
+</header>
+<main>
+  <section id="left">
+    <div class="verdict" id="verdict"></div>
+    <div class="legend" id="legend">
+      <span>% = requirements with code and a test, implied, or an exception</span>
+      <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 50%,transparent)"></i>✓ all</span>
+      <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 25%,transparent)"></i>some</span>
+      <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 6%,transparent);border:1px solid var(--line)"></i>none yet</span>
+      <span><i class="sw nrsw"></i>no report on main (hover for why)</span>
+    </div>
+    <table class="matrix" id="matrix"></table>
+    <div id="lists"></div>
+  </section>
+  <div id="divider"></div>
+  <section id="detail"></section>
+</main>
+<script src="../test-servers/loader.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const KIND = { C:"code", T:"test", I:"implied", E:"exception", D:"todo" };
+const TYPE = { CITATION:"C", TEST:"T", IMPLICATION:"I", EXCEPTION:"E", TODO:"D" };
+
+// A library is one spec, made of spec folders. Each source is one
+// language's duvet report for that library: the newest artifact its repo's
+// CI uploaded from the default branch. A source with no artifact name has
+// no duvet report, and why says so.
+// One report can cite more than one library (the Rust ESDK report also
+// cites framework/), so each source keeps only its library's folders.
+const LIBRARIES = {
+  "ESDK":      ["client-apis", "data-format"],
+  "MPL":       ["framework"],
+  "DB-ESDK":   ["dynamodb-encryption-client", "searchable-encryption", "structured-encryption"],
+  "ESDK shim": ["shim"],
+};
+const RUST = "aws/aws-crypto-tools-rust", DAFNY_REPORT = "specification_compliance_report";
+const SOURCES = [
+  { lib:"ESDK", lang:"rust", repo:RUST, artifact:"esdk-duvet-report", dir:"esdk" },
+  { lib:"ESDK", lang:"dafny", repo:"aws/aws-encryption-sdk", artifact:DAFNY_REPORT,
+    note:"Its duvet report also reads only framework/, so it never sees the ESDK's //= lines." },
+  { lib:"ESDK", lang:"java", repo:"aws/aws-encryption-sdk-java", why:"aws-encryption-sdk-java has no duvet workflow." },
+  { lib:"ESDK", lang:"python", repo:"aws/aws-encryption-sdk-python", why:"aws-encryption-sdk-python has some //= lines, but no duvet workflow." },
+  { lib:"ESDK", lang:"javascript", repo:"aws/aws-encryption-sdk-javascript", why:"aws-encryption-sdk-javascript has some //= lines, but no duvet workflow." },
+  { lib:"ESDK", lang:"c", repo:"aws/aws-encryption-sdk-c", why:"aws-encryption-sdk-c has some //= lines, but no duvet workflow." },
+  { lib:"MPL", lang:"rust", repo:RUST, artifact:"mpl-duvet-report", dir:"mpl" },
+  { lib:"MPL", lang:"dafny", repo:"aws/aws-cryptographic-material-providers-library", artifact:DAFNY_REPORT },
+  { lib:"MPL", lang:"java", repo:"aws/aws-crypto-tools-java", artifact:"mpl-duvet-report", dir:"mpl" },
+  { lib:"DB-ESDK", lang:"rust", repo:RUST, artifact:"db-esdk-duvet-report", dir:"db-esdk" },
+  { lib:"DB-ESDK", lang:"dafny", repo:"aws/aws-database-encryption-sdk-dynamodb", artifact:DAFNY_REPORT },
+  { lib:"ESDK shim", lang:"c++", repo:RUST, artifact:"aws-esdk-cpp-duvet-report", dir:"esdk/shims/aws-esdk-cpp" },
+].map(s => ({ ...s, key:s.lib + "|" + s.lang, state:s.artifact ? "queued" : "none" }));
+const LANGS = [...new Set(SOURCES.map(s => s.lang))];
+
+// ---------- loading ----------
+// duvet's HTML report carries its whole result as JSON in one script tag.
+function readReport(html, src) {
+  const m = html.match(/<script type="application\/json" id=result>([\s\S]*?)<\/script>/);
+  if (!m) throw new Error("no result JSON in the report");
+  const j = JSON.parse(m[1]), A = j.annotations, folders = LIBRARIES[src.lib], specs = {};
+  for (const [path, sp] of Object.entries(j.specifications)) {
+    // spec/, specification/ and aws-encryption-sdk-specification/ all name the same spec.
+    const k = path.replace(/^(spec|specification|aws-encryption-sdk-specification)\//, "");
+    if (!folders.includes(k.split("/")[0])) continue;
+    specs[k] = { title:sp.title, reqs:sp.requirements.map(r => {
+      const a = A[r], st = j.statuses[r] || {};
+      const ann = (st.related || []).map(i => A[i]).filter(x => (x.type || "CITATION") !== "SPEC").map(x => {
+        const t = TYPE[x.type || "CITATION"] || "C";
+        return [t, x.source, x.line || 0, "EID".includes(t) ? (x.comment || "").split(/\s+/).join(" ").slice(0, 240) : ""];
+      });
+      return { sec:a.target_section, lvl:a.level || "", q:(a.comment || "").split(/\s+/).join(" ").trim(), ann };
+    }) };
+  }
+  return specs;
+}
+
+// entryStream (loader.js) yields text chunks.
+async function entryText(zip, e) {
+  let text = "";
+  const reader = entryStream(zip, e).getReader();
+  for (;;) { const { value, done } = await reader.read(); if (done) return text; text += value; }
+}
+
+const defaultBranch = {};
+async function loadSource(src) {
+  try {
+    src.state = "loading"; draw();
+    const branch = defaultBranch[src.repo] ??= (await ghJson(`repos/${src.repo}`)).default_branch;
+    const arts = (await ghJson(`repos/${src.repo}/actions/artifacts?name=${src.artifact}&per_page=100`)).artifacts.filter(a => !a.expired);
+    const art = arts.filter(a => a.workflow_run && a.workflow_run.head_branch === branch)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    if (!art) {
+      src.state = "none";
+      src.why = `No ${src.artifact} from ${branch} in ${src.repo}` + (arts.length ? ", only from other branches." : ".") + (src.note ? " " + src.note : "");
+      return;
+    }
+    const key = `duvet1:${src.repo}:${src.lib}:${art.id}`;
+    let specs = await cacheGet(key);
+    if (!specs) {
+      const zip = await (await gh(`repos/${src.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+      const e = zipEntries(zip).find(x => x.name.endsWith(".html"));
+      if (!e) throw new Error("the artifact has no HTML report");
+      specs = readReport(await entryText(zip, e), src);
+      await cachePut(key, specs);
+    }
+    Object.assign(src, { state:"done", specs, branch, ref:art.workflow_run.head_sha, created:art.created_at,
+      run:`https://github.com/${src.repo}/actions/runs/${art.workflow_run.id}` });
+  } catch (err) {
+    src.state = "error"; src.why = "Could not load: " + (err.message || err);
+  } finally { draw(); }
+}
+
+// ---------- shared helpers ----------
+const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false };
+// Columns of the open library: a loaded report has r (its key) and specs.
+const cols = () => SOURCES.filter(s => s.lib === ui.lib).map(s => s.state === "done" ? Object.assign(s, { r:s.key }) : s);
+
+// What one requirement still needs. An implication or exception counts as done.
+function state(r) {
+  if (!r) return "na";
+  const k = new Set(r.ann.map(a => a[0]));
+  if (k.has("E")) return "exception";
+  if (k.has("I") || (k.has("C") && k.has("T"))) return "done";
+  return k.has("C") || k.has("T") ? "part" : k.has("D") ? "todo" : "missing";
+}
+// Spec quotes carry markdown links; show only the link text.
+const plain = q => q.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+const isDone = st => st === "done" || st === "exception";
+const STATE_LABEL = { done:"done", exception:"exception", part:"code or test only", todo:"todo", missing:"nothing", none:"no report", na:"not in this report" };
+const fromServer = f => /test-server|commons/.test(f);
+const keep = r => !ui.mustOnly || r.lvl === "MUST";
+// The same requirement in two reports: same spec, section and quote.
+const rkey = (s, r) => s + "|" + r.sec + "|" + r.q;
+const link = (c, f, n) => `https://github.com/${c.repo}/blob/${c.ref}/${c.dir ? c.dir + "/" : ""}${f}#L${n}`;
+const specsAll = () => [...new Set(cols().flatMap(c => Object.keys(c.specs || {})))].sort();
+const hasSpecs = c => c.r && Object.keys(c.specs).length > 0;
+function index(c) { // rkey -> requirement, per report
+  if (!c.specs) return new Map();
+  return c._idx ??= new Map(Object.entries(c.specs).flatMap(([s, sp]) => sp.reqs.map(r => [rkey(s, r), r])));
+}
+// Every requirement in the library, once, in spec order.
+function reqsOf(s) {
+  const seen = new Map();
+  for (const c of cols()) for (const r of c.specs?.[s]?.reqs || []) if (keep(r) && !seen.has(rkey(s, r))) seen.set(rkey(s, r), r);
+  return [...seen.values()];
+}
+const titleOf = s => cols().map(c => c.specs?.[s]?.title).find(Boolean);
+function stats(c, s) {
+  const rs = (c.specs?.[s]?.reqs || []).filter(keep), sts = rs.map(state);
+  return { n:rs.length, done:sts.filter(isDone).length, exc:sts.filter(x => x === "exception").length };
+}
+function totals(c) {
+  return Object.keys(c.specs || {}).reduce((a, s) => { const x = stats(c, s); return { n:a.n + x.n, done:a.done + x.done }; }, { n:0, done:0 });
+}
+// One green, brighter for more done. Not done yet is a heads-up, not a failure.
+const shade = p => `background:color-mix(in srgb,var(--pass) ${Math.round(6 + p * 44)}%,transparent)`;
+const spinner = `<i class="spin"></i>`;
+
+// A column that has no loaded report: still loading, none on the default branch, or failed.
+function emptyCell(c) {
+  if (c.state === "queued" || c.state === "loading") return `<td><span class="cell s-load">${c.state === "loading" ? spinner : ""}</span></td>`;
+  if (c.state === "error") return `<td class="nr" title="${esc(c.why)}"><span class="cell s-err">!</span></td>`;
+  return `<td class="nr" title="${esc(c.why || "")}"></td>`;
+}
+function emptyHead(c) {
+  const sub = c.state === "error" ? "failed to load" : c.state === "none" ? "no report on main" : "loading…";
+  return `<th class="nr" title="${esc(c.why || "")}">${c.lang}<small>${sub}</small></th>`;
+}
+
+// ---------- overview: library × language ----------
+function renderOverview() {
+  const langs = LANGS.filter(l => SOURCES.some(s => s.lang === l));
+  let h = `<thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const lib of Object.keys(LIBRARIES)) {
+    h += `<tr><th data-lib="${esc(lib)}" class="libname">${lib}</th>`;
+    for (const l of langs) {
+      const c = SOURCES.find(s => s.lib === lib && s.lang === l);
+      if (!c) { h += `<td><span class="cell s-na">—</span></td>`; continue; }
+      if (c.state !== "done") { h += emptyCell(c); continue; }
+      const t = totals(c), p = t.n ? t.done / t.n : 0;
+      h += `<td><span class="cell" style="${shade(p)}" data-lib="${esc(lib)}" data-c="${esc(c.key)}" title="${t.done}/${t.n} requirements done">`
+        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small></span></td>`;
+    }
+    h += `</tr>`;
+  }
+  $("matrix").innerHTML = h + `</tbody>`;
+  const loaded = SOURCES.filter(s => s.state === "done").length, going = SOURCES.filter(s => s.state === "loading" || s.state === "queued").length;
+  $("verdict").className = "line";
+  $("verdict").innerHTML = `<b>${loaded}</b> duvet reports on main, over ${Object.keys(LIBRARIES).length} libraries`
+    + (going ? ` · <span class="loadtxt">${spinner}loading ${going}…</span>` : "") + ` · click a cell to open its library`;
+  $("lists").innerHTML = "";
+}
+
+// ---------- one library: spec × language ----------
+function cellHtml(c, s) {
+  if (!c.r) return emptyCell(c);
+  if (!c.specs[s]) return `<td><span class="cell s-na">—</span></td>`;
+  const t = stats(c, s), p = t.n ? t.done / t.n : 0, all = t.done === t.n;
+  const on = ui.sel && ui.sel.s === s && ui.sel.c === c.r ? "sel" : "";
+  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}">${all ? "✓" : Math.floor(100 * p) + "%"}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
+}
+
+function renderMatrix() {
+  const C = cols(), specs = specsAll(), group = s => s.split("/")[0];
+  const groups = [...new Set(specs.map(group))];
+  const head = c => c.r
+    ? `<th><a href="${c.run}" target="_blank" title="CI run, ${c.created.slice(0, 10)}">${c.lang}</a><small>${c.repo.split("/")[1]}${c.dir ? "/" + c.dir : ""}</small><small>${esc(c.branch)} · ${c.ref.slice(0, 7)}</small></th>`
+    : emptyHead(c);
+  let h = `<thead><tr><th></th>${C.map(head).join("")}</tr></thead><tbody>`;
+  if (!specs.length) h += `<tr><td colspan="${C.length + 1}" class="empty">${C.some(c => c.state === "loading" || c.state === "queued") ? "Loading reports…" : "No language has a report for this library on main."}</td></tr>`;
+  for (const g of groups) {
+    if (groups.length > 1) h += `<tr class="group"><th colspan="${C.length + 1}">${g.replace(/-/g, " ")}</th></tr>`;
+    for (const s of specs.filter(x => group(x) === g))
+      h += `<tr><th data-spec="${esc(s)}">${esc(titleOf(s))}<small>${esc(s.split("/").pop())}</small></th>${C.map(c => cellHtml(c, s)).join("")}</tr>`;
+  }
+  const total = c => {
+    if (!hasSpecs(c)) return `<td class="nr"></td>`;
+    const t = totals(c);
+    return `<td><span class="cell s-na">${t.n ? Math.floor(100 * t.done / t.n) + "%" : ""}<small>${t.done}/${t.n}</small></span></td>`;
+  };
+  if (specs.length) h += `</tbody><tfoot><tr><th>All specs</th>${C.map(total).join("")}</tr></tfoot>`;
+  $("matrix").innerHTML = h;
+}
+
+function renderTop() {
+  const C = cols(), withRep = C.filter(hasSpecs);
+  const keys = new Set(specsAll().flatMap(s => reqsOf(s).map(r => rkey(s, r))));
+  const tested = withRep.flatMap(c => [...index(c).values()].filter(r => keep(r) && r.ann.some(a => a[0] === "T")));
+  const shared = tested.filter(r => r.ann.some(a => a[0] === "T" && fromServer(a[1]))).length;
+  $("verdict").className = "line";
+  $("verdict").innerHTML = `<span class="back" data-home>← all libraries</span> · <b>${keys.size.toLocaleString()}</b> requirements`
+    + ` · <span title="Requirements with a test annotation in shared test-server code">tested by the shared test server: <b>${shared}</b> of ${tested.length} tested</span>`;
+}
+
+const dotsFor = (s, r) => `<span class="ldots">${cols().map(c => {
+  const st = !c.r ? "none" : state(index(c).get(rkey(s, r)));
+  return `<i class="ld ${st}" title="${c.lang}: ${STATE_LABEL[st]}"></i>`; }).join("")}</span>`;
+const dotsHead = () => `<div class="ldhead">${cols().map(c => `<span>${c.lang}</span>`).join("")}</div>`;
+const reqRow = (s, r, where = "") => `<div class="rq" data-req="${esc(rkey(s, r))}"><span class="pill ${r.lvl}">${r.lvl || "—"}</span>${where}<span class="q" title="${esc(r.q)}">${esc(plain(r.q))}</span>${dotsFor(s, r)}</div>`;
+
+function annLines(c, r) {
+  if (!r.ann.length) return `<div class="ann why">No annotation cites this.</div>`;
+  return `<div class="ann">` + r.ann.map(([k, f, n, why]) =>
+    `<div><span class="dot d-${k}">${KIND[k]}</span><a href="${link(c, f, n)}" target="_blank"><code>${esc(f)}:${n}</code></a>`
+    + (k === "T" && fromServer(f) ? ` <span class="pill">test server</span>` : "")
+    + (why ? ` <span class="why">${esc(why)}</span>` : "") + `</div>`).join("") + `</div>`;
+}
+
+// One requirement, side by side in every language.
+function compareView(s, r) {
+  const k = rkey(s, r);
+  let h = `<span class="back" data-back>← ${esc(titleOf(s))}</span>
+    <h2 style="margin-top:6px">${esc(r.sec)}</h2><div class="sub">${esc(s)} · <span class="pill ${r.lvl}">${r.lvl}</span></div>
+    <div class="quote">${esc(plain(r.q))}</div>`;
+  for (const c of cols()) {
+    if (!c.r) { h += `<div class="lang"><h4>${c.lang} <span class="st none">no report</span></h4><div class="why">${esc(c.why || "")}</div></div>`; continue; }
+    const x = index(c).get(k), st = state(x);
+    h += `<div class="lang"><h4>${c.lang} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>`
+      + (x ? annLines(c, x) : `<div class="why">${hasSpecs(c) ? "This report does not list this requirement." : esc(c.why || "")}</div>`) + `</div>`;
+  }
+  return h;
+}
+
+// Letters for what one language has: C code, T test, I implied, E exception, D todo.
+const letters = r => r ? [...new Set(r.ann.map(a => a[0]))].sort((x, y) => "CTIED".indexOf(x) - "CTIED".indexOf(y)).join(" ") || "·" : "";
+function rmCell(c, s, r) {
+  const on = c.r && c.r === ui.lang ? " on" : "";
+  if (!c.r) return `<td class="rm none${on}" title="${c.lang}: no report on main"></td>`;
+  const x = index(c).get(rkey(s, r)), st = state(x);
+  return `<td class="rm ${st}${on}" title="${c.lang}: ${STATE_LABEL[st]}">${letters(x)}</td>`;
+}
+// Section header: how much of the section each language has done.
+function secCell(c, s, list) {
+  const on = c.r && c.r === ui.lang ? " on" : "";
+  if (!hasSpecs(c) || !c.specs[s]) return `<td class="rm none${on}"></td>`;
+  const xs = list.map(r => state(index(c).get(rkey(s, r)))).filter(x => x !== "na");
+  if (!xs.length) return `<td class="rm na${on}"></td>`;
+  const d = xs.filter(isDone).length;
+  return `<td class="rm ${d === xs.length ? "done" : "progress"} sec${on}">${d}/${xs.length}</td>`;
+}
+// The open row: what the chosen language has, with tabs for the others.
+function rowDetail(s, r) {
+  const C = cols(), withR = C.filter(c => c.r);
+  const c = withR.find(x => x.r === ui.lang) || withR[0];
+  const tabs = C.map(o => o.r
+    ? `<span class="tab${o === c ? " on" : ""}" data-lang="${esc(o.r)}"><i class="ld ${state(index(o).get(rkey(s, r)))}"></i>${o.lang}</span>`
+    : `<span class="tab off" title="${esc(o.why || "")}"><i class="ld none"></i>${o.lang}</span>`).join("");
+  const x = c && index(c).get(rkey(s, r));
+  const body = !c ? "" : x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`;
+  return `<tr class="open"><td colspan="${C.length + 1}"><div class="quote">${esc(plain(r.q))}</div>
+    <div class="tabs">${tabs}<span class="tab cmp" data-req="${esc(rkey(s, r))}">Compare all languages ⤢</span></div>${body}</td></tr>`;
+}
+function specView(s) {
+  const C = cols(), rs = reqsOf(s);
+  const gap = r => C.some(c => { const st = hasSpecs(c) && c.specs[s] ? state(index(c).get(rkey(s, r))) : "na"; return st !== "na" && !isDone(st); });
+  const shown = ui.gapsOnly ? rs.filter(gap) : rs;
+  let h = `<h2>${esc(titleOf(s))}</h2><div class="sub">${esc(s)} · ${rs.length} requirements · click a row for details
+    <label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="gapsOnly" ${ui.gapsOnly ? "checked" : ""}> Only gaps</label></div>
+    <table class="reqm"><thead><tr><th></th>${C.map(c => `<th class="${c.r && c.r === ui.lang ? "on" : ""}" ${c.r ? `data-lang="${esc(c.r)}"` : ""}>${c.lang}</th>`).join("")}</tr></thead><tbody>`;
+  for (const sec of [...new Set(rs.map(r => r.sec))]) {
+    const all = rs.filter(r => r.sec === sec), list = shown.filter(r => r.sec === sec);
+    if (!list.length) continue;
+    h += `<tr class="secrow"><th>${esc(sec)}</th>${C.map(c => secCell(c, s, all)).join("")}</tr>`;
+    for (const r of list) {
+      const k = rkey(s, r);
+      h += `<tr class="rrow${ui.open === k ? " opened" : ""}" data-row="${esc(k)}"><th><span class="pill ${r.lvl}">${r.lvl ? r.lvl[0] : "—"}</span> <span class="q">${esc(plain(r.q))}</span></th>${C.map(c => rmCell(c, s, r)).join("")}</tr>`;
+      if (ui.open === k) h += rowDetail(s, r);
+    }
+  }
+  return h + `</tbody></table>`;
+}
+
+function renderDetail() {
+  const open = !!ui.lib && !!(ui.sel || ui.search || ui.req);
+  document.querySelector("main").classList.toggle("open", open);
+  if (!open) { $("detail").innerHTML = ""; return; }
+  let h = `<button class="close" data-close>×</button>`;
+  if (ui.req) {
+    const s = ui.req.split("|")[0];
+    h += compareView(s, reqsOf(s).find(x => rkey(s, x) === ui.req) || cols().map(c => index(c).get(ui.req)).find(Boolean));
+  } else if (ui.search) {
+    const q = ui.search.toLowerCase();
+    const hits = specsAll().flatMap(s => reqsOf(s).filter(r => (r.q + " " + r.sec).toLowerCase().includes(q)).map(r => [s, r]));
+    h += `<h2>Requirements matching “${esc(ui.search)}”</h2><div class="sub">${hits.length} found</div>${dotsHead()}`
+      + hits.slice(0, 200).map(([s, r]) => reqRow(s, r, `<span class="pill">${esc(s.split("/").pop())} · ${esc(r.sec)}</span>`)).join("");
+  } else h += specView(ui.sel.s);
+  $("detail").innerHTML = h;
+}
+
+function renderLists() {
+  const C = cols().filter(hasSpecs);
+  const exc = C.flatMap(c => [...index(c)].filter(([, r]) => state(r) === "exception" && keep(r)).map(([k, r]) => ({ c, k, r })));
+  let h = `<details class="fold"><summary>Exceptions <small>· ${exc.length} across languages</small></summary><table class="list"><tr><th>Language</th><th>Section</th><th>Requirement</th><th>Why</th></tr>${exc.map(x =>
+    `<tr data-req="${esc(x.k)}" style="cursor:pointer"><td>${x.c.lang}</td><td>${esc(x.r.sec)}</td><td>${esc(plain(x.r.q))}</td><td class="why">${esc(x.r.ann.find(a => a[0] === "E")[3])}</td></tr>`).join("")}</table></details>`;
+  const files = {};
+  for (const c of C) for (const r of index(c).values()) for (const [k, f] of r.ann) if (k === "T") { const t = files[c.r + "|" + f] ??= { c, f, n:0 }; t.n++; }
+  const rows = Object.values(files).sort((a, b) => b.n - a.n);
+  h += `<details class="fold"><summary>Which test files cite requirements <small>· ${rows.length} test files</small></summary><table class="list"><tr><th>Language</th><th>Test file</th><th>Requirements</th><th></th></tr>${rows.map(t =>
+    `<tr><td>${t.c.lang}</td><td><code>${esc(t.f)}</code></td><td>${t.n}</td><td><span class="pill">${fromServer(t.f) ? "test server" : "local"}</span></td></tr>`).join("")}</table></details>`;
+  $("lists").innerHTML = h;
+}
+
+// Loads finish one by one; draw at most once a frame.
+let queued = false;
+function draw() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => { queued = false; render(); });
+}
+function render() {
+  $("search").disabled = !ui.lib;
+  $("legend").style.display = "";
+  if (!ui.lib) { renderOverview(); renderDetail(); return; }
+  renderTop(); renderMatrix(); renderLists(); renderDetail();
+}
+function openLib(lib, lang) {
+  ui.lib = lib; ui.lang = lang || null; ui.sel = ui.req = ui.open = null; ui.search = ""; $("search").value = "";
+  $("lib").value = lib;
+  const q = new URLSearchParams(location.search); lib ? q.set("lib", lib) : q.delete("lib"); history.replaceState(null, "", "?" + q);
+  render();
+}
+
+$("lib").innerHTML = `<option value="">All libraries</option>` + Object.keys(LIBRARIES).map(n => `<option>${n}</option>`).join("");
+$("lib").onchange = e => openLib(e.target.value);
+$("matrix").onclick = e => {
+  if (!ui.lib) {
+    const t = e.target.closest("[data-lib]");
+    if (t) openLib(t.dataset.lib, t.dataset.c);
+    return;
+  }
+  const c = e.target.closest(".cell[data-s]"), th = e.target.closest("th[data-spec]");
+  const s = c ? c.dataset.s : th && th.dataset.spec;
+  if (!s) return;
+  ui.sel = { s, c:c && c.dataset.c }; ui.lang = c ? c.dataset.c : ui.lang; ui.open = null; ui.req = null; ui.search = ""; $("search").value = ""; render();
+};
+document.body.addEventListener("click", e => {
+  if (e.target.closest("[data-home]")) { openLib(""); return; }
+  if (e.target.closest("[data-close]")) { ui.sel = ui.req = null; ui.search = ""; $("search").value = ""; render(); return; }
+  if (e.target.closest("[data-back]")) {
+    // Back from a requirement opened from the lists goes to its spec.
+    if (!ui.sel && !ui.search) ui.sel = { s:ui.req.split("|")[0] };
+    ui.req = null; renderDetail(); return;
+  }
+  const lt = e.target.closest("[data-lang]");
+  if (lt && $("detail").contains(lt)) { ui.lang = lt.dataset.lang; renderDetail(); return; }
+  const row = e.target.closest("[data-row]");
+  if (row) { ui.open = ui.open === row.dataset.row ? null : row.dataset.row; renderDetail(); return; }
+  const rq = e.target.closest("[data-req]");
+  if (rq) { ui.req = rq.dataset.req; renderDetail(); $("detail").scrollTop = 0; }
+});
+document.body.addEventListener("change", e => { if (e.target.id === "gapsOnly") { ui.gapsOnly = e.target.checked; renderDetail(); } });
+let t; $("search").oninput = e => { clearTimeout(t); t = setTimeout(() => { ui.search = e.target.value.trim(); ui.req = null; renderDetail(); }, 200); };
+$("mustOnly").onchange = e => { ui.mustOnly = e.target.checked; render(); };
+
+if (!localStorage.getItem("github-dashboard-token")) {
+  $("verdict").innerHTML = "Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).";
+} else {
+  const lib = new URLSearchParams(location.search).get("lib") || "";
+  openLib(LIBRARIES[lib] ? lib : "");
+  // Reports are a few hundred KB each, so load them all at once.
+  SOURCES.filter(s => s.artifact).forEach(loadSource);
+}
+</script>
+</body>
+</html>
