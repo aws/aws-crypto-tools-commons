@@ -16,33 +16,59 @@
   select, input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
   label { color:var(--dim); display:flex; gap:6px; align-items:center; }
   .run { color:var(--dim); margin-left:auto; font-size:12px; }
-  main { display:grid; grid-template-columns: minmax(0,var(--left,1fr)) 6px minmax(0,1fr); height:calc(100vh - 52px); }
+  .run .warn { color:#e3b341; }
+  details.view { position:relative; }
+  details.view > summary { color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; }
+  details.view > summary::before { content:none; }
+  details.view > summary::after { content:" ▾"; }
+  details.view .menu { position:absolute; top:calc(100% + 4px); left:0; z-index:5; display:flex; flex-direction:column; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; min-width:220px; box-shadow:0 8px 24px #0008; }
+  main { display:grid; grid-template-columns: minmax(0,1fr); height:calc(100vh - 52px); }
+  main.open { grid-template-columns: minmax(0,var(--left,1fr)) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
   section { overflow:auto; padding:16px 20px; }
-  #detail { background:var(--panel); }
+  #detail { background:var(--panel); position:relative; }
+  #detail .close { position:sticky; top:0; float:right; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; font-size:14px; }
+  #detail .close:hover { color:var(--text); border-color:var(--sel); }
+  #status:empty { display:none; }
+  #status { color:var(--dim); padding:20px 0; }
+  .verdict { font-size:15px; font-weight:600; margin:0 0 10px; }
+  .verdict.bad { color:#ffa198; } .verdict.good { color:#56d364; }
+  .verdict small { color:var(--dim); font-weight:400; font-size:13px; }
+  .verdict a { color:inherit; cursor:pointer; text-decoration:underline dotted; }
+  .matrix tr.group th { text-align:left; padding:10px 10px 4px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); cursor:default; border-left:0; border-right:0; background:var(--bg); }
+  .matrix tr.group th:hover { color:var(--dim); }
+  .info { cursor:help; color:var(--dim); border:1px solid var(--line); border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
+  details.fold > summary { font-size:13px; font-weight:600; padding:6px 0; margin-top:18px; }
+  details.fold > summary small { color:var(--dim); font-weight:400; }
+  .reasons td.partner { color:var(--dim); font-style:italic; }
+  .reasons td.zero { color:var(--dim); }
   #divider { cursor:col-resize; background:var(--line); }
   #divider:hover, #divider.drag { background:var(--sel); }
   body.resizing { user-select:none; cursor:col-resize; }
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:12px; }
   .legend span { display:flex; align-items:center; gap:5px; }
   .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
-  table.matrix { border-collapse:collapse; width:100%; }
+  table.matrix { border-collapse:collapse; }
+  .matrix td { min-width:84px; }
   .matrix th, .matrix td { border:1px solid var(--line); padding:0; text-align:center; }
-  .matrix thead th { padding:6px 4px; font-weight:600; font-size:12px; cursor:pointer; position:sticky; top:0; background:var(--bg); z-index:1; }
+  .matrix thead th { padding:6px 4px; font-weight:600; font-size:12px; cursor:pointer; position:sticky; top:-16px; background:var(--bg); z-index:1; }
   .matrix thead th.focus { color:var(--sel); }
   .matrix tbody th { text-align:left; padding:6px 10px; font-weight:500; white-space:nowrap; cursor:pointer; }
   .matrix tbody th:hover { color:var(--sel); }
   .matrix tbody th.bucket { color:var(--dim); font-style:italic; }
-  .cell { display:block; padding:7px 4px; cursor:pointer; font-size:12px; font-variant-numeric:tabular-nums; }
+  .cell { display:block; padding:5px 6px; cursor:pointer; font-size:14px; line-height:1.2; font-variant-numeric:tabular-nums; }
   .cell:hover { outline:2px solid var(--sel); outline-offset:-2px; }
   .cell.selected { outline:2px solid #fff; outline-offset:-2px; }
   .s-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
   .s-part { background:color-mix(in srgb,var(--part) 35%,transparent); }
   .s-fail { background:color-mix(in srgb,var(--fail) 40%,transparent); }
-  .s-none { color:var(--dim); border:1px dashed var(--line); }
+  .s-none { color:var(--dim); border:1px dashed var(--line); font-size:11px; }
   .s-zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
   .s-undecl { color:var(--dim); }
   .small { font-size:12px; font-weight:400; }
-  .cell small { display:block; font-size:10px; color:var(--dim); }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:6px; }
+  .cell small { display:block; font-size:10px; color:var(--dim); line-height:1.3; }
   .matrix td.selected > .cell { outline:2px solid #fff; outline-offset:-2px; }
   .matrix thead th.role { font-weight:400; font-size:10px; color:var(--dim); padding:2px; }
   #detail h3 { font-size:13px; margin:14px 0 6px; }
@@ -53,7 +79,7 @@
   .combos th:first-child { text-align:left; }
   .chip { display:inline-block; padding:0 6px; margin:1px 2px; border-radius:8px; background:var(--bg); border:1px solid var(--line); }
   .chip.me { border-color:var(--sel); color:var(--sel); }
-  .reasons th:first-child { max-width:340px; white-space:normal; font-weight:500; }
+  .reasons th:first-child { min-width:260px; max-width:420px; white-space:normal; font-weight:500; text-align:left; }
   .reasons .desc { color:var(--dim); font-weight:400; font-size:11px; padding:2px 0 2px 16px; }
   .reasons details.desc-toggle > summary { padding:0; }
   .reasons details.desc-toggle > summary::before { font-size:10px; }
@@ -99,54 +125,73 @@
   .pill.bad { color:#ffa198; border-color:var(--fail); }
   .pill.warn { color:#e3b341; border-color:var(--part); }
   .more { padding:4px 24px; color:var(--sel); cursor:pointer; font-size:12px; }
+  .matrix th.libname { cursor:pointer; font-weight:600; } .matrix th.libname:hover { color:var(--sel); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spin { display:inline-block; width:9px; height:9px; margin-right:5px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; }
+  /* A colored cell fills its whole box, even when a neighbor makes the row taller. */
+  .matrix tbody td { height:1px; }
+  .matrix tbody td > .cell { height:100%; display:flex; flex-direction:column; justify-content:center; }
 </style>
 </head>
 <body>
 <header>
   <h1>Test Server Dashboard</h1>
-  <label>Test server <select id="suite"></select></label>
-  <label title="Empty: newest passing run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run. Shows the newest finished run, passed or failed, for the chosen test server.">PR / commit <input type="text" id="source" size="34" placeholder="newest passing run on commons main"></label>
-  <label>Focus server <select id="focus"></select></label>
-  <label title="Hide grid rows with no problem cells, and tree tests the focus server passed"><input type="checkbox" id="onlyProblems"> Only problems</label>
-  <label title="Split each server into encrypting and decrypting columns"><input type="checkbox" id="split"> Split enc/dec</label>
-  <a href="upset.html" id="upsetLink" class="small">UpSet view</a>
-  <a href="coverage.html" id="coverageLink" class="small">Line coverage</a>
+  <label>Library <select id="suite"></select></label>
+  <label title="Empty: newest passing run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run. Shows the newest finished run, passed or failed, for the chosen library.">PR / commit <input type="text" id="source" size="34" placeholder="newest passing run on commons main"></label>
   <label>Find test <input type="text" id="search" placeholder="e.g. bitFlip"></label>
+  <details class="view" id="view"><summary>View</summary><div class="menu">
+    <label title="Highlight one server's column and its dots in the test tree">Focus server <select id="focus"></select></label>
+    <label title="Hide grid rows with no problem cells, and tree tests the focus server passed"><input type="checkbox" id="onlyProblems"> Only problems</label>
+    <label title="Split each server into encrypting and decrypting columns"><input type="checkbox" id="split"> Split enc/dec</label>
+    <a href="upset.html" id="upsetLink" class="small">UpSet view</a>
+  </div></details>
   <span class="run" id="run"></span>
 </header>
 <main>
   <section id="left">
+    <div id="status"></div>
+    <div class="verdict" id="verdict"></div>
+    <div class="sub" id="focusNote"></div>
     <div class="summary" id="summary"></div>
-    <div class="legend">
-      <span>✓ ! ✗ % = share of runs not skipped by the gate that passed</span>
-      <span><i class="sw s-pass"></i>supported, all pass</span>
-      <span><i class="sw s-part"></i>supported, some skipped (not by the gate)</span>
-      <span><i class="sw s-fail"></i>supported, some fail</span>
-      <span><i class="sw s-zero"></i>supported, ran, 0 passed</span>
-      <span><i class="sw s-none"></i>supported, no runs</span>
-      <span><i class="sw" style="border:1px solid var(--line)"></i>declared unsupported</span>
-      <span><i class="sw s-missing"></i>in neither list</span>
+    <div class="legend" id="legend">
+      <span><i class="sw s-pass"></i>✓ all pass</span>
+      <span><i class="sw s-part"></i>✓ some skipped</span>
+      <span><i class="sw s-fail"></i>✗ some fail</span>
+      <span><i class="sw s-zero"></i>0 passed</span>
+      <span><i class="sw s-none"></i>no runs</span>
+      <span><i class="sw" style="border:1px solid var(--line)"></i>— not supported</span>
+      <span><i class="sw s-missing"></i>? in neither list</span>
+      <span class="info" title="A cell counts every test run the server took part in, as encryptor or decryptor. Skips for a feature the server says it does not support, and skips caused by the other server in a pair, are left out. Hover a cell for its counts.">i</span>
     </div>
+    <div class="sub" id="cellNote">Each cell is one feature on one server: ✓ and the number of test runs that passed. Yellow means nothing failed, but some runs were skipped, mostly for a known bug (see Known bugs below). Hover a cell for its counts, click it for the tests.</div>
     <table class="matrix" id="matrix"></table>
+    <p class="sub" id="linkNote"></p>
     <div id="skips"></div>
-    <p class="sub" style="color:var(--dim);font-size:12px">Cell = passed / ran for that server, counting every test run it took part in, as encryptor or decryptor. Feature-gate skips for a feature the server declares unsupported, and skips caused by the other server in a pair, are left out. Yellow means some other skip, such as a known bug.
-    <span id="linkNote"></span></p>
   </section>
   <div id="divider" title="Drag to resize; double-click to reset"></div>
-  <section id="detail"><div class="empty">Click a cell, a feature, or a server.</div></section>
+  <section id="detail"></section>
 </main>
 
 <script src="loader.js"></script>
 <script>
-const NONE = "(no feature recorded)";
+const NONE = "core (no feature needed)";
+// Rows are grouped by what the feature is. A feature that matches no group
+// lands in "Other features".
+const GROUPS = [
+  ["Core", f => f === NONE],
+  ["Keyrings", f => /keyring|^raw-|^aws-kms|^hierarchical|^multi/.test(f)],
+  ["CMMs and caching", f => /cmm|cach|encryption-context/.test(f)],
+  ["Other features", () => true],
+];
+const groupOf = f => GROUPS.find(([, test]) => test(f))[0];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
 
 let S; // current suite
-const ui = { split:false, source:new URLSearchParams(location.search).get("run") || "", focus:"", sel:null, onlyProblems:false, search:"", open:new Set(), openCase:null, shown:{} };
+const ui = { split:false, source:readSource(), focus:"", sel:null, onlyProblems:false, search:"", open:new Set(), openCase:null, shown:{} };
 
 function loadSuite(name, d, r) {
-  const servers = d.servers.map(s => s.language);
+  const servers = sortLangs(d.servers.map(s => s.language));
   const li = Object.fromEntries(r.langs.map((l, i) => [l, i]));
   const decl = {}, src = {};
   for (const s of d.servers) {
@@ -154,7 +199,7 @@ function loadSuite(name, d, r) {
     s.supported.forEach(f => decl[s.language + "|" + f] = "supported");
     s.unsupported.forEach(f => decl[s.language + "|" + f] = "unsupported");
   }
-  const features = [...d.catalog, NONE];
+  const features = [NONE, ...d.catalog];
   const byFeature = Object.fromEntries(features.map(f => [f, []]));
   r.cases.forEach((c, i) => {
     c.id = i;
@@ -163,7 +208,15 @@ function loadSuite(name, d, r) {
     const none = !c.f.length || (c.lf && Object.values(c.lf).some(m => Object.keys(m).some(k => k.endsWith("|"))));
     [...c.f, ...(none ? [NONE] : [])].forEach(f => (byFeature[f] ??= []).push(c));
   });
-  S = { gateLog:!!r.gateLog, bugCatalog:d.bugCatalog || {}, name, servers, li, decl, src, features, byFeature, run:r.run, cases:r.cases, langs:r.langs };
+  // A language repository's CI runs only the pairs that involve its own
+  // servers. Those are the servers paired with every other server.
+  const partners = {};
+  for (const c of r.cases) for (const k of Object.keys(c.p || {})) {
+    const [e, dd] = k.split(">");
+    (partners[e] ??= new Set()).add(dd); (partners[dd] ??= new Set()).add(e);
+  }
+  const focusRun = servers.filter(s => servers.every(o => o === s || partners[s]?.has(o)));
+  S = { focusRun:focusRun.length && focusRun.length < servers.length ? focusRun : null, gateLog:!!r.gateLog, bugCatalog:d.bugCatalog || {}, name, servers, li, decl, src, features, byFeature, run:r.run, cases:r.cases, langs:r.langs };
 }
 
 const declState = (s, f) => f === NONE ? "n/a" : S.decl[s + "|" + f] || "missing";
@@ -210,35 +263,52 @@ function cellStats(s, f) {
 
 function renderHeader() {
   const r = S.run;
-  $("linkNote").innerHTML = S.gateLog
-    ? "A run counts toward a feature only when the feature gate required that feature of that server in that run."
+  $("linkNote").innerHTML = S.gateLog ? ""
     : `<b style="color:#e3b341">This run has no feature-gate log</b> (it predates <a href="https://github.com/aws/aws-crypto-tools-commons/pull/69" target="_blank">commons #69</a>). Only feature-gate skips name a feature, so most passing tests show under "${NONE}".`;
-  const concl = r.conclusion === "success" ? esc(r.conclusion) : `<b style="color:#ffa198">${esc(r.conclusion)}</b>`;
-  $("run").innerHTML = `Results: <a href="${r.url}" target="_blank">${esc(r.name || "run")} ${r.databaseId}</a> · ${esc(r.repo.split("/")[1])}@${esc(r.branch || "")} ${r.headSha.slice(0, 7)} · ${concl} · ${r.createdAt.replace("T", " ").slice(0, 16)} UTC${r.note ? ` · <b style="color:#e3b341">${esc(r.note)}</b>` : ""}`;
+  $("run").innerHTML = runLine(r);
+  $("focusNote").textContent = S.focusRun
+    ? `This run only tested pairs that involve ${S.focusRun.join(" and ")}, so the other servers show fewer runs than on commons main.` : "";
 }
 
 function renderSummary() {
-  const s = ui.focus;
+  const s = ui.focus, unit = s ? "features" : "pairs";
+  const units = n => `${n} ${n === 1 ? unit.slice(0, -1) : unit}`;
   const st = S.features.filter(f => f !== NONE).flatMap(f => (s ? [s] : S.servers).map(srv => cellStats(srv, f)));
   const supported = st.filter(c => c.state === "supported");
-  const green = supported.filter(c => c.cls === "s-pass").length;
-  const zero = supported.filter(c => c.ran > 0 && c.pass === 0).length;
+  const n = cls => supported.filter(c => c.cls === cls).length;
+  const green = n("s-pass"), skipped = n("s-part"), failing = n("s-fail"), zero = n("s-zero");
   const all = sum(S.cases, s);
-  $("summary").innerHTML = `
-    <div class="card" title="Features the server says it supports, out of all features"><small>${s ? s + " supports" : "supported"}</small><b>${supported.length}/${st.length}</b><small>${s ? "features" : "server-feature pairs"}</small></div>
-    <div class="card" title="Supported, and every test that ran passed"><small>supported, all pass</small><b>${green}</b><small>${s ? "features" : "pairs"}</small></div>
-    <div class="card" title="Supported, tests ran, and none passed. Turn on Only problems to find them."><small>supported, ran, 0 passed</small><b style="color:${zero ? '#ffa198' : ''}">${zero}</b><small>${s ? "features" : "pairs"}</small></div>
-    <div class="card"><small>test runs</small><b>${all[0].toLocaleString()}</b><small>passed · ${all[1]} failed · ${all[4].toLocaleString()} other skips · ${all[2].toLocaleString()} gated</small></div>`;
+  const bad = failing + zero;
+  $("verdict").className = "verdict " + (bad ? "bad" : "good");
+  $("verdict").innerHTML = bad
+    ? `<a data-problems="1" title="Show what fails">✗ ${units(bad)} ${bad === 1 ? "fails" : "fail"}${s ? ` on ${esc(s)}` : ""}</a>`
+    : `✓ Every supported test that ran passed${s ? ` on ${esc(s)}` : ""}` +
+      (skipped ? ` <small>· ${units(skipped)} ${skipped === 1 ? "has" : "have"} skips (${all[4].toLocaleString()} runs)</small>` : "");
+  const card = (label, value, sub, tip, color = "") =>
+    `<div class="card" title="${tip}"><small>${label}</small><b style="color:${color}">${value}</b><small>${sub}</small></div>`;
+  $("summary").innerHTML =
+    card("supported", `${supported.length}/${st.length}`, s ? "features" : "server-feature pairs", "Features the server says it supports, out of all features") +
+    card("all pass", green, unit, "Supported, and every test that ran passed") +
+    card("some skipped", skipped, unit, "Supported, nothing failed, but some tests were skipped, for example for a known bug", skipped ? "#e3b341" : "") +
+    (failing ? card("some fail", failing, unit, "Supported, and at least one test failed. Turn on Only problems to find them.", "#ffa198") : "") +
+    (zero ? card("0 passed", zero, unit, "Supported, tests ran, and none passed. Turn on Only problems to find them.", "#ffa198") : "") +
+    card("test runs passed", all[0].toLocaleString(), `${all[1].toLocaleString()} failed · ${all[4].toLocaleString()} skipped · ${all[2].toLocaleString()} not supported`,
+      "Every test run, over all servers. Not supported: skipped because the server says it does not support a feature the test needs.");
 }
 
-// Verdict for one (server, feature): icon + % of eligible runs that passed.
-// Eligible = runs the feature gate did not skip.
+// Verdict for one (server, feature). The small line says what makes the
+// cell that color: the run count, the skips, or the failures.
 function verdictCell(c, attrs, compact) {
-  if (c.state === "missing") return `<span class="cell s-missing" ${attrs}>missing</span>`;
-  if (c.state === "unsupported") return `<span class="cell s-undecl" ${attrs}>—${c.ran && !compact ? `<small>${c.pass.toLocaleString()} ran</small>` : ""}</span>`;
-  if (c.ran === 0) return `<span class="cell s-none" ${attrs} title="No test run was recorded for this feature on this server">no runs</span>`;
-  const pct = Math.floor(100 * c.pass / c.ran), icon = c.fail ? "✗" : c.skip ? "!" : "✓";
-  return `<span class="cell ${c.cls}" ${attrs}>${icon} ${pct}%${compact ? "" : `<small>${c.pass.toLocaleString()}/${c.ran.toLocaleString()}</small>`}</span>`;
+  const small = t => compact ? "" : `<small>${t}</small>`;
+  if (c.state === "missing") return `<span class="cell s-missing" ${attrs}>?${small("neither list")}</span>`;
+  if (c.state === "unsupported") return `<span class="cell s-undecl" ${attrs}>—</span>`;
+  // In a focus run, a pair with no focus server that supports the feature
+  // never runs. That is the run's scope, not a gap in the server.
+  if (c.ran === 0) return `<span class="cell s-none" ${attrs}>${S.focusRun ? "not in this run" : "no runs"}</span>`;
+  if (c.pass === 0) return `<span class="cell s-zero" ${attrs}>0 passed${small(`${c.ran.toLocaleString()} ran`)}</span>`;
+  if (c.fail) return `<span class="cell s-fail" ${attrs}>✗${small(`${c.fail.toLocaleString()} failed`)}</span>`;
+  if (c.skip) return `<span class="cell s-part" ${attrs}>✓${small(`${c.skip.toLocaleString()} skipped`)}</span>`;
+  return `<span class="cell s-pass" ${attrs}>✓${small(c.pass.toLocaleString())}</span>`;
 }
 
 // Like cellStats, but only runs where server s had one role ("E" or "D").
@@ -266,18 +336,24 @@ function renderMatrix() {
     `<th data-server="${s}" ${split ? 'colspan="2"' : ""} class="${s === ui.focus ? 'focus' : ''}" title="${esc(S.src[s].repo + '@' + S.src[s].ref)}">${s}</th>`).join("") + "</tr>";
   if (split) h += "<tr>" + S.servers.map(() => `<th class="role" title="as encryptor">enc</th><th class="role" title="as decryptor">dec</th>`).join("") + "</tr>";
   h += "</thead><tbody>";
-  for (const f of feats) {
-    h += `<tr><th data-feature="${esc(f)}" class="${f === NONE ? 'bucket' : ''}">${esc(f)}</th>`;
-    for (const s of S.servers) {
-      const sel = ui.sel && ui.sel.f === f && ui.sel.s === s ? "selected" : "";
-      const cells = split ? [roleStats(s, f, "E"), roleStats(s, f, "D")] : [cellStats(s, f)];
-      for (const c of cells) {
-        const tip = c.state === "missing" ? "in neither supportedFeatures nor unsupportedFeatures"
-          : `${c.state}: ${c.pass} pass · ${c.fail} fail · ${c.skip} other skip · ${c.gated} gated`;
-        h += `<td class="${sel}">${verdictCell(c, `title="${tip}" data-f="${esc(f)}" data-s="${s}"`, split)}</td>`;
+  const width = 1 + S.servers.length * (split ? 2 : 1);
+  for (const [g] of GROUPS) {
+    const rows = feats.filter(f => groupOf(f) === g);
+    if (!rows.length) continue;
+    h += `<tr class="group"><th colspan="${width}">${g}</th></tr>`;
+    for (const f of rows) {
+      h += `<tr><th data-feature="${esc(f)}" class="${f === NONE ? 'bucket' : ''}">${esc(f)}</th>`;
+      for (const s of S.servers) {
+        const sel = ui.sel && ui.sel.f === f && ui.sel.s === s ? "selected" : "";
+        const cells = split ? [roleStats(s, f, "E"), roleStats(s, f, "D")] : [cellStats(s, f)];
+        for (const c of cells) {
+          const tip = c.state === "missing" ? "in neither supportedFeatures nor unsupportedFeatures"
+            : `${c.state}: ${c.pass.toLocaleString()} passed · ${c.fail.toLocaleString()} failed · ${c.skip.toLocaleString()} skipped · ${c.gated.toLocaleString()} not supported`;
+          h += `<td class="${sel}">${verdictCell(c, `title="${tip}" data-f="${esc(f)}" data-s="${s}"`, split)}</td>`;
+        }
       }
+      h += "</tr>";
     }
-    h += "</tr>";
   }
   $("matrix").innerHTML = h + "</tbody>";
 }
@@ -325,7 +401,7 @@ function comboRows(f, cases) {
   }
   const rows = [...m].sort((a, b) => b[1].cases.size - a[1].cases.size);
   const max = Math.max(...rows.map(r => r[1].cases.size));
-  let h = `<h3>Feature combinations <a href="upset.html${location.search}" target="_blank" class="small">open full UpSet view</a></h3><table class="combos"><tr><th></th><th>cases</th>${S.servers.map(s => `<th>${s}</th>`).join("")}</tr>`;
+  let h = `<h3>Feature combinations <a href="upset.html?run=${encodeURIComponent(ui.source)}" target="_blank" class="small">open full UpSet view</a></h3><table class="combos"><tr><th></th><th>cases</th>${S.servers.map(s => `<th>${s}</th>`).join("")}</tr>`;
   for (const [k, row] of rows) {
     const feats = k.split("+"), n = row.cases.size;
     h += `<tr><th>${feats.map(x => `<span class="chip ${x === f ? "me" : ""}">${esc(x)}</span>`).join("")}</th>
@@ -416,7 +492,27 @@ function renderTree(cases, keyPrefix) {
   return h || '<div class="empty">Nothing here.</div>';
 }
 
+// The failing verdict opens the one failing cell, or lists every row with a problem.
+$("verdict").addEventListener("click", e => {
+  if (!e.target.closest("[data-problems]")) return;
+  const bad = S.features.filter(f => f !== NONE).flatMap(f => (ui.focus ? [ui.focus] : S.servers).map(s => ({ f, s, c:cellStats(s, f) })))
+    .filter(x => x.c.state === "supported" && (x.c.cls === "s-fail" || x.c.cls === "s-zero"));
+  if (bad.length === 1) { ui.sel = { f:bad[0].f, s:bad[0].s }; ui.focus = bad[0].s; $("focus").value = ui.focus; }
+  else { ui.onlyProblems = true; $("onlyProblems").checked = true; }
+  ui.search = ""; ui.reason = null; ui.openCase = null; ui.open.clear(); ui.shown = {};
+  render();
+});
+
+// The detail pane only takes space once something is picked.
 function renderDetail() {
+  const open = !!(ui.sel || ui.search || ui.reason);
+  document.querySelector("main").classList.toggle("open", open);
+  if (!open) { $("detail").innerHTML = ""; return; }
+  drawDetail();
+  $("detail").insertAdjacentHTML("afterbegin", `<button class="close" data-close title="Close">×</button>`);
+}
+
+function drawDetail() {
   const d = $("detail");
   const head = `<div class="dotsHead">${S.servers.map(s => `<span class="${s === ui.focus ? 'focus' : ''}">${s}</span>`).join("")}</div>`;
   if (ui.search) {
@@ -456,8 +552,11 @@ function renderDetail() {
 }
 
 // ---- skips and known bugs ----
-const reasonKind = r => r.startsWith("feature-gated") ? "unsupported feature" : r.startsWith("padding-gated") ? "unsupported padding"
-  : r.startsWith("KNOWN BUG") ? "known bug" : "other";
+// A skip is "not supported" when a gate skipped it, or when the server's own
+// skip message says it does not support what the test needs.
+const UNSUPPORTED = /does not support|not supported|unsupported|does not carry/i;
+const reasonKind = r => r.startsWith("KNOWN BUG") ? "known bug"
+  : r.startsWith("feature-gated") || r.startsWith("padding-gated") || UNSUPPORTED.test(r) ? "not supported" : "other";
 
 // reason -> server -> runs, over the given cases.
 function reasonTotals(cases) {
@@ -468,26 +567,52 @@ function reasonTotals(cases) {
   }
   return t;
 }
+const rowTotal = by => Object.values(by).reduce((x, y) => x + y, 0);
 
-function reasonTable(totals, onlyServer) {
-  const order = ["known bug", "unsupported padding", "other", "unsupported feature"];
-  const rows = Object.entries(totals).filter(([, by]) => !onlyServer || by[onlyServer])
-    .sort((a, b) => order.indexOf(reasonKind(a[0])) - order.indexOf(reasonKind(b[0]))
-      || Object.values(b[1]).reduce((x, y) => x + y, 0) - Object.values(a[1]).reduce((x, y) => x + y, 0));
+// A free-text reason like "encryptor restricts frame length 999: Frame size
+// must be ..." shows the part before the colon, with the rest folded away.
+function reasonName(r) {
+  const id = r.startsWith("KNOWN BUG ") ? r.slice(10) : null;
+  if (id) return collapsible(id, S.bugCatalog[id]?.description || "");
+  const gate = r.match(/^(feature|padding)-gated: (.*)$/);
+  if (gate) return esc(gate[2]);
+  const i = r.indexOf(": ");
+  return i > 0 ? collapsible(r.slice(0, i), r.slice(i + 2)) : esc(r);
+}
+
+// True when server s says it supports every feature a feature-gate reason
+// names, so the skip must have come from the other server in the pair.
+const partnerGated = (r, s) => r.startsWith("feature-gated: ")
+  && r.slice(15).split(", ").every(f => declState(s, f) === "supported");
+
+// One row per reason, one column per server. Header counts are the runs
+// that table skipped on that server.
+function skipTable(rows, cols, withKind) {
   if (!rows.length) return '<div class="sub">No skips.</div>';
-  const cols = onlyServer ? [onlyServer] : S.servers;
   const colTotal = s => rows.reduce((n, [, by]) => n + (by[s] || 0), 0);
-  let h = `<table class="combos reasons"><tr><th>Reason</th><th>Kind</th><th title="runs skipped for this reason">Skipped</th>${cols.map(s => `<th title="${colTotal(s).toLocaleString()} runs skipped">${s} <span class="hcount">${colTotal(s).toLocaleString()}</span></th>`).join("")}</tr>`;
+  let h = `<table class="combos reasons"><tr><th>Reason</th>${withKind ? "<th>Kind</th>" : ""}${cols.map(s => `<th title="${colTotal(s).toLocaleString()} runs skipped">${s} <span class="hcount">${colTotal(s).toLocaleString()}</span></th>`).join("")}</tr>`;
   for (const [r, by] of rows) {
-    const kind = reasonKind(r);
-    const id = r.startsWith("KNOWN BUG ") ? r.slice(10) : null;
-    const desc = id && S.bugCatalog[id] ? S.bugCatalog[id].description : "";
-    const total = cols.reduce((n, s) => n + (by[s] || 0), 0);
-    h += `<tr class="${kind === "unsupported feature" ? "dim" : ""}"><th>${collapsible(id || r, desc)}</th><td>${kind}</td><td class="num">${total.toLocaleString()}</td>`;
-    for (const s of cols) h += by[s] ? `<td class="link ${kind === "unsupported feature" ? "" : "s-part"}" data-reason="${esc(r)}" data-rs="${s}">${by[s].toLocaleString()}</td>` : "<td></td>";
+    const kind = reasonKind(r), dim = kind === "not supported";
+    h += `<tr class="${dim ? "dim" : ""}"><th>${reasonName(r)}</th>${withKind ? `<td>${kind}</td>` : ""}`;
+    for (const s of cols) {
+      if (!by[s]) { h += "<td></td>"; continue; }
+      const partner = partnerGated(r, s);
+      const cls = partner ? "partner" : dim ? "" : "s-part";
+      const tip = partner ? ` title="${s} says it supports this, so the other server in the pair caused these skips"` : "";
+      h += `<td class="link ${cls}"${tip} data-reason="${esc(r)}" data-rs="${s}">${by[s].toLocaleString()}</td>`;
+    }
     h += "</tr>";
   }
   return h + "</table>";
+}
+
+const byKindThenSize = (a, b) => ["known bug", "other", "not supported"].indexOf(reasonKind(a[0])) - ["known bug", "other", "not supported"].indexOf(reasonKind(b[0]))
+  || rowTotal(b[1]) - rowTotal(a[1]);
+
+// Every skip reason one server hit, for the detail pane.
+function reasonTable(totals, onlyServer) {
+  const rows = Object.entries(totals).filter(([, by]) => by[onlyServer]).sort(byKindThenSize);
+  return skipTable(rows, [onlyServer], true);
 }
 
 // A name with its description hidden until clicked.
@@ -496,42 +621,48 @@ const collapsible = (name, desc) => desc
   : esc(name);
 
 function renderSkips() {
-  // Known bugs: every bug any server declares, with what the run did with it.
+  // Known bugs: every bug any server declares, with the runs it skipped.
   const stale = {};
   for (const c of S.cases) for (const [id, l] of Object.entries(c.stale || {})) (stale[id] ??= new Set()).add(l);
   const totals = reasonTotals(S.cases);
   const ids = new Set([...S.servers.flatMap(s => S.src[s].bugs), ...Object.keys(stale)]);
+  const runs = (id, s) => (totals["KNOWN BUG " + id] || {})[s] || 0;
   let h = `<h3>Known bugs</h3>`;
   if (!ids.size) h += '<div class="sub">No server declares a known bug.</div>';
   else {
     const declares = (s, id) => S.src[s].bugs.includes(id) || stale[id]?.has(s);
-    h += `<div class="sub">● = declared in that server's bug-config.json (hover for runs skipped, click for the tests). <span class="s-fail" style="padding:0 4px">fixed?</span> = declared, but it no longer reproduces.</div>`;
+    h += `<div class="sub">Runs each server skipped for a bug its bug-config.json declares. Click a count for the tests. <span class="s-fail" style="padding:0 4px">fixed?</span> = declared, but it no longer reproduces.</div>`;
     const bugCount = s => [...ids].filter(id => declares(s, id)).length;
-    h += `<table class="combos reasons"><tr><th>Bug <span class="hcount">${ids.size}</span></th><th title="servers declaring this bug">Servers</th>${S.servers.map(s => `<th title="${bugCount(s)} bugs declared"><a href="https://github.com/${S.src[s].repo}/blob/${S.src[s].ref}/${S.src[s].bugPath}" target="_blank">${s}</a> <span class="hcount">${bugCount(s)}</span></th>`).join("")}</tr>`;
-    for (const id of [...ids].sort()) {
-      const n = S.servers.filter(s => declares(s, id)).length;
-      h += `<tr><th>${collapsible(id, S.bugCatalog[id]?.description || "not in the commons bug list")}</th><td class="num">${n}</td>`;
+    const sorted = [...ids].sort((a, b) => S.servers.reduce((n, s) => n + runs(b, s) - runs(a, s), 0) || a.localeCompare(b));
+    h += `<table class="combos reasons"><tr><th>Bug <span class="hcount">${ids.size}</span></th>${S.servers.map(s => `<th title="${bugCount(s)} bugs declared"><a href="https://github.com/${S.src[s].repo}/blob/${S.src[s].ref}/${S.src[s].bugPath}" target="_blank">${s}</a> <span class="hcount">${bugCount(s)}</span></th>`).join("")}</tr>`;
+    for (const id of sorted) {
+      h += `<tr><th>${collapsible(id, S.bugCatalog[id]?.description || "not in the commons bug list")}</th>`;
       for (const s of S.servers) {
-        const runs = (totals["KNOWN BUG " + id] || {})[s] || 0;
+        const n = runs(id, s);
         h += stale[id]?.has(s) ? `<td class="s-fail" title="declared, but the bug no longer reproduces: remove it from bug-config.json">fixed?</td>`
-          : S.src[s].bugs.includes(id) ? `<td class="s-part link" data-reason="KNOWN BUG ${esc(id)}" data-rs="${s}" title="${runs.toLocaleString()} runs skipped">●</td>`
-          : "<td></td>";
+          : !S.src[s].bugs.includes(id) ? "<td></td>"
+          : n ? `<td class="s-part link" data-reason="KNOWN BUG ${esc(id)}" data-rs="${s}" title="${n.toLocaleString()} runs skipped">${n.toLocaleString()}</td>`
+          : `<td class="zero" title="declared, but no test hit it in this run">0</td>`;
       }
       h += "</tr>";
     }
     h += "</table>";
   }
-  h += `<h3>Skips by reason</h3><div class="sub">Click a count to see those tests. Feature-gate skips are grayed: the server declared the feature unsupported.</div>` + reasonTable(totals);
+  const rows = Object.entries(totals).filter(([r, by]) => reasonKind(r) !== "known bug" && rowTotal(by)).sort(byKindThenSize);
+  const other = rows.filter(([r]) => reasonKind(r) === "other"), unsup = rows.filter(([r]) => reasonKind(r) === "not supported");
+  h += `<h3>Other skips</h3><div class="sub">Skips that are not a known bug and not a missing feature. Click a count for the tests.</div>` + skipTable(other, S.servers);
+  const unsupRuns = unsup.reduce((n, [, by]) => n + rowTotal(by), 0);
+  h += `<details class="fold" id="unsupFold" ${ui.unsupOpen ? "open" : ""}><summary>Not supported <small>· ${unsupRuns.toLocaleString()} runs skipped because a server lacks a feature or padding. The grid shows these as —.</small></summary>` + skipTable(unsup, S.servers) + `</details>`;
   $("skips").innerHTML = h;
 }
 
 function render() { renderHeader(); renderSummary(); renderMatrix(); renderSkips(); renderDetail(); }
 
 const loaded = {};
-const status = msg => { $("detail").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
+const status = msg => { $("status").textContent = msg; };
 async function selectSuite(name) {
   if (!localStorage.getItem("github-dashboard-token")) {
-    $("matrix").innerHTML = ""; $("summary").innerHTML = "";
+    $("matrix").innerHTML = ""; $("summary").innerHTML = ""; $("verdict").innerHTML = ""; $("skips").innerHTML = "";
     status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).");
     return false;
   }
@@ -542,6 +673,7 @@ async function selectSuite(name) {
     status("Load failed: " + (err.message || err));
     return false;
   }
+  status("");
   loadSuite(name, loaded[name + "|" + ui.source].decl, loaded[name + "|" + ui.source].results);
   if (!S.servers.includes(ui.focus)) ui.focus = "";
   ui.sel = null; ui.openCase = null; ui.open.clear(); ui.shown = {};
@@ -550,27 +682,130 @@ async function selectSuite(name) {
   if (bad.length) console.warn("feature-config.json not readable for", bad.map(s => `${s}: ${S.src[s].error}`));
   return true;
 }
-const show = async name => { if (await selectSuite(name)) render(); };
+const show = async name => {
+  if (!name) return showOverview();
+  $("legend").style.display = ""; $("cellNote").style.display = ""; $("detail").style.display = "";
+  if (await selectSuite(name)) render();
+};
 
-$("suite").innerHTML = Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
+// ---- overview: every library × every server ----
+// One cell per library and server: that server's runs in the library's test
+// server run, over every feature. Libraries load one at a time, since each
+// report zip is tens of MB.
+const OVERVIEW = {};
+async function showOverview() {
+  $("legend").style.display = "none"; $("cellNote").style.display = "none";
+  ui.sel = null; renderDetail();
+  if (!localStorage.getItem("github-dashboard-token")) {
+    status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).");
+    return;
+  }
+  const draw = () => { if (!$("suite").value) renderOverview(); };
+  for (const name of Object.keys(PRODUCTS)) OVERVIEW[name] ??= { state:"queued" };
+  draw();
+  for (const name of Object.keys(PRODUCTS)) {
+    const o = OVERVIEW[name], key = name + "|" + ui.source;
+    if (o.state === "done" && o.source === ui.source) continue;
+    o.state = "loading"; o.source = ui.source; draw();
+    try {
+      loaded[key] ??= await loadProduct(name, msg => { o.step = msg; draw(); }, ui.source);
+      const r = loaded[key].results;
+      o.run = r.run;
+      // Per server: [passed, failed, not supported, skipped by the other server, skipped],
+      // plus how many of the skips were for a known bug.
+      o.servers = Object.fromEntries(r.langs.filter(l => l !== "(none)").map(l => {
+        const t = [0, 0, 0, 0, 0], li = r.langs.indexOf(l);
+        let bug = 0;
+        for (const c of r.cases) {
+          for (let k = 0; k < 5; k++) t[k] += c.r[li][k];
+          for (const [why, by] of Object.entries(c.why)) if (why.startsWith("KNOWN BUG")) bug += by[l] || 0;
+        }
+        return [l, { t, bug }];
+      }));
+      o.state = "done";
+    } catch (err) {
+      delete loaded[key];
+      o.error = err.message || String(err);
+      o.state = /^no (finished|successful) run/.test(o.error) ? "norun" : "error";
+    }
+    draw();
+  }
+}
+
+function renderOverview() {
+  status("");
+  $("summary").innerHTML = ""; $("focusNote").innerHTML = ""; $("linkNote").innerHTML = ""; $("skips").innerHTML = "";
+  const names = Object.keys(PRODUCTS);
+  const langs = sortLangs(new Set(names.flatMap(n => Object.keys(OVERVIEW[n]?.servers || {}))));
+  const done = names.filter(n => OVERVIEW[n]?.state === "done");
+  const failing = done.flatMap(n => Object.entries(OVERVIEW[n].servers).filter(([, x]) => x.t[1]).map(([l]) => `${n} ${l}`));
+  $("verdict").className = "verdict " + (failing.length ? "bad" : "good");
+  $("verdict").innerHTML = !done.length ? "" : failing.length
+    ? `✗ ${failing.length} failing: ${failing.map(esc).join(", ")}`
+    : `✓ Every test that ran passed <small>· ${done.length} of ${names.length} libraries loaded</small>`;
+  let h = `<thead><tr><th></th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const n of names) {
+    const o = OVERVIEW[n] || { state:"queued" };
+    const run = o.run ? ` <a class="small" href="${o.run.url}" target="_blank" title="${esc(o.run.branch || "")} · ${o.run.headSha.slice(0, 7)}">run</a>` : "";
+    h += `<tr><th data-lib="${esc(n)}" class="libname">${n}${run}</th>`;
+    if (o.state !== "done") {
+      const text = o.state === "loading" ? `<span class="spin"></span>${esc(o.step || "loading")}`
+        : o.state === "queued" ? "waiting" : o.state === "norun" ? "no run yet" : "failed";
+      h += `<td colspan="${Math.max(langs.length, 1)}"><span class="cell s-none" title="${esc(o.error || "")}">${text}</span></td></tr>`;
+      continue;
+    }
+    for (const l of langs) {
+      const x = o.servers[l];
+      if (!x) { h += `<td><span class="cell s-undecl">—</span></td>`; continue; }
+      const [p, f, gated, , k] = x.t, ran = p + f + k, other = k - x.bug;
+      const cls = !ran ? "s-none" : f ? "s-fail" : k ? "s-part" : "s-pass";
+      const lines = f ? [`${f.toLocaleString()} failed`] : [`${p.toLocaleString()} passed`];
+      if (x.bug) lines.push(`${x.bug.toLocaleString()} known bug`);
+      if (other > 0) lines.push(`${other.toLocaleString()} other skip`);
+      const tip = `${p.toLocaleString()} test runs passed, ${f} failed.\n${x.bug.toLocaleString()} skipped for a known bug this server declares.\n${Math.max(other, 0).toLocaleString()} skipped for another reason.\n${gated.toLocaleString()} not run: the server does not support a feature they need.`;
+      h += `<td><span class="cell ${cls}" data-lib="${esc(n)}" data-s="${l}" title="${esc(tip)}">${!ran ? "no runs" : f ? "✗" : "✓"}${lines.map(t => `<small>${t}</small>`).join("")}</span></td>`;
+    }
+    h += `</tr>`;
+  }
+  $("matrix").innerHTML = h + `</tbody>`;
+  $("linkNote").innerHTML = `Each cell counts the test runs that server took part in, in that library's newest passing test server run on commons main.
+    <span class="s-pass" style="padding:0 4px">green</span> every run passed.
+    <span class="s-part" style="padding:0 4px">yellow</span> nothing failed, but some runs were skipped, mostly for a known bug the server declares in its bug-config.json.
+    Runs a server can't do, because it does not support a feature, are not counted. Click a cell for that library.`;
+  $("run").innerHTML = "";
+}
+
+// Opening a library from the overview focuses the clicked server.
+async function openLibrary(name, server) {
+  $("suite").value = name;
+  if (await selectSuite(name)) {
+    if (server && S.servers.includes(server)) { ui.focus = server; $("focus").value = server; }
+    $("legend").style.display = ""; $("cellNote").style.display = "";
+    render();
+  }
+}
+
+$("suite").innerHTML = `<option value="">All libraries</option>` + Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
 $("suite").onchange = e => show(e.target.value);
 $("source").value = ui.source;
 $("source").onchange = e => {
   ui.source = e.target.value.trim();
-  const q = new URLSearchParams(location.search);
-  ui.source ? q.set("run", ui.source) : q.delete("run");
-  history.replaceState(null, "", "?" + q);
+  writeSource(ui.source);
   show($("suite").value);
 };
 $("focus").onchange = e => { ui.focus = e.target.value; render(); };
 $("onlyProblems").onchange = e => { ui.onlyProblems = e.target.checked; render(); };
 $("split").onchange = e => { ui.split = e.target.checked; renderMatrix(); };
-$("upsetLink").onclick = () => { $("upsetLink").href = "upset.html" + location.search; };
-$("coverageLink").onclick = () => { $("coverageLink").href = "coverage.html" + location.search; };
+$("upsetLink").onclick = () => { $("upsetLink").href = "upset.html?run=" + encodeURIComponent(ui.source); };
 let searchTimer;
 $("search").oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { ui.search = e.target.value.trim(); ui.open.clear(); renderDetail(); }, 250); };
 $("matrix").onclick = e => {
-  const c = e.target.closest(".cell"), fh = e.target.closest("tbody th"), sh = e.target.closest("thead th[data-server]");
+  if (!$("suite").value) {
+    const t = e.target.closest("[data-lib]");
+    if (t && !e.target.closest("a")) openLibrary(t.dataset.lib, t.dataset.s);
+    return;
+  }
+  const c = e.target.closest(".cell"), fh = e.target.closest("tbody th[data-feature]"), sh = e.target.closest("thead th[data-server]");
   if (c) { ui.sel = { f:c.dataset.f, s:c.dataset.s }; ui.focus = c.dataset.s; }
   else if (fh) ui.sel = { f:fh.dataset.feature };
   else if (sh) { ui.sel = { s:sh.dataset.server }; ui.focus = sh.dataset.server; }
@@ -606,7 +841,11 @@ const reasonClick = e => {
   return false;
 };
 $("skips").addEventListener("click", e => { if (reasonClick(e)) $("detail").scrollTop = 0; });
+$("skips").addEventListener("toggle", e => { if (e.target.id === "unsupFold") ui.unsupOpen = e.target.open; }, true);
+// Close the View menu on a click anywhere else.
+document.addEventListener("click", e => { if (!e.target.closest("#view")) $("view").open = false; });
 $("detail").addEventListener("click", e => {
+  if (e.target.closest("[data-close]")) { ui.sel = null; ui.reason = null; ui.search = ""; $("search").value = ""; render(); return; }
   if (reasonClick(e)) return;
   const sum = e.target.closest("summary");
   if (sum) {
