@@ -242,7 +242,9 @@ class GitHubDashboard {
         }
 
         if (section === 'duvet') {
-            // Duvet section is static, no data loading needed
+            // The duvet page fetches its own reports, so load the frame once.
+            const frame = document.getElementById('duvetFrame');
+            if (!frame.getAttribute('src')) frame.src = 'duvet/index.html';
             return;
         }
 
@@ -370,7 +372,7 @@ class GitHubDashboard {
         // Fetch all repos in parallel
         const promises = this.config.repositories.map(repo =>
             this.fetchDataForRepository(section, repo).catch(err => {
-                console.error(`Error fetching ${section} for ${repo.name}:`, err);
+                console.error('Error fetching %s for %s:', section, repo.name, err);
                 return [];
             })
         );
@@ -404,7 +406,7 @@ class GitHubDashboard {
                 this.cache.set(cacheKey, { data: { lastReplyIsFromTeam }, timestamp: Date.now() });
                 return { ...issue, lastReplyIsFromTeam };
             } catch (err) {
-                console.error(`Error fetching comments for ${issue.number}:`, err);
+                console.error('Error fetching comments for %s:', issue.number, err);
                 return { ...issue, lastReplyIsFromTeam: false };
             }
         }));
@@ -553,7 +555,7 @@ class GitHubDashboard {
                             }
                         }
                     } catch (err) {
-                        console.error(`Error fetching CI for ${repo.name}:`, err);
+                        console.error('Error fetching CI for %s:', repo.name, err);
                     }
                 });
                 await Promise.all(promises);
@@ -589,7 +591,7 @@ class GitHubDashboard {
                     }
                     return { repo, runs };
                 } catch (err) {
-                    console.error(`Error fetching CI for ${repo.name}:`, err);
+                    console.error('Error fetching CI for %s:', repo.name, err);
                     return { repo, runs: [] };
                 }
             }));
@@ -1094,7 +1096,7 @@ class GitHubDashboard {
             return data;
             
         } catch (error) {
-            console.error(`Error fetching ${section} for ${repository.name}:`, error);
+            console.error('Error fetching %s for %s:', section, repository.name, error);
             return [];
         }
     }
@@ -1107,7 +1109,7 @@ class GitHubDashboard {
 
         try {
             while (url && pageCount < maxPages) {
-                console.log(`Fetching page ${pageCount + 1} from: ${url}`);
+                console.log('Fetching page %d from: %s', pageCount + 1, url);
                 
                 const response = await this.fetchFromGitHubRaw(url);
                 const data = response.data;
