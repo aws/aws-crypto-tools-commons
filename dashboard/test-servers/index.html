@@ -703,9 +703,10 @@ async function showOverview() {
   const draw = () => { if (!$("suite").value) renderOverview(); };
   for (const name of Object.keys(PRODUCTS)) OVERVIEW[name] ??= { state:"queued" };
   draw();
-  for (const name of Object.keys(PRODUCTS)) {
+  // Every library at once.
+  await Promise.all(Object.keys(PRODUCTS).map(async name => {
     const o = OVERVIEW[name], key = name + "|" + ui.source;
-    if (o.state === "done" && o.source === ui.source) continue;
+    if (o.state === "done" && o.source === ui.source) return;
     o.state = "loading"; o.source = ui.source; draw();
     try {
       loaded[key] ??= await loadProduct(name, msg => { o.step = msg; draw(); }, ui.source);
@@ -729,7 +730,7 @@ async function showOverview() {
       o.state = /^no (finished|successful) run/.test(o.error) ? "norun" : "error";
     }
     draw();
-  }
+  }));
 }
 
 function renderOverview() {
