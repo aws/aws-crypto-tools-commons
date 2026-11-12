@@ -173,6 +173,12 @@
   .chgbadge.chg-lost, .chgbadge.chg-removed { border-color:#e3b341; color:#e3b341; }
   .chgline { font-size:12px; color:var(--sel); margin:2px 0 4px 16px; }
   .chgline.chg-lost, .chgline.chg-removed { color:#e3b341; }
+  .lintbadge { color:#ff7b72; font-size:11px; }
+  .reqm td.rm.conflict { box-shadow:inset 0 0 0 2px #da3633; }
+  .reqm td.rm { position:relative; }
+  .notedot { position:absolute; top:3px; right:3px; width:5px; height:5px; border-radius:50%; background:var(--dim); }
+  .lintline { font-size:12px; color:var(--dim); margin:2px 0 2px 16px; }
+  .lintline.bad { color:#ff7b72; }
 </style>
 </head>
 <body>
@@ -194,6 +200,7 @@
       <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 25%,transparent)"></i>some</span>
       <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 6%,transparent);border:1px solid var(--line)"></i>none yet</span>
       <span><i class="sw nrsw"></i>no report on main (hover for why)</span>
+      <span title="Ideal: code and a test, an implication, or an exception. A conflict is two kinds that say opposite things, like implied and also tested."><b class="lintbadge">⚠</b> conflicting annotations</span>
     </div>
     <table class="matrix" id="matrix"></table>
     <div id="lists"></div>
@@ -376,7 +383,7 @@ async function loadPRSource(src, p) {
 }
 
 // ---------- shared helpers ----------
-const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false, changedOnly:false };
+const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false, changedOnly:false, conflictsOnly:false };
 // Columns of the open library. A shown report has r (its key), specs, and
 // base: the main report when a PR report replaces it.
 function view(s) {
@@ -480,7 +487,7 @@ function renderOverview() {
       if (!c.r) { h += emptyCell(c); continue; }
       const t = totalsOf(c.specs), p = t.n ? t.done / t.n : 0, was = c.base && totalsOf(c.base.specs);
       h += `<td><span class="cell${c.isPR ? " pr" : ""}" style="${shade(p)}" data-lib="${esc(lib)}" data-c="${esc(c.key)}" title="${t.done}/${t.n} requirements done${was ? ` (main: ${was.done}/${was.n})` : ""}">`
-        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}${delta(t, was)}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small>${srcTag(s)}</span></td>`;
+        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}${delta(t, was)}${warnBadge(conflictCount(c.specs))}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small>${srcTag(s)}</span></td>`;
     }
     h += `</tr>`;
   }
@@ -514,7 +521,7 @@ function cellHtml(c, s) {
   if (!c.specs[s] && !c.base?.specs?.[s]) return `<td><span class="cell s-na">—</span></td>`;
   const t = stats(c, s), p = t.n ? t.done / t.n : 0, all = t.n && t.done === t.n, was = c.base && statsOf(c.base.specs, s);
   const on = ui.sel && ui.sel.s === s && ui.sel.c === c.r ? "sel" : "";
-  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}${was ? ` (main: ${was.done}/${was.n})` : ""}">${all ? "✓" : t.n ? Math.floor(100 * p) + "%" : "removed"}${delta(t, was)}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
+  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}${was ? ` (main: ${was.done}/${was.n})` : ""}">${all ? "✓" : t.n ? Math.floor(100 * p) + "%" : "removed"}${delta(t, was)}${warnBadge(conflictCount(c.specs, s))}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
 }
 
 function renderMatrix() {
@@ -579,10 +586,47 @@ function compareView(s, r) {
   for (const c of cols()) {
     if (!c.r) { h += `<div class="lang"><h4>${c.lang} <span class="st none">no report</span></h4><div class="why">${esc(c.why || "")}</div></div>`; continue; }
     const x = index(c).get(k), st = state(x);
-    h += `<div class="lang"><h4>${c.lang}${c.isPR ? ` <span class="prtag">PR #${c.n}</span>` : ""} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>${changeLine(c, k)}`
+    h += `<div class="lang"><h4>${c.lang}${c.isPR ? ` <span class="prtag">PR #${c.n}</span>` : ""} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>${changeLine(c, k)}${lintLines(s, x)}`
       + (x ? annLines(c, x) : `<div class="why">${hasSpecs(c) ? "This report does not list this requirement." : esc(c.why || "")}</div>`) + `</div>`;
   }
   return h;
+}
+
+// How well one requirement's annotations fit together. The ideal is code
+// and a test, an implication, or an exception. More than one code or test
+// annotation is fine but worth a note. Two kinds that say opposite things
+// (implied and also tested, skipped and also built) are conflicts.
+// A data-format requirement may have two code annotations: one that reads
+// the bytes and one that writes them.
+function lint(s, r) {
+  if (!r) return { conflicts:[], notes:[] };
+  const n = k => r.ann.filter(a => a[0] === k).length;
+  const C = n("C"), T = n("T"), I = n("I"), E = n("E"), D = n("D");
+  const conflicts = [], notes = [];
+  if (I && T) conflicts.push("implied and tested: a test means it is not implied, so cite it as code");
+  if (I && C) conflicts.push("implied and also cited as code: pick one");
+  if (I && E) conflicts.push("implied and an exception: it cannot be done and skipped");
+  if (E && (C || T)) conflicts.push("an exception, but also cited as code or a test");
+  if (D && (C || T || I || E)) conflicts.push("a todo next to other annotations: the todo is stale");
+  const codeLimit = s.startsWith("data-format/") ? 2 : 1;
+  if (C > codeLimit) notes.push(`${C} code annotations`);
+  if (I > 1) notes.push(`${I} implications`);
+  if (E > 1) notes.push(`${E} exceptions`);
+  if (T >= 10) notes.push(`${T} tests`);
+  return { conflicts, notes };
+}
+// Conflicts in one report, over one spec or over all of them.
+function conflictCount(specs, only) {
+  let n = 0;
+  for (const [s, sp] of Object.entries(specs || {})) if (!only || s === only)
+    for (const r of sp.reqs) if (keep(r) && lint(s, r).conflicts.length) n++;
+  return n;
+}
+const warnBadge = n => n ? ` <b class="lintbadge" title="${n} requirement${n > 1 ? "s" : ""} with conflicting annotations">⚠ ${n}</b>` : "";
+function lintLines(s, r) {
+  const { conflicts, notes } = lint(s, r);
+  return conflicts.map(x => `<div class="lintline bad">⚠ ${esc(x)}</div>`).join("")
+    + notes.map(x => `<div class="lintline">note: ${esc(x)}</div>`).join("");
 }
 
 // Letters for what one language has: C code, T test, I implied, E exception, D todo.
@@ -590,8 +634,9 @@ const letters = r => r ? [...new Set(r.ann.map(a => a[0]))].sort((x, y) => "CTIE
 function rmCell(c, s, r) {
   const on = c.r && c.r === ui.lang ? " on" : "";
   if (!c.r) return `<td class="rm none${on}" title="${c.lang}: no report on main"></td>`;
-  const k = rkey(s, r), x = index(c).get(k), st = state(x), ch = change(c, k);
-  return `<td class="rm ${st}${on}${ch ? " chg chg-" + ch : ""}" title="${c.lang}: ${STATE_LABEL[st]}${ch ? " · PR: " + CHANGE[ch] : ""}">${letters(x)}</td>`;
+  const k = rkey(s, r), x = index(c).get(k), st = state(x), ch = change(c, k), L = lint(s, x);
+  const tip = [STATE_LABEL[st], ...L.conflicts.map(m => "⚠ " + m), ...L.notes.map(m => "note: " + m), ch ? "PR: " + CHANGE[ch] : ""].filter(Boolean).join("\n");
+  return `<td class="rm ${st}${on}${ch ? " chg chg-" + ch : ""}${L.conflicts.length ? " conflict" : ""}" title="${esc(c.lang + ": " + tip)}">${letters(x)}${L.notes.length && !L.conflicts.length ? `<i class="notedot"></i>` : ""}</td>`;
 }
 // Section header: how much of the section each language has done.
 function secCell(c, s, list) {
@@ -610,7 +655,7 @@ function rowDetail(s, r) {
     ? `<span class="tab${o === c ? " on" : ""}" data-lang="${esc(o.r)}"><i class="ld ${state(index(o).get(k))}"></i>${o.lang}</span>`
     : `<span class="tab off" title="${esc(o.why || "")}"><i class="ld none"></i>${o.lang}</span>`).join("");
   const x = c && index(c).get(k);
-  const body = !c ? "" : changeLine(c, k) + (x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`);
+  const body = !c ? "" : changeLine(c, k) + lintLines(s, x) + (x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`);
   return `<tr class="open"><td colspan="${C.length + 1}"><div class="quote">${esc(plain(r.q))}</div>
     <div class="tabs">${tabs}<span class="tab cmp" data-req="${esc(k)}">Compare all languages ⤢</span></div>${body}</td></tr>`;
 }
@@ -618,10 +663,13 @@ function specView(s) {
   const C = cols(), rs = reqsOf(s);
   const gap = r => C.some(c => { const st = hasSpecs(c) && c.specs[s] ? state(index(c).get(rkey(s, r))) : "na"; return st !== "na" && !isDone(st); });
   const changed = r => C.some(c => change(c, rkey(s, r)));
-  const shown = rs.filter(r => (!ui.gapsOnly || gap(r)) && (!ui.changedOnly || changed(r)));
+  const conflicted = r => C.some(c => c.r && lint(s, index(c).get(rkey(s, r))).conflicts.length);
+  const shown = rs.filter(r => (!ui.gapsOnly || gap(r)) && (!ui.changedOnly || changed(r)) && (!ui.conflictsOnly || conflicted(r)));
+  const nConf = rs.filter(conflicted).length;
   const anyPR = C.some(c => c.base);
   let h = `<h2>${esc(titleOf(s))}</h2><div class="sub">${esc(s)} · ${rs.length} requirements · click a row for details
     <label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="gapsOnly" ${ui.gapsOnly ? "checked" : ""}> Only gaps</label>
+    ${nConf ? `<label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="conflictsOnly" ${ui.conflictsOnly ? "checked" : ""}> Only conflicts (${nConf})</label>` : ""}
     ${anyPR ? `<label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="changedOnly" ${ui.changedOnly ? "checked" : ""}> Only what the PR changed (${rs.filter(changed).length})</label>` : ""}</div>
     <table class="reqm"><thead><tr><th></th>${C.map(c => `<th class="${c.r && c.r === ui.lang ? "on" : ""}" ${c.r ? `data-lang="${esc(c.r)}"` : ""}>${c.lang}${c.isPR ? `<br><span class="prtag">PR</span>` : ""}</th>`).join("")}</tr></thead><tbody>`;
   for (const sec of [...new Set(rs.map(r => r.sec))]) {
@@ -728,6 +776,7 @@ document.body.addEventListener("click", e => {
 });
 document.body.addEventListener("change", e => {
   if (e.target.id === "gapsOnly") { ui.gapsOnly = e.target.checked; renderDetail(); }
+  if (e.target.id === "conflictsOnly") { ui.conflictsOnly = e.target.checked; renderDetail(); }
   if (e.target.id === "changedOnly") { ui.changedOnly = e.target.checked; renderDetail(); }
 });
 let t; $("search").oninput = e => { clearTimeout(t); t = setTimeout(() => { ui.search = e.target.value.trim(); ui.req = null; renderDetail(); }, 200); };
