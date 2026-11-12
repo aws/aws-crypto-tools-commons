@@ -345,10 +345,10 @@ async function fetchResults(product, run, progress) {
   if (!arts.length) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
   const cases = new Map();
   let gateLog = null;
-  for (const [n, art] of arts.entries()) {
+  progress(`Downloading ${product} reports (${(arts.reduce((n, a) => n + a.size_in_bytes, 0) / 1e6).toFixed(1)} MB)…`);
+  const zips = await Promise.all(arts.map(async art => (await gh(`repos/${run.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer()));
+  for (const [n, zip] of zips.entries()) {
     const of = arts.length > 1 ? ` ${n + 1}/${arts.length}` : "";
-    progress(`Downloading ${product} reports${of} (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);
-    const zip = await (await gh(`repos/${run.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
     const entries = zipEntries(zip);
     const xmls = entries.filter(e => /test-results\/.*TEST-[^/]*\.xml$/.test(e.name));
     const logEntry = entries.find(e => /test-results\/feature-gate-log\.jsonl$/.test(e.name));
@@ -431,18 +431,19 @@ async function localCoverage(repo, commit, run, progress) {
   const runs = (await ghJson(`repos/${repo}/actions/runs?head_sha=${commit}&per_page=100`)).workflow_runs;
   const ids = [...new Set([...(run.repo === repo ? [run.databaseId] : []), ...runs.map(r => r.id)])];
   const newest = new Map();
-  for (const id of ids) for (const a of await named(id)) {
+  const lists = await Promise.all(ids.map(async id => [id, await named(id)]));
+  for (const [id, arts] of lists) for (const a of arts) {
     const seen = newest.get(a.name);
     if (!seen || a.created_at > seen.created_at) newest.set(a.name, { ...a, runUrl:`https://github.com/${repo}/actions/runs/${id}` });
   }
   if (!newest.size) return null;
   const files = new Map();
-  for (const a of newest.values()) {
-    const part = await cachedArtifact(repo, a, progress, async (zip, entries) => {
-      const m = new Map();
-      for (const e of entries.filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), m);
-      return m;
-    });
+  const parts = await Promise.all([...newest.values()].map(a => cachedArtifact(repo, a, progress, async (zip, entries) => {
+    const m = new Map();
+    for (const e of entries.filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), m);
+    return m;
+  })));
+  for (const part of parts) {
     for (const [f, lines] of part) {
       const into = files.get(f) || new Map();
       for (const [n, h] of lines) into.set(n, Math.max(into.get(n) || 0, h));
@@ -459,26 +460,27 @@ async function localCoverage(repo, commit, run, progress) {
 async function fetchCoverage(product, run, progress, update = () => {}) {
   const arts = await reportArtifacts(run.repo, run.databaseId, product);
   if (!arts.length) throw new Error(`run ${run.databaseId} has no ${product}-test-server-reports artifact`);
+  const parts = await Promise.all(arts.map(art => cachedArtifact(run.repo, art, progress, async (zip, entries) => {
+    const out = [];
+    for (const e of entries.filter(e => /(^|\/)coverage\/[^/]+\.json$/.test(e.name))) {
+      const lcov = entries.find(x => x.name === e.name.replace(/\.json$/, ".lcov"));
+      if (lcov) out.push({ meta:JSON.parse(await zipText(zip, e)), server:parseLcov(await zipText(zip, lcov)) });
+    }
+    return out;
+  })));
+  // The newest artifact comes first, so it wins when two report one language.
   const reports = [];
-  for (const art of arts) {
-    const part = await cachedArtifact(run.repo, art, progress, async (zip, entries) => {
-      const out = [];
-      for (const e of entries.filter(e => /(^|\/)coverage\/[^/]+\.json$/.test(e.name))) {
-        const lcov = entries.find(x => x.name === e.name.replace(/\.json$/, ".lcov"));
-        if (lcov) out.push({ meta:JSON.parse(await zipText(zip, e)), server:parseLcov(await zipText(zip, lcov)) });
-      }
-      return out;
-    });
-    // The newest artifact comes first, so it wins when two report one language.
-    for (const r of part) if (!reports.some(x => x.meta.language === r.meta.language)) reports.push(r);
-  }
+  for (const part of parts) for (const r of part) if (!reports.some(x => x.meta.language === r.meta.language)) reports.push(r);
   const out = reports.map(({ meta, server }) => ({ ...meta, server, local:undefined }));
   update(out);
-  for (const c of out) {
-    progress(`Finding ${c.repository} local coverage for ${c.commit.slice(0, 7)}…`);
-    c.local = await localCoverage(c.repository, c.commit, run, progress);
+  // Servers built from one repository and commit share its local coverage,
+  // so it is fetched once for all of them, and every repository at once.
+  progress("Finding each library's local test coverage…");
+  const local = {};
+  await Promise.all(out.map(async c => {
+    c.local = await (local[c.repository + "@" + c.commit] ??= localCoverage(c.repository, c.commit, run, progress));
     update(out);
-  }
+  }));
   return out;
 }
 

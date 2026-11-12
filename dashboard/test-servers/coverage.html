@@ -368,8 +368,8 @@ async function load() {
   for (const label of Object.keys(PRODUCTS)) ALL[label] = { phase:"queued" };
   ui.file = null; ui.lib = null; ui.lang = null;
   renderLeft(); renderDetail();
-  // One library at a time: each report zip is tens of MB.
-  for (const label of Object.keys(PRODUCTS)) await loadLibrary(label);
+  // Every library at once; each one's downloads are cached by artifact id.
+  await Promise.all(Object.keys(PRODUCTS).map(loadLibrary));
 }
 
 $("source").value = ui.source;
