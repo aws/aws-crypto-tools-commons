@@ -17,11 +17,14 @@ import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
 import aws.cryptography.testserver.tests.ExpectedError;
+import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.Arguments;
 
 /**
  * Keyring calls that any keyring's tests can use.
@@ -33,6 +36,13 @@ import java.util.Objects;
 final class KeyringTestHelpers {
 
     private KeyringTestHelpers() {
+    }
+
+    /** One test case for each pair of an input and a language server, for {@code @MethodSource}. */
+    static Stream<Arguments> forEachLanguageServer(List<?> inputs) {
+        List<LanguageServerTarget> languageServers = LanguageServerRegistry.shared().targets();
+        return inputs.stream().flatMap(input -> languageServers.stream()
+            .map(languageServer -> Arguments.of(input, languageServer)));
     }
 
     /** New encryption materials, with no data key yet. */

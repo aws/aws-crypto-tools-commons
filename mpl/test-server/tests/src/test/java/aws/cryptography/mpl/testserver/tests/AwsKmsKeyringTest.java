@@ -4,6 +4,7 @@ import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.assertKey
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.assertOnDecryptFails;
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.assertOnEncryptFails;
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.bytes;
+import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.forEachLanguageServer;
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.onEncrypt;
 import static aws.cryptography.mpl.testserver.tests.MplErrors.INVALID_CONFIGURATION_ERROR;
 import static aws.cryptography.mpl.testserver.tests.MplErrors.INVALID_MATERIALS_ERROR;
@@ -22,6 +23,8 @@ import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.testserver.tests.ExpectedError;
+import aws.cryptography.testserver.tests.KmsInputs;
+import aws.cryptography.testserver.tests.KmsInputs.Example;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
@@ -67,7 +70,6 @@ public class AwsKmsKeyringTest {
     private static final String KMS_KEY_ARN = arn("key/" + KEY_ID);
     private static final String KMS_KEY_RESOURCE = "KmsKey:" + KMS_KEY_ARN;
     private static final String ALIAS_ARN = arn("alias/x");
-    private static final String RAW_ALIAS = "alias/x";
     /** A well-formed key ARN for a key other than KMS_KEY_ARN. */
     private static final String OTHER_KEY_ARN = arn("key/00000000-0000-0000-0000-000000000000");
     private static final String OTHER_REGION = "us-east-2";
@@ -169,41 +171,29 @@ public class AwsKmsKeyringTest {
             });
     }
 
-    static Stream<Arguments> grantTokenListsByTarget() {
-        List<List<String>> lists = List.of(
-            IntStream.range(0, 10).mapToObj(i -> String.valueOf((char) ('a' + i))).toList(),
-            IntStream.range(0, 10).mapToObj(i -> String.valueOf((char) ('a' + i)).repeat(8192)).toList());
-        return lists.stream().flatMap(tokens -> targets().stream()
-            .map(languageServer -> Arguments.of(tokens.size() + " tokens of length " + tokens.get(0).length(),
-                tokens, languageServer)));
+    static Stream<Arguments> validGrantTokenListsByLanguageServer() {
+        return forEachLanguageServer(KmsInputs.validGrantTokenLists());
     }
 
-    @ParameterizedTest(name = "[aws-kms] construction accepts {0} {2}")
-    @MethodSource("grantTokenListsByTarget")
-    void constructionAcceptsGrantTokens(String name, List<String> grantTokens, LanguageServerTarget languageServer) {
+    @ParameterizedTest(name = "[aws-kms] construction accepts {0} {1}")
+    @MethodSource("validGrantTokenListsByLanguageServer")
+    void constructionAcceptsGrantTokens(Example<List<String>> grantTokens, LanguageServerTarget languageServer) {
         FeatureGate.require(Set.of(AWS_KMS_FEATURE), languageServer);
         MPLTestServerClient mpl = MplTestServerClients.forEndpoint(languageServer.endpoint());
 
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# - MAY provide a list of Grant Tokens
-        assertUsableKeyring(mpl, KMS_KEY_ARN, grantTokens);
+        assertUsableKeyring(mpl, KMS_KEY_ARN, grantTokens.value());
     }
 
-    /** Grant token limits that KMS sets: at most 10 tokens, each 1 to 8192 characters. */
-    static Stream<Arguments> invalidGrantTokenListsByTarget() {
-        List<List<String>> lists = List.of(
-            IntStream.rangeClosed(1, 11).mapToObj(i -> "grant-token-" + i).toList(),
-            List.of(""),
-            List.of("a".repeat(8193)));
-        return lists.stream().flatMap(tokens -> targets().stream()
-            .map(languageServer -> Arguments.of(tokens.size() + " tokens, first of length " + tokens.get(0).length(),
-                tokens, languageServer)));
+    static Stream<Arguments> invalidGrantTokenListsByLanguageServer() {
+        return forEachLanguageServer(KmsInputs.invalidGrantTokenLists());
     }
 
-    @ParameterizedTest(name = "[aws-kms] construction rejects {0} {2}")
-    @MethodSource("invalidGrantTokenListsByTarget")
-    void constructionRejectsInvalidGrantTokens(String name, List<String> grantTokens,
+    @ParameterizedTest(name = "[aws-kms] construction rejects {0} {1}")
+    @MethodSource("invalidGrantTokenListsByLanguageServer")
+    void constructionRejectsInvalidGrantTokens(Example<List<String>> grantTokens,
             LanguageServerTarget languageServer) {
         FeatureGate.require(Set.of(AWS_KMS_FEATURE), languageServer);
         MPLTestServerClient mpl = MplTestServerClients.forEndpoint(languageServer.endpoint());
@@ -214,7 +204,7 @@ public class AwsKmsKeyringTest {
         MPLClientError error = assertThrows(MPLClientError.class, () -> mpl.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(realKmsClient(REGION))
-            .grantTokens(grantTokens)
+            .grantTokens(grantTokens.value())
             .build()));
         MplErrors.expectError(languageServer, error).matches(INVALID_CONFIGURATION_ERROR);
     }
@@ -238,37 +228,13 @@ public class AwsKmsKeyringTest {
         MplErrors.expectError(languageServer, error).matches(INVALID_CONFIGURATION_ERROR);
     }
 
-    /** A key identifier that aws-kms-key-arn.md does not call valid. */
-    record MalformedKeyId(String name, String kmsKeyId) {
-        @Override
-        public String toString() {
-            return name;
-        }
-    }
-
-    static Stream<Arguments> malformedKeyIdsByTarget() {
-        List<MalformedKeyId> ids = List.of(
-            new MalformedKeyId("non-ASCII character", arn("key/9d989aa2-2f9c-438c-a745-cc57d3ad012\u00e9")),
-            // A raw alias that is valid apart from its length.
-            new MalformedKeyId("2049 characters", "alias/" + "a".repeat(2049 - "alias/".length())),
-            new MalformedKeyId("5-part ARN", "arn:aws:kms:" + REGION + ":" + ACCOUNT),
-            new MalformedKeyId("7-part ARN", KMS_KEY_ARN + ":extra"),
-            new MalformedKeyId("empty partition", "arn::kms:" + REGION + ":" + ACCOUNT + ":key/" + KEY_ID),
-            new MalformedKeyId("empty region", "arn:aws:kms::" + ACCOUNT + ":key/" + KEY_ID),
-            new MalformedKeyId("empty account", "arn:aws:kms:" + REGION + "::key/" + KEY_ID),
-            new MalformedKeyId("service s3", "arn:aws:s3:" + REGION + ":" + ACCOUNT + ":key/" + KEY_ID),
-            new MalformedKeyId("ARN resource foo/x", arn("foo/x")),
-            new MalformedKeyId("ARN resource key/", arn("key/")),
-            new MalformedKeyId("ARN resource key", arn("key")),
-            new MalformedKeyId("raw key/<uuid>", "key/" + KEY_ID),
-            new MalformedKeyId("raw foo/bar", "foo/bar"),
-            new MalformedKeyId("raw alias/", "alias/"));
-        return ids.stream().flatMap(id -> targets().stream().map(languageServer -> Arguments.of(id, languageServer)));
+    static Stream<Arguments> invalidKmsIdentifiersByLanguageServer() {
+        return forEachLanguageServer(KmsInputs.invalidKmsIdentifiers(KMS_KEY_ARN));
     }
 
     @ParameterizedTest(name = "[aws-kms] construction rejects a key id with {0} {1}")
-    @MethodSource("malformedKeyIdsByTarget")
-    void constructionRejectsMalformedKeyId(MalformedKeyId malformed, LanguageServerTarget languageServer) {
+    @MethodSource("invalidKmsIdentifiersByLanguageServer")
+    void constructionRejectsMalformedKeyId(Example<String> malformed, LanguageServerTarget languageServer) {
         FeatureGate.require(Set.of(AWS_KMS_FEATURE), languageServer);
         MPLTestServerClient mpl = MplTestServerClients.forEndpoint(languageServer.endpoint());
 
@@ -279,7 +245,7 @@ public class AwsKmsKeyringTest {
         assertUsableKeyring(mpl, KMS_KEY_ARN, List.of());
         // Rejects malformed AWS KMS key identifier
         MPLClientError error = assertThrows(MPLClientError.class, () -> mpl.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
-            .kmsKeyId(malformed.kmsKeyId())
+            .kmsKeyId(malformed.value())
             .kmsClient(realKmsClient(REGION))
             .build()));
         MplErrors.expectError(languageServer, error).matches(INVALID_CONFIGURATION_ERROR);
@@ -294,8 +260,8 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
-        for (String kmsKeyId : List.of(KMS_KEY_ARN, ALIAS_ARN, KEY_ID, RAW_ALIAS)) {
-            assertUsableKeyring(mpl, kmsKeyId, List.of());
+        for (Example<String> kmsKeyId : KmsInputs.validKmsIdentifiers(KMS_KEY_ARN)) {
+            assertUsableKeyring(mpl, kmsKeyId.value(), List.of());
         }
     }
 
@@ -366,7 +332,7 @@ public class AwsKmsKeyringTest {
             AlgorithmSuiteId.ALG_AES_192_GCM_IV12_TAG16_NO_KDF,
             AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_NO_KDF);
         List<Integer> lengths = List.of(16, 24, 32);
-        return Stream.of(KMS_KEY_ARN, KEY_ID, ALIAS_ARN, RAW_ALIAS)
+        return KmsInputs.validKmsIdentifiers(KMS_KEY_ARN).stream().map(Example::value)
             .flatMap(id -> IntStream.range(0, suites.size())
                 .mapToObj(i -> new RequestCase(id, suites.get(i), lengths.get(i))))
             .flatMap(c -> targets().stream().map(languageServer -> Arguments.of(c, languageServer)));
@@ -548,8 +514,7 @@ public class AwsKmsKeyringTest {
     // -----------------------------------------------------------------------
 
     static Stream<Arguments> keyIdFormsByTarget() {
-        return Stream.of(KMS_KEY_ARN, KEY_ID, ALIAS_ARN, RAW_ALIAS)
-            .flatMap(keyId -> targets().stream().map(languageServer -> Arguments.of(keyId, languageServer)));
+        return forEachLanguageServer(KmsInputs.validKmsIdentifiers(KMS_KEY_ARN).stream().map(Example::value).toList());
     }
 
     /** FakeKms replies with a different key than the keyring's own, and the EDK must record the key from the reply. */
