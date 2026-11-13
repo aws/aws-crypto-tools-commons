@@ -102,6 +102,9 @@ class EncryptionContextBehaviorTests {
         ESDKClientConfig config = configFor(new TargetPair(target, target));
         Map<String, String> reserved = new LinkedHashMap<>();
         reserved.put(RESERVED_KEY, "any-value");
+        // Accepts an encryption context key without the reserved prefix
+        EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of("any-key", "any-value"), null, null);
+        // Rejects an encryption context key with the reserved prefix
         ESDKClientError error = assertThrows(ESDKClientError.class,
             () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
             "encrypt with a reserved '" + RESERVED_KEY + "' encryption-context key must be "
@@ -136,6 +139,9 @@ class EncryptionContextBehaviorTests {
         Map<String, String> ec = Map.of("purpose", "test");
         Map<String, String> wrong = Map.of("purpose", "tampered");
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
+        // Accepts the encryption context the message was encrypted with
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec));
+        // Rejects an encryption context that changes a value
         ESDKClientError error = assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, wrong),
             "decrypt with a reproduced encryption context that changes a value must be rejected "
