@@ -38,14 +38,14 @@ class CLaunchPlanTest {
         assertEquals(
             List.of("cmake", "-S", REPO.toString(), "-B", BUILD.toString(),
                 "-DBUILD_TEST_SERVER=ON", "-DBUILD_AWS_ENC_SDK_CPP=OFF"),
-            CLaunchPlan.configureCommand("cmake", REPO, BUILD, null));
+            CLaunchPlan.configureCommand("cmake", REPO, BUILD, null, false));
     }
 
     @Test
     @DisplayName("a set CMAKE_PREFIX_PATH passes through to the configure, like the Makefile")
     void configureWithPrefixPath() {
         List<String> command =
-            CLaunchPlan.configureCommand("cmake", REPO, BUILD, "/opt/awsdeps");
+            CLaunchPlan.configureCommand("cmake", REPO, BUILD, "/opt/awsdeps", false);
         assertEquals("-DCMAKE_PREFIX_PATH=/opt/awsdeps", command.get(command.size() - 1));
     }
 
@@ -53,8 +53,15 @@ class CLaunchPlanTest {
     @DisplayName("a blank CMAKE_PREFIX_PATH is not passed through")
     void configureWithBlankPrefixPath() {
         assertEquals(
-            CLaunchPlan.configureCommand("cmake", REPO, BUILD, null),
-            CLaunchPlan.configureCommand("cmake", REPO, BUILD, "  "));
+            CLaunchPlan.configureCommand("cmake", REPO, BUILD, null, false),
+            CLaunchPlan.configureCommand("cmake", REPO, BUILD, "  ", false));
+    }
+
+    @Test
+    @DisplayName("coverage turns on the repository's CODE_COVERAGE_ENABLE option")
+    void configureWithCoverage() {
+        List<String> command = CLaunchPlan.configureCommand("cmake", REPO, BUILD, null, true);
+        assertEquals("-DCODE_COVERAGE_ENABLE=ON", command.get(command.size() - 1));
     }
 
     @Test

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Test Server UpSet</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+          --pass:#2ea043; --fail:#da3633; --part:#d29922; --sel:#388bfd; --dot:#3a3f4b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:14px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 10px 0 0; }
+  select, input { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  #run { margin-left:auto; color:var(--dim); font-size:12px; }
+  main { padding:16px 20px; overflow:auto; }
+  .note { color:var(--dim); font-size:12px; max-width:1100px; margin:0 0 12px; }
+  table { border-collapse:collapse; }
+  th, td { padding:0; }
+  /* feature columns */
+  th.feat { width:22px; vertical-align:bottom; cursor:pointer; }
+  th.feat .name { writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; font-weight:500; font-size:12px; padding:4px 0; color:var(--dim); }
+  th.feat.on .name { color:var(--sel); }
+  th.feat .size { height:60px; display:flex; align-items:flex-end; justify-content:center; }
+  th.feat .size i { width:10px; background:var(--dim); border-radius:2px 2px 0 0; }
+  td.dotcell { width:22px; text-align:center; position:relative; }
+  .dot { width:11px; height:11px; border-radius:50%; background:var(--dot); display:inline-block; position:relative; z-index:1; vertical-align:middle; }
+  .dot.in { background:var(--text); }
+  td.dotcell.span::before { content:""; position:absolute; left:0; right:0; top:50%; height:3px; margin-top:-1.5px; background:var(--text); }
+  td.dotcell.first::before { left:50%; } td.dotcell.last::before { right:50%; }
+  td.dotcell.only::before { display:none; }
+  /* intersection size bar */
+  td.bar { width:150px; padding:0 10px; }
+  .bar i { display:inline-block; height:12px; background:var(--sel); border-radius:2px; vertical-align:middle; }
+  .bar span { color:var(--dim); font-size:11px; margin-left:6px; font-variant-numeric:tabular-nums; }
+  /* server verdict cells */
+  th.srv { font-size:12px; font-weight:600; padding:0 3px 6px; vertical-align:bottom; min-width:64px; }
+  td.v { text-align:center; border:1px solid var(--line); font-size:11px; font-variant-numeric:tabular-nums; padding:3px 4px; min-width:64px; }
+  td.v.ok { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  td.v.bad { background:color-mix(in srgb,var(--fail) 40%,transparent); }
+  td.v.some { background:color-mix(in srgb,var(--part) 35%,transparent); }
+  td.v.zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
+  td.v.na { color:var(--dim); }
+  tr.row { cursor:pointer; }
+  tr.row:hover td { background-color:color-mix(in srgb,var(--sel) 10%,transparent); }
+  tr.row.open td.bar, tr.row.open td.dotcell { background:color-mix(in srgb,var(--sel) 18%,transparent); }
+  tr.detail td { padding:6px 10px 12px; background:var(--panel); }
+  .tests { columns:2; font-family:ui-monospace,monospace; font-size:11px; }
+  .tests div { break-inside:avoid; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:12px; }
+  .legend span { display:flex; gap:5px; align-items:center; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid var(--line); }
+  .empty { color:var(--dim); padding:40px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Feature combinations (UpSet)</h1>
+  <label>Test server <select id="suite"></select></label>
+  <label>Count <select id="unit"><option value="cases">test cases</option><option value="runs">test runs</option></select></label>
+  <label>PR / commit <input id="source" size="30" placeholder="newest passing run on commons main"></label>
+  <span id="run"></span>
+</header>
+<main>
+  <p class="note">Each row is one exact set of features that some tests need. Black dots show the set.
+  A test sits in exactly one row, so rows never overlap and every server in a row has the same tests to run.
+  Click a feature name to keep only rows that include it. Click a row to see its tests.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 35%,transparent)"></i>supports all, all pass</span>
+    <span><i class="sw" style="background:color-mix(in srgb,var(--part) 35%,transparent)"></i>supports all, some skipped</span>
+    <span><i class="sw" style="background:color-mix(in srgb,var(--fail) 40%,transparent)"></i>supports all, some fail</span>
+    <span><i class="sw" style="background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 4px,transparent 4px 8px)"></i>supports all, 0 ran</span>
+    <span><i class="sw"></i>— lacks a feature in the row</span>
+  </div>
+  <div id="out" class="empty">Loading…</div>
+</main>
+<script src="loader.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const ui = { source:readSource(), filter:new Set(), open:null, unit:"cases" };
+const loaded = {};
+let D;
+
+function build(decl, results) {
+  const servers = sortLangs(decl.servers.map(s => s.language));
+  const li = Object.fromEntries(results.langs.map((l, i) => [l, i]));
+  const sup = {};
+  decl.servers.forEach(s => sup[s.language] = new Set(s.supported));
+  // With the gate log, a combo is the exact feature set the gate required of
+  // one server in one run, so a case can sit in several rows (one per
+  // server role). Each row's per-server counts are only that server's runs
+  // with exactly that set. Without the log, a combo is the case's feature set.
+  const combos = new Map();
+  const row = key => combos.get(key) || combos.set(key, { feats:key ? key.split("+") : [], cases:[], by:{} }).get(key);
+  for (const c of results.cases) {
+    if (c.lf) {
+      const seen = new Set();
+      for (const [s, entries] of Object.entries(c.lf)) for (const [k, x] of Object.entries(entries)) {
+        const fs = k.split("|")[1], r = row(fs), t = r.by[s] ??= [0, 0, 0, 0, 0];
+        for (let i = 0; i < 5; i++) t[i] += x[i];
+        if (!seen.has(fs)) { seen.add(fs); r.cases.push(c); }
+      }
+    } else {
+      const r = row(c.f.join("+"));
+      r.cases.push(c);
+      for (const s of servers) { const i = li[s]; if (i === undefined) continue; const t = r.by[s] ??= [0, 0, 0, 0, 0]; for (let k = 0; k < 5; k++) t[k] += c.r[i][k]; }
+    }
+  }
+  const used = new Map();
+  for (const r of combos.values()) for (const f of r.feats) used.set(f, (used.get(f) || 0) + r.cases.length);
+  const feats = [...used.keys()].sort((a, b) => used.get(b) - used.get(a));
+  return { servers, li, sup, combos:[...combos.values()], feats, used, run:results.run, decl };
+}
+
+const runsOf = combo => Object.values(combo.by).reduce((n, t) => n + t[0] + t[1] + t[4], 0);
+const sizeOf = combo => ui.unit === "cases" ? combo.cases.length : runsOf(combo);
+
+function verdict(combo, s) {
+  if (!combo.feats.every(f => D.sup[s].has(f))) return `<td class="v na" title="${s} lacks ${combo.feats.filter(f => !D.sup[s].has(f)).join(", ")}">—</td>`;
+  const [p, f, , , k] = combo.by[s] || [0, 0, 0, 0, 0], ran = p + f + k;
+  const cls = ran === 0 ? "zero" : f ? "bad" : k ? "some" : "ok";
+  return `<td class="v ${cls}" title="${s}: ${p} pass · ${f} fail · ${k} skip">${ran ? `${p.toLocaleString()}/${ran.toLocaleString()}` : "0 ran"}</td>`;
+}
+
+function render() {
+  const r = D.run;
+  $("run").innerHTML = `<a href="${r.url}" target="_blank">run ${r.databaseId}</a> · ${esc(r.repo.split("/")[1])}@${esc(r.branch || "")} ${r.headSha.slice(0, 7)} · ${esc(r.conclusion)}`;
+  const rows = D.combos.filter(c => [...ui.filter].every(f => c.feats.includes(f)))
+    .sort((a, b) => sizeOf(b) - sizeOf(a));
+  const max = Math.max(1, ...rows.map(sizeOf));
+  const maxSet = Math.max(1, ...D.used.values());
+  let h = `<table><thead><tr>`;
+  for (const f of D.feats)
+    h += `<th class="feat ${ui.filter.has(f) ? "on" : ""}" data-f="${esc(f)}" title="${esc(f)}: ${D.used.get(f)} test cases"><div class="size"><i style="height:${Math.max(2, 56 * D.used.get(f) / maxSet)}px"></i></div><div class="name">${esc(f)}</div></th>`;
+  h += `<th class="srv" style="text-align:left;padding-left:10px">${ui.unit === "cases" ? "test cases" : "test runs"}</th>`;
+  h += D.servers.map(s => `<th class="srv" title="${esc(D.decl.servers.find(x => x.language === s).repo)}">${s}</th>`).join("") + `</tr></thead><tbody>`;
+  rows.forEach((combo, idx) => {
+    const ins = D.feats.map(f => combo.feats.includes(f));
+    const firstIn = ins.indexOf(true), lastIn = ins.lastIndexOf(true);
+    h += `<tr class="row ${ui.open === combo ? "open" : ""}" data-i="${idx}">`;
+    ins.forEach((on, j) => {
+      const span = j >= firstIn && j <= lastIn && firstIn >= 0;
+      const cls = !span ? "" : firstIn === lastIn ? "span only" : j === firstIn ? "span first" : j === lastIn ? "span last" : "span";
+      h += `<td class="dotcell ${cls}"><i class="dot ${on ? "in" : ""}"></i></td>`;
+    });
+    const n = sizeOf(combo);
+    h += `<td class="bar"><i style="width:${Math.max(2, 110 * n / max)}px"></i><span>${n.toLocaleString()}${combo.feats.length ? "" : " · no feature"}</span></td>`;
+    h += D.servers.map(s => verdict(combo, s)).join("") + `</tr>`;
+    if (ui.open === combo) {
+      const groups = new Map();
+      combo.cases.forEach(c => { const k = `${c.c} · ${c.m}`; groups.set(k, (groups.get(k) || 0) + 1); });
+      h += `<tr class="detail"><td colspan="${D.feats.length + 1 + D.servers.length}">
+        <b>${combo.feats.length ? combo.feats.map(esc).join(" + ") : "no feature recorded"}</b> · ${combo.cases.length.toLocaleString()} test cases in ${groups.size} test methods
+        <div class="tests">${[...groups].sort((a, b) => b[1] - a[1]).map(([k, n]) => `<div title="${esc(k)}">${esc(k)}${n > 1 ? ` <span style="color:var(--dim)">×${n}</span>` : ""}</div>`).join("")}</div></td></tr>`;
+    }
+  });
+  $("out").className = ""; $("out").innerHTML = h + `</tbody></table>`;
+  $("out").querySelectorAll("tr.row").forEach(tr => tr.onclick = () => { const c = rows[+tr.dataset.i]; ui.open = ui.open === c ? null : c; render(); });
+  $("out").querySelectorAll("th.feat").forEach(th => th.onclick = () => { const f = th.dataset.f; ui.filter.has(f) ? ui.filter.delete(f) : ui.filter.add(f); ui.open = null; render(); });
+}
+
+async function show() {
+  const name = $("suite").value;
+  if (!localStorage.getItem("github-dashboard-token")) { $("out").className = "empty"; $("out").textContent = "Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."; return; }
+  const key = name + "|" + ui.source;
+  try {
+    loaded[key] ??= await loadProduct(name, msg => { $("out").className = "empty"; $("out").textContent = msg; }, ui.source);
+  } catch (e) { delete loaded[key]; $("out").className = "empty"; $("out").textContent = "Load failed: " + (e.message || e); return; }
+  D = build(loaded[key].decl, loaded[key].results);
+  ui.filter.clear(); ui.open = null;
+  render();
+}
+
+$("suite").innerHTML = Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
+$("suite").onchange = show;
+$("unit").onchange = e => { ui.unit = e.target.value; if (D) render(); };
+$("source").value = ui.source;
+$("source").onchange = e => { ui.source = e.target.value.trim(); writeSource(ui.source); show(); };
+show();
+</script>
+</body>
+</html>

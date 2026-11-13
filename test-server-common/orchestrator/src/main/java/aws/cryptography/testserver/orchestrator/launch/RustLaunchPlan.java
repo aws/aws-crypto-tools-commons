@@ -78,6 +78,8 @@ public final class RustLaunchPlan implements Launcher {
 
     /** The default cargo target directory (relative to the server crate). */
     static final String DEFAULT_TARGET_DIR = "target";
+    /** The RUSTFLAGS of a coverage build; CI sets the same value so its cargo cache matches. */
+    static final String COVERAGE_RUSTFLAGS = "-C instrument-coverage";
 
     private static final String SERVER_LOG_NAME = "rust-server.log";
 
@@ -172,11 +174,14 @@ public final class RustLaunchPlan implements Launcher {
         //    Skipped when the stamp shows this commit's binary is already built.
         BuildStamp stamp = new BuildStamp(serverDir, product);
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
+        Optional<Path> coverage = Coverage.start(entry, sources, "llvm",
+            Map.of("objects", List.of(binary.toAbsolutePath().normalize().toString())));
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary))) {
             if (dafnyProject.isPresent()) {
                 transpile(language, dafnyProject.get(), resolved.dirty());
             }
-            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, Map.of());
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir,
+                coverage.isPresent() ? Map.of("RUSTFLAGS", COVERAGE_RUSTFLAGS) : Map.of());
             stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
@@ -186,6 +191,9 @@ public final class RustLaunchPlan implements Launcher {
         server.directory(serverDir.toFile());
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
+        // The instrumented server writes its profile here when it exits.
+        coverage.ifPresent(dir -> server.environment().put("LLVM_PROFILE_FILE",
+            dir.resolve("%p-%m.profraw").toString()));
         return subprocessLauncher.launch(language, entry.port(), server);
     }
 

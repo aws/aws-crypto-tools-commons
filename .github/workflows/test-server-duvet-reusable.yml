@@ -1,0 +1,180 @@
+# Reusable workflow: list the shared Tests that run for one language, and
+# upload their duvet test annotations for that language's duvet report.
+#
+#   1. A dry run of the <product> Tests for <language>
+#      (`make orchestrate ... languages=<language> dryRun=true`): no server is
+#      built or launched, and each Test stops at its first server call. The
+#      feature-gate log then names every Test that would run for the language.
+#   2. test-server-common/tools/duvet_test_annotations.py keeps the
+#      annotations of those Tests, minus Tests gated by a bug in the
+#      language's bug-config.json and quotes not in the language's spec.
+#   3. The result is one file, uploaded as <artifact-name>. The caller's duvet
+#      job downloads it into the path its .duvet/config.toml reads.
+#
+# Refs resolve the same way as the <product>-test-server-reusable.yml
+# workflows, Test-Server-Override lines included. No AWS credentials.
+
+name: TestServer duvet annotations
+
+on:
+  workflow_call:
+    inputs:
+      product:
+        description: The commons product whose Tests to dry-run (esdk, mpl, dbesdk, primitives).
+        type: string
+        required: true
+      language:
+        description: The language whose Tests to list (e.g. rust).
+        type: string
+        required: true
+      config-path:
+        description: >-
+          Directory in the language repository holding the language's
+          bug-config.json (e.g. esdk/test-server).
+        type: string
+        required: true
+      spec-command:
+        description: >-
+          Command run in the language repository before the quote check, to
+          check out its spec (e.g. scripts/resolve-spec.sh). Empty runs nothing.
+        type: string
+        default: ""
+      spec-root:
+        description: >-
+          Directory in the language repository that the annotations' spec paths
+          are relative to. Empty skips the quote check.
+        type: string
+        default: ""
+      prefixes:
+        description: >-
+          Space-separated FROM=TO spec path rewrites (e.g. specification/=spec/).
+        type: string
+        default: ""
+      artifact-name:
+        description: The name of the uploaded artifact holding <product>.java.
+        type: string
+        required: true
+      language-repository:
+        description: owner/name of the language repository. Defaults to the caller.
+        type: string
+        default: ""
+      language-ref:
+        description: The language-repository ref. Defaults to the calling commit.
+        type: string
+        default: ""
+      commons-ref:
+        description: The aws-crypto-tools-commons ref to run when called from another repository.
+        type: string
+        default: main
+      runner:
+        description: >-
+          Runner label for every job. Callers from another repo must pass their
+          own codebuild-<project>-<run_id>-<run_attempt> label.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    secrets:
+      repo-pat:
+        description: Read-only token for the private repositories (aws-crypto-tools-commons, ...).
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: resolve refs
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      commons_ref: ${{ steps.refs.outputs.commons_ref }}
+      language_repository: ${{ steps.refs.outputs.language_repository }}
+      language_ref: ${{ steps.refs.outputs.language_ref }}
+      language_branches: ${{ steps.refs.outputs.language_branches }}
+    steps:
+      - name: Check out the resolve script
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+          sparse-checkout: .github/scripts
+      - name: Resolve refs
+        id: refs
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          EVENT_BODY: ${{ github.event.pull_request.body }}
+          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
+          INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
+          INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+        run: .github/scripts/resolve-test-server-refs.sh resolve
+
+  annotations:
+    name: duvet annotations (${{ inputs.language }})
+    needs: resolve
+    runs-on: ${{ inputs.runner }}
+    env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
+    steps:
+      - name: Check out aws-crypto-tools-commons
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ needs.resolve.outputs.commons_ref }}
+          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
+
+      - name: Check out the language repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.LANGUAGE_REPOSITORY }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
+          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          path: language-repo
+
+      - name: Set up JDK 21 (Temurin) for the orchestrator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Dry-run the ${{ inputs.product }} Tests for ${{ inputs.language }}
+        working-directory: ${{ inputs.product }}/test-server
+        run: |
+          repo=${LANGUAGE_REPOSITORY#*/}
+          make orchestrate ORCHESTRATE_ARGS="workingTreeOverlay.$repo=$GITHUB_WORKSPACE/language-repo workingTreeLanguages=${{ inputs.language }} languages=${{ inputs.language }} dryRun=true"
+
+      - name: Check out the language's spec
+        if: inputs.spec-command != ''
+        working-directory: language-repo
+        run: ${{ inputs.spec-command }}
+
+      - name: Write the annotations of the Tests that run for ${{ inputs.language }}
+        env:
+          PRODUCT: ${{ inputs.product }}
+          CONFIG_PATH: ${{ inputs.config-path }}
+          SPEC_ROOT: ${{ inputs.spec-root }}
+          PREFIXES: ${{ inputs.prefixes }}
+        run: |
+          args=()
+          if [ -n "$SPEC_ROOT" ]; then args+=(--spec-root "language-repo/$SPEC_ROOT"); fi
+          for prefix in $PREFIXES; do args+=(--prefix "$prefix"); done
+          python3 test-server-common/tools/duvet_test_annotations.py \
+            --gate-log "$PRODUCT/test-server/tests/build/test-results/feature-gate-log.jsonl" \
+            --tests-dir "$PRODUCT/test-server/tests/src/test/java" \
+            --bug-config "language-repo/$CONFIG_PATH/bug-config.json" \
+            --out "out/$PRODUCT.java" "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the annotations
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: out/${{ inputs.product }}.java
+          if-no-files-found: error

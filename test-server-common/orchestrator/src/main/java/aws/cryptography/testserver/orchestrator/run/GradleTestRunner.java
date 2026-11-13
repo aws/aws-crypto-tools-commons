@@ -75,6 +75,9 @@ public final class GradleTestRunner implements TestRunner {
     public static final String REFERENCE_IMPLEMENTATION_PROPERTY =
         "testserver.referenceImplementation";
 
+    /** Runtime-config key: {@code true} for a dry run (see the tests-support DryRun). */
+    public static final String DRY_RUN_PROPERTY = "testserver.dryRun";
+
     private final Path testsModuleDir;
     private volatile String lastOutput = "";
 
@@ -203,6 +206,9 @@ public final class GradleTestRunner implements TestRunner {
             + input.referenceImplementation());
         if (focus != null && !focus.isBlank()) {
             command.add("-D" + FOCUS_PROPERTY + "=" + focus);
+        }
+        if (input.dryRun()) {
+            command.add("-D" + DRY_RUN_PROPERTY + "=true");
         }
         command.add("--console=plain");
         if (testFilter != null && !testFilter.isBlank()) {
