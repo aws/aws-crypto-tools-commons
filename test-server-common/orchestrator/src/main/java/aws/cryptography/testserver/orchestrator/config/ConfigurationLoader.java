@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Loads the TestServer's three-file configuration. The commons configuration is
@@ -173,7 +175,78 @@ public final class ConfigurationLoader {
             stringList(feature.get("unsupportedFeatures")),
             stringList(feature.get("rawRsaPaddingSchemes")),
             overrides,
-            bugIds);
+            bugIds,
+            errorChecks(feature.get("errors"), featurePath));
+    }
+
+    /**
+     * Parse the {@code errors} block of {@code feature-config.json} (see {@link ErrorChecks}).
+     * A wrong shape fails the load, so a typo never turns a check off without a word.
+     * Keys inside a check's object other than {@code version} are ignored,
+     * so later commons releases can add settings to a check.
+     *
+     * @return {@code null} when the file has no {@code errors} block
+     */
+    static ErrorChecks errorChecks(JsonNode errors, Path location) {
+        if (errors == null || errors.isNull()) {
+            return null;
+        }
+        String where = "feature-config.json at " + location + ": errors";
+        if (!errors.isObject()) {
+            throw new ConfigurationLoadException(where + " must be an object", location);
+        }
+        errors.fieldNames().forEachRemaining(name -> {
+            if (!name.equals("supported") && !name.equals("unsupported")) {
+                throw new ConfigurationLoadException(where + " has unknown key '" + name
+                    + "'; the keys are 'supported' and 'unsupported'", location);
+            }
+        });
+
+        Map<String, Integer> supported = new LinkedHashMap<>();
+        JsonNode supportedNode = errors.get("supported");
+        if (supportedNode != null) {
+            if (!supportedNode.isObject()) {
+                throw new ConfigurationLoadException(where + ".supported must be an object", location);
+            }
+            supportedNode.fields().forEachRemaining(check -> {
+                requireKnownCheck(where + ".supported", check.getKey(), location);
+                JsonNode version = check.getValue().get("version");
+                if (!check.getValue().isObject() || version == null
+                        || !version.canConvertToInt() || version.asInt() < 1) {
+                    throw new ConfigurationLoadException(where + ".supported." + check.getKey()
+                        + " must be { \"version\": N } with N of 1 or more", location);
+                }
+                supported.put(check.getKey(), version.asInt());
+            });
+        }
+
+        Map<String, String> unsupported = new LinkedHashMap<>();
+        JsonNode unsupportedNode = errors.get("unsupported");
+        if (unsupportedNode != null) {
+            if (!unsupportedNode.isObject()) {
+                throw new ConfigurationLoadException(where + ".unsupported must be an object", location);
+            }
+            unsupportedNode.fields().forEachRemaining(check -> {
+                requireKnownCheck(where + ".unsupported", check.getKey(), location);
+                if (!check.getValue().isTextual() || check.getValue().asText().isBlank()) {
+                    throw new ConfigurationLoadException(where + ".unsupported." + check.getKey()
+                        + " must be a reason, as a non-blank string", location);
+                }
+                if (supported.containsKey(check.getKey())) {
+                    throw new ConfigurationLoadException(where + ": '" + check.getKey()
+                        + "' is in both 'supported' and 'unsupported'", location);
+                }
+                unsupported.put(check.getKey(), check.getValue().asText());
+            });
+        }
+        return new ErrorChecks(supported, unsupported);
+    }
+
+    private static void requireKnownCheck(String where, String check, Path location) {
+        if (!ErrorChecks.CHECKS.contains(check)) {
+            throw new ConfigurationLoadException(where + " has unknown check '" + check
+                + "'; the checks are " + ErrorChecks.CHECKS, location);
+        }
     }
 
     // ------------------------------------------------------------------

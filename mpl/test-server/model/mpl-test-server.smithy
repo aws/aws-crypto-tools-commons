@@ -676,8 +676,20 @@ structure GenericServerError {
 }
 
 /// A failure forwarded from the underlying Material Providers Library.
+///
+/// The other members describe the error for the error checks.
+/// A server fills in only the members its library has.
+/// The value formats are in `ErrorFields` in test-server-common/tests-support.
 @error("client")
 structure MPLClientError {
     @required
     message: String
+
+    kind: String
+    service: String
+    resource: String
+    code: String
+    retryable: Boolean
+    retryKind: String
+    conflictReason: String
 }
