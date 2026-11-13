@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -125,10 +126,13 @@ public class AwsKmsKeyringTest {
         assertNotNull(createKeyring(client, KMS_KEY_ARN, realKms(REGION), List.of()));
         // Rejects a missing AWS KMS client
         KnownBugGate.gateDeclared("aws-kms-keyring-accepts-missing-kms-client", target,
-            () -> assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(
-                CreateAwsKmsKeyringInput.builder()
-                    .kmsKeyId(KMS_KEY_ARN)
-                    .build())));
+            () -> {
+                MPLClientError error = assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(
+                    CreateAwsKmsKeyringInput.builder()
+                        .kmsKeyId(KMS_KEY_ARN)
+                        .build()));
+                MplErrors.expectError(target, error).kind("Validation").retryable(false);
+            });
     }
 
     static Stream<Arguments> grantTokenListsByTarget() {
@@ -396,11 +400,7 @@ public class AwsKmsKeyringTest {
             // Accepts a successful GenerateDataKey call
             onEncrypt(client, keyringId, initializeEncryption(client, SUITE));
             // Rejects a failed GenerateDataKey call
-            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
-                .kind("ResourceNotFound")
-                .service("kms")
-                .resource(KMS_KEY_RESOURCE)
-                .code(KMS_ERROR);
+            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE), AwsKmsKeyringTest::kmsCallFailed);
         }
     }
 
@@ -429,10 +429,7 @@ public class AwsKmsKeyringTest {
             // Accepts a GenerateDataKey plaintext of the suite's length
             onEncrypt(client, keyringId, initializeEncryption(client, SUITE));
             // Rejects a GenerateDataKey plaintext one byte short or long
-            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
-                .kind("Service")
-                .service("kms")
-                .resource(KMS_KEY_RESOURCE);
+            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE), AwsKmsKeyringTest::kmsReplyRejected);
         }
     }
 
@@ -467,10 +464,7 @@ public class AwsKmsKeyringTest {
             // Accepts a GenerateDataKey reply KeyId that is a key ARN
             onEncrypt(client, keyringId, initializeEncryption(client, SUITE));
             // Rejects a GenerateDataKey reply KeyId that is not a KMS identifier
-            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
-                .kind("Service")
-                .service("kms")
-                .resource(KMS_KEY_RESOURCE);
+            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE), AwsKmsKeyringTest::kmsReplyRejected);
         }
     }
 
@@ -495,7 +489,8 @@ public class AwsKmsKeyringTest {
             onEncrypt(client, keyringId, initializeEncryption(client, SUITE));
             // Rejects a GenerateDataKey reply KeyId that is a raw key id or an alias ARN
             KnownBugGate.gateDeclared("aws-kms-keyring-accepts-reply-key-id-that-is-not-a-key-arn", target,
-                () -> assertOnEncryptFails(target, client, keyringId, materials));
+                () -> assertOnEncryptFails(target, client, keyringId, materials,
+                    AwsKmsKeyringTest::kmsReplyRejected));
         }
     }
 
@@ -596,11 +591,7 @@ public class AwsKmsKeyringTest {
             // Accepts a successful Encrypt call
             onEncrypt(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
             // Rejects a failed Encrypt call
-            assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)))
-                .kind("ResourceNotFound")
-                .service("kms")
-                .resource(KMS_KEY_RESOURCE)
-                .code(KMS_ERROR);
+            assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)), AwsKmsKeyringTest::kmsCallFailed);
         }
     }
 
@@ -621,10 +612,7 @@ public class AwsKmsKeyringTest {
             // Accepts an Encrypt reply KeyId that is a key ARN
             onEncrypt(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
             // Rejects an Encrypt reply KeyId that is not a KMS identifier
-            assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)))
-                .kind("Service")
-                .service("kms")
-                .resource(KMS_KEY_RESOURCE);
+            assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)), AwsKmsKeyringTest::kmsReplyRejected);
         }
     }
 
@@ -647,7 +635,8 @@ public class AwsKmsKeyringTest {
             onEncrypt(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
             // Rejects an Encrypt reply KeyId that is a raw key id or an alias ARN
             KnownBugGate.gateDeclared("aws-kms-keyring-accepts-reply-key-id-that-is-not-a-key-arn", target,
-                () -> assertOnEncryptFails(target, client, keyringId, materials));
+                () -> assertOnEncryptFails(target, client, keyringId, materials,
+                    AwsKmsKeyringTest::kmsReplyRejected));
         }
     }
 
@@ -674,7 +663,8 @@ public class AwsKmsKeyringTest {
         // Accepts a call through the us-west-2 client
         onEncrypt(client, rightRegion, initializeEncryption(client, SUITE));
         // Rejects a call through the us-east-2 client
-        assertOnEncryptFails(target, client, wrongRegion, initializeEncryption(client, SUITE));
+        assertOnEncryptFails(target, client, wrongRegion, initializeEncryption(client, SUITE),
+            AwsKmsKeyringTest::otherRegionKmsCallFailed);
     }
 
     @ParameterizedTest(name = "[aws-kms] Encrypt goes through the configured client {0}")
@@ -691,7 +681,8 @@ public class AwsKmsKeyringTest {
         // Accepts a call through the us-west-2 client
         onEncrypt(client, rightRegion, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
         // Rejects a call through the us-east-2 client
-        assertOnEncryptFails(target, client, wrongRegion, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
+        assertOnEncryptFails(target, client, wrongRegion, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)),
+            AwsKmsKeyringTest::otherRegionKmsCallFailed);
     }
 
     @ParameterizedTest(name = "[aws-kms] Decrypt goes through the configured client {0}")
@@ -711,7 +702,7 @@ public class AwsKmsKeyringTest {
         // Accepts a call through the us-west-2 client
         onDecrypt(client, rightRegion, edks);
         // Rejects a call through the us-east-2 client
-        assertOnDecryptFails(target, client, wrongRegion, edks);
+        assertOnDecryptFails(target, client, wrongRegion, edks, AwsKmsKeyringTest::otherRegionKmsCallFailed);
     }
 
     /** OnEncrypt on one server and OnDecrypt on another, both against real KMS. */
@@ -835,7 +826,7 @@ public class AwsKmsKeyringTest {
             // Accepts an EDK for its key
             onDecrypt(client, keyringId, List.of(edk(1)));
             // Rejects EDKs that are all for another provider or another key
-            assertOnDecryptFails(target, client, keyringId, others).kind("NoMatchingDataKey");
+            assertOnDecryptFails(target, client, keyringId, others, e -> e.kind("NoMatchingDataKey"));
             //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
             //= type=test
             //# The set of encrypted data keys MUST first be filtered to match this keyring’s configuration.
@@ -878,8 +869,8 @@ public class AwsKmsKeyringTest {
             // Accepts provider info that is a key ARN
             onDecrypt(client, keyringId, List.of(edk(1)));
             // Rejects provider info that is not an ARN
-            assertOnDecryptFails(target, client, keyringId, List.of(withProviderInfo(edk(1), info.bytes()), edk(2)))
-                .kind("Cryptographic");
+            assertOnDecryptFails(target, client, keyringId, List.of(withProviderInfo(edk(1), info.bytes()), edk(2)),
+                e -> e.kind("Cryptographic"));
         }
     }
 
@@ -904,7 +895,7 @@ public class AwsKmsKeyringTest {
             onDecrypt(client, keyringId, List.of(edk(1)));
             // Rejects provider info that is an alias ARN
             KnownBugGate.gateDeclared("aws-kms-keyring-skips-alias-arn-provider-info", target,
-                () -> assertOnDecryptFails(target, client, keyringId, edks));
+                () -> assertOnDecryptFails(target, client, keyringId, edks, e -> e.kind("Cryptographic")));
         }
     }
 
@@ -1119,10 +1110,7 @@ public class AwsKmsKeyringTest {
         // Rejects a bad Decrypt reply for the only EDK
         try (FakeKms kms = new FakeKms()) {
             kms.reply(FakeKms.DECRYPT, bad);
-            assertOnDecryptFails(target, client, fakeKmsKeyring(client, kms, KMS_KEY_ARN), List.of(edk(1)))
-                .kind("Service")
-                .service("kms")
-                .resource(KMS_KEY_RESOURCE);
+            assertOnDecryptFails(target, client, fakeKmsKeyring(client, kms, KMS_KEY_ARN), List.of(edk(1)), AwsKmsKeyringTest::kmsReplyRejected);
         }
     }
 
@@ -1136,18 +1124,20 @@ public class AwsKmsKeyringTest {
         }
     }
 
-    private static ErrorExpectation assertOnEncryptFails(LanguageServerTarget target,
-            MPLTestServerClient client, String keyringId, EncryptionMaterials materials) {
+    /** OnEncrypt fails, and {@code expected} checks the error. */
+    private static void assertOnEncryptFails(LanguageServerTarget target, MPLTestServerClient client,
+            String keyringId, EncryptionMaterials materials, Consumer<ErrorExpectation> expected) {
         MPLClientError error = assertThrows(MPLClientError.class, () -> client.onEncrypt(
             OnEncryptInput.builder()
                 .keyringId(keyringId)
                 .materials(materials)
                 .build()));
-        return MplErrors.expectError(target, error);
+        expected.accept(MplErrors.expectError(target, error));
     }
 
-    private static ErrorExpectation assertOnDecryptFails(LanguageServerTarget target,
-            MPLTestServerClient client, String keyringId, List<EncryptedDataKey> edks) {
+    /** OnDecrypt fails, and {@code expected} checks the error. */
+    private static void assertOnDecryptFails(LanguageServerTarget target, MPLTestServerClient client,
+            String keyringId, List<EncryptedDataKey> edks, Consumer<ErrorExpectation> expected) {
         DecryptionMaterials materials = initializeDecryption(client);
         MPLClientError error = assertThrows(MPLClientError.class, () -> client.onDecrypt(
             OnDecryptInput.builder()
@@ -1155,7 +1145,25 @@ public class AwsKmsKeyringTest {
                 .materials(materials)
                 .encryptedDataKeys(edks)
                 .build()));
-        return MplErrors.expectError(target, error);
+        expected.accept(MplErrors.expectError(target, error));
+    }
+
+    /** A KMS call that failed with {@link #KMS_ERROR}. */
+    private static void kmsCallFailed(ErrorExpectation error) {
+        error.kind("ResourceNotFound").service("kms").resource(KMS_KEY_RESOURCE).code(KMS_ERROR);
+    }
+
+    /** A KMS reply the keyring rejects. */
+    private static void kmsReplyRejected(ErrorExpectation error) {
+        error.kind("Service").service("kms").resource(KMS_KEY_RESOURCE);
+    }
+
+    /**
+     * A real KMS call through the us-east-2 client.
+     * The kind is not checked, because it depends on what KMS in us-east-2 says about a us-west-2 key.
+     */
+    private static void otherRegionKmsCallFailed(ErrorExpectation error) {
+        error.service("kms").resource(KMS_KEY_RESOURCE);
     }
 
     private static KmsClientConfig realKms(String region) {
