@@ -18,6 +18,7 @@ import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
+import aws.cryptography.testserver.tests.ErrorExpectation;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
@@ -58,6 +59,7 @@ public class AwsKmsKeyringTest {
     private static final String ACCOUNT = "370957321024";
     private static final String KEY_ID = "9d989aa2-2f9c-438c-a745-cc57d3ad0126";
     private static final String KMS_KEY_ARN = arn("key/" + KEY_ID);
+    private static final String KMS_KEY_RESOURCE = "KmsKey:" + KMS_KEY_ARN;
     private static final String ALIAS_ARN = arn("alias/x");
     private static final String RAW_ALIAS = "alias/x";
     /** A well-formed key ARN for a key other than KMS_KEY_ARN. */
@@ -97,9 +99,10 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# - MUST provide an AWS KMS key identifier
-        assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
+        MPLClientError error = assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsClient(realKms(REGION))
             .build()));
+        MplErrors.expectError(target, error).kind("Validation").retryable(false);
     }
 
     @ParameterizedTest(name = "[aws-kms] construction without a KMS client fails {0}")
@@ -161,11 +164,12 @@ public class AwsKmsKeyringTest {
         FeatureGate.require(Set.of(FEATURE), target);
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
 
-        assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
+        MPLClientError error = assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(realKms(REGION))
             .grantTokens(grantTokens)
             .build()));
+        MplErrors.expectError(target, error).kind("Validation").retryable(false);
     }
 
     @ParameterizedTest(name = "[aws-kms] construction rejects an empty key id {0}")
@@ -177,10 +181,11 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST NOT be null or empty.
-        assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
+        MPLClientError error = assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId("")
             .kmsClient(realKms(REGION))
             .build()));
+        MplErrors.expectError(target, error).kind("Validation").retryable(false);
     }
 
     /** A key identifier that aws-kms-key-arn.md does not call valid. */
@@ -220,10 +225,11 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
-        assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
+        MPLClientError error = assertThrows(MPLClientError.class, () -> client.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId(malformed.kmsKeyId())
             .kmsClient(realKms(REGION))
             .build()));
+        MplErrors.expectError(target, error).kind("Validation").retryable(false);
     }
 
     @ParameterizedTest(name = "[aws-kms] construction accepts key ARN, alias ARN, raw key id, raw alias {0}")
@@ -370,7 +376,11 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# If the call to [AWS KMS GenerateDataKey](https://docs.aws.amazon.com/kms/latest/APIReference/API_GenerateDataKey.html) does not succeed,
             //# OnEncrypt MUST NOT modify the [encryption materials](../structures.md#encryption-materials) and MUST fail.
-            assertOnEncryptFails(client, keyringId, initializeEncryption(client, SUITE));
+            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
+                .kind("ResourceNotFound")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE)
+                .code(KMS_ERROR);
         }
     }
 
@@ -394,7 +404,10 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# If the Generate Data Key call succeeds, OnEncrypt MUST verify that the response `Plaintext` length matches
             //# the specification of the [algorithm suite](../algorithm-suites.md)'s Key Derivation Input Length field.
-            assertOnEncryptFails(client, keyringId, initializeEncryption(client, SUITE));
+            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
+                .kind("Service")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE);
         }
     }
 
@@ -424,7 +437,10 @@ public class AwsKmsKeyringTest {
             //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
             //= type=test
             //# The Generate Data Key response’s `KeyId` MUST be [a valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
-            assertOnEncryptFails(client, keyringId, initializeEncryption(client, SUITE));
+            assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
+                .kind("Service")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE);
         }
     }
 
@@ -444,7 +460,7 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# The Generate Data Key response’s `KeyId` MUST be [a valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
             KnownBugGate.gateDeclared("aws-kms-keyring-accepts-reply-key-id-that-is-not-a-key-arn", target,
-                () -> assertOnEncryptFails(client, keyringId, materials));
+                () -> assertOnEncryptFails(target, client, keyringId, materials));
         }
     }
 
@@ -541,7 +557,11 @@ public class AwsKmsKeyringTest {
             //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
             //= type=test
             //# If the call to [AWS KMS Encrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Encrypt.html) does not succeed, OnEncrypt MUST fail.
-            assertOnEncryptFails(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
+            assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)))
+                .kind("ResourceNotFound")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE)
+                .code(KMS_ERROR);
         }
     }
 
@@ -558,7 +578,10 @@ public class AwsKmsKeyringTest {
             //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
             //= type=test
             //# If the Encrypt call succeeds the response’s `KeyId` MUST be [A valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
-            assertOnEncryptFails(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
+            assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)))
+                .kind("Service")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE);
         }
     }
 
@@ -577,7 +600,7 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# If the Encrypt call succeeds the response’s `KeyId` MUST be [A valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
             KnownBugGate.gateDeclared("aws-kms-keyring-accepts-reply-key-id-that-is-not-a-key-arn", target,
-                () -> assertOnEncryptFails(client, keyringId, materials));
+                () -> assertOnEncryptFails(target, client, keyringId, materials));
         }
     }
 
@@ -598,7 +621,7 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# If the keyring calls AWS KMS GenerateDataKeys, it MUST use the configured AWS KMS client to make the call.
-        assertOnEncryptFails(client, keyringId, initializeEncryption(client, SUITE));
+        assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE));
     }
 
     @ParameterizedTest(name = "[aws-kms] Encrypt goes through the configured client {0}")
@@ -611,7 +634,7 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# The keyring MUST call [AWS KMS Encrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Encrypt.html) using the configured AWS KMS client.
-        assertOnEncryptFails(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
+        assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
     }
 
     @ParameterizedTest(name = "[aws-kms] Decrypt goes through the configured client {0}")
@@ -626,7 +649,7 @@ public class AwsKmsKeyringTest {
         //= type=test
         //# To attempt to decrypt a particular [encrypted data key](../structures.md#encrypted-data-key),
         //# OnDecrypt MUST call [AWS KMS Decrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Decrypt.html) with the configured AWS KMS client.
-        assertOnDecryptFails(client, keyringId, encrypted.getEncryptedDataKeys());
+        assertOnDecryptFails(target, client, keyringId, encrypted.getEncryptedDataKeys());
     }
 
     /** OnEncrypt on one server and OnDecrypt on another, both against real KMS. */
@@ -665,11 +688,13 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# If the [decryption materials](../structures.md#decryption-materials) already contained a valid plaintext data key
             //# OnDecrypt MUST return an error.
-            assertThrows(MPLClientError.class, () -> client.onDecrypt(OnDecryptInput.builder()
-                .keyringId(keyringId)
-                .materials(withKey)
-                .encryptedDataKeys(List.of(edk(1)))
-                .build()));
+            MPLClientError error = assertThrows(MPLClientError.class, () -> client.onDecrypt(
+                OnDecryptInput.builder()
+                    .keyringId(keyringId)
+                    .materials(withKey)
+                    .encryptedDataKeys(List.of(edk(1)))
+                    .build()));
+            MplErrors.expectError(target, error).kind("InvalidMaterials");
         }
     }
 
@@ -740,7 +765,7 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# If OnDecrypt fails to successfully decrypt any [encrypted data key](../structures.md#encrypted-data-key),
             //# then it MUST yield an error that includes all the collected errors.
-            assertOnDecryptFails(client, keyringId, others);
+            assertOnDecryptFails(target, client, keyringId, others).kind("NoMatchingDataKey");
             //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
             //= type=test
             //# The set of encrypted data keys MUST first be filtered to match this keyring’s configuration.
@@ -777,7 +802,8 @@ public class AwsKmsKeyringTest {
             //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
             //= type=test
             //# - The provider info MUST be a [valid AWS KMS ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn) with a resource type of `key` or OnDecrypt MUST fail.
-            assertOnDecryptFails(client, keyringId, List.of(withProviderInfo(edk(1), info.bytes()), edk(2)));
+            assertOnDecryptFails(target, client, keyringId, List.of(withProviderInfo(edk(1), info.bytes()), edk(2)))
+                .kind("Cryptographic");
         }
     }
 
@@ -797,7 +823,7 @@ public class AwsKmsKeyringTest {
             //= type=test
             //# - The provider info MUST be a [valid AWS KMS ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn) with a resource type of `key` or OnDecrypt MUST fail.
             KnownBugGate.gateDeclared("aws-kms-keyring-skips-alias-arn-provider-info", target,
-                () -> assertOnDecryptFails(client, keyringId, edks));
+                () -> assertOnDecryptFails(target, client, keyringId, edks));
         }
     }
 
@@ -851,6 +877,11 @@ public class AwsKmsKeyringTest {
             //# If OnDecrypt fails to successfully decrypt any [encrypted data key](../structures.md#encrypted-data-key),
             //# then it MUST yield an error that includes all the collected errors.
             assertEquals(3, error.getCollectedErrors().size(), "one collected error per EDK tried");
+            MplErrors.expectError(target, error)
+                .kind("ResourceNotFound")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE)
+                .code(KMS_ERROR);
         }
     }
 
@@ -991,7 +1022,10 @@ public class AwsKmsKeyringTest {
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
         try (FakeKms kms = new FakeKms()) {
             kms.reply(FakeKms.DECRYPT, bad);
-            assertOnDecryptFails(client, fakeKmsKeyring(client, kms, KMS_KEY_ARN), List.of(edk(1)));
+            assertOnDecryptFails(target, client, fakeKmsKeyring(client, kms, KMS_KEY_ARN), List.of(edk(1)))
+                .kind("Service")
+                .service("kms")
+                .resource(KMS_KEY_RESOURCE);
         }
         try (FakeKms kms = new FakeKms()) {
             kms.reply(FakeKms.DECRYPT, bad)
@@ -1013,22 +1047,26 @@ public class AwsKmsKeyringTest {
         }
     }
 
-    private static void assertOnEncryptFails(MPLTestServerClient client, String keyringId,
-            EncryptionMaterials materials) {
-        assertThrows(MPLClientError.class, () -> client.onEncrypt(OnEncryptInput.builder()
-            .keyringId(keyringId)
-            .materials(materials)
-            .build()));
+    private static ErrorExpectation assertOnEncryptFails(LanguageServerTarget target,
+            MPLTestServerClient client, String keyringId, EncryptionMaterials materials) {
+        MPLClientError error = assertThrows(MPLClientError.class, () -> client.onEncrypt(
+            OnEncryptInput.builder()
+                .keyringId(keyringId)
+                .materials(materials)
+                .build()));
+        return MplErrors.expectError(target, error);
     }
 
-    private static void assertOnDecryptFails(MPLTestServerClient client, String keyringId,
-            List<EncryptedDataKey> edks) {
+    private static ErrorExpectation assertOnDecryptFails(LanguageServerTarget target,
+            MPLTestServerClient client, String keyringId, List<EncryptedDataKey> edks) {
         DecryptionMaterials materials = initializeDecryption(client);
-        assertThrows(MPLClientError.class, () -> client.onDecrypt(OnDecryptInput.builder()
-            .keyringId(keyringId)
-            .materials(materials)
-            .encryptedDataKeys(edks)
-            .build()));
+        MPLClientError error = assertThrows(MPLClientError.class, () -> client.onDecrypt(
+            OnDecryptInput.builder()
+                .keyringId(keyringId)
+                .materials(materials)
+                .encryptedDataKeys(edks)
+                .build()));
+        return MplErrors.expectError(target, error);
     }
 
     private static KmsClientConfig realKms(String region) {
