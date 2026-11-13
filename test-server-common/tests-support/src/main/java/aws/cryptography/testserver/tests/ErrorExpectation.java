@@ -153,6 +153,12 @@ public final class ErrorExpectation {
         return check("message", actual.message(), expected, ErrorExpectation::messageMatches);
     }
 
+    /** Check every part {@code expected} names. */
+    public ErrorExpectation matches(ExpectedError expected) {
+        expected.checkAgainst(this);
+        return this;
+    }
+
     private <T> ErrorExpectation check(
             String check, T got, Versioned<T>[] expected, BiPredicate<T, T> matches) {
         if (expected.length == 0) {
