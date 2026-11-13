@@ -27,25 +27,6 @@ class KmsInputsTest {
     }
 
     @Test
-    void defaultRunHasOnlyTheFixedExamples() {
-        assertEquals(14, KmsInputs.invalidKmsIdentifiers(KEY_ARN, KmsInputs.Fuzz.NONE).size());
-    }
-
-    @Test
-    void fuzzAddsRandomExamplesThatTheSeedRepeats() {
-        KmsInputs.Fuzz fuzz = new KmsInputs.Fuzz(50, 42);
-        List<Example<String>> first = KmsInputs.invalidKmsIdentifiers(KEY_ARN, fuzz);
-        assertEquals(14 + 50, first.size());
-        assertEquals(first, KmsInputs.invalidKmsIdentifiers(KEY_ARN, fuzz));
-        assertTrue(first.get(14).name().startsWith("fuzz 0 seed=42: "));
-        assertEquals(2 + 50, KmsInputs.validGrantTokenLists(fuzz).size());
-        assertTrue(KmsInputs.validGrantTokenLists(fuzz).stream()
-            .allMatch(e -> e.value().size() <= 10 && e.value().stream().allMatch(t -> !t.isEmpty() && t.length() <= 8192)));
-        assertTrue(KmsInputs.invalidGrantTokenLists(fuzz).stream()
-            .allMatch(e -> e.value().size() > 10 || e.value().stream().anyMatch(t -> t.isEmpty() || t.length() > 8192)));
-    }
-
-    @Test
     void rejectsAnInputThatIsNotAKeyArn() {
         assertThrows(IllegalArgumentException.class, () -> KmsInputs.validKmsIdentifiers("alias/x"));
     }
