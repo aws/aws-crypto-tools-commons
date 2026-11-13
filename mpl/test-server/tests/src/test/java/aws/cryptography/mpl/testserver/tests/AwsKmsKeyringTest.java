@@ -397,13 +397,17 @@ public class AwsKmsKeyringTest {
 
         try (FakeKms kms = new FakeKms()) {
             kms.reply(FakeKms.GENERATE_DATA_KEY,
-                FakeKms.Reply.generateDataKey(KMS_KEY_ARN, bytes(length, 1), bytes(64, 2)));
+                    FakeKms.Reply.generateDataKey(KMS_KEY_ARN, bytes(DATA_KEY_LENGTH, 1), bytes(64, 2)))
+                .reply(FakeKms.GENERATE_DATA_KEY,
+                    FakeKms.Reply.generateDataKey(KMS_KEY_ARN, bytes(length, 1), bytes(64, 2)));
             String keyringId = fakeKmsKeyring(client, kms, KMS_KEY_ARN);
 
             //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
             //= type=test
+            //= reason=32-byte reply plaintext -> works; one byte short or long -> Service error
             //# If the Generate Data Key call succeeds, OnEncrypt MUST verify that the response `Plaintext` length matches
             //# the specification of the [algorithm suite](../algorithm-suites.md)'s Key Derivation Input Length field.
+            onEncrypt(client, keyringId, initializeEncryption(client, SUITE));
             assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
                 .kind("Service")
                 .service("kms")
@@ -431,12 +435,16 @@ public class AwsKmsKeyringTest {
 
         try (FakeKms kms = new FakeKms()) {
             kms.reply(FakeKms.GENERATE_DATA_KEY,
-                FakeKms.Reply.generateDataKey(keyId, bytes(DATA_KEY_LENGTH, 1), bytes(64, 2)));
+                    FakeKms.Reply.generateDataKey(KMS_KEY_ARN, bytes(DATA_KEY_LENGTH, 1), bytes(64, 2)))
+                .reply(FakeKms.GENERATE_DATA_KEY,
+                    FakeKms.Reply.generateDataKey(keyId, bytes(DATA_KEY_LENGTH, 1), bytes(64, 2)));
             String keyringId = fakeKmsKeyring(client, kms, KMS_KEY_ARN);
 
             //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
             //= type=test
+            //= reason=reply KeyId is a key ARN -> works; reply KeyId is garbage -> Service error
             //# The Generate Data Key response’s `KeyId` MUST be [a valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
+            onEncrypt(client, keyringId, initializeEncryption(client, SUITE));
             assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE))
                 .kind("Service")
                 .service("kms")
@@ -572,12 +580,15 @@ public class AwsKmsKeyringTest {
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
 
         try (FakeKms kms = new FakeKms()) {
-            kms.reply(FakeKms.ENCRYPT, FakeKms.Reply.encrypt(keyId, bytes(64, 4)));
+            kms.reply(FakeKms.ENCRYPT, FakeKms.Reply.encrypt(KMS_KEY_ARN, bytes(64, 4)))
+                .reply(FakeKms.ENCRYPT, FakeKms.Reply.encrypt(keyId, bytes(64, 4)));
             String keyringId = fakeKmsKeyring(client, kms, KMS_KEY_ARN);
 
             //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
             //= type=test
+            //= reason=reply KeyId is a key ARN -> works; reply KeyId is garbage -> Service error
             //# If the Encrypt call succeeds the response’s `KeyId` MUST be [A valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
+            onEncrypt(client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
             assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)))
                 .kind("Service")
                 .service("kms")
@@ -607,8 +618,10 @@ public class AwsKmsKeyringTest {
     // -----------------------------------------------------------------------
     // The configured KMS client, with real KMS
     //
-    // A us-east-2 client cannot use the us-west-2 key. Each call fails only if
-    // the keyring sends it through the client it was given.
+    // A us-east-2 client cannot use the us-west-2 key. Each test runs the same
+    // call twice: through a us-west-2 client it works, so the server has
+    // working credentials; through a us-east-2 client it fails, which happens
+    // only if the keyring sends the call through the client it was given.
     // -----------------------------------------------------------------------
 
     @ParameterizedTest(name = "[aws-kms] GenerateDataKey goes through the configured client {0}")
@@ -616,12 +629,15 @@ public class AwsKmsKeyringTest {
     void generateDataKeyUsesConfiguredClient(LanguageServerTarget target) {
         FeatureGate.require(Set.of(FEATURE), target);
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String keyringId = createKeyring(client, KMS_KEY_ARN, realKms(OTHER_REGION), List.of());
+        String rightRegion = realKeyring(client);
+        String wrongRegion = createKeyring(client, KMS_KEY_ARN, realKms(OTHER_REGION), List.of());
 
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
+        //= reason=us-west-2 client -> OnEncrypt works; us-east-2 client -> it fails
         //# If the keyring calls AWS KMS GenerateDataKeys, it MUST use the configured AWS KMS client to make the call.
-        assertOnEncryptFails(target, client, keyringId, initializeEncryption(client, SUITE));
+        onEncrypt(client, rightRegion, initializeEncryption(client, SUITE));
+        assertOnEncryptFails(target, client, wrongRegion, initializeEncryption(client, SUITE));
     }
 
     @ParameterizedTest(name = "[aws-kms] Encrypt goes through the configured client {0}")
@@ -629,12 +645,15 @@ public class AwsKmsKeyringTest {
     void encryptUsesConfiguredClient(LanguageServerTarget target) {
         FeatureGate.require(Set.of(FEATURE), target);
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String keyringId = createKeyring(client, KMS_KEY_ARN, realKms(OTHER_REGION), List.of());
+        String rightRegion = realKeyring(client);
+        String wrongRegion = createKeyring(client, KMS_KEY_ARN, realKms(OTHER_REGION), List.of());
 
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
+        //= reason=us-west-2 client -> OnEncrypt works; us-east-2 client -> it fails
         //# The keyring MUST call [AWS KMS Encrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Encrypt.html) using the configured AWS KMS client.
-        assertOnEncryptFails(target, client, keyringId, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
+        onEncrypt(client, rightRegion, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
+        assertOnEncryptFails(target, client, wrongRegion, withDataKey(client, bytes(DATA_KEY_LENGTH, 3)));
     }
 
     @ParameterizedTest(name = "[aws-kms] Decrypt goes through the configured client {0}")
@@ -642,14 +661,18 @@ public class AwsKmsKeyringTest {
     void decryptUsesConfiguredClient(LanguageServerTarget target) {
         FeatureGate.require(Set.of(FEATURE), target);
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        EncryptionMaterials encrypted = onEncrypt(client, realKeyring(client), initializeEncryption(client, SUITE));
-        String keyringId = createKeyring(client, KMS_KEY_ARN, realKms(OTHER_REGION), List.of());
+        String rightRegion = realKeyring(client);
+        String wrongRegion = createKeyring(client, KMS_KEY_ARN, realKms(OTHER_REGION), List.of());
+        List<EncryptedDataKey> edks =
+            onEncrypt(client, rightRegion, initializeEncryption(client, SUITE)).getEncryptedDataKeys();
 
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
+        //= reason=us-west-2 client -> OnDecrypt works; us-east-2 client -> it fails
         //# To attempt to decrypt a particular [encrypted data key](../structures.md#encrypted-data-key),
         //# OnDecrypt MUST call [AWS KMS Decrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Decrypt.html) with the configured AWS KMS client.
-        assertOnDecryptFails(target, client, keyringId, encrypted.getEncryptedDataKeys());
+        onDecrypt(client, rightRegion, edks);
+        assertOnDecryptFails(target, client, wrongRegion, edks);
     }
 
     /** OnEncrypt on one server and OnDecrypt on another, both against real KMS. */
@@ -678,7 +701,8 @@ public class AwsKmsKeyringTest {
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
 
         try (FakeKms kms = new FakeKms()) {
-            kms.reply(FakeKms.DECRYPT, FakeKms.Reply.decrypt(KMS_KEY_ARN, bytes(DATA_KEY_LENGTH, 1)));
+            kms.reply(FakeKms.DECRYPT, FakeKms.Reply.decrypt(KMS_KEY_ARN, bytes(DATA_KEY_LENGTH, 1)))
+                .reply(FakeKms.DECRYPT, FakeKms.Reply.decrypt(KMS_KEY_ARN, bytes(DATA_KEY_LENGTH, 1)));
             String keyringId = fakeKmsKeyring(client, kms, KMS_KEY_ARN);
             DecryptionMaterials withKey = initializeDecryption(client).toBuilder()
                 .plaintextDataKey(ByteBuffer.wrap(bytes(DATA_KEY_LENGTH, 5)))
@@ -686,8 +710,10 @@ public class AwsKmsKeyringTest {
 
             //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
             //= type=test
+            //= reason=same keyring and EDK: no data key -> works; a data key -> InvalidMaterials
             //# If the [decryption materials](../structures.md#decryption-materials) already contained a valid plaintext data key
             //# OnDecrypt MUST return an error.
+            onDecrypt(client, keyringId, List.of(edk(1)));
             MPLClientError error = assertThrows(MPLClientError.class, () -> client.onDecrypt(
                 OnDecryptInput.builder()
                     .keyringId(keyringId)
@@ -843,6 +869,7 @@ public class AwsKmsKeyringTest {
             assertArrayEquals(plaintext, bytes(decrypted.getPlaintextDataKey()));
             //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
             //= type=test
+            //= reason=the Decrypt call for EDK 1 fails; FakeKms then gets one for EDK 2, whose key comes back
             //# For each encrypted data key in the filtered set, one at a time, the OnDecrypt MUST attempt to decrypt the data key.
             assertDecryptCiphertexts(kms, edk(1), edk(2));
         }
@@ -976,6 +1003,7 @@ public class AwsKmsKeyringTest {
             assertArrayEquals(plaintext, bytes(decrypted.getPlaintextDataKey()));
             //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
             //= type=test
+            //= reason=both EDKs match, but FakeKms gets only the Decrypt call for EDK 1
             //# - MUST immediately return the modified [decryption materials](../structures.md#decryption-materials).
             assertDecryptCiphertexts(kms, edk(1));
         }
