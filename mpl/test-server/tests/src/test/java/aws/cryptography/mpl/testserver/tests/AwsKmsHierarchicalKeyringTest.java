@@ -263,11 +263,15 @@ public class AwsKmsHierarchicalKeyringTest {
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
         String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
 
-        // Accepts a branch key id alone
-        assertNotNull(createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+        // Accepts a branch key id alone: the keyring encrypts a data key and decrypts it again
+        String keyringId = createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
             .keyStoreId(keyStoreId)
             .branchKeyId(BRANCH_KEY_ID)
-            .ttlSeconds(TTL_SECONDS)));
+            .ttlSeconds(TTL_SECONDS));
+        EncryptionMaterials encrypted = onEncrypt(client, keyringId, initializeEncryption(client, EC));
+        DecryptionMaterials decrypted = onDecrypt(client, keyringId, initializeDecryption(client, EC),
+            encrypted.getEncryptedDataKeys());
+        assertEquals(encrypted.getPlaintextDataKey(), decrypted.getPlaintextDataKey());
         // Rejects a branch key id and a supplier together
         MPLClientError error = assertThrows(MPLClientError.class,
             () -> client.createAwsKmsHierarchicalKeyring(
