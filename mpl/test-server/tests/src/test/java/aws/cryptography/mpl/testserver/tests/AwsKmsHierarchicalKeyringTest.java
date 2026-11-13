@@ -263,13 +263,15 @@ public class AwsKmsHierarchicalKeyringTest {
         MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
         String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
 
-        assertThrows(MPLClientError.class, () -> client.createAwsKmsHierarchicalKeyring(
-            CreateAwsKmsHierarchicalKeyringInput.builder()
-                .keyStoreId(keyStoreId)
-                .branchKeyId(BRANCH_KEY_ID)
-                .branchKeyIdSupplier(supplier())
-                .ttlSeconds(TTL_SECONDS)
-                .build()));
+        MPLClientError error = assertThrows(MPLClientError.class,
+            () -> client.createAwsKmsHierarchicalKeyring(
+                CreateAwsKmsHierarchicalKeyringInput.builder()
+                    .keyStoreId(keyStoreId)
+                    .branchKeyId(BRANCH_KEY_ID)
+                    .branchKeyIdSupplier(supplier())
+                    .ttlSeconds(TTL_SECONDS)
+                    .build()));
+        MplErrors.expectError(target, error).kind("Validation").retryable(false);
     }
 
     @ParameterizedTest(name = "[hierarchical] neither branch key id nor supplier rejected {0}")
