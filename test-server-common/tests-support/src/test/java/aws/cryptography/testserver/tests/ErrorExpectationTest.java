@@ -82,6 +82,18 @@ class ErrorExpectationTest {
     }
 
     @Test
+    void namedExpectedErrorChecksEachPart() {
+        String declared = "rust:1:aws-crypto-tools-rust:kind=1;service=1";
+        ExpectedError kmsValidation = ExpectedError.builder().kind("Validation").service("kms").build();
+        ExpectedError wrongService = ExpectedError.builder().kind("Validation").service("dynamodb").build();
+
+        assertDoesNotThrow(() -> expect(declared, error("Validation", "x")).matches(kmsValidation));
+        assertThrows(AssertionFailedError.class,
+            () -> expect(declared, error("Validation", "x")).matches(wrongService));
+        assertThrows(IllegalStateException.class, () -> ExpectedError.builder().build());
+    }
+
+    @Test
     void nameInBracesMatchesAnyStyle() {
         String pattern = "must provide keyring to {OnEncrypt}";
         assertTrue(ErrorExpectation.messageMatches(pattern, "must provide keyring to OnEncrypt"));
