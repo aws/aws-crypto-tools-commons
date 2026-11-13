@@ -18,9 +18,12 @@ final class EsdkErrors {
     private EsdkErrors() {
     }
 
-    /** Start checking the error {@code target} sent back. */
-    static ErrorExpectation expectError(LanguageServerTarget target, ESDKClientError e) {
-        return ErrorExpectation.expectError(target, new ErrorFields(
+    /**
+     * Start checking the error that {@code languageServer} sent back.
+     * {@code languageServer} is the language whose ESDK ran the call, such as Rust or Java.
+     */
+    static ErrorExpectation expectError(LanguageServerTarget languageServer, ESDKClientError e) {
+        return ErrorExpectation.expectError(languageServer, new ErrorFields(
             e.getKind(), e.getService(), e.getResource(), e.getCode(), e.isRetryable(),
             e.getRetryKind(), e.getConflictReason(), e.getMessage()), KINDS);
     }

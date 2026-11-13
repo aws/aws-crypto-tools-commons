@@ -17,7 +17,7 @@ import org.opentest4j.AssertionFailedError;
  *
  * <pre>{@code
  * ESDKClientError e = assertThrows(ESDKClientError.class, () -> decrypt(...));
- * expectError(target, e)
+ * expectError(languageServer, e)
  *     .kind(v1("InvalidInput"), v2("MissingKeyring"))
  *     .service("kms")
  *     .message("must provide keyring to {OnEncrypt}");
@@ -38,34 +38,35 @@ public final class ErrorExpectation {
     // A name in braces, like {OnEncrypt}.
     private static final Pattern SLOT = Pattern.compile("\\{([A-Za-z0-9]+)}");
 
-    private final LanguageServerTarget target;
+    private final LanguageServerTarget languageServer;
     private final ErrorFields actual;
     private final Set<String> kinds;
     private final ErrorCheckDeclarations declarations;
 
-    private ErrorExpectation(LanguageServerTarget target, ErrorFields actual, Set<String> kinds,
+    private ErrorExpectation(LanguageServerTarget languageServer, ErrorFields actual, Set<String> kinds,
             ErrorCheckDeclarations declarations) {
-        this.target = Objects.requireNonNull(target, "target");
+        this.languageServer = Objects.requireNonNull(languageServer, "languageServer");
         this.actual = Objects.requireNonNull(actual, "actual");
         this.kinds = Set.copyOf(kinds);
         this.declarations = Objects.requireNonNull(declarations, "declarations");
     }
 
     /**
-     * Start checking the error {@code target} sent back.
+     * Start checking the error that {@code languageServer} sent back.
+     * {@code languageServer} is the language whose library ran the call, such as Rust or Java.
      * Each library's tests wrap this with their own error type and kinds.
      *
      * @param kinds every kind the library has; an expected kind not in this set is a typo in the test
      */
     public static ErrorExpectation expectError(
-            LanguageServerTarget target, ErrorFields actual, Set<String> kinds) {
-        return new ErrorExpectation(target, actual, kinds, ErrorCheckDeclarations.shared());
+            LanguageServerTarget languageServer, ErrorFields actual, Set<String> kinds) {
+        return new ErrorExpectation(languageServer, actual, kinds, ErrorCheckDeclarations.shared());
     }
 
     /** {@link #expectError(LanguageServerTarget, ErrorFields, Set)} with the declarations given. */
-    public static ErrorExpectation expectError(LanguageServerTarget target, ErrorFields actual,
+    public static ErrorExpectation expectError(LanguageServerTarget languageServer, ErrorFields actual,
             Set<String> kinds, ErrorCheckDeclarations declarations) {
-        return new ErrorExpectation(target, actual, kinds, declarations);
+        return new ErrorExpectation(languageServer, actual, kinds, declarations);
     }
 
     public ErrorExpectation kind(String expected) {
@@ -172,7 +173,7 @@ public final class ErrorExpectation {
             }
         }
 
-        OptionalInt serverVersion = declarations.version(target, check);
+        OptionalInt serverVersion = declarations.version(languageServer, check);
         if (serverVersion.isEmpty()) {
             return this;
         }
@@ -184,7 +185,7 @@ public final class ErrorExpectation {
         }
 
         T want = applies.get().value();
-        String where = target + " error " + check + " (version " + serverVersion.getAsInt() + ")";
+        String where = languageServer + " error " + check + " (version " + serverVersion.getAsInt() + ")";
         if (got == null) {
             throw new AssertionFailedError(where + ": expected " + want + " but the server sent none");
         }

@@ -112,10 +112,10 @@ public final class ErrorCheckDeclarations {
         return byCheck;
     }
 
-    /** The version {@code target} runs {@code check} at, or empty when the check is off. */
-    public OptionalInt version(LanguageServerTarget target, String check) {
+    /** The version that {@code languageServer} runs {@code check} at, or empty when the check is off. */
+    public OptionalInt version(LanguageServerTarget languageServer, String check) {
         Map<String, Integer> byCheck = versions.get(
-            target.language() + ":" + target.majorVersion() + ":" + target.repo());
+            languageServer.language() + ":" + languageServer.majorVersion() + ":" + languageServer.repo());
         if (byCheck == null || !byCheck.containsKey(check)) {
             return OptionalInt.empty();
         }
