@@ -1,5 +1,6 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -83,6 +84,19 @@ final class KeyringTestHelpers {
                 .build())).getMaterials();
         assertNotNull(out.getPlaintextDataKey());
         return out;
+    }
+
+    /**
+     * Check that a keyring works, not just that it was created.
+     * OnEncrypt must make a data key and an EDK, and OnDecrypt must get the same data key back from that EDK.
+     */
+    static void assertKeyringRoundTrips(MPLTestServerClient mpl, String keyringId,
+            EncryptionMaterials encryptionMaterials, DecryptionMaterials decryptionMaterials) {
+        EncryptionMaterials encrypted = onEncrypt(mpl, keyringId, encryptionMaterials);
+        DecryptionMaterials decrypted = onDecrypt(mpl, keyringId, decryptionMaterials,
+            encrypted.getEncryptedDataKeys());
+        assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()),
+            "OnDecrypt must return the data key that OnEncrypt made");
     }
 
     /** Start an OnEncrypt call that must fail. {@link OnEncryptFailure#withError} runs it. */

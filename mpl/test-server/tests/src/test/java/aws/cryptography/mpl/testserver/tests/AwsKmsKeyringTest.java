@@ -1,5 +1,6 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.assertKeyringRoundTrips;
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.assertOnDecryptFails;
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.assertOnEncryptFails;
 import static aws.cryptography.mpl.testserver.tests.KeyringTestHelpers.bytes;
@@ -9,7 +10,6 @@ import static aws.cryptography.mpl.testserver.tests.MplErrors.INVALID_MATERIALS_
 import static aws.cryptography.mpl.testserver.tests.MplErrors.NO_MATCHING_DATA_KEY_ERROR;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
@@ -135,7 +135,7 @@ public class AwsKmsKeyringTest {
         //= type=test
         //# - MUST provide an AWS KMS key identifier
         // Accepts an AWS KMS key identifier
-        assertNotNull(createKeyring(mpl, KMS_KEY_ARN, realKmsClient(REGION), List.of()));
+        assertUsableKeyring(mpl, KMS_KEY_ARN, List.of());
         // Rejects a missing AWS KMS key identifier
         MPLClientError error = assertThrows(MPLClientError.class, () -> mpl.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsClient(realKmsClient(REGION))
@@ -157,7 +157,7 @@ public class AwsKmsKeyringTest {
         //= type=test
         //# The AWS KMS SDK client MUST NOT be null.
         // Accepts an AWS KMS client
-        assertNotNull(createKeyring(mpl, KMS_KEY_ARN, realKmsClient(REGION), List.of()));
+        assertUsableKeyring(mpl, KMS_KEY_ARN, List.of());
         // Rejects a missing AWS KMS client
         KnownBugGate.gateDeclared("aws-kms-keyring-accepts-missing-kms-client", languageServer,
             () -> {
@@ -187,7 +187,7 @@ public class AwsKmsKeyringTest {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# - MAY provide a list of Grant Tokens
-        assertNotNull(createKeyring(mpl, KMS_KEY_ARN, realKmsClient(REGION), grantTokens));
+        assertUsableKeyring(mpl, KMS_KEY_ARN, grantTokens);
     }
 
     /** Grant token limits that KMS sets: at most 10 tokens, each 1 to 8192 characters. */
@@ -209,7 +209,7 @@ public class AwsKmsKeyringTest {
         MPLTestServerClient mpl = MplTestServerClients.forEndpoint(languageServer.endpoint());
 
         // Accepts valid grant tokens
-        assertNotNull(createKeyring(mpl, KMS_KEY_ARN, realKmsClient(REGION), GRANT_TOKENS));
+        assertUsableKeyring(mpl, KMS_KEY_ARN, GRANT_TOKENS);
         // Rejects invalid grant tokens
         MPLClientError error = assertThrows(MPLClientError.class, () -> mpl.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId(KMS_KEY_ARN)
@@ -229,7 +229,7 @@ public class AwsKmsKeyringTest {
         //= type=test
         //# The AWS KMS key identifier MUST NOT be null or empty.
         // Accepts non-empty AWS KMS key identifier
-        assertNotNull(createKeyring(mpl, KMS_KEY_ARN, realKmsClient(REGION), List.of()));
+        assertUsableKeyring(mpl, KMS_KEY_ARN, List.of());
         // Rejects empty AWS KMS key identifier
         MPLClientError error = assertThrows(MPLClientError.class, () -> mpl.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId("")
@@ -276,7 +276,7 @@ public class AwsKmsKeyringTest {
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
         // Accepts valid AWS KMS key identifier
-        assertNotNull(createKeyring(mpl, KMS_KEY_ARN, realKmsClient(REGION), List.of()));
+        assertUsableKeyring(mpl, KMS_KEY_ARN, List.of());
         // Rejects malformed AWS KMS key identifier
         MPLClientError error = assertThrows(MPLClientError.class, () -> mpl.createAwsKmsKeyring(CreateAwsKmsKeyringInput.builder()
             .kmsKeyId(malformed.kmsKeyId())
@@ -295,7 +295,7 @@ public class AwsKmsKeyringTest {
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
         for (String kmsKeyId : List.of(KMS_KEY_ARN, ALIAS_ARN, KEY_ID, RAW_ALIAS)) {
-            assertNotNull(createKeyring(mpl, kmsKeyId, realKmsClient(REGION), List.of()), kmsKeyId);
+            assertUsableKeyring(mpl, kmsKeyId, List.of());
         }
     }
 
@@ -1211,6 +1211,26 @@ public class AwsKmsKeyringTest {
         for (int i = 0; i < edks.length; i++) {
             assertArrayEquals(bytes(edks[i].getCiphertext()), requests.get(i).blob("CiphertextBlob"),
                 "Decrypt call " + i + " ciphertext");
+        }
+    }
+
+    /**
+     * Create a keyring with FakeKms as its KMS client, and check that it works.
+     * A keyring for KMS_KEY_ARN must encrypt a data key and decrypt it again.
+     * A keyring for a raw key ID or an alias only runs OnEncrypt, because OnDecrypt needs a key ARN.
+     */
+    private static void assertUsableKeyring(MPLTestServerClient mpl, String kmsKeyId, List<String> grantTokens) {
+        byte[] dataKey = bytes(DATA_KEY_LENGTH, 9);
+        try (FakeKms fakeKms = new FakeKms()) {
+            fakeKms.reply(FakeKms.GENERATE_DATA_KEY, FakeKms.Reply.generateDataKey(KMS_KEY_ARN, dataKey, bytes(64, 9)))
+                .reply(FakeKms.DECRYPT, FakeKms.Reply.decrypt(KMS_KEY_ARN, dataKey));
+            String keyringId = createKeyring(mpl, kmsKeyId, fakeKmsClient(fakeKms), grantTokens);
+            if (kmsKeyId.equals(KMS_KEY_ARN)) {
+                assertKeyringRoundTrips(mpl, keyringId,
+                    initializeEncryption(mpl, ALGORITHM_SUITE), initializeDecryption(mpl));
+            } else {
+                onEncrypt(mpl, keyringId, initializeEncryption(mpl, ALGORITHM_SUITE));
+            }
         }
     }
 
