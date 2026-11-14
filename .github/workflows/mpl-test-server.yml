@@ -9,6 +9,7 @@ on:
       - "test-server-common/**"
       - ".github/workflows/mpl-test-server.yml"
       - ".github/workflows/mpl-test-server-reusable.yml"
+      - ".github/workflows/duvet-test-reach-reusable.yml"
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - "test-server-common/**"
       - ".github/workflows/mpl-test-server.yml"
       - ".github/workflows/mpl-test-server-reusable.yml"
+      - ".github/workflows/duvet-test-reach-reusable.yml"
   # Nightly on main: rebuilds any server whose branch tip moved and saves it
   # to main's caches, which every pull request can restore.
   schedule:
@@ -55,5 +57,19 @@ jobs:
       # The MPL repository's CI role does not trust this repository; this one
       # does, and reads the hierarchical keyring fixtures.
       aws-role-arn: arn:aws:iam::370957321024:role/GitHub-CI-Public-ESDK-Dafny-Role-us-west-2
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
+
+  duvet-test-reach:
+    name: duvet test reach
+    needs: mpl
+    if: always()
+    uses: ./.github/workflows/duvet-test-reach-reusable.yml
+    with:
+      library: mpl
+      language: rust
+      language-repository: aws/aws-crypto-tools-rust
+      source: mpl/src
+      artifacts: mpl-test-server-reports
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}

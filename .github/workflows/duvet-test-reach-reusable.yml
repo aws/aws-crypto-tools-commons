@@ -1,0 +1,218 @@
+# Reusable workflow: check that the test behind each duvet test annotation
+# runs the code under the implementation annotation it cites, for one library
+# in one language (test-server-common/tools/duvet_test_reach.py).
+#
+# It reads per-test-coverage/<language>.jsonl and <language>.lcov files from
+# artifacts that earlier jobs of the same workflow run uploaded, such as a
+# TestServer report. The library is checked out at the commit those files
+# name, so the annotations match the code that ran. Pull requests check only
+# the annotations they change; other events check every annotation.
+#
+# It is a separate check from duvet and from the line coverage gate, and
+# callers keep it out of their required jobs. No AWS credentials.
+
+name: duvet test reach
+
+on:
+  workflow_call:
+    inputs:
+      library:
+        description: The library to check (esdk, mpl, dbesdk, primitives). Its commons Tests are in <library>/test-server.
+        type: string
+        required: true
+      language:
+        description: The language whose coverage to read (e.g. rust).
+        type: string
+        required: true
+      language-repository:
+        description: owner/name of the library repository. Defaults to the caller.
+        type: string
+        default: ""
+      source:
+        description: Space-separated directories in the library repository holding implementation annotations.
+        type: string
+        required: true
+      local-tests:
+        description: Space-separated directories in the library repository holding Rust test files. Empty for none.
+        type: string
+        default: ""
+      crate:
+        description: Package name of the crate whose tests are in local-tests.
+        type: string
+        default: ""
+      artifacts:
+        description: >-
+          Space-separated names or globs of this run's artifacts that hold
+          per-test-coverage/<language>.jsonl and <language>.lcov files.
+        type: string
+        required: true
+      prefixes:
+        description: Space-separated FROM=TO spec path rewrites (e.g. specification/=spec/).
+        type: string
+        default: ""
+      commons-ref:
+        description: The aws-crypto-tools-commons ref to run when called from another repository.
+        type: string
+        default: main
+      runner:
+        description: >-
+          Runner label. Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    secrets:
+      repo-pat:
+        description: Read-only token for the private repositories (aws-crypto-tools-commons, ...).
+        required: true
+
+permissions:
+  contents: read
+  # Downloads this run's artifacts.
+  actions: read
+
+jobs:
+  reach:
+    name: duvet test reach (${{ inputs.library }}, ${{ inputs.language }})
+    runs-on: ${{ inputs.runner }}
+    env:
+      COMMONS: aws/aws-crypto-tools-commons
+    steps:
+      - name: Check out aws-crypto-tools-commons (this pull request or push)
+        if: github.repository == 'aws/aws-crypto-tools-commons'
+        uses: actions/checkout@v4
+        with:
+          path: commons
+          fetch-depth: 0
+
+      - name: Check out the resolve script
+        if: github.repository != 'aws/aws-crypto-tools-commons'
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons-ref }}
+          token: ${{ secrets.repo-pat }}
+          sparse-checkout: .github/scripts
+          path: resolve
+
+      - name: Resolve the commons ref, Test-Server-Override lines included
+        if: github.repository != 'aws/aws-crypto-tools-commons'
+        id: refs
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          EVENT_BODY: ${{ github.event.pull_request.body }}
+          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+        run: resolve/.github/scripts/resolve-test-server-refs.sh resolve
+
+      - name: Check out aws-crypto-tools-commons at the resolved ref
+        if: github.repository != 'aws/aws-crypto-tools-commons'
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ steps.refs.outputs.commons_ref }}
+          token: ${{ secrets.repo-pat }}
+          path: commons
+
+      - name: Download the coverage artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACTS: ${{ inputs.artifacts }}
+        run: |
+          mkdir -p artifacts
+          for name in $ARTIFACTS; do
+            gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -p "$name" -D "artifacts/$name" \
+              || echo "No artifact matches $name in this run."
+          done
+          find artifacts -name "*.jsonl" -path "*per-test-coverage*" -o -name "*.lcov" | sort
+
+      - name: Find the library commit the coverage ran
+        # The first per-test coverage row names it. Without coverage, the
+        # caller's commit when the caller is the library repository.
+        id: library
+        env:
+          LANGUAGE: ${{ inputs.language }}
+          INPUT_REPOSITORY: ${{ inputs.language-repository }}
+        run: |
+          repository=${INPUT_REPOSITORY:-$GITHUB_REPOSITORY}
+          commit=""
+          row=$(find artifacts -path "*per-test-coverage/$LANGUAGE.jsonl" -exec head -n 1 {} \; -quit)
+          if [ -n "$row" ]; then
+            commit=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["commit"])' "$row")
+          fi
+          if [ -z "$commit" ] && [ "$repository" = "$GITHUB_REPOSITORY" ]; then
+            commit=$GITHUB_SHA
+          fi
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "library: $repository ${commit:-(none)}"
+
+      - name: Report that there is nothing to check
+        if: steps.library.outputs.commit == ''
+        env:
+          LANGUAGE: ${{ inputs.language }}
+        run: echo "No per-test coverage for $LANGUAGE in this run, so there is nothing to check." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Check out the library repository (the caller)
+        if: steps.library.outputs.commit != '' && steps.library.outputs.repository == github.repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.library.outputs.commit }}
+          path: library
+          fetch-depth: 0
+
+      - name: Check out the library repository
+        if: steps.library.outputs.commit != '' && steps.library.outputs.repository != github.repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.library.outputs.repository }}
+          ref: ${{ steps.library.outputs.commit }}
+          token: ${{ secrets.repo-pat }}
+          path: library
+
+      - name: Check only the annotations this pull request changes in the library repository
+        if: github.event_name == 'pull_request' && github.repository != 'aws/aws-crypto-tools-commons'
+        run: echo "CHANGED_SINCE=library=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+
+      - name: Check only the annotations this pull request changes in aws-crypto-tools-commons
+        if: github.event_name == 'pull_request' && github.repository == 'aws/aws-crypto-tools-commons'
+        run: echo "CHANGED_SINCE=commons=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+
+      - name: Check the annotations
+        if: steps.library.outputs.commit != ''
+        env:
+          LIBRARY: ${{ inputs.library }}
+          LANGUAGE: ${{ inputs.language }}
+          REPOSITORY: ${{ steps.library.outputs.repository }}
+          COMMIT: ${{ steps.library.outputs.commit }}
+          SOURCE: ${{ inputs.source }}
+          LOCAL_TESTS: ${{ inputs.local-tests }}
+          CRATE: ${{ inputs.crate }}
+          PREFIXES: ${{ inputs.prefixes }}
+        run: |
+          set -o pipefail
+          args=()
+          for dir in $SOURCE; do args+=(--source "$dir"); done
+          for dir in $LOCAL_TESTS; do args+=(--local-tests "$dir"); done
+          for prefix in $PREFIXES; do args+=(--prefix "$prefix"); done
+          if [ -n "${CHANGED_SINCE:-}" ]; then args+=(--changed-since "$CHANGED_SINCE"); fi
+          while IFS= read -r f; do args+=(--coverage "$f"); done < <(find artifacts -path "*per-test-coverage/$LANGUAGE.jsonl")
+          while IFS= read -r f; do args+=(--lcov "$f"); done < <(find artifacts -name "*.lcov")
+          shared="commons/$LIBRARY/test-server/tests/src/test/java"
+          if [ -d "$shared" ]; then args+=(--shared-tests "$LIBRARY/test-server/tests/src/test/java"); fi
+          python3 commons/test-server-common/tools/duvet_test_reach.py \
+            --language "$LANGUAGE" --library "$LIBRARY" \
+            --repository "$REPOSITORY" --repo-root library --commit "$COMMIT" --crate "$CRATE" \
+            --commons-root commons --commons-commit "$(git -C commons rev-parse HEAD)" \
+            --out "reach/$LIBRARY-$LANGUAGE.json" "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the findings
+        if: always() && steps.library.outputs.commit != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: duvet-test-reach-${{ inputs.library }}-${{ inputs.language }}
+          path: reach/${{ inputs.library }}-${{ inputs.language }}.json
+          if-no-files-found: error
