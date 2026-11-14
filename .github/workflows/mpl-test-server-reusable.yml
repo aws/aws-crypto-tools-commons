@@ -943,10 +943,20 @@ jobs:
         with:
           components: llvm-tools-preview
 
+      - name: Pick the Tests the per-test pass records
+        if: inputs.focus != ''
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
+          PRODUCT: mpl
+          LANGUAGE_DIR: language-repo
+        run: .github/scripts/select-per-test-tests.sh
+
       - name: Record the lines each test runs
         # A second pass over the focus language's own pairs, one test at a time,
         # so each server's coverage can be split by test. The pass above stays parallel.
-        if: inputs.focus != ''
+        if: inputs.focus != '' && env.PER_TEST_RUN == 'true'
         working-directory: mpl/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
@@ -963,7 +973,7 @@ jobs:
             if [ -e "${kept[$i]}" ]; then cp -r "${kept[$i]}" "$saved/$i"; fi
           done
           status=0
-          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=$FOCUS" || status=$?
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=$FOCUS ${PER_TEST_TESTS:+tests=$PER_TEST_TESTS}" || status=$?
           for i in "${!kept[@]}"; do
             if [ -e "$saved/$i" ]; then rm -rf "${kept[$i]}" && cp -r "$saved/$i" "${kept[$i]}"; fi
           done

@@ -102,6 +102,19 @@ class GradleTestRunnerTest {
             .noneMatch(a -> a.startsWith("-Dtestserver.focus")));
     }
 
+    @Test
+    @DisplayName("each pattern of a comma-separated filter becomes its own --tests")
+    void commandSplitsTheTestFilter() {
+        TestRunInput input = new TestRunInput(
+            List.of(new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091"))),
+            Map.of(), List.of(), Map.of(), "java");
+
+        List<String> command = GradleTestRunner.command(Path.of("tests"), input, "*.A.one, *.B.two");
+        int first = command.indexOf("--tests");
+        assertEquals(List.of("--tests", "*.A.one", "--tests", "*.B.two"),
+            command.subList(first, command.size()));
+    }
+
     // ---- JUnit XML parsing ----------------------------------------------
 
     @Test

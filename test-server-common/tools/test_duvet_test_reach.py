@@ -367,6 +367,30 @@ async fn red() {
         self.assertEqual("changed", report["mode"])
         self.assertEqual({("local", "The box MUST be red."): reach.NEVER}, states)
 
+    def test_select_tests_names_only_the_tests_of_changed_annotations(self):
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+        lib = self.root / "lib"
+        subprocess.run(git + ["init", "-q", str(lib)], check=True)
+        subprocess.run(git + ["-C", str(lib), "add", "."], check=True)
+        subprocess.run(git + ["-C", str(lib), "commit", "-qm", "base"], check=True)
+        base = subprocess.run(["git", "-C", str(lib), "rev-parse", "HEAD"],
+                              check=True, capture_output=True, text=True).stdout.strip()
+        # Changing the box's implementation selects both tests that cite it.
+        source = lib / "src" / "lib.rs"
+        source.write_text(source.read_text().replace("let red = paint(blue);", "let red = paint(blue) + 1;"))
+        subprocess.run(git + ["-C", str(lib), "commit", "-qam", "change"], check=True)
+        out = self.root / "selected.json"
+        code = reach.main([
+            "--language", "rust", "--library", "lib", "--repository", "aws/lib",
+            "--repo-root", str(lib), "--source", "src", "--local-tests", "tests", "--crate", "lib",
+            "--commons-root", str(self.root / "commons"), "--shared-tests", "tests",
+            "--prefix", "specification/=spec/", "--changed-since", f"library={base}",
+            "--select-tests", str(out)])
+        self.assertEqual(0, code)
+        self.assertEqual({"shared": ["*.SampleTests.boxIsRed"],
+                          "local": "(binary_id(=lib::sample) & test(=red))"},
+                         json.loads(out.read_text()))
+
     def test_changed_mode_reports_only_errors_on_changed_lines(self):
         git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
         lib = self.root / "lib"

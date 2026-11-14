@@ -281,6 +281,8 @@ def implementations(repo_root, sources, prefixes, countable_lines):
                     if not lines and closing in countable:
                         lines = {closing}
                 for block in blocks:
+                    if block.kind == "test":
+                        continue
                     block.target = rewrite(block.target, prefixes)
                     by_target[block.target].append(Implementation(block, region, sorted(lines)))
     return by_target
@@ -490,6 +492,16 @@ def read_lcov(paths):
     return lines
 
 
+def repository_path(repo_root, crates, path):
+    """`path` made relative to the repository when it is relative to one crate."""
+    if (repo_root / path).is_file():
+        return path
+    for crate in crates:
+        if (repo_root / crate / path).is_file():
+            return f"{crate}/{path}"
+    return path
+
+
 def changed_lines(repo, base):
     """{path: {line}} of lines added or changed since `base` in a git checkout."""
     diff = subprocess.run(["git", "-C", str(repo), "diff", "-U0", "--no-color", f"{base}...HEAD"],
@@ -505,9 +517,11 @@ def changed_lines(repo, base):
     return out
 
 
-def touched(annotation, changed):
+def touched(annotation, changed, region=None):
+    """Whether a changed line is in the annotation or in the code under it."""
     lines = changed.get(annotation.path, ())
-    return any(line in lines for line in range(annotation.line, annotation.end + 1))
+    spans = [(annotation.line, annotation.end)] + ([region] if region else [])
+    return any(line in lines for first, last in spans for line in range(first, last + 1))
 
 
 # ---------- the check ----------
@@ -549,6 +563,22 @@ def check(test, impls, rows, have_coverage):
     return finding
 
 
+def write_selection(path, selected, crate):
+    """Write the selected tests in the forms the test runners take.
+
+    shared: Gradle `--tests` patterns, one per JUnit method.
+    local: one cargo-nextest filterset that matches every selected Rust test.
+    """
+    shared = sorted("*." + name.replace("#", ".") for name in selected["test-server"])
+    local = []
+    for name in sorted(selected["local"]):
+        binary, _, test = name.partition("::")
+        local.append(f"(binary_id(={crate}::{binary}) & test(={test}))")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"shared": shared, "local": " | ".join(local)}, indent=1) + "\n", encoding="utf-8")
+    print(f"selected {len(shared)} shared Tests and {len(local)} local tests; wrote {path}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--language", required=True)
@@ -573,12 +603,22 @@ def main(argv=None):
                         help="REPO=BASE: check only annotations changed in that checkout since BASE,"
                              " where REPO is 'library' or 'commons'")
     parser.add_argument("--prefix", action="append", default=[], help="rewrite a spec path prefix, as FROM=TO")
-    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--select-tests", type=Path,
+                        help="write the tests that hold the changed annotations to this JSON file and stop;"
+                             " needs --changed-since and no coverage")
+    parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
+    if not args.out and not args.select_tests:
+        parser.error("one of --out or --select-tests is required")
 
     prefixes = [tuple(p.split("=", 1)) for p in args.prefix]
     coverage_files = [p for p in args.coverage if p.is_file()]
     rows = [r for p in coverage_files for r in read_coverage(p) if r.get("language", args.language) == args.language]
+    # A crate's own tests record paths relative to the crate, not the
+    # repository; the crate is the first part of each --source.
+    crates = {Path(s).parts[0] for s in args.source if Path(s).parts and Path(s).parts[0] != "."}
+    for row in rows:
+        row["files"] = {repository_path(args.repo_root, crates, f): lines for f, lines in row["files"].items()}
     countable = read_lcov([p for p in args.lcov if p.is_file()])
     # For a file no lcov names, a line counts if any run hit it.
     hit_anywhere = defaultdict(set)
@@ -610,6 +650,7 @@ def main(argv=None):
 
     commits = {args.repository: args.commit, "aws/aws-crypto-tools-commons": args.commons_commit}
     findings, skipped = [], defaultdict(int)
+    selected = {"test-server": set(), "local": set()}
     for test in tests:
         impls_all = matching(test.annotation, by_target)
         impls = [i for i in impls_all if i.annotation.kind not in SKIPPED_TYPES]
@@ -619,8 +660,11 @@ def main(argv=None):
         if changed is not None:
             test_side = "commons" if test.source == "test-server" else "library"
             if not (touched(test.annotation, changed.get(test_side, {})) or
-                    any(touched(i.annotation, changed.get("library", {})) for i in impls)):
+                    any(touched(i.annotation, changed.get("library", {}), i.region) for i in impls)):
                 continue
+        if args.select_tests:
+            selected[test.source].update(name for name, _ in test.tests)
+            continue
         finding = check(test, impls, rows, bool(coverage_files))
         finding.update({
             "requirement": {"target": test.annotation.target, "quote": test.annotation.text()},
@@ -631,6 +675,10 @@ def main(argv=None):
             "tests": [name for name, _ in test.tests],
         })
         findings.append(finding)
+
+    if args.select_tests:
+        write_selection(args.select_tests, selected, args.crate)
+        return 0
 
     counts = {state: sum(f["state"] == state for f in findings) for state in LABELS}
     report = {"language": args.language, "library": args.library, "repository": args.repository,
