@@ -261,6 +261,26 @@ public final class EsdkClientConfigs {
     }
 
     /**
+     * @return a Raw-RSA / Default-CMM config whose keyring uses the given key namespace and key
+     *     name with the standard key pair, for wire assertions over the EDK provider fields.
+     */
+    public static ESDKClientConfig rawRsaNamed(String keyNamespace, String keyName) {
+        Keyring keyring = Keyring.builder()
+            .rawRsa(RawRsaKeyringConfig.builder()
+                .keyNamespace(keyNamespace)
+                .keyName(keyName)
+                .paddingScheme(PaddingScheme.OAEP_SHA256_MGF1)
+                .publicKey(ByteBuffer.wrap(RSA_KEY_PAIR.publicPem()))
+                .privateKey(ByteBuffer.wrap(RSA_KEY_PAIR.privatePem()))
+                .build())
+            .build();
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(keyring))
+            .build();
+    }
+
+    /**
      * @return a Raw-AES config whose CMM is a Required-Encryption-Context CMM over a Default CMM,
      *     requiring {@code requiredKeys} (dropped from the header on encrypt, demanded again on
      *     decrypt). Fully offline.
