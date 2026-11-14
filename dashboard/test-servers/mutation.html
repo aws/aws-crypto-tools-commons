@@ -28,6 +28,7 @@
   .matrix tbody th { text-align:left; }
   /* One look per state. A missing run is calm grey, never red. */
   .st-wait { color:var(--dim); border-style:dotted; }
+  .st-token { color:#e3b341; border-style:dotted; }
   .st-loading { color:var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); animation:pulse 1.4s ease-in-out infinite; }
   .st-norun { color:var(--dim); background:var(--bg); border-style:dashed; }
   .st-running { color:#e3b341; background:color-mix(in srgb,var(--part) 14%,transparent); }
@@ -76,7 +77,7 @@ const secs = s => s >= 3600 ? (s / 3600).toFixed(1) + " h" : s >= 60 ? (s / 60).
 const cells = {};
 for (const lib of Object.values(LIBRARIES)) for (const lang of LANGUAGES) cells[lib + "|" + lang] = { state:"norun" };
 for (const { language } of MUTATION_REPOS) for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + language] = { state:"wait" };
-let results = [], runInfo = null, problem = null;
+let results = [], shownRun = null, problem = null;
 
 async function findRun(entry, text) {
   const runs = `repos/${entry.repo}/actions/workflows/${entry.workflow}/runs`;
@@ -91,6 +92,7 @@ async function load() {
   const text = $("source").value.trim();
   if (!token()) {
     problem = "Add a GitHub token on the main dashboard's Settings page to load mutation runs.";
+    for (const key of Object.keys(cells)) if (cells[key].state === "wait") cells[key] = { state:"token" };
     render();
     return;
   }
@@ -109,7 +111,7 @@ async function load() {
       render();
       continue;
     }
-    runInfo = run;
+    shownRun = run;
     const arts = (await ghJson(`repos/${entry.repo}/actions/runs/${run.id}/artifacts?per_page=100`)).artifacts
       .filter(a => a.name.startsWith("mutation-results-") && !a.expired);
     const found = new Set(arts.map(a => a.name.replace("mutation-results-", "")));
@@ -145,6 +147,7 @@ async function load() {
 function matrixCell(cell) {
   switch (cell.state) {
     case "wait": return `<td class="st-wait">waiting</td>`;
+    case "token": return `<td class="st-token">needs a token</td>`;
     case "loading": return `<td class="st-loading">loading…</td>`;
     case "norun": return `<td class="st-norun">no run yet</td>`;
     case "running": return `<td class="st-running">running</td>`;
@@ -159,8 +162,8 @@ function matrixCell(cell) {
 }
 
 function render() {
-  if (runInfo) {
-    $("run").innerHTML = `<a href="${runInfo.html_url}" target="_blank">run ${runInfo.id}</a> · ${esc(runInfo.head_branch)} · ${runInfo.head_sha.slice(0, 7)} · ${esc(runInfo.status === "completed" ? runInfo.conclusion : runInfo.status)}`;
+  if (shownRun) {
+    $("run").innerHTML = `<a href="${shownRun.html_url}" target="_blank">run ${shownRun.id}</a> · ${esc(shownRun.head_branch)} · ${shownRun.head_sha.slice(0, 7)} · ${esc(shownRun.status === "completed" ? shownRun.conclusion : shownRun.status)}`;
   }
   let h = problem ? `<div class="quiet">${esc(problem)}</div>` : "";
   h += `<h2>Kill rate</h2><div class="sub">Of the mutants on lines a test runs, the share some test fails on. A mutant on a line no test runs is counted apart.</div>`;
