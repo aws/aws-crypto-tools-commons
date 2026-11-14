@@ -62,6 +62,16 @@ class FuzzTest {
     }
 
     @Test
+    void aLongValueIsNotCutInsideAnEmoji(@TempDir Path dir) throws Exception {
+        Path log = dir.resolve("fuzz-log.jsonl");
+        // Character 100 is the second half of an emoji, at both the start and the end.
+        String value = "a".repeat(99) + "\ud83d\ude80" + "b".repeat(300) + "\ud83d\ude80" + "c".repeat(99);
+        new Fuzz(1, 7, log).examples("emoji", random -> new Example<>("emoji at the cut", value));
+        String logged = new ObjectMapper().readTree(Files.readAllLines(log).get(0)).get("value").asText();
+        assertEquals("a".repeat(99) + "\ud83d\ude80...\ud83d\ude80" + "c".repeat(99), logged);
+    }
+
+    @Test
     void bytesAreLoggedAsHex(@TempDir Path dir) throws Exception {
         Path log = dir.resolve("fuzz-log.jsonl");
         new Fuzz(1, 7, log).examples("bytes", random -> new Example<>("two bytes", new byte[] {1, (byte) 0xff}));
