@@ -78,8 +78,11 @@ public final class RustLaunchPlan implements Launcher {
 
     /** The default cargo target directory (relative to the server crate). */
     static final String DEFAULT_TARGET_DIR = "target";
-    /** The RUSTFLAGS of a coverage build; CI sets the same value so its cargo cache matches. */
-    static final String COVERAGE_RUSTFLAGS = "-C instrument-coverage";
+    /**
+     * The RUSTFLAGS of a coverage build; CI sets the same value so its cargo cache matches.
+     * The cfg adds the server's {@code POST /control/coverage}, which writes one test's coverage.
+     */
+    static final String COVERAGE_RUSTFLAGS = "-C instrument-coverage --cfg testserver_coverage";
 
     private static final String SERVER_LOG_NAME = "rust-server.log";
 
