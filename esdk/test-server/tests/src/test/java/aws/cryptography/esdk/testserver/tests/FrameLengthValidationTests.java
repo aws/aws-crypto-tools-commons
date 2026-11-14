@@ -1,8 +1,10 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import aws.cryptography.testserver.tests.FeatureGate;
+import aws.cryptography.testserver.tests.FrameLengthInputs;
 import aws.cryptography.testserver.tests.KnownBugGate;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.TargetPair;
 
@@ -12,11 +14,12 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -29,8 +32,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       ({@code spec/client-apis/encrypt.md#frame-length}).</li>
  * </ul>
  *
- * <p>Only the {@code > 0} bound is asserted here because it is the spec requirement common to
- * every implementation. The "multiple of the cipher block size" restriction and the signed-int
+ * <p>The fixed examples check the {@code > 0} bound. Random examples also check the 2^32-1 bound.
+ * The "multiple of the cipher block size" restriction and the signed-int
  * (2^31-1) cap are implementation-specific — the message format permits any frame length up to
  * 2^32-1, and the native implementations accept the full range — so they are not asserted as
  * cross-language conformance.
@@ -48,8 +51,8 @@ class FrameLengthValidationTests {
     private static final ESDKCommitmentPolicy POLICY =
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
-    static List<LanguageServerTarget> targets() {
-        return LanguageServerRegistry.shared().targets();
+    static Stream<Arguments> invalidFrameLengthsWithEachLanguageServer() {
+        return ExampleCases.withEachLanguageServer(FrameLengthInputs.invalidFrameLengths());
     }
 
     /**
@@ -65,18 +68,19 @@ class FrameLengthValidationTests {
         return keyring.config(POLICY);
     }
 
-    /** ENC-001: a frame length that is not greater than 0 (here negative) is rejected on encrypt. */
-    @ParameterizedTest(name = "nonPositiveFrameLengthRejected {0}")
-    @MethodSource("targets")
-    void encryptRejectsNonPositiveFrameLength(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
+    /** ENC-001: a frame length outside [1, 2^32 - 1] is rejected on encrypt. */
+    @ParameterizedTest(name = "nonPositiveFrameLengthRejected {0} {1}")
+    @MethodSource("invalidFrameLengthsWithEachLanguageServer")
+    void encryptRejectsNonPositiveFrameLength(Example<Long> frameLength, LanguageServerTarget languageServer) {
+        ESDKClientConfig config = configFor(new TargetPair(languageServer, languageServer));
         //= spec/client-apis/encrypt.md#frame-length
         //= type=test
         //# This value MUST be greater than 0 and MUST NOT exceed the value 2^32 - 1.
-        KnownBugGate.gateDeclared("encrypt-non-positive-frame-length-generic-error", target,
+        KnownBugGate.gateDeclared("encrypt-non-positive-frame-length-generic-error", languageServer,
             () -> assertThrows(ESDKClientError.class,
-                () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, Map.of(), null, -16L),
-                "encrypt with a frame length that is not greater than 0 must be rejected as an "
-                    + "ESDKClientError (" + target + ")"));
+                () -> EsdkOps.encrypt(languageServer.endpoint(), config, PLAINTEXT, Map.of(), null,
+                    frameLength.value()),
+                "encrypt with a frame length that is not in [1, 2^32 - 1] must be rejected as an "
+                    + "ESDKClientError (" + languageServer + ")"));
     }
 }
