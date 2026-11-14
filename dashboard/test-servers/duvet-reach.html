@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Duvet Test Reach · Test Server Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd; --info:#58a6ff;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  main { display:grid; grid-template-columns:minmax(0,1fr); height:calc(100vh - 52px); }
+  main.open { grid-template-columns:minmax(0,var(--left,1fr)) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
+  section { overflow:auto; padding:16px 20px; }
+  #detail { background:var(--panel); }
+  #detail .close { position:sticky; top:-16px; float:right; z-index:2; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; }
+  #divider { cursor:col-resize; background:var(--line); }
+  #divider:hover, #divider.drag { background:var(--sel); }
+  body.resizing { user-select:none; cursor:col-resize; }
+  h2 { font-size:15px; margin:0 0 4px; }
+  h3 { font-size:13px; margin:18px 0 6px; cursor:pointer; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:8px; }
+  .empty { color:var(--dim); padding:40px 0; text-align:center; }
+  .intro { color:var(--dim); font-size:12px; max-width:760px; margin:0 0 12px; }
+  table.matrix { border-collapse:collapse; margin-bottom:6px; }
+  .matrix th, .matrix td { border:1px solid var(--line); padding:6px 10px; text-align:center; font-size:12px; }
+  .matrix tbody th { text-align:left; white-space:nowrap; font-weight:600; }
+  .matrix td { min-width:96px; }
+  .matrix td[data-lib] { cursor:pointer; }
+  .matrix td[data-lib]:hover { outline:2px solid var(--sel); outline-offset:-2px; }
+  .matrix td.selected { outline:2px solid #fff; outline-offset:-2px; }
+  .matrix td b { display:block; font-size:15px; font-variant-numeric:tabular-nums; }
+  .matrix td small { color:var(--dim); font-size:10px; display:block; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin:10px 0; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  @keyframes pulse { 50% { opacity:.45; } }
+  /* One look per cell state. */
+  .st-queued { color:var(--dim); background:var(--bg); border:1px dotted var(--line) !important; }
+  .st-loading { color:var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); animation:pulse 1.4s ease-in-out infinite; }
+  .st-norun { color:var(--dim); background:var(--bg); border:1px dashed var(--line) !important; }
+  .st-nocov { color:var(--dim); background:color-mix(in srgb,var(--dim) 14%,transparent); }
+  .st-clean { background:color-mix(in srgb,var(--pass) 30%,transparent); }
+  .st-gaps { background:color-mix(in srgb,var(--pass) 18%,transparent); box-shadow:inset 0 -3px 0 var(--part); }
+  .st-found { background:color-mix(in srgb,var(--fail) 28%,transparent); }
+  .st-error { color:#ffa198; background:color-mix(in srgb,var(--fail) 12%,transparent); border:1px solid var(--fail) !important; }
+  /* One badge per finding state. */
+  .badge { display:inline-block; font-size:10px; font-weight:600; padding:1px 7px; border-radius:8px; margin-right:6px; white-space:nowrap; }
+  .b-ok { background:color-mix(in srgb,var(--pass) 30%,transparent); color:#56d364; }
+  .b-never-reaches { background:color-mix(in srgb,var(--fail) 30%,transparent); color:#ffa198; }
+  .b-not-run { background:color-mix(in srgb,var(--info) 20%,transparent); color:var(--info); }
+  .b-no-region { background:color-mix(in srgb,var(--part) 25%,transparent); color:#e3b341; }
+  .b-no-coverage { background:color-mix(in srgb,var(--dim) 20%,transparent); color:var(--dim); }
+  .b-error { background:transparent; color:#ffa198; border:1px solid var(--fail); }
+  .finding { border-bottom:1px solid var(--line); padding:7px 0; font-size:12px; }
+  .finding .quote { color:var(--text); margin:3px 0; }
+  .finding .links { color:var(--dim); }
+  .finding .links a { margin-right:10px; }
+  .finding code { font:11px ui-monospace,monospace; color:var(--dim); }
+  .group.closed .items { display:none; }
+  .group h3::before { content:"▾ "; color:var(--dim); }
+  .group.closed h3::before { content:"▸ "; }
+  .note { color:#e3b341; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Duvet Test Reach</h1>
+  <label title="Empty: the newest check on main of each library repository. Or paste a PR (URL or owner/repo#N), or a run URL.">PR / run <input type="text" id="source" size="40" placeholder="newest check on main"></label>
+</header>
+<main>
+  <section id="left"><div class="empty">Loading…</div></section>
+  <div id="divider" title="Drag to resize; double-click to reset"></div>
+  <section id="detail"></section>
+</main>
+
+<script src="loader.js"></script>
+<script>
+// Each cell is one library in one language. Its data is the report
+// test-server-common/tools/duvet_test_reach.py wrote, uploaded as the artifact
+// duvet-test-reach-<library>-<language> by a CI run in the library's
+// repository (local tests and shared Tests) or in commons (shared Tests only).
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const STATES = [
+  ["never-reaches", "TEST NEVER REACHES CODE", "a run of the test hit no line under the implementation annotation"],
+  ["no-region", "NO REGION", "no code coverage can count sits under the implementation annotation"],
+  ["not-run", "NOT RUN", "the test was skipped, or no run of it was recorded"],
+  ["no-coverage", "NO COVERAGE", "this language has no per-test coverage yet"],
+  ["ok", "OK", "a run of the test hit the code"],
+];
+const STATE_LABEL = Object.fromEntries(STATES.map(([k, l]) => [k, l]));
+const ui = { source:readSource(), lib:null, lang:null };
+const CELLS = {};   // "<label>|<language>" -> { phase, report, run, repo, error }
+const LANGS = {};   // label -> [{ language, repo }]
+
+const artifactName = (product, language) => `duvet-test-reach-${product}-${language}`;
+const blob = (repo, commit, path, a, b) =>
+  `https://github.com/${repo}/blob/${commit || "HEAD"}/${path}#L${a}${b && b !== a ? "-L" + b : ""}`;
+
+// The runs to read for what the user typed: [{ repo, runId, url }], or null
+// for "the newest on main".
+async function sourceRuns(text) {
+  if (!text) return null;
+  let m;
+  if ((m = text.match(/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)/))) {
+    const run = await ghJson(`repos/${m[1]}/actions/runs/${m[2]}`);
+    return [{ repo:m[1], runId:run.id, url:run.html_url, sha:run.head_sha }];
+  }
+  if ((m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/))) {
+    const repo = m[1] || COMMONS;
+    const pr = await ghJson(`repos/${repo}/pulls/${m[2]}`);
+    const runs = (await ghJson(`repos/${repo}/actions/runs?head_sha=${pr.head.sha}&per_page=50`)).workflow_runs;
+    return runs.map(r => ({ repo, runId:r.id, url:r.html_url, sha:r.head_sha, going:r.status !== "completed" }));
+  }
+  throw new Error(`"${text}" is not a pull request or run URL`);
+}
+
+// The newest unexpired report for one cell: from the runs given, else from
+// main in the library's repository, then in commons.
+async function findReport(product, language, repo, runs) {
+  const name = artifactName(product, language);
+  if (runs) {
+    for (const r of runs) {
+      const arts = (await ghJson(`repos/${r.repo}/actions/runs/${r.runId}/artifacts?per_page=100`)).artifacts;
+      const art = arts.find(a => a.name === name && !a.expired);
+      if (art) return { art, repo:r.repo, url:r.url };
+    }
+    return null;
+  }
+  for (const where of [repo, COMMONS]) {
+    const arts = (await ghJson(`repos/${where}/actions/artifacts?name=${name}&per_page=30`)).artifacts
+      .filter(a => !a.expired && a.workflow_run && a.workflow_run.head_branch === "main");
+    if (arts.length) return { art:arts[0], repo:where,
+      url:`https://github.com/${where}/actions/runs/${arts[0].workflow_run.id}` };
+  }
+  return null;
+}
+
+async function loadCell(label, language, repo, runs) {
+  const key = label + "|" + language, c = CELLS[key];
+  c.phase = "loading"; renderLeft();
+  try {
+    const found = await findReport(PRODUCTS[label], language, repo, runs);
+    if (!found) { c.phase = "norun"; renderLeft(); return; }
+    const zip = await (await gh(`repos/${found.repo}/actions/artifacts/${found.art.id}/zip`)).arrayBuffer();
+    const entry = zipEntries(zip).find(e => e.name.endsWith(".json"));
+    c.report = JSON.parse(await zipText(zip, entry));
+    c.run = found;
+    c.phase = c.report.coverage ? "done" : "nocov";
+  } catch (err) {
+    c.phase = "error"; c.error = err.message || String(err);
+  }
+  renderLeft();
+  if (ui.lib === label && ui.lang === language) renderDetail();
+}
+
+function cellView(c) {
+  if (c.phase === "queued") return ["st-queued", "<small>waiting</small>"];
+  if (c.phase === "loading") return ["st-loading", "<small>loading…</small>"];
+  if (c.phase === "norun") return ["st-norun", "<small>no run yet</small>"];
+  if (c.phase === "error") return ["st-error", `<small title="${esc(c.error)}">failed to load</small>`];
+  const n = c.report.counts, errors = c.report.errors.length;
+  if (c.phase === "nocov") return ["st-nocov", `<b>–</b><small>no coverage yet</small>`];
+  const bad = n["never-reaches"] + errors;
+  const cls = bad ? "st-found" : n["no-region"] || n["not-run"] ? "st-gaps" : "st-clean";
+  const parts = [`${n.ok} ok`];
+  if (n["not-run"]) parts.push(`${n["not-run"]} not run`);
+  if (n["never-reaches"]) parts.push(`${n["never-reaches"]} never reach`);
+  if (n["no-region"]) parts.push(`${n["no-region"]} no region`);
+  if (errors) parts.push(`${errors} not in a test`);
+  return [cls, `<b>${bad ? bad + (bad > 1 ? " false annotations" : " false annotation") : "all reach"}</b><small>${parts.join(" · ")}</small>`];
+}
+
+function renderLeft() {
+  const labels = Object.keys(PRODUCTS).filter(l => LANGS[l]);
+  if (!labels.length) return;
+  const langs = [...new Set(labels.flatMap(l => LANGS[l].map(x => x.language)))].sort();
+  let h = `<p class="intro">For each duvet test annotation, did a run of its test hit the code under the
+    implementation annotation for the same requirement? Pull requests check only the annotations they change;
+    nightly runs check all of them. Click a cell to list the findings.</p>
+    <table class="matrix"><thead><tr><th></th>${langs.map(l => `<th>${esc(l)}</th>`).join("")}</tr></thead><tbody>`;
+  for (const label of labels) {
+    h += `<tr><th>${esc(label)}</th>`;
+    for (const lang of langs) {
+      const c = CELLS[label + "|" + lang];
+      if (!c) { h += `<td class="st-norun"><small>no server</small></td>`; continue; }
+      const [cls, inner] = cellView(c);
+      const sel = ui.lib === label && ui.lang === lang ? " selected" : "";
+      h += `<td class="${cls}${sel}" data-lib="${esc(label)}" data-lang="${esc(lang)}">${inner}</td>`;
+    }
+    h += "</tr>";
+  }
+  h += `</tbody></table><div class="legend">
+    <span><i class="sw st-clean"></i>every checked test reaches its code</span>
+    <span><i class="sw st-gaps"></i>reaches, some not run or no region</span>
+    <span><i class="sw st-found"></i>a test never reaches its code</span>
+    <span><i class="sw st-nocov"></i>no per-test coverage yet</span>
+    <span><i class="sw st-norun"></i>no run yet</span>
+    <span><i class="sw st-loading"></i>loading</span>
+    <span><i class="sw st-error"></i>failed to load</span></div>`;
+  $("left").innerHTML = h;
+}
+
+function findingHtml(f, report) {
+  const t = f.test_annotation;
+  const impls = f.implementations.map(i => i.region
+    ? `<a href="${blob(report.repository, report.commit, i.path, i.region[0], i.region[1])}" target="_blank">region ${esc(i.path)}:${i.region[0]}–${i.region[1]}</a>`
+    : `<a href="${blob(report.repository, report.commit, i.path, i.line)}" target="_blank">annotation ${esc(i.path)}:${i.line} (no code)</a>`).join("");
+  const detail = f.detail ? ` · ${esc(f.detail)}` : "";
+  const hit = f.hit ? ` · hit by <code>${esc(f.hit.test)}</code>` : "";
+  return `<div class="finding"><span class="badge b-${f.state}">${STATE_LABEL[f.state]}</span>
+    <code>${esc(f.requirement.target)}</code> <span class="sub">${esc(f.source === "local" ? "local test" : "shared Test")}${detail}${hit}</span>
+    <div class="quote">${esc(f.requirement.quote)}</div>
+    <div class="links"><a href="${blob(t.repository, t.commit, t.path, t.line, t.end)}" target="_blank">test annotation ${esc(t.path)}:${t.line}</a>
+      tests: ${f.tests.map(x => `<code>${esc(x)}</code>`).join(", ")}<br>${impls}</div></div>`;
+}
+
+function renderDetail() {
+  const d = $("detail"), c = ui.lib && CELLS[ui.lib + "|" + ui.lang];
+  document.querySelector("main").classList.toggle("open", !!c);
+  if (!c) { d.innerHTML = ""; return; }
+  const title = `<button class="close" data-close title="Close">×</button><h2>${esc(ui.lib)} · ${esc(ui.lang)}</h2>`;
+  if (c.phase === "queued" || c.phase === "loading") { d.innerHTML = title + `<div class="empty">Loading…</div>`; return; }
+  if (c.phase === "norun") { d.innerHTML = title + `<div class="empty">No duvet test reach check has run for this library in this language yet.</div>`; return; }
+  if (c.phase === "error") { d.innerHTML = title + `<div class="empty">Could not load the report: ${esc(c.error)}</div>`; return; }
+  const r = c.report;
+  let h = title + `<div class="sub"><a href="${esc(c.run.url)}" target="_blank">run</a> in ${esc(c.run.repo)} ·
+    ${esc(r.repository)} @ ${esc((r.commit || "").slice(0, 7))} · ${r.mode === "changed" ? "annotations this pull request changes" : "every annotation"}</div>`;
+  if (!r.coverage) h += `<p class="sub">This language has no per-test coverage yet, so no test could be checked.</p>`;
+  const skipped = Object.entries(r.skipped || {});
+  if (skipped.length) h += `<p class="sub">Not checked: ${skipped.map(([k, n]) => `${n} with ${esc(k)}`).join(", ")}.</p>`;
+  if (r.errors.length) {
+    h += `<div class="group"><h3>Annotations not in a test (${r.errors.length})</h3><div class="items">` +
+      r.errors.map(e => {
+        const m = e.match(/^(.+?):(\d+): (.*)$/);
+        const link = m ? `<a href="${blob(r.repository, r.commit, m[1], +m[2])}" target="_blank">${esc(m[1])}:${m[2]}</a> ${esc(m[3])}` : esc(e);
+        return `<div class="finding"><span class="badge b-error">NOT IN A TEST</span>${link}</div>`;
+      }).join("") + `</div></div>`;
+  }
+  for (const [state, label, meaning] of STATES) {
+    const list = r.findings.filter(f => f.state === state);
+    if (!list.length) continue;
+    const closed = state === "ok" ? " closed" : "";
+    h += `<div class="group${closed}"><h3 title="${esc(meaning)}"><span class="badge b-${state}">${label}</span>${list.length}</h3>
+      <div class="items">${list.map(f => findingHtml(f, r)).join("")}</div></div>`;
+  }
+  if (!r.findings.length && !r.errors.length) h += `<div class="empty">No annotations to check in this run.</div>`;
+  d.innerHTML = h;
+}
+
+async function load() {
+  if (!localStorage.getItem("github-dashboard-token")) {
+    $("left").innerHTML = `<div class="empty">Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).</div>`;
+    return;
+  }
+  for (const k in CELLS) delete CELLS[k];
+  let runs = null;
+  try { runs = await sourceRuns(ui.source); }
+  catch (err) { $("left").innerHTML = `<div class="empty">${esc(err.message || err)}</div>`; return; }
+  // The languages come from each product's server list on commons main.
+  await Promise.all(Object.entries(PRODUCTS).map(async ([label, product]) => {
+    const entries = JSON.parse(await ghRaw(COMMONS, `${product}/test-server/config/server-config.json`, "main")).entries;
+    LANGS[label] = entries.map(e => ({ language:e.language, repo:repoSlug((e.libraryRepository || e.serverLocation).url) }));
+    for (const x of LANGS[label]) CELLS[label + "|" + x.language] = { phase:"queued" };
+  }));
+  renderLeft(); renderDetail();
+  await Promise.all(Object.keys(PRODUCTS).flatMap(label =>
+    LANGS[label].map(x => loadCell(label, x.language, x.repo, runs))));
+}
+
+$("source").value = ui.source;
+$("source").onchange = e => { ui.source = e.target.value.trim(); writeSource(ui.source); load(); };
+$("left").addEventListener("click", e => {
+  const td = e.target.closest("td[data-lib]");
+  if (td) { ui.lib = td.dataset.lib; ui.lang = td.dataset.lang; renderLeft(); renderDetail(); $("detail").scrollTop = 0; }
+});
+$("detail").addEventListener("click", e => {
+  if (e.target.closest("[data-close]")) { ui.lib = ui.lang = null; renderLeft(); renderDetail(); return; }
+  const h = e.target.closest(".group h3");
+  if (h) h.parentElement.classList.toggle("closed");
+});
+(() => {
+  const main = document.querySelector("main"), div = $("divider");
+  const set = px => main.style.setProperty("--left", px ? px + "px" : "1fr");
+  set(+localStorage.getItem("leftPane") || 0);
+  div.addEventListener("mousedown", e => {
+    e.preventDefault(); div.classList.add("drag"); document.body.classList.add("resizing");
+    const move = ev => {
+      const px = Math.min(Math.max(ev.clientX - main.getBoundingClientRect().left, 240), main.clientWidth - 240);
+      set(px); localStorage.setItem("leftPane", Math.round(px));
+    };
+    const up = () => { div.classList.remove("drag"); document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  });
+  div.addEventListener("dblclick", () => { localStorage.removeItem("leftPane"); set(0); });
+})();
+
+load();
+</script>
+</body>
+</html>

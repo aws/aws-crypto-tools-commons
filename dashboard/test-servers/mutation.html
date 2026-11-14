@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mutation Testing · Test Server Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  main { padding:16px 20px; }
+  h2 { font-size:15px; margin:18px 0 6px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:8px; }
+  table { border-collapse:collapse; font-size:12px; }
+  th, td { border:1px solid var(--line); padding:5px 9px; }
+  thead th { color:var(--dim); font-weight:600; background:var(--bg); }
+  .matrix td { text-align:center; min-width:86px; }
+  .matrix td b { display:block; font-size:15px; font-variant-numeric:tabular-nums; }
+  .matrix td small { color:var(--dim); font-size:10px; }
+  .matrix tbody th { text-align:left; }
+  /* One look per state. A missing run is calm grey, never red. */
+  .st-wait { color:var(--dim); border-style:dotted; }
+  .st-token { color:#e3b341; border-style:dotted; }
+  .st-loading { color:var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); animation:pulse 1.4s ease-in-out infinite; }
+  .st-norun { color:var(--dim); background:var(--bg); border-style:dashed; }
+  .st-running { color:#e3b341; background:color-mix(in srgb,var(--part) 14%,transparent); }
+  .st-error { color:#ffa198; background:color-mix(in srgb,var(--fail) 22%,transparent); cursor:help; }
+  .st-empty { color:var(--dim); background:repeating-linear-gradient(45deg,var(--line) 0 4px,transparent 4px 9px); }
+  .st-done { background:var(--tint); }
+  @keyframes pulse { 50% { opacity:.45; } }
+  .speed td, .speed th { text-align:right; font-variant-numeric:tabular-nums; }
+  .speed td:first-child, .speed th:first-child { text-align:left; }
+  .survivors td { vertical-align:top; }
+  .survivors td.code { font-family:ui-monospace,monospace; white-space:pre-wrap; }
+  .survivors tr.file td { background:var(--panel); font-weight:600; font-family:ui-monospace,monospace; }
+  .kind { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin:6px 0; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid var(--line); }
+  .quiet { color:var(--dim); padding:24px 0; }
+  .good { color:#56d364; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mutation Testing</h1>
+  <label title="Empty: newest finished mutation run on the Rust repository's main. Or paste a run URL or a branch.">Run <input type="text" id="source" size="40" placeholder="newest finished run on main"></label>
+  <span class="run" id="run"></span>
+</header>
+<main id="main"><div class="quiet">Loading…</div></main>
+
+<script src="loader.js"></script>
+<script>
+// Mutation testing results, read in the browser from GitHub Actions.
+//
+// Each library's mutation job (aws-crypto-tools-rust's mutation.yml today)
+// uploads an artifact named mutation-results-<crate> holding results.json,
+// which test-server-common/tools/mutation/mutate.py writes. A survivor is a
+// small change to the library that no test failed on.
+
+const MUTATION_REPOS = [{ language:"Rust", repo:"aws/aws-crypto-tools-rust", workflow:"mutation.yml" }];
+const LIBRARIES = { esdk:"ESDK", mpl:"MPL", dbesdk:"DB-ESDK", prim:"Primitives" };
+const LANGUAGES = ["Rust", "Java", "Python", ".NET", "Go", "JavaScript", "C"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const secs = s => s >= 3600 ? (s / 3600).toFixed(1) + " h" : s >= 60 ? (s / 60).toFixed(1) + " min" : s.toFixed(s < 10 ? 2 : 0) + " s";
+
+// Every cell starts as waiting and moves through loading to one end state.
+const cells = {};
+for (const lib of Object.values(LIBRARIES)) for (const lang of LANGUAGES) cells[lib + "|" + lang] = { state:"norun" };
+for (const { language } of MUTATION_REPOS) for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + language] = { state:"wait" };
+let results = [], shownRun = null, problem = null;
+
+async function findRun(entry, text) {
+  const runs = `repos/${entry.repo}/actions/workflows/${entry.workflow}/runs`;
+  const id = (text.match(/actions\/runs\/(\d+)/) || text.match(/^(\d+)$/) || [])[1];
+  if (id) return ghJson(`repos/${entry.repo}/actions/runs/${id}`);
+  const branch = text || "main";
+  const list = (await ghJson(`${runs}?branch=${encodeURIComponent(branch)}&per_page=20`)).workflow_runs;
+  return list.find(run => run.status === "completed") || list[0] || null;
+}
+
+async function load() {
+  const text = $("source").value.trim();
+  if (!token()) {
+    problem = "Add a GitHub token on the main dashboard's Settings page to load mutation runs.";
+    for (const key of Object.keys(cells)) if (cells[key].state === "wait") cells[key] = { state:"token" };
+    render();
+    return;
+  }
+  results = []; problem = null;
+  for (const entry of MUTATION_REPOS) {
+    let run;
+    try {
+      run = await findRun(entry, text);
+    } catch (e) {
+      for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + entry.language] = { state:"error", note:e.message };
+      render();
+      continue;
+    }
+    if (!run) {
+      for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + entry.language] = { state:"norun" };
+      render();
+      continue;
+    }
+    shownRun = run;
+    const arts = (await ghJson(`repos/${entry.repo}/actions/runs/${run.id}/artifacts?per_page=100`)).artifacts
+      .filter(a => a.name.startsWith("mutation-results-") && !a.expired);
+    const found = new Set(arts.map(a => a.name.replace("mutation-results-", "")));
+    for (const [crate, lib] of Object.entries(LIBRARIES)) {
+      const key = lib + "|" + entry.language;
+      if (!found.has(crate)) cells[key] = run.status === "completed" ? { state:"empty" } : { state:"running" };
+      else cells[key] = { state:"loading" };
+    }
+    render();
+    for (const art of arts) {
+      const crate = art.name.replace("mutation-results-", "");
+      const lib = LIBRARIES[crate] || crate;
+      const key = lib + "|" + entry.language;
+      try {
+        const data = await cachedArtifact(entry.repo, art, () => {}, async (zip, entries) => {
+          const file = entries.find(e => e.name.endsWith("results.json"));
+          return file ? JSON.parse(await zipText(zip, file)) : null;
+        });
+        if (!data) { cells[key] = { state:"empty" }; continue; }
+        results.push({ lib, language:entry.language, repo:entry.repo, data });
+        const s = data.summary.statuses;
+        const killed = (s.killed || 0) + (s.timed_out || 0), survived = s.survived || 0;
+        cells[key] = { state:"done", killed, survived, notCovered:s.not_covered || 0 };
+      } catch (e) {
+        cells[key] = { state:"error", note:e.message };
+      }
+      render();
+    }
+  }
+  render();
+}
+
+function matrixCell(cell) {
+  switch (cell.state) {
+    case "wait": return `<td class="st-wait">waiting</td>`;
+    case "token": return `<td class="st-token">needs a token</td>`;
+    case "loading": return `<td class="st-loading">loading…</td>`;
+    case "norun": return `<td class="st-norun">no run yet</td>`;
+    case "running": return `<td class="st-running">running</td>`;
+    case "empty": return `<td class="st-empty">no results</td>`;
+    case "error": return `<td class="st-error" title="${esc(cell.note)}">failed to load</td>`;
+  }
+  const tested = cell.killed + cell.survived;
+  const rate = tested ? cell.killed / tested : 1;
+  const tint = `color-mix(in srgb,var(--pass) ${Math.round(10 + rate * 40)}%,transparent)`;
+  return `<td class="st-done" style="--tint:${tint}" title="${cell.killed} killed, ${cell.survived} survived, ${cell.notCovered} on lines no test runs">
+    <b>${tested ? Math.round(rate * 100) + "%" : "–"}</b><small>${cell.survived} survived</small></td>`;
+}
+
+function render() {
+  if (shownRun) {
+    $("run").innerHTML = `<a href="${shownRun.html_url}" target="_blank">run ${shownRun.id}</a> · ${esc(shownRun.head_branch)} · ${shownRun.head_sha.slice(0, 7)} · ${esc(shownRun.status === "completed" ? shownRun.conclusion : shownRun.status)}`;
+  }
+  let h = problem ? `<div class="quiet">${esc(problem)}</div>` : "";
+  h += `<h2>Kill rate</h2><div class="sub">Of the mutants on lines a test runs, the share some test fails on. A mutant on a line no test runs is counted apart.</div>`;
+  h += `<table class="matrix"><thead><tr><th></th>${LANGUAGES.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const lib of Object.values(LIBRARIES))
+    h += `<tr><th>${lib}</th>${LANGUAGES.map(lang => matrixCell(cells[lib + "|" + lang])).join("")}</tr>`;
+  h += `</tbody></table><div class="legend">
+    <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 45%,transparent)"></i>brighter: more mutants killed</span>
+    <span><i class="sw st-norun"></i>no mutation run for this language yet</span>
+    <span><i class="sw st-empty"></i>run finished without results for this library</span>
+    <span><i class="sw st-running"></i>run still going</span>
+    <span><i class="sw st-error"></i>could not load</span></div>`;
+
+  for (const { lib, language, repo, data } of results) {
+    const s = data.summary;
+    const st = s.statuses;
+    const ran = s.ran || 0, total = s.seconds;
+    h += `<h2>${lib} · ${language}: speed</h2>`;
+    h += `<div class="sub">${s.mutants} mutants written. ${st.unviable || 0} did not compile, ${st.not_covered || 0} are on lines no test runs, ${s.cached || 0} came from the cache, ${ran} ran ${s.tests_run} tests. ${s.servers} server${s.servers === 1 ? "" : "s"}.</div>`;
+    h += `<table class="speed"><thead><tr><th>step</th><th>time</th></tr></thead><tbody>`;
+    for (const [phase, t] of Object.entries(s.phases)) h += `<tr><td>${esc(phase)}</td><td>${secs(t)}</td></tr>`;
+    const decided = (st.killed || 0) + (st.survived || 0) + (st.timed_out || 0) + (st.not_covered || 0);
+    h += `<tr><th>total</th><th>${secs(total)}</th></tr>`;
+    h += `<tr><td>mutants per hour</td><td>${decided ? Math.round(decided / total * 3600).toLocaleString() : "–"}</td></tr></tbody></table>`;
+
+    const survivors = data.mutants.filter(m => m.status === "survived");
+    h += `<h2>${lib} · ${language}: survived (${survivors.length})</h2>`;
+    if (!survivors.length) { h += `<div class="quiet good">Every mutant on a tested line was killed.</div>`; continue; }
+    h += `<table class="survivors"><thead><tr><th>line</th><th>mutation</th><th>code</th><th>function</th></tr></thead><tbody>`;
+    let file = null;
+    for (const m of survivors.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
+      if (m.file !== file) { file = m.file; h += `<tr class="file"><td colspan="4">${esc(file)}</td></tr>`; }
+      const link = `https://github.com/${repo}/blob/${s.commit || "main"}/${m.file}#L${m.line}`;
+      h += `<tr><td><a href="${link}" target="_blank">${m.line}</a></td><td><span class="kind">${esc(m.kind)}</span> ${esc(m.description)}</td><td class="code">${esc(m.source_line)}</td><td>${esc(m.function)}</td></tr>`;
+    }
+    h += `</tbody></table>`;
+  }
+  $("main").innerHTML = h;
+}
+
+$("source").value = new URLSearchParams(location.search).get("run") || "";
+$("source").addEventListener("change", load);
+render();
+load();
+</script>
+</body>
+</html>

@@ -229,9 +229,14 @@ public final class GradleTestRunner implements TestRunner {
             }
         }
         command.add("--console=plain");
-        if (testFilter != null && !testFilter.isBlank()) {
-            command.add("--tests");
-            command.add(testFilter.trim());
+        if (testFilter != null) {
+            // A comma-separated filter runs every Test any of its patterns names.
+            for (String pattern : testFilter.split(",")) {
+                if (!pattern.isBlank()) {
+                    command.add("--tests");
+                    command.add(pattern.trim());
+                }
+            }
         }
         return command;
     }
