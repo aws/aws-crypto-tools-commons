@@ -9,6 +9,7 @@ on:
       - "test-server-common/**"
       - ".github/workflows/esdk-test-server.yml"
       - ".github/workflows/esdk-test-server-reusable.yml"
+      - ".github/workflows/duvet-test-reach-reusable.yml"
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - "test-server-common/**"
       - ".github/workflows/esdk-test-server.yml"
       - ".github/workflows/esdk-test-server-reusable.yml"
+      - ".github/workflows/duvet-test-reach-reusable.yml"
   # Nightly on main: rebuilds any language whose branch tip moved and saves it
   # to main's caches, which every pull request can restore.
   schedule:
@@ -49,5 +51,19 @@ jobs:
       focus: ${{ inputs.focus || '' }}
       language-repository: ${{ inputs.language-repository || '' }}
       language-ref: ${{ inputs.language-ref || '' }}
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
+
+  duvet-test-reach:
+    name: duvet test reach
+    needs: esdk
+    if: always()
+    uses: ./.github/workflows/duvet-test-reach-reusable.yml
+    with:
+      library: esdk
+      language: rust
+      language-repository: aws/aws-crypto-tools-rust
+      source: esdk/src
+      artifacts: esdk-test-server-reports
     secrets:
       repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
