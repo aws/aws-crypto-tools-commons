@@ -1,0 +1,95 @@
+# Runs every library's test server with random examples added to the shared
+# input lists (tests-support Fuzz). No branch rule requires this workflow, so
+# a red run here never blocks a pull request.
+name: Test server fuzz
+
+on:
+  pull_request:
+    paths:
+      - "esdk/test-server/**"
+      - "mpl/test-server/**"
+      - "dbesdk/test-server/**"
+      - "primitives/test-server/**"
+      - "test-server-common/**"
+      - ".github/workflows/test-server-fuzz.yml"
+      - ".github/workflows/*-test-server-reusable.yml"
+  schedule:
+    - cron: "47 8 * * *"
+  workflow_dispatch:
+    inputs:
+      count:
+        description: How many random examples to add to each shared input list.
+        type: string
+        default: "200"
+      seed:
+        description: The seed to repeat. Empty uses this run's id.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+  pull-requests: read
+
+jobs:
+  settings:
+    name: pick the count and seed
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.pick.outputs.count }}
+      seed: ${{ steps.pick.outputs.seed }}
+    steps:
+      - id: pick
+        env:
+          COUNT: ${{ inputs.count }}
+          SEED: ${{ inputs.seed }}
+        run: |
+          echo "count=${COUNT:-200}" >> "$GITHUB_OUTPUT"
+          echo "seed=${SEED:-$GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "Fuzz count ${COUNT:-200}, seed ${SEED:-$GITHUB_RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
+
+  esdk:
+    name: ESDK
+    needs: settings
+    uses: ./.github/workflows/esdk-test-server-reusable.yml
+    with:
+      fuzz: ${{ needs.settings.outputs.count }}
+      fuzz-seed: ${{ needs.settings.outputs.seed }}
+      report-artifact: esdk-test-server-fuzz-reports
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
+
+  mpl:
+    name: MPL
+    needs: settings
+    uses: ./.github/workflows/mpl-test-server-reusable.yml
+    with:
+      fuzz: ${{ needs.settings.outputs.count }}
+      fuzz-seed: ${{ needs.settings.outputs.seed }}
+      report-artifact: mpl-test-server-fuzz-reports
+      # The same role the MPL TestServer workflow uses.
+      aws-role-arn: arn:aws:iam::370957321024:role/GitHub-CI-Public-ESDK-Dafny-Role-us-west-2
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
+
+  dbesdk:
+    name: DB-ESDK
+    needs: settings
+    uses: ./.github/workflows/dbesdk-test-server-reusable.yml
+    with:
+      runner: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+      fuzz: ${{ needs.settings.outputs.count }}
+      fuzz-seed: ${{ needs.settings.outputs.seed }}
+      report-artifact: dbesdk-test-server-fuzz-reports
+
+  primitives:
+    name: Primitives
+    needs: settings
+    uses: ./.github/workflows/primitives-test-server-reusable.yml
+    with:
+      fuzz: ${{ needs.settings.outputs.count }}
+      fuzz-seed: ${{ needs.settings.outputs.seed }}
+      report-artifact: primitives-test-server-fuzz-reports
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}

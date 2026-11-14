@@ -255,10 +255,22 @@ structure GenericServerError {
 
 /// Returned for exceptions forwarded from the underlying ESDK_Client. Its
 /// message is the ESDK exception's message, unmodified (Requirement 5.6).
+///
+/// The other members describe the error for the error checks.
+/// A server fills in only the members its library has.
+/// The value formats are in `ErrorFields` in test-server-common/tests-support.
 @error("client")
 structure ESDKClientError {
     @required
     message: String
+
+    kind: String
+    service: String
+    resource: String
+    code: String
+    retryable: Boolean
+    retryKind: String
+    conflictReason: String
 }
 
 // ===========================================================================

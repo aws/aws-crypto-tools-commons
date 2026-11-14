@@ -1,5 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.EncryptionContextInputs;
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
@@ -14,13 +17,14 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKClientError;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -63,6 +67,25 @@ class EncryptionContextBehaviorTests {
         return LanguageServerRegistry.shared().pairs();
     }
 
+    static Stream<Arguments> validContextsWithEachPair() {
+        return ExampleCases.withEachPair(EncryptionContextInputs.validEncryptionContexts());
+    }
+
+    /** A changed context needs a value to change, so the empty context is left out. */
+    static Stream<Arguments> nonEmptyContextsWithEachPair() {
+        return ExampleCases.withEachPair(EncryptionContextInputs.validEncryptionContexts().stream()
+            .filter(example -> !example.value().isEmpty())
+            .toList());
+    }
+
+    static Stream<Arguments> publicKeyContextsWithEachLanguageServer() {
+        return ExampleCases.withEachLanguageServer(EncryptionContextInputs.publicKeyEncryptionContexts());
+    }
+
+    static Stream<Arguments> reservedPrefixContextsWithEachLanguageServer() {
+        return ExampleCases.withEachLanguageServer(EncryptionContextInputs.reservedPrefixEncryptionContexts());
+    }
+
     /** The producer leg needs only Raw-AES; the reproduced-EC capability gates per decryptor. */
     static List<ReferencePair> decryptSide() {
         return ReferenceImplementation.decryptSide(Set.of("raw-aes"));
@@ -96,27 +119,30 @@ class EncryptionContextBehaviorTests {
      * EC-010: a caller-supplied encryption context containing the reserved
      * {@code aws-crypto-public-key} key must make encrypt fail. Per-server property.
      */
-    @ParameterizedTest(name = "reservedEcKeyRejected {0}")
-    @MethodSource("targets")
-    void encryptRejectsReservedEncryptionContextKey(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
-        Map<String, String> reserved = new LinkedHashMap<>();
-        reserved.put(RESERVED_KEY, "any-value");
-        assertThrows(ESDKClientError.class,
-            () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
+    @ParameterizedTest(name = "reservedEcKeyRejected {0} {1}")
+    @MethodSource("publicKeyContextsWithEachLanguageServer")
+    void encryptRejectsReservedEncryptionContextKey(Example<Map<String, String>> reserved,
+            LanguageServerTarget languageServer) {
+        ESDKClientConfig config = configFor(new TargetPair(languageServer, languageServer));
+        // Accepts an encryption context key without the reserved prefix
+        EsdkOps.encrypt(languageServer.endpoint(), config, PLAINTEXT, Map.of("any-key", "any-value"), null, null);
+        // Rejects an encryption context key with the reserved prefix
+        ESDKClientError error = assertThrows(ESDKClientError.class,
+            () -> EsdkOps.encrypt(languageServer.endpoint(), config, PLAINTEXT, reserved.value(), null, null),
             "encrypt with a reserved '" + RESERVED_KEY + "' encryption-context key must be "
-                + "rejected as an ESDKClientError (" + target + ")");
+                + "rejected as an ESDKClientError (" + languageServer + ")");
+        EsdkErrors.expectError(languageServer, error).kind("Validation").retryable(false);
     }
 
     /**
      * EC-020: decrypt succeeds when the reproduced encryption context exactly matches
      * what encrypt stored in the header. Cross-language matrix.
      */
-    @ParameterizedTest(name = "reproducedEcMatchDecrypts {0}")
-    @MethodSource("pairs")
-    void decryptSucceedsWithMatchingReproducedContext(TargetPair pair) {
+    @ParameterizedTest(name = "reproducedEcMatchDecrypts {0} {1}")
+    @MethodSource("validContextsWithEachPair")
+    void decryptSucceedsWithMatchingReproducedContext(Example<Map<String, String>> context, TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
-        Map<String, String> ec = Map.of("purpose", "test", "tenant", "acme");
+        Map<String, String> ec = context.value();
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
         byte[] recovered = EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec);
         assertArrayEquals(PLAINTEXT, recovered,
@@ -128,17 +154,23 @@ class EncryptionContextBehaviorTests {
      * EC-023: decrypt must fail when the reproduced encryption context mismatches the
      * header — here a present key given a different value. Cross-language matrix.
      */
-    @ParameterizedTest(name = "reproducedEcMismatchRejected {0}")
-    @MethodSource("pairs")
-    void decryptRejectsMismatchedReproducedContext(TargetPair pair) {
+    @ParameterizedTest(name = "reproducedEcMismatchRejected {0} {1}")
+    @MethodSource("nonEmptyContextsWithEachPair")
+    void decryptRejectsMismatchedReproducedContext(Example<Map<String, String>> context, TargetPair pair) {
         ESDKClientConfig config = configFor(pair);
-        Map<String, String> ec = Map.of("purpose", "test");
-        Map<String, String> wrong = Map.of("purpose", "tampered");
+        Map<String, String> ec = context.value();
+        Map<String, String> wrong = EncryptionContextInputs.withOneValueChanged(ec);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT, ec, null, null);
-        assertThrows(ESDKClientError.class,
+        // Accepts the encryption context the message was encrypted with
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, ec));
+        // Rejects an encryption context that changes a value
+        ESDKClientError error = assertThrows(ESDKClientError.class,
             () -> EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext, wrong),
             "decrypt with a reproduced encryption context that changes a value must be rejected "
                 + "as an ESDKClientError (" + pair + ")");
+        EsdkErrors.expectError(pair.decryptTarget(), error)
+            .kind("EncryptionContextMismatch")
+            .retryable(false);
     }
 
     /**
@@ -265,21 +297,20 @@ class EncryptionContextBehaviorTests {
      * public-key rather than the whole prefix, so the gate re-activates the assertion if a server
      * starts enforcing it.
      */
-    @ParameterizedTest(name = "reservedPrefixEcKeyRejected {0}")
-    @MethodSource("targets")
-    void encryptRejectsReservedPrefixEncryptionContextKey(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
-        Map<String, String> reserved = new LinkedHashMap<>();
-        reserved.put("aws-crypto-not-a-real-reserved-key", "any-value");
+    @ParameterizedTest(name = "reservedPrefixEcKeyRejected {0} {1}")
+    @MethodSource("reservedPrefixContextsWithEachLanguageServer")
+    void encryptRejectsReservedPrefixEncryptionContextKey(Example<Map<String, String>> reserved,
+            LanguageServerTarget languageServer) {
+        ESDKClientConfig config = configFor(new TargetPair(languageServer, languageServer));
         //= spec/client-apis/encrypt.md#encryption-context
         //= type=test
         //# If the input encryption context contains any entries with a key beginning with `aws-crypto-`,
         //# the encryption operation MUST fail.
-        KnownBugGate.gateDeclared("encrypt-accepts-reserved-prefix-encryption-context-key", target,
+        KnownBugGate.gateDeclared("encrypt-accepts-reserved-prefix-encryption-context-key", languageServer,
             () -> assertThrows(ESDKClientError.class,
-                () -> EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, reserved, null, null),
+                () -> EsdkOps.encrypt(languageServer.endpoint(), config, PLAINTEXT, reserved.value(), null, null),
                 "encrypt with an 'aws-crypto-' prefixed encryption-context key must be rejected as an "
-                    + "ESDKClientError (" + target + ")"));
+                    + "ESDKClientError (" + languageServer + ")"));
     }
 
     /**

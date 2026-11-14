@@ -44,6 +44,9 @@ dependencies {
     // Executable through their own JUnit dep, not by transit from us.
     implementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 
+    // ExampleCases builds the arguments of a parameterized test.
+    implementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
+
     // FeatureGateLog is a launcher TestExecutionListener. The launcher that
     // loads it is always on the test runtime classpath (Gradle supplies it),
     // so the API is needed here only to compile.

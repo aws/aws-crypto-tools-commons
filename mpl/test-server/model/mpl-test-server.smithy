@@ -13,9 +13,9 @@ use smithy.protocols#rpcv2Cbor
 /// CMM materials retrieval.
 ///
 /// Scope is the MPL surface every configured Language_Server implements: the
-/// Raw AES keyring, the AWS KMS Hierarchical keyring with its key store and
-/// materials cache, a static test keyring, and the Default CMM, over ESDK
-/// algorithm suites only.
+/// Raw AES keyring, the AWS KMS keyring, the AWS KMS Hierarchical keyring
+/// with its key store and materials cache, a static test keyring, and the
+/// Default CMM, over ESDK algorithm suites only.
 /// Keyrings, CMMs, and suite formats a server does not implement are not
 /// modeled.
 ///
@@ -34,6 +34,7 @@ service MPLTestServer {
     operations: [
         CreateRawAesKeyring
         CreateStaticKeyring
+        CreateAwsKmsKeyring
         CreateKeyStoreClient
         CreateCryptographicMaterialsCache
         CreateAwsKmsHierarchicalKeyring
@@ -69,6 +70,13 @@ operation CreateRawAesKeyring {
 operation CreateStaticKeyring {
     input: CreateStaticKeyringRequest
     output: CreateStaticKeyringResponse
+    errors: [GenericServerError, MPLClientError]
+}
+
+/// Construct and register an AWS KMS keyring, returning its handle.
+operation CreateAwsKmsKeyring {
+    input: CreateAwsKmsKeyringRequest
+    output: CreateAwsKmsKeyringResponse
     errors: [GenericServerError, MPLClientError]
 }
 
@@ -241,6 +249,49 @@ structure CreateStaticKeyringResponse {
     /// Handle referencing the registered keyring for subsequent operations.
     @required
     keyringId: ResourceId
+}
+
+// ===========================================================================
+// CreateAwsKmsKeyring shapes
+// ===========================================================================
+
+/// The server passes kmsKeyId and grantTokens to the MPL unchanged, and builds
+/// the KMS client from kmsClient. A missing kmsKeyId or kmsClient reaches the
+/// MPL as missing, so the MPL's own validation answers with MPLClientError.
+@input
+structure CreateAwsKmsKeyringRequest {
+    /// A key ARN, key ID, alias name, or alias ARN.
+    /// When absent, the server gives the MPL no key identifier.
+    kmsKeyId: String
+
+    /// The keyring's KMS client.
+    /// When absent, the server gives the MPL no client.
+    kmsClient: KmsClientConfig
+
+    /// Grant tokens sent with every KMS request.
+    grantTokens: GrantTokenList
+}
+
+/// How the server builds a KMS client, from the ambient AWS credentials.
+structure KmsClientConfig {
+    /// Region of the client.
+    @required
+    region: String
+
+    /// URL the client sends its requests to, in place of the region's
+    /// endpoint. Tests set it to FakeKms's address.
+    endpoint: String
+}
+
+@output
+structure CreateAwsKmsKeyringResponse {
+    /// Handle referencing the registered keyring for subsequent operations.
+    @required
+    keyringId: ResourceId
+}
+
+list GrantTokenList {
+    member: String
 }
 
 // ===========================================================================
@@ -676,8 +727,29 @@ structure GenericServerError {
 }
 
 /// A failure forwarded from the underlying Material Providers Library.
+///
+/// The other members describe the error for the error checks.
+/// A server fills in only the members its library has.
+/// The value formats are in `ErrorFields` in test-server-common/tests-support.
 @error("client")
 structure MPLClientError {
     @required
     message: String
+
+    kind: String
+    service: String
+    resource: String
+    code: String
+    retryable: Boolean
+    retryKind: String
+    conflictReason: String
+
+    /// The messages of the errors the MPL collected before it failed, in
+    /// order, such as one per encrypted data key a keyring tried.
+    /// Absent when the error collected none.
+    collectedErrors: ErrorMessageList
+}
+
+list ErrorMessageList {
+    member: String
 }

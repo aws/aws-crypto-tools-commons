@@ -235,6 +235,42 @@ This solution is rejected. The bug ledger in the `commons` repo contains per-lan
 
 **Alternative Solution:** Write the test cases such that tests associated with a known bug eagerly pass. In other words, if a test which is expected to fail passes instead, that test case passes. Then, only `commons` requires a Bug Config. When a given language fixes a bug, there is no local override needed. The test will simply pass in the PR as well as in `commons` once it is merged to the default branch of the language repo. There will be a stale entry in `commons` which should be cleaned up via automation. This is arguably the simplest workflow. However, there are other drawbacks. Unlike the proposed solution, the stale entry in `commons` is not just stale but misleading, as it would include the language/version target, and the language would still be present once the bug is fixed. Additionally, it is more difficult to follow TDD, since the tests pass both when the bug is fixed and when the bug is active. When fixing a bug, the engineer must be very careful to check the test report to ensure that the relevant test case(s) are now *actually* passing, and not just allowed to fail. Both result in green CI. This means that an unsuccessful attempt to fix a bug would still have green CI. This could be ameliorated by use of local override config, at which point this solution is roughly equivalent to the rejected solution immediately preceding this one.
 
+### Issue: Error Checks
+
+A test that expects a call to fail can also check what the error says: its kind, the AWS service, the resource, and so on. Each server turns these checks on in an optional `errors` block of its `feature-config.json`:
+
+```
+"errors": {
+  "supported": {
+    "kind":    { "version": 2 },
+    "service": { "version": 1 }
+  },
+  "unsupported": {
+    "message": "Rust messages can change in any release"
+  }
+}
+```
+
+*Exhibit G: Example of the `errors` block in aws-crypto-tools-rust/esdk-test-server/feature-config.json*
+
+The checks are `kind`, `service`, `resource`, `code`, `retryable`, `retryKind`, `conflictReason` and `message`. A check in `supported` runs at its version. A check in `unsupported` is off, and the reason says why. A check in neither list is off too, because nobody has decided yet. With the check off, a test still requires the call to fail.
+
+Each server's handler fills the matching optional members of `ESDKClientError` or `MPLClientError`. The value formats are in `ErrorFields` in `test-server-common/tests-support`. The kinds are the variants of the Rust ESDK and MPL `Error` enums.
+
+A test checks an error like this:
+
+```
+ESDKClientError error = assertThrows(ESDKClientError.class, () -> decrypt(...));
+EsdkErrors.expectError(target, error)
+    .kind(v1("InvalidInput"), v2("MissingKeyring"))
+    .service("kms")
+    .message("must provide keyring to {OnEncrypt}");
+```
+
+When a library changes an error, the test keeps the old value and adds the new one with the next version. A server at version 1 must send `InvalidInput`, and a server at version 2 must send `MissingKeyring`. Each server moves up a version when its handler is updated. A plain value, such as `.service("kms")`, applies at every version.
+
+In a message, a name in braces matches that name in any language's style: `{OnEncrypt}` matches `OnEncrypt`, `onEncrypt` and `on_encrypt`. The rest of the message must match exactly.
+
 # Appendix A - Development Workflows
 
 Requirement 2: The TestServer MUST make it easy to perform various common workflows, such as adding a new feature in one or more languages or fixing a bug in a single language. Whenever possible, the TestServer SHOULD enable Test-Driven Development (TDD).
@@ -576,7 +612,7 @@ The Orchestrator turns Configuration into a run through a **fail-closed** pipeli
 4. **Resolve + materialize sources** for every effective entry: the `libraryRepository` and `serverLocation` at the pinned ref. The own language (Language_Repository_Run) resolves to its working tree; every other server is cloned. De-duplicated: a library and server on the same tree share one clone.
 5. **Load + validate each server's declaration** from its `configPath`:
 
-   - `feature-config.json` → its Feature_Declaration. Validated against the catalog: every catalog feature in **exactly one** of `supportedFeatures`/`unsupportedFeatures`, no unknown names, no conflicts; optional `rawRsaPaddingSchemes` checked; `product` must match commons.
+   - `feature-config.json` → its Feature_Declaration. Validated against the catalog: every catalog feature in **exactly one** of `supportedFeatures`/`unsupportedFeatures`, no unknown names, no conflicts; optional `rawRsaPaddingSchemes` checked; optional `errors` block checked; `product` must match commons.
    - `bug-config.json` → the flat list of bug ids the server currently exhibits. (No cross-check against the ledger yet — that's the future reconciler.)
 6. **Emit the Resolution_Record** (stdout + JSON) — the exact sources, refs, and outcomes — *before* any launch, so every run is auditable even on abort.
 7. **Build + launch** each server on its configured port, then re-check reachability across all ports. Tests start only once every server is reachable.
@@ -586,6 +622,7 @@ The Orchestrator turns Configuration into a run through a **fail-closed** pipeli
    - `esdk.testserver.features` = `lang:feat=bool;…` (flattened declarations) + `esdk.testserver.featureCatalog`,
    - `esdk.testserver.rawRsaPaddingSchemes` (only languages that declare it),
    - `esdk.testserver.knownBugs` = `lang:major:repo=id;…` (each server's exhibited bugs),
+   - `testserver.errorChecks` = `lang:major:repo:check=version;…` (only servers that declare error checks),
    - `esdk.testserver.referenceImplementation`. The Tests consult these at gate time: `FeatureDeclarations` skips a feature-gated row for a target that doesn't support it; `KnownBugGate` tolerates exactly the assertion a declared bug breaks for the acting target.
 9. **Report** the pass/fail matrix and **teardown** every launched server (always, in a `finally`).
 

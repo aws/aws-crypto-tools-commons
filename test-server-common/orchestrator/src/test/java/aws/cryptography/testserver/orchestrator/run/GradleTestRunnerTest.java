@@ -102,6 +102,46 @@ class GradleTestRunnerTest {
             .noneMatch(a -> a.startsWith("-Dtestserver.focus")));
     }
 
+    @Test
+    @DisplayName("declared error checks are passed as testserver.errorChecks; none passes nothing")
+    void commandCarriesTheErrorChecks() {
+        List<TestTarget> targets =
+            List.of(new TestTarget("rust", 1, "rust-repo", URI.create("http://127.0.0.1:8091")));
+        Map<String, Map<String, String>> checks = new java.util.LinkedHashMap<>();
+        checks.put("rust:1:rust-repo", new java.util.LinkedHashMap<>(
+            Map.of("kind", "2")));
+        checks.get("rust:1:rust-repo").put("message", "unsupported");
+        TestRunInput withChecks = new TestRunInput(
+            targets, Map.of(), List.of(), Map.of(), "rust", Map.of(), false, checks);
+        TestRunInput without = new TestRunInput(targets, Map.of(), List.of(), Map.of(), "rust");
+
+        assertTrue(GradleTestRunner.command(Path.of("tests"), withChecks, "")
+            .contains("-Dtestserver.errorChecks=rust:1:rust-repo:kind=2;message=unsupported"));
+        assertTrue(GradleTestRunner.command(Path.of("tests"), without, "").stream()
+            .noneMatch(a -> a.startsWith("-Dtestserver.errorChecks")));
+    }
+
+    @Test
+    @DisplayName("the orchestrator's fuzz properties are passed on; none set passes nothing")
+    void commandCarriesTheFuzzProperties() {
+        TestRunInput input = new TestRunInput(
+            List.of(new TestTarget("rust", 1, "rust-repo", URI.create("http://127.0.0.1:8091"))),
+            Map.of(), List.of(), Map.of(), "rust");
+        assertTrue(GradleTestRunner.command(Path.of("tests"), input, "").stream()
+            .noneMatch(a -> a.startsWith("-Dtestserver.fuzz")));
+
+        System.setProperty("testserver.fuzz", "200");
+        System.setProperty("testserver.fuzzSeed", "42");
+        try {
+            List<String> command = GradleTestRunner.command(Path.of("tests"), input, "");
+            assertTrue(command.contains("-Dtestserver.fuzz=200"));
+            assertTrue(command.contains("-Dtestserver.fuzzSeed=42"));
+        } finally {
+            System.clearProperty("testserver.fuzz");
+            System.clearProperty("testserver.fuzzSeed");
+        }
+    }
+
     // ---- JUnit XML parsing ----------------------------------------------
 
     @Test
