@@ -52,7 +52,7 @@
 <body>
 <header>
   <h1>Mutation Testing</h1>
-  <label title="Empty: newest finished mutation run on the Rust repository's main. Or paste a run URL or a branch.">Run <input type="text" id="source" size="40" placeholder="newest finished run on main"></label>
+  <label title="Empty: newest finished mutation run on the Rust repository's main. Or paste a PR (a commons PR uses the Rust PR its Test-Server-Override names), a run URL, or a branch.">PR / run <input type="text" id="source" size="40" placeholder="newest finished run on main"></label>
   <span class="run" id="run"></span>
 </header>
 <main id="main"><div class="quiet">Loading…</div></main>
@@ -79,12 +79,28 @@ for (const lib of Object.values(LIBRARIES)) for (const lang of LANGUAGES) cells[
 for (const { language } of MUTATION_REPOS) for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + language] = { state:"wait" };
 let results = [], shownRun = null, problem = null;
 
+// The pull request in this entry's repository that the text names: the PR
+// itself, or for a commons PR the one its Test-Server-Override line names.
+async function prFor(entry, text) {
+  const m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/);
+  if (!m) return null;
+  const repo = m[1] || COMMONS;
+  const pr = await ghJson(`repos/${repo}/pulls/${m[2]}`);
+  if (repo === entry.repo) return pr;
+  const named = (pr.body || "").match(new RegExp(entry.repo.replace(/[.\/]/g, "\\$&") + "#(\\d+)"));
+  return named ? ghJson(`repos/${entry.repo}/pulls/${named[1]}`) : undefined;
+}
+
 async function findRun(entry, text) {
   const runs = `repos/${entry.repo}/actions/workflows/${entry.workflow}/runs`;
   const id = (text.match(/actions\/runs\/(\d+)/) || text.match(/^(\d+)$/) || [])[1];
   if (id) return ghJson(`repos/${entry.repo}/actions/runs/${id}`);
-  const branch = text || "main";
-  const list = (await ghJson(`${runs}?branch=${encodeURIComponent(branch)}&per_page=20`)).workflow_runs;
+  const pr = await prFor(entry, text);
+  if (pr === undefined) throw new Error(`the PR names no ${entry.repo} PR in its Test-Server-Override line`);
+  const query = pr ? `head_sha=${pr.head.sha}` : `branch=${encodeURIComponent(text || "main")}`;
+  let list = (await ghJson(`${runs}?${query}&per_page=20`)).workflow_runs;
+  // A new commit with no run yet falls back to the PR branch's newest run.
+  if (pr && !list.length) list = (await ghJson(`${runs}?branch=${encodeURIComponent(pr.head.ref)}&per_page=20`)).workflow_runs;
   return list.find(run => run.status === "completed") || list[0] || null;
 }
 
@@ -204,8 +220,9 @@ function render() {
   $("main").innerHTML = h;
 }
 
-$("source").value = new URLSearchParams(location.search).get("run") || "";
-$("source").addEventListener("change", load);
+// The PR box is shared with the other test server pages.
+$("source").value = readSource();
+$("source").addEventListener("change", e => { writeSource(e.target.value.trim()); load(); });
 render();
 load();
 </script>
