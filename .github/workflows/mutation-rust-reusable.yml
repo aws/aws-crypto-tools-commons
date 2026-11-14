@@ -1,0 +1,164 @@
+# Mutation testing of a Rust crate, callable by aws-crypto-tools-rust.
+#
+# A mutant is a small change to the library, such as `<` turned into `<=`.
+# This job records which tests run which lines (the commons Tests against the
+# crate's test server, and the crate's own tests), builds every mutant into
+# one copy of the crate, and runs the tests that reach each mutant's line.
+# test-server-common/tools/mutation/mutate.py has the details.
+#
+# It uploads mutation-results-<crate> (results.json) for the dashboard's
+# Mutation testing page. It never fails because a mutant survived.
+
+name: Rust mutation testing
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner label; a CodeBuild label must belong to the calling repository.
+        type: string
+        required: true
+      crate:
+        description: The crate to mutate, for example mpl.
+        type: string
+        required: true
+      product:
+        description: The commons test server product whose Tests run, for example mpl.
+        type: string
+        required: true
+      server:
+        description: <server dir>:<binary>, relative to the repository, for example mpl/test-server:mpl-test-server.
+        type: string
+        required: true
+      changed-since:
+        description: A git ref. Only mutants on lines changed since it run. Empty runs every mutant.
+        type: string
+        default: ""
+      commons-ref:
+        description: The aws-crypto-tools-commons ref whose Tests and tools run.
+        type: string
+        default: main
+      aws-role-arn:
+        description: Role for the Tests that read DynamoDB and KMS. Those Tests fail without it and are left out.
+        type: string
+        default: ""
+
+jobs:
+  mutation:
+    name: ${{ inputs.crate }} mutation testing
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RUST: ${{ github.workspace }}/rust
+      COMMONS: ${{ github.workspace }}/commons
+      WORK: ${{ github.workspace }}/mutation-work
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: rust
+          submodules: 'true'
+          fetch-depth: 0
+
+      - uses: actions/checkout@v6
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons-ref }}
+          path: commons
+
+      - name: Install CMake
+        run: sudo apt-get update && sudo apt-get install -y cmake
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov and cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+
+      - name: Set up JDK 21 for the commons Tests
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Configure AWS credentials
+        if: inputs.aws-role-arn != ''
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-west-2
+          role-to-assume: ${{ inputs.aws-role-arn }}
+          role-session-name: RustMutationTesting
+
+      # The mutation tool runs only tests that passed here, on the unmutated crate.
+      - name: Record the lines each test server test runs
+        env:
+          TESTSERVER_COVERAGE_DIR: ${{ github.workspace }}/coverage/test-server
+          RUSTFLAGS: -C instrument-coverage --cfg testserver_coverage
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target-coverage
+          GRADLE_OPTS: -Dorg.gradle.daemon=false
+        run: |
+          # A failed Test (for example one that needs AWS) only drops out of the plan.
+          make -C "commons/${{ inputs.product }}/test-server" orchestrate \
+            ORCHESTRATE_ARGS="languages=rust workingTreeOverlay.aws-crypto-tools-rust=$RUST" || echo "some Tests failed"
+          python3 commons/test-server-common/tools/per_test_coverage.py build \
+            "$TESTSERVER_COVERAGE_DIR" coverage/out/test-server
+
+      - name: Record the lines each of the crate's own tests runs
+        working-directory: rust/${{ inputs.crate }}
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: python3 ${{ github.workspace }}/commons/test-server-common/tools/per_test_coverage.py run-test
+          PER_TEST_COVERAGE_DIR: ${{ github.workspace }}/coverage/local
+          PER_TEST_REPOSITORY: ${{ github.repository }}
+          PER_TEST_ROOT: ${{ github.workspace }}/rust
+        run: |
+          cargo llvm-cov nextest --workspace --no-report --no-fail-fast || echo "some tests failed"
+          python3 "$GITHUB_WORKSPACE/commons/test-server-common/tools/per_test_coverage.py" build \
+            "$PER_TEST_COVERAGE_DIR" "$GITHUB_WORKSPACE/coverage/out/local"
+
+      - name: Restore earlier mutation results
+        uses: actions/cache/restore@v4
+        with:
+          path: mutation-cache.json
+          key: mutation-${{ inputs.crate }}-${{ github.run_id }}
+          restore-keys: mutation-${{ inputs.crate }}-
+
+      - name: Mutate every line
+        if: inputs.changed-since == ''
+        run: echo "CHANGED_SINCE_ARGS=" >> "$GITHUB_ENV"
+
+      - name: Mutate only the changed lines
+        if: inputs.changed-since != ''
+        run: |
+          git -C rust fetch --no-tags origin "${{ inputs.changed-since }}"
+          echo "CHANGED_SINCE_ARGS=--changed-since FETCH_HEAD" >> "$GITHUB_ENV"
+
+      - name: Run the mutants
+        env:
+          MUTATION_SCHEMATA_TARGET: ${{ github.workspace }}/target-schemata
+        run: |
+          mkdir -p results
+          python3 commons/test-server-common/tools/mutation/mutate.py \
+            --repo "$RUST" --repository "${{ github.repository }}" --crates "${{ inputs.crate }}" \
+            --server "${{ inputs.server }}" \
+            --tests-jvm coverage/test-server/tests-jvm.json \
+            --per-test coverage/out/test-server/rust.jsonl,coverage/out/local/rust.jsonl \
+            --tests-source "commons/${{ inputs.product }}/test-server/tests,commons/test-server-common/tests-support" \
+            --work "$WORK" --cache mutation-cache.json --out results/results.json \
+            --servers 4 $CHANGED_SINCE_ARGS
+
+      - name: Save the mutation results for the next run
+        uses: actions/cache/save@v4
+        with:
+          path: mutation-cache.json
+          key: mutation-${{ inputs.crate }}-${{ github.run_id }}
+
+      - name: Upload the mutation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results-${{ inputs.crate }}
+          path: results/results.json
+          if-no-files-found: error

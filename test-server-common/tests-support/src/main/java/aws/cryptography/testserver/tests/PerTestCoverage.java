@@ -81,6 +81,18 @@ public final class PerTestCoverage implements TestExecutionListener {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        // Mutation testing reruns chosen tests outside Gradle, in a JVM set up like this one.
+        Map<String, Object> jvm = new LinkedHashMap<>();
+        jvm.put("class_path", System.getProperty("java.class.path"));
+        Map<String, String> properties = new LinkedHashMap<>();
+        System.getProperties().stringPropertyNames().stream().filter(name -> name.startsWith("testserver."))
+            .sorted().forEach(name -> properties.put(name, System.getProperty(name)));
+        jvm.put("system_properties", properties);
+        try {
+            JSON.writerWithDefaultPrettyPrinter().writeValue(directory.resolve("tests-jvm.json").toFile(), jvm);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         // What the servers ran before the first test (starting up, the readiness
         // check) goes to its own file, so the first test is not charged for it.
         dumpAll("before-tests");
