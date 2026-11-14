@@ -71,6 +71,9 @@ public final class GradleTestRunner implements TestRunner {
     /** Runtime-config key: comma-separated {@code lang:id[;id…]} exhibited-bug entries. */
     public static final String KNOWN_BUGS_PROPERTY = "testserver.knownBugs";
 
+    /** Each source's error checks; see {@link TestRunInput#formatErrorChecks}. */
+    public static final String ERROR_CHECKS_PROPERTY = "testserver.errorChecks";
+
     /** Runtime-config key: the reference implementation's language. */
     public static final String REFERENCE_IMPLEMENTATION_PROPERTY =
         "testserver.referenceImplementation";
@@ -202,6 +205,10 @@ public final class GradleTestRunner implements TestRunner {
             command.add("-D" + KNOWN_BUGS_PROPERTY + "="
                 + TestRunInput.formatKnownBugs(input.knownBugs()));
         }
+        if (!input.errorChecks().isEmpty()) {
+            command.add("-D" + ERROR_CHECKS_PROPERTY + "="
+                + TestRunInput.formatErrorChecks(input.errorChecks()));
+        }
         command.add("-D" + REFERENCE_IMPLEMENTATION_PROPERTY + "="
             + input.referenceImplementation());
         if (focus != null && !focus.isBlank()) {
@@ -211,9 +218,14 @@ public final class GradleTestRunner implements TestRunner {
             command.add("-D" + DRY_RUN_PROPERTY + "=true");
         }
         command.add("--console=plain");
-        if (testFilter != null && !testFilter.isBlank()) {
-            command.add("--tests");
-            command.add(testFilter.trim());
+        if (testFilter != null) {
+            // A comma-separated filter runs every Test any of its patterns names.
+            for (String pattern : testFilter.split(",")) {
+                if (!pattern.isBlank()) {
+                    command.add("--tests");
+                    command.add(pattern.trim());
+                }
+            }
         }
         return command;
     }

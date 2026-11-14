@@ -102,6 +102,38 @@ class GradleTestRunnerTest {
             .noneMatch(a -> a.startsWith("-Dtestserver.focus")));
     }
 
+    @Test
+    @DisplayName("each pattern of a comma-separated filter becomes its own --tests")
+    void commandSplitsTheTestFilter() {
+        TestRunInput input = new TestRunInput(
+            List.of(new TestTarget("java", 3, "dbe", URI.create("http://127.0.0.1:8091"))),
+            Map.of(), List.of(), Map.of(), "java");
+
+        List<String> command = GradleTestRunner.command(Path.of("tests"), input, "*.A.one, *.B.two");
+        int first = command.indexOf("--tests");
+        assertEquals(List.of("--tests", "*.A.one", "--tests", "*.B.two"),
+            command.subList(first, command.size()));
+    }
+
+    @Test
+    @DisplayName("declared error checks are passed as testserver.errorChecks; none passes nothing")
+    void commandCarriesTheErrorChecks() {
+        List<TestTarget> targets =
+            List.of(new TestTarget("rust", 1, "rust-repo", URI.create("http://127.0.0.1:8091")));
+        Map<String, Map<String, String>> checks = new java.util.LinkedHashMap<>();
+        checks.put("rust:1:rust-repo", new java.util.LinkedHashMap<>(
+            Map.of("kind", "2")));
+        checks.get("rust:1:rust-repo").put("message", "unsupported");
+        TestRunInput withChecks = new TestRunInput(
+            targets, Map.of(), List.of(), Map.of(), "rust", Map.of(), false, checks);
+        TestRunInput without = new TestRunInput(targets, Map.of(), List.of(), Map.of(), "rust");
+
+        assertTrue(GradleTestRunner.command(Path.of("tests"), withChecks, "")
+            .contains("-Dtestserver.errorChecks=rust:1:rust-repo:kind=2;message=unsupported"));
+        assertTrue(GradleTestRunner.command(Path.of("tests"), without, "").stream()
+            .noneMatch(a -> a.startsWith("-Dtestserver.errorChecks")));
+    }
+
     // ---- JUnit XML parsing ----------------------------------------------
 
     @Test

@@ -231,6 +231,56 @@ class ConfigurationLoaderTest {
     }
 
     // ------------------------------------------------------------------
+    // The errors block of feature-config.json
+    // ------------------------------------------------------------------
+
+    private static ServerConfiguration loadWithErrors(Path dir, String errors) {
+        write(dir, "server-config.json", "{ \"product\": \"esdk\" }");
+        write(dir, "feature-config.json", "{ \"errors\": " + errors + " }");
+        return ConfigurationLoader.loadServerConfiguration(dir);
+    }
+
+    @Test
+    @DisplayName("errors: supported versions and unsupported reasons parse in file order")
+    void parsesErrorChecks(@TempDir Path dir) {
+        ServerConfiguration config = loadWithErrors(dir, """
+            {
+              "supported": { "kind": { "version": 2 }, "service": { "version": 1, "later": true } },
+              "unsupported": { "message": "messages can change in any release" }
+            }
+            """);
+        assertEquals(java.util.Map.of("kind", 2, "service", 1), config.errorChecks().supported());
+        assertEquals(java.util.Map.of("message", "messages can change in any release"),
+            config.errorChecks().unsupported());
+        assertEquals(List.of("kind", "service", "message"),
+            List.copyOf(config.errorChecks().flatten().keySet()));
+        assertEquals("unsupported", config.errorChecks().flatten().get("message"));
+    }
+
+    @Test
+    @DisplayName("errors: absent means no error checks")
+    void absentErrorChecksIsNull(@TempDir Path dir) {
+        write(dir, "server-config.json", "{ \"product\": \"esdk\" }");
+        write(dir, "feature-config.json", "{}");
+        assertNull(ConfigurationLoader.loadServerConfiguration(dir).errorChecks());
+    }
+
+    @Test
+    @DisplayName("errors: a wrong shape fails the load")
+    void badErrorChecksAreRejected(@TempDir Path dir) {
+        for (String errors : List.of(
+                "[]",
+                "{ \"supportd\": {} }",
+                "{ \"supported\": { \"kinds\": { \"version\": 1 } } }",
+                "{ \"supported\": { \"kind\": { \"version\": 0 } } }",
+                "{ \"supported\": { \"kind\": 1 } }",
+                "{ \"unsupported\": { \"message\": \"\" } }",
+                "{ \"supported\": { \"kind\": { \"version\": 1 } }, \"unsupported\": { \"kind\": \"no\" } }")) {
+            assertThrows(ConfigurationLoadException.class, () -> loadWithErrors(dir, errors), errors);
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Strict duplicate detection (both trios)
     // ------------------------------------------------------------------
 
