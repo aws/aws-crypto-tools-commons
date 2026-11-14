@@ -35,6 +35,7 @@ import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -161,22 +162,35 @@ public final class EsdkClientConfigs {
      *     two raw-AES keyrings both round-trip, and either alone can decrypt.
      */
     public static ESDKClientConfig rawAesMulti() {
+        return rawAesMulti(2);
+    }
+
+    /**
+     * @return a Raw-AES multi-keyring config like {@link #rawAesMulti()} that writes
+     *     {@code edkCount} EDKs: the generator's, then one for each of {@code edkCount - 1}
+     *     copies of the child keyring.
+     */
+    public static ESDKClientConfig rawAesMulti(int edkCount) {
         return ESDKClientConfig.builder()
             .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
-            .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .cmm(defaultCmm(rawAesMultiKeyring(edkCount)))
             .build();
     }
 
     /**
-     * @return the same two-EDK multi-keyring config as {@link #rawAesMulti()} but with the
+     * @return the {@code edkCount}-EDK multi-keyring config of {@link #rawAesMulti(int)} with the
      *     encrypted-data-key count capped at {@code maxEncryptedDataKeys}.
      */
-    public static ESDKClientConfig rawAesMultiWithMaxEdks(long maxEncryptedDataKeys) {
+    public static ESDKClientConfig rawAesMultiWithMaxEdks(int edkCount, long maxEncryptedDataKeys) {
         return ESDKClientConfig.builder()
             .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
             .maxEncryptedDataKeys(maxEncryptedDataKeys)
-            .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .cmm(defaultCmm(rawAesMultiKeyring(edkCount)))
             .build();
+    }
+
+    private static Keyring rawAesMultiKeyring(int edkCount) {
+        return multiKeyring(rawAesKeyring(), Collections.nCopies(edkCount - 1, rawAesKeyringB()));
     }
 
     /**
@@ -238,6 +252,26 @@ public final class EsdkClientConfigs {
                 .keyName(keyName)
                 .wrappingKey(ByteBuffer.wrap(WRAPPING_KEY_32.clone()))
                 .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
+                .build())
+            .build();
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .cmm(defaultCmm(keyring))
+            .build();
+    }
+
+    /**
+     * @return a Raw-RSA / Default-CMM config whose keyring uses the given key namespace and key
+     *     name with the standard key pair, for wire assertions over the EDK provider fields.
+     */
+    public static ESDKClientConfig rawRsaNamed(String keyNamespace, String keyName) {
+        Keyring keyring = Keyring.builder()
+            .rawRsa(RawRsaKeyringConfig.builder()
+                .keyNamespace(keyNamespace)
+                .keyName(keyName)
+                .paddingScheme(PaddingScheme.OAEP_SHA256_MGF1)
+                .publicKey(ByteBuffer.wrap(RSA_KEY_PAIR.publicPem()))
+                .privateKey(ByteBuffer.wrap(RSA_KEY_PAIR.privatePem()))
                 .build())
             .build();
         return ESDKClientConfig.builder()

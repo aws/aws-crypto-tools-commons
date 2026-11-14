@@ -1,9 +1,15 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.RawAesWrappingKeys;
+import aws.cryptography.testserver.tests.RawAesWrappingKeys.WrappingKey;
+import aws.cryptography.testserver.tests.RawKeyringNames;
+import aws.cryptography.testserver.tests.RawKeyringNames.KeyNames;
 import aws.cryptography.testserver.tests.TargetPair;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -22,7 +28,9 @@ import aws.cryptography.esdk.testserver.client.model.RawAesKeyringConfig;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -45,6 +53,14 @@ class ClientConfigValidationTests {
 
     static List<LanguageServerTarget> targets() {
         return LanguageServerRegistry.shared().targets();
+    }
+
+    static Stream<Arguments> invalidWrappingKeys() {
+        return ExampleCases.withEachLanguageServer(RawAesWrappingKeys.invalidWrappingKeys());
+    }
+
+    static Stream<Arguments> invalidKeyNames() {
+        return ExampleCases.withEachLanguageServer(RawKeyringNames.invalidKeyNames());
     }
 
     private static ESDKClientConfig config(Keyring keyring, Long maxEdks) {
@@ -88,15 +104,17 @@ class ClientConfigValidationTests {
                 "a maxEncryptedDataKeys of 0"));
     }
 
-    /** KEYRING-006: a 16-byte wrapping key does not match the AES-256 wrapping suite. */
-    @ParameterizedTest(name = "wrongAesKeyLengthRejected {0}")
-    @MethodSource("targets")
-    void createClientRejectsMismatchedAesWrappingKeyLength(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
-        KnownBugGate.gateDeclared("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", target,
-            () -> assertCreateRejected(target,
-                config(rawAes(new byte[16], AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16), null),
-                "a 16-byte wrapping key for a 256-bit AES wrapping suite"));
+    /** KEYRING-006: a wrapping key whose length does not match the AES wrapping suite. */
+    @ParameterizedTest(name = "wrongAesKeyLengthRejected {0} {1}")
+    @MethodSource("invalidWrappingKeys")
+    void createClientRejectsMismatchedAesWrappingKeyLength(Example<WrappingKey> example,
+                                                           LanguageServerTarget languageServer) {
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(languageServer, languageServer));
+        WrappingKey wrappingKey = example.value();
+        KnownBugGate.gateDeclared("raw-aes-wrong-wrapping-key-length-rejected-as-esdk-error", languageServer,
+            () -> assertCreateRejected(languageServer,
+                config(rawAes(wrappingKey.key(), wrappingAlg(wrappingKey.algorithmKeyLength())), null),
+                "a " + example));
     }
 
     /** KEYRING-022: a KMS keyring with an empty key id is invalid. */
@@ -171,21 +189,31 @@ class ClientConfigValidationTests {
     }
 
     /** KEYRING-073: a Raw-AES keyring in the reserved "aws-kms" key namespace is rejected. */
-    @ParameterizedTest(name = "reservedNamespaceRejected {0}")
-    @MethodSource("targets")
-    void createClientRejectsReservedNamespace(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), new TargetPair(target, target));
+    @ParameterizedTest(name = "reservedNamespaceRejected {0} {1}")
+    @MethodSource("invalidKeyNames")
+    void createClientRejectsReservedNamespace(Example<KeyNames> example, LanguageServerTarget languageServer) {
+        FeatureGate.require(Set.of("raw-aes"), new TargetPair(languageServer, languageServer));
         Keyring keyring = Keyring.builder()
             .rawAes(RawAesKeyringConfig.builder()
-                .keyNamespace("aws-kms")
-                .keyName("reserved-namespace-key")
+                .keyNamespace(example.value().keyNamespace())
+                .keyName(example.value().keyName())
                 .wrappingKey(ByteBuffer.wrap(new byte[32]))
                 .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
                 .build())
             .build();
-        KnownBugGate.gateDeclared("create-client-accepts-reserved-aws-kms-namespace", target,
-            () -> KnownBugGate.gateDeclared("raw-aes-reserved-namespace-rejected-as-esdk-error", target,
-                () -> assertCreateRejected(target, config(keyring, null),
-                    "a Raw-AES keyring in the reserved 'aws-kms' key namespace")));
+        KnownBugGate.gateDeclared("create-client-accepts-reserved-aws-kms-namespace", languageServer,
+            () -> KnownBugGate.gateDeclared("raw-aes-reserved-namespace-rejected-as-esdk-error", languageServer,
+                () -> assertCreateRejected(languageServer, config(keyring, null),
+                    "a Raw-AES keyring with " + example)));
+    }
+
+    /** The wrapping suite whose key is {@code keyLength} bytes long. */
+    private static AesWrappingAlg wrappingAlg(int keyLength) {
+        return switch (keyLength) {
+            case 16 -> AesWrappingAlg.ALG_AES128_GCM_IV12_TAG16;
+            case 24 -> AesWrappingAlg.ALG_AES192_GCM_IV12_TAG16;
+            case 32 -> AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
+            default -> throw new IllegalArgumentException("no wrapping suite has a " + keyLength + "-byte key");
+        };
     }
 }

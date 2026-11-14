@@ -24,7 +24,7 @@ import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.testserver.tests.ExpectedError;
 import aws.cryptography.testserver.tests.KmsInputs;
-import aws.cryptography.testserver.tests.KmsInputs.Example;
+import aws.cryptography.testserver.tests.Example;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
