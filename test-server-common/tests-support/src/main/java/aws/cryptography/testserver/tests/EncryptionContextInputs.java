@@ -96,7 +96,7 @@ public final class EncryptionContextInputs {
         examples.addAll(fuzz.examples("reservedPrefixEncryptionContexts", random -> {
             String suffix = randomText(random, 1 + random.nextInt(MAX_RANDOM_KEY_LENGTH));
             // Servers with the known bug encrypt-accepts-reserved-prefix-encryption-context-key
-            // still reject aws-crypto-public-key, so that key belongs only in publicKeyEncryptionContexts.
+            // also reject aws-crypto-public-key, so that key belongs only in publicKeyEncryptionContexts.
             String key = RESERVED_PREFIX + (suffix.equals("public-key") ? "x" + suffix : suffix);
             Map<String, String> context = withPair(random, randomPairs(random, random.nextInt(4)),
                 key, randomText(random, 1 + random.nextInt(MAX_RANDOM_VALUE_LENGTH)));
