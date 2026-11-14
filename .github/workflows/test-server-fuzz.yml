@@ -1,10 +1,11 @@
 # Runs every library's test server with random examples added to the shared
-# input lists (tests-support Fuzz). No branch rule requires this workflow, so
-# a red run here never blocks a pull request.
+# input lists (tests-support Fuzz), on main only.
 name: Test server fuzz
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
     paths:
       - "esdk/test-server/**"
       - "mpl/test-server/**"
