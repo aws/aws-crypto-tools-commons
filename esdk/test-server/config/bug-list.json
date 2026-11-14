@@ -49,6 +49,10 @@
       "description": "a message encrypted with a __proto__ encryption-context key omits that key from the serialized header while still binding it into the data-key wrap, so no other implementation can decrypt it; the same-language round trip succeeds and masks it",
       "ticketId": null
     },
+    "encrypt-accepts-zero-frame-length": {
+      "description": "encrypt accepts a frame length of 0 and writes a message without frames; the spec says the frame length MUST be greater than 0",
+      "ticketId": null
+    },
     "encrypt-non-positive-frame-length-generic-error": {
       "description": "encrypt of a non-positive frame length is rejected as a GenericServerError instead of the modeled ESDKClientError",
       "ticketId": null
