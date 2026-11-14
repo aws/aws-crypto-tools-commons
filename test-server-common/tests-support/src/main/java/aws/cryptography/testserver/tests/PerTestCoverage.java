@@ -59,6 +59,8 @@ public final class PerTestCoverage implements TestExecutionListener {
     private List<Server> servers = List.of();
     private BufferedWriter index;
     private int nextFile;
+    private int running;
+    private boolean warned;
 
     private record Server(LanguageServerTarget target, String tool, int jacocoPort, Path files) {
     }
@@ -85,17 +87,27 @@ public final class PerTestCoverage implements TestExecutionListener {
     }
 
     @Override
-    public void executionSkipped(TestIdentifier test, String reason) {
+    public synchronized void executionStarted(TestIdentifier test) {
+        if (index != null && test.isTest() && running++ > 0 && !warned) {
+            warned = true;
+            System.err.println("[per-test coverage] tests are running at the same time, so each test's"
+                + " lines include lines from the others; turn off junit.jupiter.execution.parallel.enabled");
+        }
+    }
+
+    @Override
+    public synchronized void executionSkipped(TestIdentifier test, String reason) {
         if (index != null && test.isTest()) {
             record(test, "skipped", null);
         }
     }
 
     @Override
-    public void executionFinished(TestIdentifier test, TestExecutionResult result) {
+    public synchronized void executionFinished(TestIdentifier test, TestExecutionResult result) {
         if (index == null || !test.isTest()) {
             return;
         }
+        running--;
         String file = String.valueOf(nextFile++);
         dumpAll(file);
         String status = switch (result.getStatus()) {
