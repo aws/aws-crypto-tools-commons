@@ -943,6 +943,32 @@ jobs:
         with:
           components: llvm-tools-preview
 
+      - name: Record the lines each test runs
+        # A second pass over the focus language's own pairs, one test at a time,
+        # so each server's coverage can be split by test. The pass above stays parallel.
+        if: inputs.focus != ''
+        working-directory: mpl/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          TESTSERVER_COVERAGE_DIR: ${{ runner.temp }}/per-test-coverage-raw
+          TESTSERVER_PER_TEST_COVERAGE: "1"
+          FOCUS: ${{ inputs.focus }}
+        run: |
+          # This pass rewrites the JUnit results and the resolution record, and the
+          # uploaded reports must show the full run above, so they are put back after.
+          saved="$RUNNER_TEMP/full-run"
+          kept=(tests/build/test-results build/resolution-record.json ../../test-server-common/orchestrator/build/resolution-record.json)
+          mkdir -p "$saved"
+          for i in "${!kept[@]}"; do
+            if [ -e "${kept[$i]}" ]; then cp -r "${kept[$i]}" "$saved/$i"; fi
+          done
+          status=0
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=$FOCUS" || status=$?
+          for i in "${!kept[@]}"; do
+            if [ -e "$saved/$i" ]; then rm -rf "${kept[$i]}" && cp -r "$saved/$i" "${kept[$i]}"; fi
+          done
+          exit "$status"
+
       - name: Write the line coverage reports
         # build/coverage/<language>.lcov (paths relative to the library's
         # repository) and <language>.json (that repository and commit), for
@@ -953,7 +979,7 @@ jobs:
       - name: Write the per-test line coverage
         # build/per-test-coverage/<language>.jsonl: the lines each test ran.
         if: always()
-        run: python3 test-server-common/tools/per_test_coverage.py build "$RUNNER_TEMP/coverage" mpl/test-server/build/per-test-coverage
+        run: python3 test-server-common/tools/per_test_coverage.py build "$RUNNER_TEMP/per-test-coverage-raw" mpl/test-server/build/per-test-coverage
 
       - name: Upload test reports + Resolution_Record
         if: always()

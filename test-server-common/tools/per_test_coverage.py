@@ -94,6 +94,10 @@ def build(coverage_dir, out_dir):
             meta = json.load(f)
         if meta["tool"] not in ("llvm", "jacoco"):
             continue
+        # A server built without the per-test dump (the Dafny-generated Rust servers) wrote no test files.
+        if not glob.glob(os.path.join(directory, "tests", "*")):
+            print("::notice::%s gave no per-test coverage" % meta["language"])
+            continue
 
         def convert(test):
             files = {}
