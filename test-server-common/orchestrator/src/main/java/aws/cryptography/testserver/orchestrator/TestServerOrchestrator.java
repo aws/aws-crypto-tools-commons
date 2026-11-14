@@ -4,6 +4,7 @@ import aws.cryptography.testserver.orchestrator.config.ServerConfiguration;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationLoadException;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationLoader;
+import aws.cryptography.testserver.orchestrator.config.ErrorChecks;
 import aws.cryptography.testserver.orchestrator.config.CommonsConfiguration;
 import aws.cryptography.testserver.orchestrator.config.CommonsConfigurationValidation;
 import aws.cryptography.testserver.orchestrator.config.ConfigurationValidation;
@@ -346,11 +347,12 @@ public final class TestServerOrchestrator {
     /**
      * One language's Feature_Declaration, wherever it was carried, with its
      * optional raw-RSA padding capability ({@code null} = every scheme) and the
-     * bug ids it exhibits (empty = none / no bug ledger).
+     * bug ids it exhibits (empty = none / no bug ledger), and its error checks
+     * ({@code null} = none declared).
      */
     private record Declaration(
             List<String> supported, List<String> unsupported, List<String> rawRsaPaddingSchemes,
-            List<String> bugIds) {
+            List<String> bugIds, ErrorChecks errorChecks) {
     }
 
     private PipelineOutcome executePipeline(
@@ -442,7 +444,7 @@ public final class TestServerOrchestrator {
                     own.product(), commonsConfiguration.product()));
             declarations.put(context.ownLanguage(),
                 new Declaration(own.supportedFeatures(), own.unsupportedFeatures(),
-                    own.rawRsaPaddingSchemes(), own.bugIds()));
+                    own.rawRsaPaddingSchemes(), own.bugIds(), own.errorChecks()));
         }
         for (ConfigurationEntry entry : effectiveEntries) {
             if (isOwnLanguage(entry) || !entry.hasFeatureDeclaration()) {
@@ -455,7 +457,7 @@ public final class TestServerOrchestrator {
                     entry.rawRsaPaddingSchemes(), entry.supportedFeatures()));
             declarations.put(entry.language(),
                 new Declaration(entry.supportedFeatures(), entry.unsupportedFeatures(),
-                    entry.rawRsaPaddingSchemes(), List.of()));
+                    entry.rawRsaPaddingSchemes(), List.of(), null));
         }
         if (!onHand.valid()) {
             return PipelineOutcome.aborted(
@@ -570,7 +572,7 @@ public final class TestServerOrchestrator {
             }
             declarations.put(language,
                 new Declaration(carried.supportedFeatures(), carried.unsupportedFeatures(),
-                    carried.rawRsaPaddingSchemes(), carried.bugIds()));
+                    carried.rawRsaPaddingSchemes(), carried.bugIds(), carried.errorChecks()));
         }
 
         if (dryRun) {
@@ -726,6 +728,7 @@ public final class TestServerOrchestrator {
         Map<String, Map<String, Boolean>> features = new LinkedHashMap<>();
         Map<String, List<String>> rawRsaPaddingSchemes = new LinkedHashMap<>();
         Map<String, List<String>> knownBugs = new LinkedHashMap<>();
+        Map<String, Map<String, String>> errorChecks = new LinkedHashMap<>();
         List<String> bugLedgerIds = commonsConfiguration.bugLedgerIds();
         for (ConfigurationEntry entry : effectiveEntries) {
             Declaration declaration = declarations.get(entry.language());
@@ -745,6 +748,9 @@ public final class TestServerOrchestrator {
             if (declaration.rawRsaPaddingSchemes() != null) {
                 rawRsaPaddingSchemes.put(sourceKey, declaration.rawRsaPaddingSchemes());
             }
+            if (declaration.errorChecks() != null && !declaration.errorChecks().flatten().isEmpty()) {
+                errorChecks.put(sourceKey, declaration.errorChecks().flatten());
+            }
             // Each exhibited bug id must be defined in the commons bug ledger:
             // a server cannot declare a bug the
             // ledger does not catalog.
@@ -762,7 +768,7 @@ public final class TestServerOrchestrator {
             }
         }
         return new TestRunInput(targets, features, catalog, rawRsaPaddingSchemes,
-            referenceImplementation, knownBugs, dryRunInput);
+            referenceImplementation, knownBugs, dryRunInput, errorChecks);
     }
 
     private boolean isOwnLanguage(ConfigurationEntry entry) {

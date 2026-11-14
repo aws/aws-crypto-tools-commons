@@ -41,6 +41,8 @@ import java.util.List;
  *                            {@link FeatureValidation#validateRawRsaPaddingSchemes})
  * @param configurationOverrides complete replacement Configuration_Entries for
  *                            Other languages; never null
+ * @param errorChecks         the {@code errors} block of {@code feature-config.json},
+ *                            or {@code null} when the file has none
  */
 public record ServerConfiguration(
     RepositoryCoordinates commonsRepository,
@@ -49,7 +51,8 @@ public record ServerConfiguration(
     List<String> unsupportedFeatures,
     List<String> rawRsaPaddingSchemes,
     List<ConfigurationEntry> configurationOverrides,
-    List<String> bugIds
+    List<String> bugIds,
+    ErrorChecks errorChecks
 ) {
     public ServerConfiguration {
         supportedFeatures = supportedFeatures == null ? null : List.copyOf(supportedFeatures);
