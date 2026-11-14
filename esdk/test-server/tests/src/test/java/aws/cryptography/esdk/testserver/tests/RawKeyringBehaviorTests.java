@@ -183,7 +183,7 @@ class RawKeyringBehaviorTests {
 
     /** The key provider ID and key provider info of a message's first EDK. */
     private record ProviderFields(byte[] providerId, byte[] providerInfo) {
-        // First EDK entry: providerIdLen(2) ‖ providerId ‖ providerInfoLen(2) ‖ providerInfo ...
+        // The first EDK entry is: providerId length (2 bytes), providerId, providerInfo length (2 bytes), providerInfo, ...
         static ProviderFields ofFirstEdk(EsdkMessage message) {
             int pos = message.edkCountOffset + 2;
             int providerIdLen = u16(message.bytes, pos);
