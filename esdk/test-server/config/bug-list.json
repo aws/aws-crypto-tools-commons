@@ -53,6 +53,10 @@
       "description": "encrypt accepts a frame length of 0 and writes a message without frames; the spec says the frame length MUST be greater than 0",
       "ticketId": null
     },
+    "server-cannot-read-integer-beyond-2-53": {
+      "description": "the server's CBOR reader rejects a whole number above 2^53 - 1 or below -2^53 as a GenericServerError, so a long input such as a frame length never reaches the ESDK",
+      "ticketId": null
+    },
     "encrypt-non-positive-frame-length-generic-error": {
       "description": "encrypt of a non-positive frame length is rejected as a GenericServerError instead of the modeled ESDKClientError",
       "ticketId": null

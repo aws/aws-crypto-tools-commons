@@ -52,6 +52,9 @@ class FrameLengthValidationTests {
     private static final ESDKCommitmentPolicy POLICY =
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
+    /** 2^53 - 1, the largest whole number that a JavaScript number holds exactly. */
+    private static final long MAX_SAFE_JAVASCRIPT_INTEGER = (1L << 53) - 1;
+
     static Stream<Arguments> invalidFrameLengthsWithEachLanguageServer() {
         return ExampleCases.withEachLanguageServer(FrameLengthInputs.invalidFrameLengths());
     }
@@ -85,9 +88,13 @@ class FrameLengthValidationTests {
                     frameLength.value()),
                 "encrypt with a frame length that is not in [1, 2^32 - 1] must be rejected as an "
                     + "ESDKClientError (" + languageServer + ")"));
-        if (frameLength.value() == 0) {
-            // The Java ESDK reads a frame length of 0 as "no frames".
+        long value = frameLength.value();
+        if (value == 0) {
+            // The Java and Python ESDKs read a frame length of 0 as "no frames".
             KnownBugGate.gateDeclared("encrypt-accepts-zero-frame-length", languageServer, rejects);
+        } else if (value > MAX_SAFE_JAVASCRIPT_INTEGER || value < -MAX_SAFE_JAVASCRIPT_INTEGER - 1) {
+            // CBOR stores a negative number v as -1 - v, so -2^53 still fits.
+            KnownBugGate.gateDeclared("server-cannot-read-integer-beyond-2-53", languageServer, rejects);
         } else {
             rejects.execute();
         }
