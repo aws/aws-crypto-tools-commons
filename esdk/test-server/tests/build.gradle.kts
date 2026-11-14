@@ -58,7 +58,7 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     // Per-test coverage zeroes each server's counters between tests, so the tests must run one at a time.
-    if (System.getenv("TESTSERVER_COVERAGE_DIR") != null) {
+    if (System.getenv("TESTSERVER_PER_TEST_COVERAGE") != null) {
         systemProperty("junit.jupiter.execution.parallel.enabled", "false")
     }
     // FeatureGateLog writes every feature-gate decision here, next to the

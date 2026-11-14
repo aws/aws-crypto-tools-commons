@@ -36,8 +36,9 @@ import org.junit.platform.launcher.TestPlan;
  * and its file number. {@code test-server-common/tools/per_test_coverage.py}
  * turns the files into line numbers after the run.
  *
- * <p>It runs when {@value #DIRECTORY_VARIABLE} names the coverage directory the
- * orchestrator wrote. A language takes part when its {@code meta.json} there
+ * <p>It runs when {@value #SWITCH_VARIABLE} is set and {@value #DIRECTORY_VARIABLE}
+ * names the coverage directory the orchestrator wrote. The Tests must then run
+ * one at a time. A language takes part when its {@code meta.json} there
  * names a tool with a per-test dump:
  * <ul>
  *   <li>{@code llvm} (Rust): the server answers {@code POST /control/coverage}
@@ -50,6 +51,9 @@ public final class PerTestCoverage implements TestExecutionListener {
 
     /** The environment variable naming the orchestrator's coverage directory. */
     public static final String DIRECTORY_VARIABLE = "TESTSERVER_COVERAGE_DIR";
+
+    /** The environment variable that turns per-test coverage on. */
+    public static final String SWITCH_VARIABLE = "TESTSERVER_PER_TEST_COVERAGE";
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = HttpClient.newBuilder()
@@ -68,7 +72,8 @@ public final class PerTestCoverage implements TestExecutionListener {
     @Override
     public void testPlanExecutionStarted(TestPlan plan) {
         String value = System.getenv(DIRECTORY_VARIABLE);
-        if (value == null || value.isBlank()) {
+        String on = System.getenv(SWITCH_VARIABLE);
+        if (value == null || value.isBlank() || on == null || on.isBlank()) {
             return;
         }
         directory = Path.of(value);
