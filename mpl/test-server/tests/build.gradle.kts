@@ -42,6 +42,11 @@ tasks.withType<Test>().configureEach {
         "testserver.featureGateLog",
         layout.buildDirectory.file("test-results/feature-gate-log.jsonl").get().asFile.path,
     )
+    // Fuzz writes each random example here when TESTSERVER_FUZZ is set.
+    systemProperty(
+        "testserver.fuzzLog",
+        layout.buildDirectory.file("test-results/fuzz-log.jsonl").get().asFile.path,
+    )
     useJUnitPlatform {
         includeEngines("junit-jupiter")
     }

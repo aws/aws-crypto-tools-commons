@@ -321,7 +321,8 @@ function addTestcase(cases, attrs, body, gateLog) {
   }
 }
 
-async function scanXml(stream, cases, gateLog) {
+// Calls each(attributes, body) for every <testcase> in a JUnit XML stream.
+async function scanTestcases(stream, each) {
   let buf = "";
   const reader = stream.getReader();
   for (;;) {
@@ -329,11 +330,12 @@ async function scanXml(stream, cases, gateLog) {
     if (value) buf += value;
     TESTCASE.lastIndex = 0;
     let m, end = 0;
-    while ((m = TESTCASE.exec(buf))) { addTestcase(cases, m[1], m[2], gateLog); end = TESTCASE.lastIndex; }
+    while ((m = TESTCASE.exec(buf))) { each(m[1], m[2]); end = TESTCASE.lastIndex; }
     buf = buf.slice(end);
     if (done) return;
   }
 }
+const scanXml = (stream, cases, gateLog) => scanTestcases(stream, (attrs, body) => addTestcase(cases, attrs, body, gateLog));
 
 async function fetchResults(product, run, progress) {
   // Bump the prefix when the stored shape changes, so old caches are ignored.
@@ -410,8 +412,9 @@ async function zipText(zip, e) {
 
 // A downloaded artifact never changes, so its parsed contents are cached by
 // artifact id and a reload only downloads artifacts it has not seen.
-async function cachedArtifact(repo, art, progress, parse) {
-  const key = `cov2:${repo}:${art.id}`;
+// A page that parses the zip into a different shape passes its own prefix.
+async function cachedArtifact(repo, art, progress, parse, prefix = "cov2") {
+  const key = `${prefix}:${repo}:${art.id}`;
   const hit = await cacheGet(key);
   if (hit) return hit;
   progress(`Downloading ${art.name} (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);

@@ -63,6 +63,11 @@ tasks.withType<Test>().configureEach {
         "testserver.featureGateLog",
         layout.buildDirectory.file("test-results/feature-gate-log.jsonl").get().asFile.path,
     )
+    // Fuzz writes each random example here when TESTSERVER_FUZZ is set.
+    systemProperty(
+        "testserver.fuzzLog",
+        layout.buildDirectory.file("test-results/fuzz-log.jsonl").get().asFile.path,
+    )
     // The vector suites hold ~260k dynamic tests and their messages; the 512 MiB
     // default leaves the test JVM spending most of its time in GC.
     maxHeapSize = "3g"
