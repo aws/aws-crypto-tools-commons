@@ -1,5 +1,6 @@
-# Unit tests for the dry run and the duvet annotation picker that
-# test-server-duvet-reusable.yml runs for each language repository.
+# Unit tests for the dry run, the duvet annotation picker that
+# test-server-duvet-reusable.yml runs for each language repository, and the
+# duvet test reach check.
 
 name: TestServer duvet annotations
 
@@ -41,5 +42,5 @@ jobs:
         working-directory: test-server-common/orchestrator
         run: ./gradlew --console=plain test --tests '*DryRunOrchestratorTest' --tests '*GradleTestRunnerTest'
 
-      - name: duvet annotation picker
+      - name: duvet tools
         run: python3 -m unittest discover -s test-server-common/tools -v
