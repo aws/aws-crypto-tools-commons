@@ -51,6 +51,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import duvet_test_annotations as shared_tests
+import per_test_coverage
 
 OK, NEVER, NOT_RUN, NO_REGION, NO_COVERAGE = (
     "ok", "never-reaches", "not-run", "no-region", "no-coverage")
@@ -319,16 +320,12 @@ def rust_tests(repo_root, tests_dir, crate, repository, prefixes, errors):
             tests = []
             for f in functions:
                 if f.name in names and f.is_test:
+                    # nextest names a test <crate>::<test binary>::<path in the binary>.
                     path_in_binary = "::".join(f.modules + [f.name])
-                    ids = {f"{crate}::{binary}::{path_in_binary}", f"{binary}::{path_in_binary}",
-                           f"{crate}::{path_in_binary}"}
-                    tests.append((f"{binary}::{path_in_binary}", lambda row, ids=ids: rust_id(row) in ids))
+                    test_id = f"{crate}::{binary}::{path_in_binary}"
+                    tests.append((f"{binary}::{path_in_binary}", lambda row, test_id=test_id: row["test"] == test_id))
             out.append(TestAnnotation(block, repository, "local", tests))
     return out
-
-
-def rust_id(row):
-    return re.sub(r"\s+", "::", row["test"].strip())
 
 
 class Function:
@@ -459,12 +456,9 @@ def java_match(row, cls, method):
 # ---------- coverage ----------
 
 def read_coverage(path):
-    rows = []
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        if raw.strip():
-            row = json.loads(raw)
-            row["files"] = {f: set(lines) for f, lines in row.get("files", {}).items()}
-            rows.append(row)
+    rows = per_test_coverage.read(path)
+    for row in rows:
+        row["files"] = {f: set(lines) for f, lines in row.get("files", {}).items()}
     return rows
 
 
