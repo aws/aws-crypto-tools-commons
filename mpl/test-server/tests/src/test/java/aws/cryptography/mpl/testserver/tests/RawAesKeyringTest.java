@@ -18,9 +18,15 @@ import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterial
 import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.RawAesWrappingKeys;
+import aws.cryptography.testserver.tests.RawAesWrappingKeys.WrappingKey;
+import aws.cryptography.testserver.tests.RawKeyringNames;
+import aws.cryptography.testserver.tests.RawKeyringNames.KeyNames;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -62,10 +68,20 @@ public class RawAesKeyringTest {
     private static final int IV_LENGTH = 12;
     private static final int TAG_LENGTH = 16;
 
-    static Stream<Arguments> pairsByWrappingAlg() {
-        List<TargetPair> pairs = LanguageServerRegistry.shared().pairs();
-        return AesWrappingAlg.values().stream()
-            .flatMap(alg -> pairs.stream().map(pair -> Arguments.of(alg, pair)));
+    static Stream<Arguments> validWrappingKeys() {
+        return ExampleCases.withEachPair(RawAesWrappingKeys.validWrappingKeys());
+    }
+
+    static Stream<Arguments> invalidWrappingKeys() {
+        return ExampleCases.withEachLanguageServer(RawAesWrappingKeys.invalidWrappingKeys());
+    }
+
+    static Stream<Arguments> validKeyNames() {
+        return ExampleCases.withEachPair(RawKeyringNames.validKeyNames());
+    }
+
+    static Stream<Arguments> invalidKeyNames() {
+        return ExampleCases.withEachLanguageServer(RawKeyringNames.invalidKeyNames());
     }
 
     static List<TargetPair> pairs() {
@@ -77,12 +93,13 @@ public class RawAesKeyringTest {
     }
 
     @ParameterizedTest(name = "[raw-aes] {0} OnEncrypt/OnDecrypt {1}")
-    @MethodSource("pairsByWrappingAlg")
-    void onEncryptOnDecryptRoundTrip(AesWrappingAlg alg, TargetPair pair) {
+    @MethodSource("validWrappingKeys")
+    void onEncryptOnDecryptRoundTrip(Example<WrappingKey> example, TargetPair pair) {
         FeatureGate.require(Set.of("raw-aes"), pair);
         MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        byte[] wrappingKey = wrappingKey(alg, 0);
+        AesWrappingAlg alg = wrappingAlg(example.value().algorithmKeyLength());
+        byte[] wrappingKey = example.value().key();
 
         EncryptionMaterials encrypted = onEncrypt(enc,
             createKeyring(enc, KEY_NAME, wrappingKey, alg), initializeEncryption(enc));
@@ -97,6 +114,59 @@ public class RawAesKeyringTest {
             initializeDecryption(dec), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(plaintextDataKey, bytes(decrypted.getPlaintextDataKey()));
+    }
+
+    @ParameterizedTest(name = "[raw-aes] wrong wrapping key length rejected {0} {1}")
+    @MethodSource("invalidWrappingKeys")
+    void createRejectsWrongWrappingKeyLength(Example<WrappingKey> example, LanguageServerTarget languageServer) {
+        FeatureGate.require(Set.of("raw-aes"), languageServer);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(languageServer.endpoint());
+        assertThrows(MPLClientError.class, () -> client.createRawAesKeyring(CreateRawAesKeyringInput.builder()
+            .keyNamespace(NAMESPACE)
+            .keyName(KEY_NAME)
+            .wrappingKey(ByteBuffer.wrap(example.value().key()))
+            .wrappingAlg(wrappingAlg(example.value().algorithmKeyLength()))
+            .build()));
+    }
+
+    /**
+     * The encrypt target writes the key namespace and key name into the EDK as UTF-8,
+     * and the decrypt target must match those exact bytes to find its key.
+     */
+    @ParameterizedTest(name = "[raw-aes] key namespace and name round-trip {0} {1}")
+    @MethodSource("validKeyNames")
+    void keyNamespaceAndNameRoundTrip(Example<KeyNames> example, TargetPair pair) {
+        FeatureGate.require(Set.of("raw-aes"), pair);
+        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
+        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+        AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
+        byte[] wrappingKey = wrappingKey(alg, 0);
+        KeyNames names = example.value();
+
+        EncryptionMaterials encrypted = onEncrypt(enc,
+            createKeyring(enc, names.keyNamespace(), names.keyName(), wrappingKey, alg),
+            initializeEncryption(enc));
+        assertRawAesEdk(encrypted.getEncryptedDataKeys().get(0), names.keyNamespace(), names.keyName());
+
+        DecryptionMaterials decrypted = onDecrypt(dec,
+            createKeyring(dec, names.keyNamespace(), names.keyName(), wrappingKey, alg),
+            initializeDecryption(dec), encrypted.getEncryptedDataKeys());
+
+        assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
+    }
+
+    @ParameterizedTest(name = "[raw-aes] reserved key namespace rejected {0} {1}")
+    @MethodSource("invalidKeyNames")
+    void createRejectsReservedKeyNamespace(Example<KeyNames> example, LanguageServerTarget languageServer) {
+        FeatureGate.require(Set.of("raw-aes"), languageServer);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(languageServer.endpoint());
+        AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
+        assertThrows(MPLClientError.class, () -> client.createRawAesKeyring(CreateRawAesKeyringInput.builder()
+            .keyNamespace(example.value().keyNamespace())
+            .keyName(example.value().keyName())
+            .wrappingKey(ByteBuffer.wrap(wrappingKey(alg, 0)))
+            .wrappingAlg(alg)
+            .build()));
     }
 
     /**
@@ -269,7 +339,11 @@ public class RawAesKeyringTest {
     // -----------------------------------------------------------------------
 
     private static void assertRawAesEdk(EncryptedDataKey edk, String keyName) {
-        assertEquals(NAMESPACE, edk.getKeyProviderId(), "key provider id is the key namespace");
+        assertRawAesEdk(edk, NAMESPACE, keyName);
+    }
+
+    private static void assertRawAesEdk(EncryptedDataKey edk, String keyNamespace, String keyName) {
+        assertEquals(keyNamespace, edk.getKeyProviderId(), "key provider id is the key namespace");
 
         byte[] name = keyName.getBytes(StandardCharsets.UTF_8);
         byte[] info = bytes(edk.getKeyProviderInfo());
@@ -285,9 +359,14 @@ public class RawAesKeyringTest {
 
     private static String createKeyring(
         MPLTestServerClient client, String keyName, byte[] wrappingKey, AesWrappingAlg alg) {
+        return createKeyring(client, NAMESPACE, keyName, wrappingKey, alg);
+    }
+
+    private static String createKeyring(MPLTestServerClient client, String keyNamespace, String keyName,
+        byte[] wrappingKey, AesWrappingAlg alg) {
         return MplTestServerClients.withRetry(() -> client.createRawAesKeyring(
             CreateRawAesKeyringInput.builder()
-                .keyNamespace(NAMESPACE)
+                .keyNamespace(keyNamespace)
                 .keyName(keyName)
                 .wrappingKey(ByteBuffer.wrap(wrappingKey))
                 .wrappingAlg(alg)
@@ -352,6 +431,16 @@ public class RawAesKeyringTest {
                 .build())).getMaterials();
         assertNotNull(out.getPlaintextDataKey());
         return out;
+    }
+
+    /** The wrapping algorithm whose key is {@code keyLength} bytes long. */
+    private static AesWrappingAlg wrappingAlg(int keyLength) {
+        return switch (keyLength) {
+            case 16 -> AesWrappingAlg.ALG_AES128_GCM_IV12_TAG16;
+            case 24 -> AesWrappingAlg.ALG_AES192_GCM_IV12_TAG16;
+            case 32 -> AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
+            default -> throw new IllegalArgumentException("no wrapping algorithm has a " + keyLength + "-byte key");
+        };
     }
 
     /** A deterministic wrapping key of the length {@code alg} requires; {@code seed} varies it. */

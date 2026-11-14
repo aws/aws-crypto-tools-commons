@@ -1,8 +1,12 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
+import aws.cryptography.testserver.tests.RawKeyringNames;
+import aws.cryptography.testserver.tests.RawKeyringNames.KeyNames;
 import aws.cryptography.testserver.tests.TargetPair;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -16,7 +20,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -60,8 +66,8 @@ class RawKeyringBehaviorTests {
         return LanguageServerRegistry.shared().targets();
     }
 
-    static List<TargetPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static Stream<Arguments> validKeyNames() {
+        return ExampleCases.withEachPair(RawKeyringNames.validKeyNames());
     }
 
     /** KEYRING-003: a two-keyring message decrypts under a keyring holding only the second key. */
@@ -116,7 +122,7 @@ class RawKeyringBehaviorTests {
     }
 
     /**
-     * Non-ASCII key namespace and key name survive the EDK provider fields exactly. The header
+     * A key namespace and key name, including non-ASCII ones, survive the EDK provider fields exactly. The header
      * stores each field as UTF-8 bytes behind a 2-byte BYTE length
      * ({@code spec/data-format/message-header.md#encrypted-data-key-entries}); an implementation
      * that measures the length in characters instead of encoded bytes emits a self-consistent
@@ -124,37 +130,70 @@ class RawKeyringBehaviorTests {
      * keyring again, which is how the ESDK for Python permanently lost data until its 2018
      * serializer fix. Asserted on the wire, then round-tripped cross-language.
      */
-    @ParameterizedTest(name = "nonAsciiProviderFieldsRoundTrip {0}")
-    @MethodSource("pairs")
-    void nonAsciiKeyNamespaceAndNameRoundTrip(TargetPair pair) {
+    @ParameterizedTest(name = "nonAsciiProviderFieldsRoundTrip {0} {1}")
+    @MethodSource("validKeyNames")
+    void nonAsciiKeyNamespaceAndNameRoundTrip(Example<KeyNames> example, TargetPair pair) {
         FeatureGate.require(Set.of("raw-aes"), pair);
-        String namespace = "\u6a19\u6e96-namespace";        // 標準-namespace
-        String keyName = "raw-aes-\u043a\u043b\u044e\u0447"; // raw-aes-ключ
+        String namespace = example.value().keyNamespace();
+        String keyName = example.value().keyName();
         ESDKClientConfig config = EsdkClientConfigs.rawAesNamed(namespace, keyName);
         byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT);
 
-        EsdkMessage message = EsdkMessage.parse(ciphertext);
+        ProviderFields fields = ProviderFields.ofFirstEdk(EsdkMessage.parse(ciphertext));
         byte[] namespaceUtf8 = namespace.getBytes(StandardCharsets.UTF_8);
         byte[] keyNameUtf8 = keyName.getBytes(StandardCharsets.UTF_8);
-        // First EDK entry: providerIdLen(2) ‖ providerId ‖ providerInfoLen(2) ‖ providerInfo ...
-        int pos = message.edkCountOffset + 2;
-        int providerIdLen = u16(message.bytes, pos);
-        pos += 2;
-        assertEquals(namespaceUtf8.length, providerIdLen,
+        assertEquals(namespaceUtf8.length, fields.providerId().length,
             pair + ": the provider-id length must count UTF-8 bytes, not characters");
-        assertArrayEquals(namespaceUtf8, Arrays.copyOfRange(message.bytes, pos, pos + providerIdLen),
+        assertArrayEquals(namespaceUtf8, fields.providerId(),
             pair + ": the provider id must be the exact UTF-8 encoding of the key namespace");
-        pos += providerIdLen;
-        int providerInfoLen = u16(message.bytes, pos);
-        pos += 2;
         // Raw-AES provider info = keyName ‖ tagLenBits(4) ‖ ivLen(4) ‖ iv(12).
-        assertEquals(keyNameUtf8.length + 4 + 4 + 12, providerInfoLen,
+        assertEquals(keyNameUtf8.length + 4 + 4 + 12, fields.providerInfo().length,
             pair + ": the provider-info length must count the key name's UTF-8 bytes");
-        assertArrayEquals(keyNameUtf8, Arrays.copyOfRange(message.bytes, pos, pos + keyNameUtf8.length),
+        assertArrayEquals(keyNameUtf8, Arrays.copyOf(fields.providerInfo(), keyNameUtf8.length),
             pair + ": the provider info must begin with the exact UTF-8 encoding of the key name");
 
         assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
-            pair + ": a non-ASCII key namespace/name must round-trip");
+            pair + ": the key namespace and key name must round-trip");
+    }
+
+    /**
+     * A Raw-RSA keyring writes its key namespace as the provider id and its key name as the whole
+     * provider info ({@code spec/framework/raw-rsa-keyring.md#onencrypt}), and the decryptor must
+     * match both exactly. Asserted on the wire, then round-tripped cross-language.
+     */
+    @ParameterizedTest(name = "rawRsaProviderFieldsRoundTrip {0} {1}")
+    @MethodSource("validKeyNames")
+    void rawRsaKeyNamespaceAndNameRoundTrip(Example<KeyNames> example, TargetPair pair) {
+        FeatureGate.require(Set.of("raw-rsa"), pair);
+        FeatureGate.requireRawRsaPaddings(Set.of(PaddingScheme.OAEP_SHA256_MGF1.getValue()), pair);
+        String namespace = example.value().keyNamespace();
+        String keyName = example.value().keyName();
+        ESDKClientConfig config = EsdkClientConfigs.rawRsaNamed(namespace, keyName);
+        byte[] ciphertext = EsdkOps.encrypt(pair.encryptEndpoint(), config, PLAINTEXT);
+
+        ProviderFields fields = ProviderFields.ofFirstEdk(EsdkMessage.parse(ciphertext));
+        assertArrayEquals(namespace.getBytes(StandardCharsets.UTF_8), fields.providerId(),
+            pair + ": the provider id must be the exact UTF-8 encoding of the key namespace");
+        assertArrayEquals(keyName.getBytes(StandardCharsets.UTF_8), fields.providerInfo(),
+            pair + ": the provider info must be the exact UTF-8 encoding of the key name");
+
+        assertArrayEquals(PLAINTEXT, EsdkOps.decrypt(pair.decryptEndpoint(), config, ciphertext),
+            pair + ": the key namespace and key name must round-trip");
+    }
+
+    /** The key provider ID and key provider info of a message's first EDK. */
+    private record ProviderFields(byte[] providerId, byte[] providerInfo) {
+        // First EDK entry: providerIdLen(2) ‖ providerId ‖ providerInfoLen(2) ‖ providerInfo ...
+        static ProviderFields ofFirstEdk(EsdkMessage message) {
+            int pos = message.edkCountOffset + 2;
+            int providerIdLen = u16(message.bytes, pos);
+            pos += 2;
+            byte[] providerId = Arrays.copyOfRange(message.bytes, pos, pos + providerIdLen);
+            pos += providerIdLen;
+            int providerInfoLen = u16(message.bytes, pos);
+            pos += 2;
+            return new ProviderFields(providerId, Arrays.copyOfRange(message.bytes, pos, pos + providerInfoLen));
+        }
     }
 
     private static int u16(byte[] b, int offset) {
