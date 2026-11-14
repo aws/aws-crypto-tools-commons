@@ -81,6 +81,9 @@ public final class GradleTestRunner implements TestRunner {
     /** Runtime-config key: {@code true} for a dry run (see the tests-support DryRun). */
     public static final String DRY_RUN_PROPERTY = "testserver.dryRun";
 
+    /** How many random examples to add to each shared input list, and their seed (tests-support Fuzz). */
+    static final List<String> FUZZ_PROPERTIES = List.of("testserver.fuzz", "testserver.fuzzSeed");
+
     private final Path testsModuleDir;
     private volatile String lastOutput = "";
 
@@ -216,6 +219,14 @@ public final class GradleTestRunner implements TestRunner {
         }
         if (input.dryRun()) {
             command.add("-D" + DRY_RUN_PROPERTY + "=true");
+        }
+        // TESTSERVER_FUZZ and TESTSERVER_FUZZ_SEED reach the Tests through the environment,
+        // but a -D on the orchestrator has to be passed on by name.
+        for (String fuzzProperty : FUZZ_PROPERTIES) {
+            String value = System.getProperty(fuzzProperty);
+            if (value != null && !value.isBlank()) {
+                command.add("-D" + fuzzProperty + "=" + value.trim());
+            }
         }
         command.add("--console=plain");
         if (testFilter != null && !testFilter.isBlank()) {
