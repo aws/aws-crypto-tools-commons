@@ -79,6 +79,23 @@ class RegionTest(unittest.TestCase):
 """
         self.assertEqual((4, 5), region(source, 3))
 
+    def test_an_annotation_inside_the_block_does_not_end_it(self):
+        source = """fn f() {
+    match k {
+        //= spec/a.md#s
+        //# A MUST b.
+        kdf => {
+            //= spec/a.md#s
+            //# C MUST d.
+            hkdf(kdf)
+        }
+        _ => g(),
+    }
+}
+"""
+        self.assertEqual((5, 9), region(source, 4))
+        self.assertEqual((8, 8), region(source, 7))
+
     def test_an_annotation_at_the_end_of_a_block_has_no_region(self):
         source = """fn f() {
     if a {
@@ -147,6 +164,12 @@ pub fn not_recorded() {
     //# The pen MUST be capped.
     cap();
 }
+
+pub async fn tail() -> u8 {
+    //= spec/doc.md#sec
+    //# The tail MUST wag.
+    wag()
+}
 """
 
 LOCAL_TESTS = """mod helpers;
@@ -177,6 +200,14 @@ fn green() {
     //= type=test
     //# The lid MUST be green.
     encrypt(3);
+}
+
+#[test]
+fn tail() {
+    //= spec/doc.md#sec
+    //= type=test
+    //# The tail MUST wag.
+    tail();
 }
 
 #[test]
@@ -231,6 +262,7 @@ def row(test, source, status="passed", lines=(), **extra):
 COVERAGE = [
     row("lib::sample::blue", "local", lines=[1, 4]),
     row("lib::sample::red", "local", lines=[1, 4]),
+    row("lib::sample::tail", "local", lines=[34, 38]),
     row("x.SampleTests#cap(LanguageServerTarget)", "test-server", "skipped", reason="feature caps unsupported"),
     # A parameterized case: only its JUnit unique ID names the method.
     row("x.SampleTests#[1] rust", "test-server", lines=[1, 4, 8],
@@ -239,8 +271,9 @@ COVERAGE = [
 ]
 
 # Every line of LIBRARY that holds code coverage could count, except the
-# struct, which has none.
-LCOV = "SF:src/lib.rs\n" + "".join(f"DA:{n},1\n" for n in (1, 4, 8, 13, 22, 25, 28, 31)) + "end_of_record\n"
+# struct, which has none, and the tail expression `wag()`, which counts on
+# its closing brace.
+LCOV = "SF:src/lib.rs\n" + "".join(f"DA:{n},1\n" for n in (1, 4, 8, 13, 22, 25, 28, 31, 34, 38)) + "end_of_record\n"
 
 
 class CheckTest(unittest.TestCase):
@@ -273,6 +306,7 @@ class CheckTest(unittest.TestCase):
             ("local", "The thing MUST be blue."): reach.OK,
             ("local", "The box MUST be red."): reach.NEVER,
             ("local", "The jar MUST be shut."): reach.NO_REGION,
+            ("local", "The tail MUST wag."): reach.OK,
             ("test-server", "The cap MUST be tight."): reach.NOT_RUN,
             ("test-server", "The pen MUST be capped."): reach.NOT_RUN,
             ("test-server", "The box MUST be red."): reach.OK,
@@ -308,7 +342,7 @@ async fn red() {
         tests.write_text(tests.read_text().replace("#[test]\nfn jar()", "/*\n#[test]\nfn jar()") + "*/\n")
         code, report, states = self.run_check()
         self.assertNotIn(("local", "The jar MUST be shut."), states)
-        self.assertEqual(["tests/sample.rs:34: test annotation is in a /* */ comment, so no test runs it"],
+        self.assertEqual(["tests/sample.rs:42: test annotation is in a /* */ comment, so no test runs it"],
                          report["errors"])
         self.assertEqual(1, code)
 
@@ -332,6 +366,23 @@ async fn red() {
         _, report, states = self.run_check("--changed-since", f"library={base}")
         self.assertEqual("changed", report["mode"])
         self.assertEqual({("local", "The box MUST be red."): reach.NEVER}, states)
+
+    def test_changed_mode_reports_only_errors_on_changed_lines(self):
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+        lib = self.root / "lib"
+        tests = lib / "tests" / "sample.rs"
+        tests.write_text(tests.read_text().replace("#[test]\nfn jar()", "/*\n#[test]\nfn jar()") + "*/\n")
+        subprocess.run(git + ["init", "-q", str(lib)], check=True)
+        subprocess.run(git + ["-C", str(lib), "add", "."], check=True)
+        subprocess.run(git + ["-C", str(lib), "commit", "-qm", "base"], check=True)
+        base = subprocess.run(["git", "-C", str(lib), "rev-parse", "HEAD"],
+                              check=True, capture_output=True, text=True).stdout.strip()
+        _, report, _ = self.run_check("--changed-since", f"library={base}")
+        self.assertEqual([], report["errors"])
+        tests.write_text(tests.read_text().replace("//# The jar MUST be shut.", "//# The jar MUST be shut. "))
+        subprocess.run(git + ["-C", str(lib), "commit", "-qam", "change"], check=True)
+        _, report, _ = self.run_check("--changed-since", f"library={base}")
+        self.assertEqual(1, len(report["errors"]))
 
 
 if __name__ == "__main__":

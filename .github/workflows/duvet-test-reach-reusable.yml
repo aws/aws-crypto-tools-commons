@@ -193,6 +193,7 @@ jobs:
           CRATE: ${{ inputs.crate }}
           PREFIXES: ${{ inputs.prefixes }}
         run: |
+          set -o pipefail
           args=()
           for dir in $SOURCE; do args+=(--source "$dir"); done
           for dir in $LOCAL_TESTS; do args+=(--local-tests "$dir"); done

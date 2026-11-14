@@ -14,12 +14,16 @@ or block that starts on the first code line after the annotation:
   - a block (`fn`, `if`, `match`, ...) ends at its closing `}`, unless an
     `else` follows it;
   - the region also ends where the enclosing block closes, and just before the
-    next annotation.
+    next annotation outside the brackets the region opened. An annotation
+    inside a block the region opened belongs to that block's own code.
 Annotations with only blank lines or comments between them share one region,
-the one after the last of them. Only lines the
-coverage tool can count (`DA` lines in --lcov) are checked; a region with none
-is NO REGION. `implication`, `exception` and `todo` annotations have no code to
-run and are skipped.
+the one after the last of them. Only lines the coverage tool can count (`DA`
+lines in --lcov, or lines any run hit) are checked; a region with none
+is NO REGION. The one exception: a region that is the last statement of its
+block and has no countable line takes the block's closing `}` instead, because
+some coverage tools count only that line for a tail expression (Rust in an
+`async_trait` method). `implication`, `exception` and `todo` annotations have
+no code to run and are skipped.
 
 A test annotation belongs to the test function or JUnit method around it. One
 in a helper belongs to every test in the same file that calls the helper. A
@@ -194,7 +198,7 @@ def region_after(code, after, stops):
         return upto
 
     while line <= n:
-        if line != first and line in stops:
+        if line != first and line in stops and depth == 0:
             return first, closed_at or last_code(line - 1)
         text = code[line - 1]
         for col, c in enumerate(text):
@@ -225,6 +229,15 @@ def region_after(code, after, stops):
                 return first, line
         line += 1
     return first, closed_at or last_code(n)
+
+
+def closing_brace_after(code, line):
+    """The line of the `}` that closes the block right after `line`, or None."""
+    for number in range(line + 1, len(code) + 1):
+        text = code[number - 1].strip()
+        if text:
+            return number if text.startswith("}") else None
+    return None
 
 
 def normalize(text):
@@ -262,8 +275,11 @@ def implementations(repo_root, sources, prefixes, countable_lines):
                 region = region_after(code, last, stops)
                 lines = set()
                 if region:
-                    lines = {line for line in range(region[0], region[1] + 1)
-                             if line in countable_lines.get(rel, ())}
+                    countable = countable_lines.get(rel, ())
+                    lines = {line for line in range(region[0], region[1] + 1) if line in countable}
+                    closing = closing_brace_after(code, region[1])
+                    if not lines and closing in countable:
+                        lines = {closing}
                 for block in blocks:
                     block.target = rewrite(block.target, prefixes)
                     by_target[block.target].append(Implementation(block, region, sorted(lines)))
@@ -307,15 +323,15 @@ def rust_tests(repo_root, tests_dir, crate, repository, prefixes, errors):
         for block in blocks:
             block.target = rewrite(block.target, prefixes)
             if block.line in commented_out:
-                errors.append(f"{rel}:{block.line}: test annotation is in a /* */ comment, so no test runs it")
+                errors.append(("library", rel, block.line, block.end, "test annotation is in a /* */ comment, so no test runs it"))
                 continue
             holder = enclosing(functions, block.line) or function_after(functions, code, block.end)
             if holder is None:
-                errors.append(f"{rel}:{block.line}: test annotation is not inside or above a function")
+                errors.append(("library", rel, block.line, block.end, "test annotation is not inside or above a function"))
                 continue
             names = reaching(holder, functions)
             if not names:
-                errors.append(f"{rel}:{block.line}: no test in {path.name} calls {holder.name}")
+                errors.append(("library", rel, block.line, block.end, f"no test in {path.name} calls {holder.name}"))
                 continue
             tests = []
             for f in functions:
@@ -424,11 +440,11 @@ def java_tests(commons_root, tests_dir, prefixes, errors):
             block.meta, block.quote = dict(raw.meta), raw.quote
             method = shared_tests.enclosing(methods, raw.line)
             if method is None:
-                errors.append(f"{rel}:{raw.line}: test annotation is not inside a method")
+                errors.append(("commons", rel, raw.line, raw.line + len(raw.meta) + len(raw.quote), "test annotation is not inside a method"))
                 continue
             names = shared_tests.tests_reaching(method, methods)
             if not names:
-                errors.append(f"{rel}:{raw.line}: no test in {path.name} calls {method.name}")
+                errors.append(("commons", rel, raw.line, raw.line + len(raw.meta) + len(raw.quote), f"no test in {path.name} calls {method.name}"))
                 continue
             tests = [(f"{path.stem}#{name}", lambda row, cls=path.stem, name=name: java_match(row, cls, name))
                      for name in sorted(names)]
@@ -564,11 +580,13 @@ def main(argv=None):
     coverage_files = [p for p in args.coverage if p.is_file()]
     rows = [r for p in coverage_files for r in read_coverage(p) if r.get("language", args.language) == args.language]
     countable = read_lcov([p for p in args.lcov if p.is_file()])
-    if not countable:
-        # Without lcov, a line counts if any run hit it.
-        for row in rows:
-            for path, lines in row["files"].items():
-                countable.setdefault(path, set()).update(lines)
+    # For a file no lcov names, a line counts if any run hit it.
+    hit_anywhere = defaultdict(set)
+    for row in rows:
+        for path, lines in row["files"].items():
+            hit_anywhere[path] |= lines
+    for path, lines in hit_anywhere.items():
+        countable.setdefault(path, lines)
 
     errors = []
     by_target = implementations(args.repo_root, args.source, prefixes, countable)
@@ -584,6 +602,11 @@ def main(argv=None):
         root = args.repo_root if which == "library" else args.commons_root
         changed = changed or {}
         changed[which] = changed_lines(root, base)
+
+    if changed is not None:
+        errors = [(side, path, first, last, message) for side, path, first, last, message in errors
+                  if any(line in changed.get(side, {}).get(path, ()) for line in range(first, last + 1))]
+    errors = [f"{path}:{line}: {message}" for _, path, line, _, message in errors]
 
     commits = {args.repository: args.commit, "aws/aws-crypto-tools-commons": args.commons_commit}
     findings, skipped = [], defaultdict(int)
