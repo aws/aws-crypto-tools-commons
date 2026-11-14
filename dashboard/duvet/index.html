@@ -179,6 +179,13 @@
   .notedot { position:absolute; top:3px; right:3px; width:5px; height:5px; border-radius:50%; background:var(--dim); }
   .lintline { font-size:12px; color:var(--dim); margin:2px 0 2px 16px; }
   .lintline.bad { color:#ff7b72; }
+  .reachbadge { color:#ffa657; font-size:11px; }
+  .reqm td.rm.noreach { box-shadow:inset 0 0 0 2px #db6d28; }
+  .reqm td.rm.conflict.noreach { box-shadow:inset 0 0 0 2px #da3633, inset 0 0 0 4px #db6d28; }
+  .reachline { font-size:12px; margin:2px 0 2px 16px; color:var(--dim); }
+  .reachline.bad { color:#ffa657; }
+  .reachline.ok { color:#56d364; }
+  .reachline code { font-size:11px; }
 </style>
 </head>
 <body>
@@ -201,6 +208,7 @@
       <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 6%,transparent);border:1px solid var(--line)"></i>none yet</span>
       <span><i class="sw nrsw"></i>no report on main (hover for why)</span>
       <span title="Ideal: code and a test, an implication, or an exception. A conflict is two kinds that say opposite things, like implied and also tested."><b class="lintbadge">⚠</b> conflicting annotations</span>
+      <span title="The duvet test reach check: a run of the test holding the test annotation hit no line of the code under the implementation annotation. It does not change the %."><b class="reachbadge">⚠</b> test doesn't run its code</span>
     </div>
     <table class="matrix" id="matrix"></table>
     <div id="lists"></div>
@@ -229,14 +237,14 @@ const LIBRARIES = {
 };
 const RUST = "aws/aws-crypto-tools-rust", DAFNY_REPORT = "specification_compliance_report";
 const SOURCES = [
-  { lib:"ESDK", lang:"rust", repo:RUST, artifact:"esdk-duvet-report", dir:"esdk" },
+  { lib:"ESDK", lang:"rust", repo:RUST, artifact:"esdk-duvet-report", dir:"esdk", reach:"duvet-test-reach-esdk-rust" },
   { lib:"ESDK", lang:"dafny", repo:"aws/aws-encryption-sdk", artifact:DAFNY_REPORT,
     note:"Its duvet report also reads only framework/, so it never sees the ESDK's //= lines." },
   { lib:"ESDK", lang:"java", repo:"aws/aws-encryption-sdk-java", why:"aws-encryption-sdk-java has no duvet workflow." },
   { lib:"ESDK", lang:"python", repo:"aws/aws-encryption-sdk-python", why:"aws-encryption-sdk-python has some //= lines, but no duvet workflow." },
   { lib:"ESDK", lang:"javascript", repo:"aws/aws-encryption-sdk-javascript", why:"aws-encryption-sdk-javascript has some //= lines, but no duvet workflow." },
   { lib:"ESDK", lang:"c", repo:"aws/aws-encryption-sdk-c", why:"aws-encryption-sdk-c has some //= lines, but no duvet workflow." },
-  { lib:"MPL", lang:"rust", repo:RUST, artifact:"mpl-duvet-report", dir:"mpl" },
+  { lib:"MPL", lang:"rust", repo:RUST, artifact:"mpl-duvet-report", dir:"mpl", reach:"duvet-test-reach-mpl-rust" },
   { lib:"MPL", lang:"dafny", repo:"aws/aws-cryptographic-material-providers-library", artifact:DAFNY_REPORT },
   { lib:"MPL", lang:"java", repo:"aws/aws-crypto-tools-java", artifact:"mpl-duvet-report", dir:"mpl" },
   { lib:"DB-ESDK", lang:"rust", repo:RUST, artifact:"db-esdk-duvet-report", dir:"db-esdk" },
@@ -298,7 +306,26 @@ async function readArtifact(src, art) {
     await cachePut(key, specs);
   }
   return { specs, branch:art.workflow_run.head_branch, ref:art.workflow_run.head_sha, created:art.created_at,
-    run:`https://github.com/${src.repo}/actions/runs/${art.workflow_run.id}` };
+    run:`https://github.com/${src.repo}/actions/runs/${art.workflow_run.id}`,
+    reach:src.reach ? await readReach(src, art.workflow_run.id) : null };
+}
+
+// The duvet test reach report (test-server-common/tools/duvet_test_reach.py)
+// that the same CI run uploaded, or { missing:true } when it uploaded none.
+// A pull request's report checks only the annotations it changed.
+async function readReach(src, runId) {
+  const arts = (await ghJson(`repos/${src.repo}/actions/runs/${runId}/artifacts?per_page=100`)).artifacts;
+  const art = arts.find(a => a.name === src.reach && !a.expired);
+  if (!art) return { missing:true };
+  const key = `reach1:${src.repo}:${art.id}`;
+  let report = await cacheGet(key);
+  if (!report) {
+    const zip = await (await gh(`repos/${src.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+    const e = zipEntries(zip).find(x => x.name.endsWith(".json"));
+    report = e ? JSON.parse(await entryText(zip, e)) : { missing:true };
+    await cachePut(key, report);
+  }
+  return report;
 }
 
 const defaultBranch = {};
@@ -383,7 +410,7 @@ async function loadPRSource(src, p) {
 }
 
 // ---------- shared helpers ----------
-const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false, changedOnly:false, conflictsOnly:false };
+const ui = { lib:"", sel:null, req:null, open:null, lang:null, search:"", mustOnly:false, gapsOnly:false, changedOnly:false, conflictsOnly:false, reachOnly:false };
 // Columns of the open library. A shown report has r (its key), specs, and
 // base: the main report when a PR report replaces it.
 function view(s) {
@@ -487,7 +514,7 @@ function renderOverview() {
       if (!c.r) { h += emptyCell(c); continue; }
       const t = totalsOf(c.specs), p = t.n ? t.done / t.n : 0, was = c.base && totalsOf(c.base.specs);
       h += `<td><span class="cell${c.isPR ? " pr" : ""}" style="${shade(p)}" data-lib="${esc(lib)}" data-c="${esc(c.key)}" title="${t.done}/${t.n} requirements done${was ? ` (main: ${was.done}/${was.n})` : ""}">`
-        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}${delta(t, was)}${warnBadge(conflictCount(c.specs))}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small>${srcTag(s)}</span></td>`;
+        + `${t.n ? (t.done === t.n ? "✓" : Math.floor(100 * p) + "%") : "0 reqs"}${delta(t, was)}${warnBadge(conflictCount(c.specs))}${reachBadge(reachCount(c))}<small>${t.done.toLocaleString()}/${t.n.toLocaleString()}</small>${srcTag(s)}</span></td>`;
     }
     h += `</tr>`;
   }
@@ -521,7 +548,7 @@ function cellHtml(c, s) {
   if (!c.specs[s] && !c.base?.specs?.[s]) return `<td><span class="cell s-na">—</span></td>`;
   const t = stats(c, s), p = t.n ? t.done / t.n : 0, all = t.n && t.done === t.n, was = c.base && statsOf(c.base.specs, s);
   const on = ui.sel && ui.sel.s === s && ui.sel.c === c.r ? "sel" : "";
-  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}${was ? ` (main: ${was.done}/${was.n})` : ""}">${all ? "✓" : t.n ? Math.floor(100 * p) + "%" : "removed"}${delta(t, was)}${warnBadge(conflictCount(c.specs, s))}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
+  return `<td class="${on}"><span class="cell" style="${shade(p)}" data-s="${esc(s)}" data-c="${esc(c.r)}" title="${t.done}/${t.n} done${t.exc ? `, ${t.exc} by exception` : ""}${was ? ` (main: ${was.done}/${was.n})` : ""}">${all ? "✓" : t.n ? Math.floor(100 * p) + "%" : "removed"}${delta(t, was)}${warnBadge(conflictCount(c.specs, s))}${reachBadge(reachCount(c, s))}<small>${all ? t.n : `${t.done}/${t.n}`}</small></span></td>`;
 }
 
 function renderMatrix() {
@@ -586,7 +613,7 @@ function compareView(s, r) {
   for (const c of cols()) {
     if (!c.r) { h += `<div class="lang"><h4>${c.lang} <span class="st none">no report</span></h4><div class="why">${esc(c.why || "")}</div></div>`; continue; }
     const x = index(c).get(k), st = state(x);
-    h += `<div class="lang"><h4>${c.lang}${c.isPR ? ` <span class="prtag">PR #${c.n}</span>` : ""} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>${changeLine(c, k)}${lintLines(s, x)}`
+    h += `<div class="lang"><h4>${c.lang}${c.isPR ? ` <span class="prtag">PR #${c.n}</span>` : ""} <span class="st ${st === "na" ? "none" : st}">${STATE_LABEL[st]}</span></h4>${changeLine(c, k)}${lintLines(s, x)}${reachLines(c, s, x)}`
       + (x ? annLines(c, x) : `<div class="why">${hasSpecs(c) ? "This report does not list this requirement." : esc(c.why || "")}</div>`) + `</div>`;
   }
   return h;
@@ -623,6 +650,60 @@ function conflictCount(specs, only) {
   return n;
 }
 const warnBadge = n => n ? ` <b class="lintbadge" title="${n} requirement${n > 1 ? "s" : ""} with conflicting annotations">⚠ ${n}</b>` : "";
+
+// ---------- duvet test reach ----------
+// A finding is about one test annotation. It belongs to a requirement when
+// they name the same spec and section and one quote holds the other.
+const REACH_BAD = new Set(["never-reaches", "no-region"]);
+const letterOnly = q => q.replace(/[^A-Za-z0-9]/g, "");
+const RIDX = new WeakMap();
+function reachIndex(report) { // "<spec>#<section>" -> findings
+  if (!report?.findings) return new Map();
+  if (!RIDX.has(report)) {
+    const m = new Map();
+    for (const f of report.findings) {
+      const k = f.requirement.target.replace(/^(spec|specification|aws-encryption-sdk-specification)\//, "");
+      (m.get(k) || m.set(k, []).get(k)).push({ ...f, letters:letterOnly(f.requirement.quote) });
+    }
+    RIDX.set(report, m);
+  }
+  return RIDX.get(report);
+}
+function reachOf(c, s, r) {
+  if (!r || !c.reach?.findings) return [];
+  const q = letterOnly(r.q);
+  return (reachIndex(c.reach).get(s + "#" + r.sec) || []).filter(f => f.letters && (q.includes(f.letters) || f.letters.includes(q)));
+}
+const reachBad = (c, s, r) => reachOf(c, s, r).some(f => REACH_BAD.has(f.state));
+function reachCount(c, only) {
+  let n = 0;
+  for (const [s, sp] of Object.entries(c.specs || {})) if (!only || s === only)
+    for (const r of sp.reqs) if (keep(r) && reachBad(c, s, r)) n++;
+  return n;
+}
+const reachBadge = n => n ? ` <b class="reachbadge" title="${n} requirement${n > 1 ? "s" : ""} whose test doesn't run its code">⚠ ${n}</b>` : "";
+const blobLink = (repo, commit, path, a, b) =>
+  `https://github.com/${repo}/blob/${commit || "HEAD"}/${path}#L${a}${b && b !== a ? "-L" + b : ""}`;
+// What the reach check found for one requirement in one column.
+function reachLines(c, s, r) {
+  if (!r || !r.ann.some(a => a[0] === "T")) return "";
+  if (!c.reach) return `<div class="reachline">reach: no per-test coverage for ${esc(c.lang)} yet</div>`;
+  if (c.reach.missing) return `<div class="reachline">reach: this run has no reach check</div>`;
+  const fs = reachOf(c, s, r);
+  if (!fs.length) return c.reach.mode === "changed"
+    ? `<div class="reachline">reach: not checked, the PR did not change these annotations</div>` : "";
+  return fs.map(f => {
+    const t = f.test_annotation;
+    const at = `<a href="${blobLink(t.repository, t.commit, t.path, t.line, t.end)}" target="_blank"><code>${esc(t.path.split("/").pop())}:${t.line}</code></a>`;
+    const code = f.implementations.filter(i => i.region).map(i =>
+      `<a href="${blobLink(c.reach.repository, c.reach.commit, i.path, i.region[0], i.region[1])}" target="_blank"><code>${esc(i.path.split("/").pop())}:${i.region[0]}–${i.region[1]}</code></a>`).join(", ");
+    if (f.state === "ok") return `<div class="reachline ok">✓ ${at} runs the code</div>`;
+    if (f.state === "never-reaches") return `<div class="reachline bad">⚠ test at ${at} never runs the code at ${code}</div>`;
+    if (f.state === "no-region") return `<div class="reachline bad">⚠ ${at}: ${esc(f.detail || "no code under the implementation annotation")}</div>`;
+    if (f.state === "not-run") return `<div class="reachline">${at} not run: ${esc(f.detail || "skipped")}</div>`;
+    return `<div class="reachline">${at}: no per-test coverage yet</div>`;
+  }).join("");
+}
 function lintLines(s, r) {
   const { conflicts, notes } = lint(s, r);
   return conflicts.map(x => `<div class="lintline bad">⚠ ${esc(x)}</div>`).join("")
@@ -634,9 +715,9 @@ const letters = r => r ? [...new Set(r.ann.map(a => a[0]))].sort((x, y) => "CTIE
 function rmCell(c, s, r) {
   const on = c.r && c.r === ui.lang ? " on" : "";
   if (!c.r) return `<td class="rm none${on}" title="${c.lang}: no report on main"></td>`;
-  const k = rkey(s, r), x = index(c).get(k), st = state(x), ch = change(c, k), L = lint(s, x);
-  const tip = [STATE_LABEL[st], ...L.conflicts.map(m => "⚠ " + m), ...L.notes.map(m => "note: " + m), ch ? "PR: " + CHANGE[ch] : ""].filter(Boolean).join("\n");
-  return `<td class="rm ${st}${on}${ch ? " chg chg-" + ch : ""}${L.conflicts.length ? " conflict" : ""}" title="${esc(c.lang + ": " + tip)}">${letters(x)}${L.notes.length && !L.conflicts.length ? `<i class="notedot"></i>` : ""}</td>`;
+  const k = rkey(s, r), x = index(c).get(k), st = state(x), ch = change(c, k), L = lint(s, x), R = reachBad(c, s, x);
+  const tip = [STATE_LABEL[st], ...L.conflicts.map(m => "⚠ " + m), R ? "⚠ a test doesn't run its code" : "", ...L.notes.map(m => "note: " + m), ch ? "PR: " + CHANGE[ch] : ""].filter(Boolean).join("\n");
+  return `<td class="rm ${st}${on}${ch ? " chg chg-" + ch : ""}${L.conflicts.length ? " conflict" : ""}${R ? " noreach" : ""}" title="${esc(c.lang + ": " + tip)}">${letters(x)}${L.notes.length && !L.conflicts.length ? `<i class="notedot"></i>` : ""}</td>`;
 }
 // Section header: how much of the section each language has done.
 function secCell(c, s, list) {
@@ -655,7 +736,7 @@ function rowDetail(s, r) {
     ? `<span class="tab${o === c ? " on" : ""}" data-lang="${esc(o.r)}"><i class="ld ${state(index(o).get(k))}"></i>${o.lang}</span>`
     : `<span class="tab off" title="${esc(o.why || "")}"><i class="ld none"></i>${o.lang}</span>`).join("");
   const x = c && index(c).get(k);
-  const body = !c ? "" : changeLine(c, k) + lintLines(s, x) + (x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`);
+  const body = !c ? "" : changeLine(c, k) + lintLines(s, x) + reachLines(c, s, x) + (x ? annLines(c, x) : `<div class="ann why">${c.lang}: this report does not list this requirement.</div>`);
   return `<tr class="open"><td colspan="${C.length + 1}"><div class="quote">${esc(plain(r.q))}</div>
     <div class="tabs">${tabs}<span class="tab cmp" data-req="${esc(k)}">Compare all languages ⤢</span></div>${body}</td></tr>`;
 }
@@ -664,12 +745,14 @@ function specView(s) {
   const gap = r => C.some(c => { const st = hasSpecs(c) && c.specs[s] ? state(index(c).get(rkey(s, r))) : "na"; return st !== "na" && !isDone(st); });
   const changed = r => C.some(c => change(c, rkey(s, r)));
   const conflicted = r => C.some(c => c.r && lint(s, index(c).get(rkey(s, r))).conflicts.length);
-  const shown = rs.filter(r => (!ui.gapsOnly || gap(r)) && (!ui.changedOnly || changed(r)) && (!ui.conflictsOnly || conflicted(r)));
-  const nConf = rs.filter(conflicted).length;
+  const unreached = r => C.some(c => c.r && reachBad(c, s, index(c).get(rkey(s, r))));
+  const shown = rs.filter(r => (!ui.gapsOnly || gap(r)) && (!ui.changedOnly || changed(r)) && (!ui.conflictsOnly || conflicted(r)) && (!ui.reachOnly || unreached(r)));
+  const nConf = rs.filter(conflicted).length, nReach = rs.filter(unreached).length;
   const anyPR = C.some(c => c.base);
   let h = `<h2>${esc(titleOf(s))}</h2><div class="sub">${esc(s)} · ${rs.length} requirements · click a row for details
     <label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="gapsOnly" ${ui.gapsOnly ? "checked" : ""}> Only gaps</label>
     ${nConf ? `<label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="conflictsOnly" ${ui.conflictsOnly ? "checked" : ""}> Only conflicts (${nConf})</label>` : ""}
+    ${nReach ? `<label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="reachOnly" ${ui.reachOnly ? "checked" : ""}> Only tests that don't run their code (${nReach})</label>` : ""}
     ${anyPR ? `<label style="display:inline-flex;margin-left:12px"><input type="checkbox" id="changedOnly" ${ui.changedOnly ? "checked" : ""}> Only what the PR changed (${rs.filter(changed).length})</label>` : ""}</div>
     <table class="reqm"><thead><tr><th></th>${C.map(c => `<th class="${c.r && c.r === ui.lang ? "on" : ""}" ${c.r ? `data-lang="${esc(c.r)}"` : ""}>${c.lang}${c.isPR ? `<br><span class="prtag">PR</span>` : ""}</th>`).join("")}</tr></thead><tbody>`;
   for (const sec of [...new Set(rs.map(r => r.sec))]) {
@@ -713,6 +796,12 @@ function renderLists() {
   let h = "";
   if (prRows.length) h += `<details class="fold" open><summary>What the PR changed <small>· ${prRows.length} requirements</small></summary><table class="list"><tr><th>Language</th><th>Change</th><th>Section</th><th>Requirement</th></tr>${prRows.map(x =>
     `<tr data-req="${esc(x.k)}" style="cursor:pointer"><td>${x.c.lang}</td><td><span class="chgbadge chg-${x.ch}">${CHANGE[x.ch]}</span></td><td>${esc(x.r.sec)}</td><td>${esc(plain(x.r.q))}</td></tr>`).join("")}</table></details>`;
+  const unreached = C.flatMap(c => [...index(c)].flatMap(([k, r]) => {
+    const s = k.split("|")[0];
+    return keep(r) ? reachOf(c, s, r).filter(f => REACH_BAD.has(f.state)).map(f => ({ c, k, r, f })) : [];
+  }));
+  if (unreached.length) h += `<details class="fold" open><summary>Tests that don't run their code <small>· ${unreached.length} test annotations</small></summary><table class="list"><tr><th>Language</th><th>Section</th><th>Requirement</th><th>Test</th></tr>${unreached.map(x =>
+    `<tr data-req="${esc(x.k)}" style="cursor:pointer"><td>${x.c.lang}</td><td>${esc(x.r.sec)}</td><td>${esc(plain(x.r.q))}</td><td><code>${esc(x.f.tests.join(", "))}</code></td></tr>`).join("")}</table></details>`;
   const exc = C.flatMap(c => [...index(c)].filter(([, r]) => state(r) === "exception" && keep(r)).map(([k, r]) => ({ c, k, r })));
   h += `<details class="fold"><summary>Exceptions <small>· ${exc.length} across languages</small></summary><table class="list"><tr><th>Language</th><th>Section</th><th>Requirement</th><th>Why</th></tr>${exc.map(x =>
     `<tr data-req="${esc(x.k)}" style="cursor:pointer"><td>${x.c.lang}</td><td>${esc(x.r.sec)}</td><td>${esc(plain(x.r.q))}</td><td class="why">${esc(x.r.ann.find(a => a[0] === "E")[3])}</td></tr>`).join("")}</table></details>`;
@@ -777,6 +866,7 @@ document.body.addEventListener("click", e => {
 document.body.addEventListener("change", e => {
   if (e.target.id === "gapsOnly") { ui.gapsOnly = e.target.checked; renderDetail(); }
   if (e.target.id === "conflictsOnly") { ui.conflictsOnly = e.target.checked; renderDetail(); }
+  if (e.target.id === "reachOnly") { ui.reachOnly = e.target.checked; renderDetail(); }
   if (e.target.id === "changedOnly") { ui.changedOnly = e.target.checked; renderDetail(); }
 });
 let t; $("search").oninput = e => { clearTimeout(t); t = setTimeout(() => { ui.search = e.target.value.trim(); ui.req = null; renderDetail(); }, 200); };
