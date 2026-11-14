@@ -97,6 +97,7 @@ jobs:
       - name: Record the lines each test server test runs
         env:
           TESTSERVER_COVERAGE_DIR: ${{ github.workspace }}/coverage/test-server
+          TESTSERVER_PER_TEST_COVERAGE: "1"
           RUSTFLAGS: -C instrument-coverage --cfg testserver_coverage
           CARGO_TARGET_DIR: ${{ github.workspace }}/target-coverage
           GRADLE_OPTS: -Dorg.gradle.daemon=false
