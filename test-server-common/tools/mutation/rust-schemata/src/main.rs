@@ -271,14 +271,17 @@ impl VisitMut for Mutator<'_> {
     }
 
     fn visit_item_impl_mut(&mut self, item: &mut syn::ItemImpl) {
-        // Debug and Display output is not behavior the SDKs promise.
-        let formatting = item
+        let trait_name = item
             .trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
-            .is_some_and(|segment| segment.ident == "Debug" || segment.ident == "Display");
-        if formatting {
+            .map(|segment| segment.ident.to_string());
+        // Debug and Display output is not behavior the SDKs promise.
+        // What Drop does (wiping keys) cannot be seen once the value is gone.
+        if matches!(trait_name.as_deref(), Some("Debug" | "Display")) {
             self.skip("Debug or Display impl");
+        } else if trait_name.as_deref() == Some("Drop") {
+            self.skip("Drop impl");
         } else if is_test(&item.attrs) {
             self.skip("test impl");
         } else {
@@ -319,8 +322,8 @@ impl VisitMut for Mutator<'_> {
                 Expr::MethodCall(call) => call.method.to_string(),
                 _ => continue,
             };
-            if named == "drop" {
-                self.skip("drop call");
+            if named == "drop" || named == "zeroize" {
+                self.skip("drop or zeroize call");
                 continue;
             }
             let Some(id) = self.take(
@@ -336,6 +339,20 @@ impl VisitMut for Mutator<'_> {
     }
 
     fn visit_expr_mut(&mut self, expr: &mut Expr) {
+        // A capacity is only a hint: a wrong one changes no result.
+        let capacity_hint = match &*expr {
+            Expr::MethodCall(call) => call.method == "reserve",
+            Expr::Call(call) => call
+                .func
+                .to_token_stream()
+                .to_string()
+                .ends_with("with_capacity"),
+            _ => false,
+        };
+        if capacity_hint {
+            self.skip("capacity hint");
+            return;
+        }
         let original = expr.clone();
         visit_mut::visit_expr_mut(self, expr);
         match &original {
