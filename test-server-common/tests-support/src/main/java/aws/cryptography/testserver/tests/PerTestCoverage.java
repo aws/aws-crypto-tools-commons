@@ -36,8 +36,9 @@ import org.junit.platform.launcher.TestPlan;
  * and its file number. {@code test-server-common/tools/per_test_coverage.py}
  * turns the files into line numbers after the run.
  *
- * <p>It runs when {@value #DIRECTORY_VARIABLE} names the coverage directory the
- * orchestrator wrote. A language takes part when its {@code meta.json} there
+ * <p>It runs when {@value #SWITCH_VARIABLE} is set and {@value #DIRECTORY_VARIABLE}
+ * names the coverage directory the orchestrator wrote. The Tests must then run
+ * one at a time. A language takes part when its {@code meta.json} there
  * names a tool with a per-test dump:
  * <ul>
  *   <li>{@code llvm} (Rust): the server answers {@code POST /control/coverage}
@@ -51,6 +52,9 @@ public final class PerTestCoverage implements TestExecutionListener {
     /** The environment variable naming the orchestrator's coverage directory. */
     public static final String DIRECTORY_VARIABLE = "TESTSERVER_COVERAGE_DIR";
 
+    /** The environment variable that turns per-test coverage on. */
+    public static final String SWITCH_VARIABLE = "TESTSERVER_PER_TEST_COVERAGE";
+
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10)).build();
@@ -59,6 +63,8 @@ public final class PerTestCoverage implements TestExecutionListener {
     private List<Server> servers = List.of();
     private BufferedWriter index;
     private int nextFile;
+    private int running;
+    private boolean warned;
 
     private record Server(LanguageServerTarget target, String tool, int jacocoPort, Path files) {
     }
@@ -66,7 +72,8 @@ public final class PerTestCoverage implements TestExecutionListener {
     @Override
     public void testPlanExecutionStarted(TestPlan plan) {
         String value = System.getenv(DIRECTORY_VARIABLE);
-        if (value == null || value.isBlank()) {
+        String on = System.getenv(SWITCH_VARIABLE);
+        if (value == null || value.isBlank() || on == null || on.isBlank()) {
             return;
         }
         directory = Path.of(value);
@@ -85,17 +92,27 @@ public final class PerTestCoverage implements TestExecutionListener {
     }
 
     @Override
-    public void executionSkipped(TestIdentifier test, String reason) {
+    public synchronized void executionStarted(TestIdentifier test) {
+        if (index != null && test.isTest() && running++ > 0 && !warned) {
+            warned = true;
+            System.err.println("[per-test coverage] tests are running at the same time, so each test's"
+                + " lines include lines from the others; turn off junit.jupiter.execution.parallel.enabled");
+        }
+    }
+
+    @Override
+    public synchronized void executionSkipped(TestIdentifier test, String reason) {
         if (index != null && test.isTest()) {
             record(test, "skipped", null);
         }
     }
 
     @Override
-    public void executionFinished(TestIdentifier test, TestExecutionResult result) {
+    public synchronized void executionFinished(TestIdentifier test, TestExecutionResult result) {
         if (index == null || !test.isTest()) {
             return;
         }
+        running--;
         String file = String.valueOf(nextFile++);
         dumpAll(file);
         String status = switch (result.getStatus()) {
