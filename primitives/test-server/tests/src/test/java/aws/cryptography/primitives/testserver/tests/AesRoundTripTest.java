@@ -7,8 +7,11 @@ import aws.cryptography.primitives.testserver.client.model.AesDecryptOutput;
 import aws.cryptography.primitives.testserver.client.model.AesEncryptInput;
 import aws.cryptography.primitives.testserver.client.model.AesEncryptOutput;
 import aws.cryptography.primitives.testserver.client.model.PrimitivesError;
+import aws.cryptography.testserver.tests.Example;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
+import aws.cryptography.testserver.tests.PrimitivesInputs;
+import aws.cryptography.testserver.tests.PrimitivesInputs.AesGcmMessage;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -49,10 +52,12 @@ public class AesRoundTripTest {
         return key;
     }
 
-    static Stream<Arguments> pairsByAlgorithm() {
+    /** The arguments are (message, algorithm, pair), so the display name ends with the pair. */
+    static Stream<Arguments> messagesByAlgorithm() {
         List<TargetPair> pairs = LanguageServerRegistry.shared().pairs();
-        return AesAlgorithm.values().stream()
-            .flatMap(algorithm -> pairs.stream().map(pair -> Arguments.of(algorithm, pair)));
+        return PrimitivesInputs.aesGcmMessages().stream()
+            .flatMap(message -> AesAlgorithm.values().stream()
+                .flatMap(algorithm -> pairs.stream().map(pair -> Arguments.of(message, algorithm, pair))));
     }
 
     /** One altered input to an otherwise valid AesDecrypt request. */
@@ -66,16 +71,18 @@ public class AesRoundTripTest {
             .flatMap(tamper -> pairs.stream().map(pair -> Arguments.of(tamper, pair)));
     }
 
-    @ParameterizedTest(name = "[aes-gcm] round-trip {0} {1}")
-    @MethodSource("pairsByAlgorithm")
-    void aesGcmRoundTrip(AesAlgorithm algorithm, TargetPair pair) {
+    @ParameterizedTest(name = "[aes-gcm] round-trip {1} {0} {2}")
+    @MethodSource("messagesByAlgorithm")
+    void aesGcmRoundTrip(Example<AesGcmMessage> message, AesAlgorithm algorithm, TargetPair pair) {
         FeatureGate.require(Set.of("aes-gcm"), pair);
         PrimitivesTestServerClient decryptor =
             PrimitivesTestServerClients.forEndpoint(pair.decryptEndpoint());
         byte[] key = key(algorithm);
+        byte[] plaintext = Bytes.hex(message.value().plaintext());
+        byte[] aad = Bytes.hex(message.value().aad());
 
-        AesEncryptOutput encOut = encrypt(pair, algorithm, key);
-        assertEquals(PLAINTEXT.length, encOut.getCiphertext().remaining());
+        AesEncryptOutput encOut = encrypt(pair, algorithm, key, plaintext, aad);
+        assertEquals(plaintext.length, encOut.getCiphertext().remaining());
         assertEquals(16, encOut.getAuthTag().remaining());
 
         AesDecryptOutput decOut = PrimitivesTestServerClients.withRetry(() ->
@@ -85,10 +92,10 @@ public class AesRoundTripTest {
                 .ciphertext(encOut.getCiphertext())
                 .authTag(encOut.getAuthTag())
                 .iv(ByteBuffer.wrap(IV))
-                .aad(ByteBuffer.wrap(AAD))
+                .aad(ByteBuffer.wrap(aad))
                 .build()));
 
-        assertArrayEquals(PLAINTEXT, Bytes.of(decOut.getPlaintext()));
+        assertArrayEquals(plaintext, Bytes.of(decOut.getPlaintext()));
     }
 
     @ParameterizedTest(name = "[aes-gcm] tampered {0} rejected {1}")
@@ -99,7 +106,7 @@ public class AesRoundTripTest {
             PrimitivesTestServerClients.forEndpoint(pair.decryptEndpoint());
         AesAlgorithm algorithm = AesAlgorithm.AES_256_GCM;
         byte[] key = key(algorithm);
-        AesEncryptOutput encOut = encrypt(pair, algorithm, key);
+        AesEncryptOutput encOut = encrypt(pair, algorithm, key, PLAINTEXT, AAD);
 
         byte[] tag = Bytes.of(encOut.getAuthTag());
         byte[] ciphertext = Bytes.of(encOut.getCiphertext());
@@ -115,7 +122,8 @@ public class AesRoundTripTest {
         assertThrows(PrimitivesError.class, () -> decryptor.aesDecrypt(input));
     }
 
-    private static AesEncryptOutput encrypt(TargetPair pair, AesAlgorithm algorithm, byte[] key) {
+    private static AesEncryptOutput encrypt(
+            TargetPair pair, AesAlgorithm algorithm, byte[] key, byte[] plaintext, byte[] aad) {
         PrimitivesTestServerClient encryptor =
             PrimitivesTestServerClients.forEndpoint(pair.encryptEndpoint());
         return PrimitivesTestServerClients.withRetry(() ->
@@ -123,8 +131,8 @@ public class AesRoundTripTest {
                 .algorithm(algorithm)
                 .iv(ByteBuffer.wrap(IV))
                 .key(ByteBuffer.wrap(key))
-                .message(ByteBuffer.wrap(PLAINTEXT))
-                .aad(ByteBuffer.wrap(AAD))
+                .message(ByteBuffer.wrap(plaintext))
+                .aad(ByteBuffer.wrap(aad))
                 .build()));
     }
 }
