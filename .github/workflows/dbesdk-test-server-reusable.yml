@@ -79,6 +79,20 @@ on:
           project only picks up jobs from the repo it is connected to.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+      fuzz:
+        description: >-
+          How many random examples to add to each shared input list
+          (TESTSERVER_FUZZ). Empty runs only the fixed examples.
+        type: string
+        default: ""
+      fuzz-seed:
+        description: The seed for the random examples (TESTSERVER_FUZZ_SEED). Empty picks a new one.
+        type: string
+        default: ""
+      report-artifact:
+        description: Name of the uploaded test report artifact.
+        type: string
+        default: dbesdk-test-server-reports
 
 # Callers must grant these.
 permissions:
@@ -728,6 +742,8 @@ jobs:
           # The name SubprocessLauncher reads.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
+          TESTSERVER_FUZZ: ${{ inputs.fuzz }}
+          TESTSERVER_FUZZ_SEED: ${{ inputs.fuzz-seed }}
         # $OVERLAY already carries the dbe-ref working-tree overlay (and is empty
         # otherwise, in which case each server is cloned per server-config.json),
         # so it is the single source of the overlay — passing DBESDK_DBE_REPO too
@@ -759,7 +775,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dbesdk-test-server-reports
+          name: ${{ inputs.report-artifact }}
           path: |
             test-server-common/orchestrator/build/resolution-record.json
             test-server-common/orchestrator/build/launch/*/*.log
