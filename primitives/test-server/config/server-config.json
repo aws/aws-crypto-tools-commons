@@ -3,7 +3,7 @@
     "Primitives TestServer commons server-config.json (design 'Server Configuration'):",
     "product + one Configuration_Entry per language. The Feature_Catalog lives in the",
     "sibling feature-set.json and the bug ledger in bug-list.json (the doc's",
-    "three-file layout) — the only supported configuration format. The shared",
+    "three-file layout) \u2014 the only supported configuration format. The shared",
     "orchestrator (test-server-common/orchestrator/) loads this trio and resolves",
     "each entry's server from its Server_Location.",
     "",
@@ -23,13 +23,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "main",
+        "branch": "lucmcdon/duvet-test-reach-kms-trial",
         "path": "prim"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "main",
+        "ref": "lucmcdon/duvet-test-reach-kms-trial",
         "path": "prim/test-server"
       }
     },
@@ -41,13 +41,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "main",
+        "branch": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "AwsCryptographyPrimitives/runtimes/java"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "main",
+        "ref": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "test-server/java-v1-server"
       }
     },
@@ -59,13 +59,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "main",
+        "branch": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "AwsCryptographyPrimitives/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "main",
+        "ref": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "test-server/net-v2-server"
       }
     },
@@ -77,13 +77,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "main",
+        "branch": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "AwsCryptographyPrimitives/runtimes/python"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "main",
+        "ref": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "test-server/python-v1-server"
       }
     },
@@ -95,13 +95,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "main",
+        "branch": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "releases/go/primitives"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "main",
+        "ref": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "test-server/go-v1-server"
       }
     },
@@ -113,13 +113,13 @@
       "libraryRepository": {
         "name": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "branch": "main",
+        "branch": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "releases/rust/mpl"
       },
       "serverLocation": {
         "repository": "aws-cryptographic-material-providers-library",
         "url": "git@github.com:aws/aws-cryptographic-material-providers-library.git",
-        "ref": "main",
+        "ref": "lucmcdon/mpl-test-server-aws-kms-keyring",
         "path": "test-server/rust-dafny-v1-server"
       }
     }

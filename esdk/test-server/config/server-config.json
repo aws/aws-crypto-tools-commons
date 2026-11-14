@@ -9,13 +9,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "branch": "master",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-java",
         "url": "https://github.com/aws/aws-encryption-sdk-java",
-        "ref": "master",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "test-server/server"
       }
     },
@@ -27,13 +27,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
-        "branch": "kessplas/esdk-test-server",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-python",
         "url": "https://github.com/aws/aws-encryption-sdk-python",
-        "ref": "kessplas/esdk-test-server",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "test-server"
       }
     },
@@ -45,13 +45,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "main",
+        "branch": "lucmcdon/duvet-test-reach-kms-trial",
         "path": "esdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "main",
+        "ref": "lucmcdon/duvet-test-reach-kms-trial",
         "path": "esdk/test-server"
       }
     },
@@ -63,13 +63,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "branch": "main",
+        "branch": "lucmcdon/duvet-test-reach-kms-trial",
         "path": "esdk/shims/aws-esdk-cpp"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-rust-cpp",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
-        "ref": "main",
+        "ref": "lucmcdon/duvet-test-reach-kms-trial",
         "path": "esdk/shims/aws-esdk-cpp/test-server"
       }
     },
@@ -81,13 +81,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "branch": "kessplas/bug-config",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-javascript",
         "url": "https://github.com/aws/aws-encryption-sdk-javascript",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "test-server"
       }
     },
@@ -99,13 +99,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk-c",
         "url": "https://github.com/aws/aws-encryption-sdk-c",
-        "branch": "kessplas/bug-config",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "."
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk-c",
         "url": "https://github.com/aws/aws-encryption-sdk-c",
-        "ref": "kessplas/bug-config",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "test-server"
       }
     },
@@ -117,13 +117,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "mainline",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "AwsEncryptionSDK/runtimes/net"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "mainline",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "esdk-test-servers/net"
       }
     },
@@ -135,13 +135,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "mainline",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "AwsEncryptionSDK/runtimes/rust"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "mainline",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "esdk-test-servers/rust"
       }
     },
@@ -153,13 +153,13 @@
       "libraryRepository": {
         "name": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "branch": "mainline",
+        "branch": "lucmcdon/test-server-coverage",
         "path": "AwsEncryptionSDK/runtimes/go"
       },
       "serverLocation": {
         "repository": "aws-encryption-sdk",
         "url": "https://github.com/aws/aws-encryption-sdk",
-        "ref": "mainline",
+        "ref": "lucmcdon/test-server-coverage",
         "path": "esdk-test-servers/go"
       }
     }
