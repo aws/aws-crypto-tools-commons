@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -51,6 +52,9 @@ class FrameLengthValidationTests {
     private static final ESDKCommitmentPolicy POLICY =
         ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
+    /** 2^53 - 1, the largest whole number that a JavaScript number holds exactly. */
+    private static final long MAX_SAFE_JAVASCRIPT_INTEGER = (1L << 53) - 1;
+
     static Stream<Arguments> invalidFrameLengthsWithEachLanguageServer() {
         return ExampleCases.withEachLanguageServer(FrameLengthInputs.invalidFrameLengths());
     }
@@ -71,16 +75,28 @@ class FrameLengthValidationTests {
     /** ENC-001: a frame length outside [1, 2^32 - 1] is rejected on encrypt. */
     @ParameterizedTest(name = "nonPositiveFrameLengthRejected {0} {1}")
     @MethodSource("invalidFrameLengthsWithEachLanguageServer")
-    void encryptRejectsNonPositiveFrameLength(Example<Long> frameLength, LanguageServerTarget languageServer) {
+    void encryptRejectsNonPositiveFrameLength(Example<Long> frameLength, LanguageServerTarget languageServer)
+            throws Throwable {
         ESDKClientConfig config = configFor(new TargetPair(languageServer, languageServer));
         //= spec/client-apis/encrypt.md#frame-length
         //= type=test
         //# This value MUST be greater than 0 and MUST NOT exceed the value 2^32 - 1.
-        KnownBugGate.gateDeclared("encrypt-non-positive-frame-length-generic-error", languageServer,
+        Executable rejects = () -> KnownBugGate.gateDeclared("encrypt-non-positive-frame-length-generic-error",
+            languageServer,
             () -> assertThrows(ESDKClientError.class,
                 () -> EsdkOps.encrypt(languageServer.endpoint(), config, PLAINTEXT, Map.of(), null,
                     frameLength.value()),
                 "encrypt with a frame length that is not in [1, 2^32 - 1] must be rejected as an "
                     + "ESDKClientError (" + languageServer + ")"));
+        long value = frameLength.value();
+        if (value == 0) {
+            // The Java and Python ESDKs read a frame length of 0 as "no frames".
+            KnownBugGate.gateDeclared("encrypt-accepts-zero-frame-length", languageServer, rejects);
+        } else if (value > MAX_SAFE_JAVASCRIPT_INTEGER || value < -MAX_SAFE_JAVASCRIPT_INTEGER - 1) {
+            // CBOR stores a negative number v as -1 - v, so -2^53 still fits.
+            KnownBugGate.gateDeclared("server-cannot-read-integer-beyond-2-53", languageServer, rejects);
+        } else {
+            rejects.execute();
+        }
     }
 }
