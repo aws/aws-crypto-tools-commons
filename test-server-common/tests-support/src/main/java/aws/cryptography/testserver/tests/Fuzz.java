@@ -166,10 +166,15 @@ public record Fuzz(int count, long seed, Path log) {
 
     // An 8192-character grant token would make the log huge, so long values keep their start and end.
     private static String shorten(String value) {
+        if (value.length() <= LOGGED_VALUE_LENGTH) {
+            return value;
+        }
+        // Cut between code points, because half of an emoji cannot be written as UTF-8.
         int half = LOGGED_VALUE_LENGTH / 2;
-        return value.length() <= LOGGED_VALUE_LENGTH
-            ? value
-            : value.substring(0, half) + "..." + value.substring(value.length() - half);
+        int startEnd = value.offsetByCodePoints(0, value.codePointCount(0, half));
+        int endStart = value.offsetByCodePoints(value.length(),
+            -value.codePointCount(value.length() - half, value.length()));
+        return value.substring(0, startEnd) + "..." + value.substring(endStart);
     }
 
     private static String setting(String property, String env) {
