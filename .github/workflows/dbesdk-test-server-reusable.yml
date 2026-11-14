@@ -209,7 +209,7 @@ jobs:
           emit net net "$(tip net)" \
             "$net/bin/Release/net8.0" \
             "$net/.dbesdk-build-stamp"
-          emit rust rust "$(tip rust)-coverage" \
+          emit rust rust "$(tip rust)-per-test-coverage" \
             "$rust/target/release/dbesdk-test-server" \
             "$rust/.dbesdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
@@ -378,7 +378,7 @@ jobs:
 
       - name: Build the Rust code with line coverage
         if: startsWith(matrix.language, 'rust')
-        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+        run: echo "RUSTFLAGS=-C instrument-coverage --cfg testserver_coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and the workspace's Cargo.lock; our own crates
@@ -755,6 +755,11 @@ jobs:
         if: always()
         run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" dbesdk/test-server/build/coverage
 
+      - name: Write the per-test line coverage
+        # build/per-test-coverage/<language>.jsonl: the lines each test ran.
+        if: always()
+        run: python3 test-server-common/tools/per_test_coverage.py build "$RUNNER_TEMP/coverage" dbesdk/test-server/build/per-test-coverage
+
       - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
@@ -765,6 +770,7 @@ jobs:
             test-server-common/orchestrator/build/launch/*/*.log
             dbesdk/test-server/build/resolution-record.json
             dbesdk/test-server/build/coverage
+            dbesdk/test-server/build/per-test-coverage
             dbesdk/test-server/build/launch/*/*.log
             dbesdk/test-server/tests/build/reports/tests
             dbesdk/test-server/tests/build/test-results

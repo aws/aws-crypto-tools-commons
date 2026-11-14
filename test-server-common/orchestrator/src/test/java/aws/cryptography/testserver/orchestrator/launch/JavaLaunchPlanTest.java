@@ -123,8 +123,8 @@ class JavaLaunchPlanTest {
     @DisplayName("the init script adds the agent to every JavaExec task, quoted for Groovy")
     void coverageInitScript() {
         String argument = JavaLaunchPlan.agentArgument(Path.of("/jacoco/agent.jar"),
-            Path.of("/coverage/java"), "com.example.*");
-        assertEquals("-javaagent:/jacoco/agent.jar=destfile=/coverage/java/jacoco.exec,append=true,"
+            Path.of("/coverage/java"), "com.example.*", 6300);
+        assertEquals("-javaagent:/jacoco/agent.jar=output=tcpserver,address=127.0.0.1,port=6300,"
             + "classdumpdir=/coverage/java/classes,includes=com.example.*", argument);
         assertEquals("allprojects {\n"
                 + "    tasks.withType(JavaExec).configureEach {\n"
