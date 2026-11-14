@@ -390,15 +390,16 @@ public final class JavaLaunchPlan implements Launcher {
         if (includes.isEmpty()) {
             return Optional.empty();
         }
+        int agentPort = freePort(entry.language());
         Optional<Path> directory = Coverage.start(entry, sources, "jacoco",
-            Map.of("sources", sourceRoots.stream().map(Path::toString).toList()));
+            Map.of("sources", sourceRoots.stream().map(Path::toString).toList(), "jacoco_port", agentPort));
         if (directory.isEmpty()) {
             return Optional.empty();
         }
         Path script = directory.get().resolve("jacoco.init.gradle");
         try {
             Files.writeString(script,
-                initScript(agentArgument(Path.of(agent), directory.get(), includes)));
+                initScript(agentArgument(Path.of(agent), directory.get(), includes, agentPort)));
         } catch (IOException e) {
             throw new ServerLaunchException(entry.language(), ServerLaunchException.Category.BUILD,
                 "failed to write the " + entry.language() + " coverage init script " + script
@@ -456,13 +457,25 @@ public final class JavaLaunchPlan implements Launcher {
     }
 
     /**
-     * {@code -javaagent:<agent>=destfile=<dir>/jacoco.exec,append=true,
-     * classdumpdir=<dir>/classes,includes=<includes>}. The agent writes the
-     * data file when the JVM exits, SIGTERM included.
+     * {@code -javaagent:<agent>=output=tcpserver,address=127.0.0.1,port=<port>,
+     * classdumpdir=<dir>/classes,includes=<includes>}. The tests' PerTestCoverage
+     * listener asks the agent on that port for each test's data and writes it
+     * under {@code <dir>/tests/}.
      */
-    static String agentArgument(Path agent, Path directory, String includes) {
-        return "-javaagent:" + agent + "=destfile=" + directory.resolve("jacoco.exec")
-            + ",append=true,classdumpdir=" + directory.resolve("classes") + ",includes=" + includes;
+    static String agentArgument(Path agent, Path directory, String includes, int port) {
+        return "-javaagent:" + agent + "=output=tcpserver,address=127.0.0.1,port=" + port
+            + ",classdumpdir=" + directory.resolve("classes") + ",includes=" + includes;
+    }
+
+    /** A port nothing listens on now, for the JaCoCo agent. */
+    private static int freePort(String language) throws ServerLaunchException {
+        try (java.net.ServerSocket socket = new java.net.ServerSocket(0, 1,
+                java.net.InetAddress.getLoopbackAddress())) {
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                "failed to find a free port for the " + language + " JaCoCo agent: " + e.getMessage(), e);
+        }
     }
 
     /** A Gradle init script adding {@code jvmArgument} to every {@code JavaExec} task. */

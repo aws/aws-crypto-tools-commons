@@ -439,7 +439,7 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
-          emit rustdafny rust-dafny "$esdk_tip-coverage" \
+          emit rustdafny rust-dafny "$esdk_tip-per-test-coverage" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
           # "-coverage": built with line coverage on, so apart from older
@@ -447,10 +447,10 @@ jobs:
           emit go go "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          emit rust rust "$(tip rust)-coverage" \
+          emit rust rust "$(tip rust)-per-test-coverage" \
             "$rust/esdk/test-server/target/release/esdk-test-server" \
             "$rust/esdk/test-server/.esdk-build-stamp"
-          emit rustcpp rust-cpp "$(tip rust-cpp)-coverage" \
+          emit rustcpp rust-cpp "$(tip rust-cpp)-per-test-coverage" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
@@ -752,7 +752,7 @@ jobs:
 
       - name: Build the Rust code with line coverage
         if: startsWith(matrix.language, 'rust')
-        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+        run: echo "RUSTFLAGS=-C instrument-coverage --cfg testserver_coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -1578,6 +1578,11 @@ jobs:
         if: always()
         run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" esdk/test-server/build/coverage
 
+      - name: Write the per-test line coverage
+        # build/per-test-coverage/<language>.jsonl: the lines each test ran.
+        if: always()
+        run: python3 test-server-common/tools/per_test_coverage.py build "$RUNNER_TEMP/coverage" esdk/test-server/build/per-test-coverage
+
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
         # the artifacts (including resolution-record.json, Requirement 5.3)
@@ -1595,6 +1600,7 @@ jobs:
           path: |
             esdk/test-server/build/resolution-record.json
             esdk/test-server/build/coverage
+            esdk/test-server/build/per-test-coverage
             esdk/test-server/build/launch/*/*.log
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results

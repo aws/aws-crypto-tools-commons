@@ -49,6 +49,9 @@ dependencies {
     // so the API is needed here only to compile.
     compileOnly("org.junit.platform:junit-platform-launcher:$junitPlatformVersion")
 
+    // PerTestCoverage asks a Java server's JaCoCo agent for each test's coverage.
+    implementation("org.jacoco:org.jacoco.core:0.8.13")
+
     // Self-tests only.
     testImplementation("org.junit.platform:junit-platform-launcher:$junitPlatformVersion")
     testImplementation("net.jqwik:jqwik:$jqwikVersion")

@@ -42,7 +42,8 @@ def llvm_tools():
 
 def llvm(meta, directory):
     """Rust and anything linking Rust code built with -C instrument-coverage."""
-    profiles = glob.glob(os.path.join(directory, "*.profraw"))
+    # Per-test files under tests/ hold the counts the server zeroed after each test.
+    profiles = glob.glob(os.path.join(directory, "*.profraw")) + glob.glob(os.path.join(directory, "tests", "*.profraw"))
     if not profiles:
         return None
     tools = llvm_tools()
@@ -65,12 +66,13 @@ def jacoco(meta, directory):
     JaCoCo covered at least one of its instructions; JaCoCo keeps no hit
     counts.
     """
-    data = os.path.join(directory, "jacoco.exec")
+    # The agent sends each test's data to the PerTestCoverage listener, which writes it under tests/.
+    data = sorted(glob.glob(os.path.join(directory, "tests", "*.exec")))
     classes = os.path.join(directory, "classes")
-    if not os.path.exists(data) or not os.path.isdir(classes):
+    if not data or not os.path.isdir(classes):
         return None
     xml_path = os.path.join(directory, "jacoco.xml")
-    run(["java", "-jar", os.environ["TESTSERVER_JACOCO_CLI"], "report", data,
+    run(["java", "-jar", os.environ["TESTSERVER_JACOCO_CLI"], "report", *data,
          "--classfiles", classes, "--xml", xml_path])
     return jacoco_xml_to_lcov(xml_path, meta["sources"])
 
