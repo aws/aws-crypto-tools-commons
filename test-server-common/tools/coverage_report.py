@@ -52,7 +52,10 @@ def llvm(meta, directory):
     objects = [o for o in meta["objects"] if os.path.exists(o)]
     if not objects:
         raise RuntimeError("none of the instrumented objects exist: %s" % meta["objects"])
-    args = [os.path.join(tools, "llvm-cov"), "export", "-format=lcov", "-instr-profile=" + profdata, objects[0]]
+    # Exporting functions crashes llvm-cov 23 on a branch coverage profile,
+    # and the lcov records here use only the lines and branches.
+    args = [os.path.join(tools, "llvm-cov"), "export", "-format=lcov", "-skip-functions",
+            "-instr-profile=" + profdata, objects[0]]
     for extra in objects[1:]:
         args += ["-object", extra]
     return run(args, capture_output=True, text=True).stdout
