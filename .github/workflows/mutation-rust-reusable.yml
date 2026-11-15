@@ -70,9 +70,15 @@ jobs:
       - name: Install CMake
         run: sudo apt-get update && sudo apt-get install -y cmake
 
-      - uses: dtolnay/rust-toolchain@stable
+      # The orchestrator builds the Rust server with branch coverage, which
+      # needs a nightly compiler.
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-10-26
           components: llvm-tools-preview
+
+      - name: Use the nightly toolchain for every cargo command below
+        run: echo "RUSTUP_TOOLCHAIN=nightly-2026-10-26" >> "$GITHUB_ENV"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@v2
@@ -98,7 +104,7 @@ jobs:
         env:
           TESTSERVER_COVERAGE_DIR: ${{ github.workspace }}/coverage/test-server
           TESTSERVER_PER_TEST_COVERAGE: "1"
-          RUSTFLAGS: -C instrument-coverage --cfg testserver_coverage
+          RUSTFLAGS: -C instrument-coverage -Z coverage-options=branch --cfg testserver_coverage
           CARGO_TARGET_DIR: ${{ github.workspace }}/target-coverage
           GRADLE_OPTS: -Dorg.gradle.daemon=false
         run: |
