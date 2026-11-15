@@ -456,7 +456,7 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
-          emit rustdafny rust-dafny "$esdk_tip-per-test-coverage" \
+          emit rustdafny rust-dafny "$esdk_tip-branch-coverage" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
           # "-coverage": built with line coverage on, so apart from older
@@ -464,10 +464,10 @@ jobs:
           emit go go "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          emit rust rust "$(tip rust)-per-test-coverage" \
+          emit rust rust "$(tip rust)-branch-coverage" \
             "$rust/esdk/test-server/target/release/esdk-test-server" \
             "$rust/esdk/test-server/.esdk-build-stamp"
-          emit rustcpp rust-cpp "$(tip rust-cpp)-per-test-coverage" \
+          emit rustcpp rust-cpp "$(tip rust-cpp)-branch-coverage" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"

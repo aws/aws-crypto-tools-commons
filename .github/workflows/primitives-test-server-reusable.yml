@@ -319,10 +319,10 @@ jobs:
           java_project="$mpl/$(dirname "$(dirname "$(library_path java)")")"
           python_library="$mpl/$(library_path python)"
           m2=$HOME/.m2/repository/software/amazon/cryptography
-          emit rust rust "-per-test-coverage" \
+          emit rust rust "-branch-coverage" \
             "$rust/target/release/primitives-test-server" \
             "$rust/.primitives-build-stamp"
-          emit rustdafny rust-dafny "-per-test-coverage" \
+          emit rustdafny rust-dafny "-branch-coverage" \
             "$rustdafny/target/release/primitives-test-server" \
             "$rustdafny/.primitives-build-stamp"
           emit net net "-dafny$DAFNY_VERSION" \

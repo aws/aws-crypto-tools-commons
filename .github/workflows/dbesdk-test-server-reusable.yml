@@ -226,7 +226,7 @@ jobs:
           emit net net "$(tip net)" \
             "$net/bin/Release/net8.0" \
             "$net/.dbesdk-build-stamp"
-          emit rust rust "$(tip rust)-per-test-coverage" \
+          emit rust rust "$(tip rust)-branch-coverage" \
             "$rust/target/release/dbesdk-test-server" \
             "$rust/.dbesdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
