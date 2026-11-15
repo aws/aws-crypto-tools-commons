@@ -9,7 +9,7 @@ The orchestrator writes <coverage dir>/<language>/meta.json for each server it
 launched with coverage on (see Coverage.java), and the server writes its raw
 data next to it. For each language this writes:
 
-  <out dir>/<language>.lcov  line coverage, paths relative to the library's repository
+  <out dir>/<language>.lcov  line and branch coverage, paths relative to the library's repository
   <out dir>/<language>.json  {language, repository, commit}
 
 A language whose converter fails or finds no data is reported and skipped;
@@ -19,6 +19,7 @@ coverage never fails the test run.
 import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -63,7 +64,8 @@ def jacoco(meta, directory):
     The agent dumped the library classes it saw under classes/, so the report
     reads the exact class files the server ran. A line counts as hit when
     JaCoCo covered at least one of its instructions; JaCoCo keeps no hit
-    counts.
+    counts. JaCoCo counts a line's covered and missed branches but does not
+    say which is which, so the covered ones are listed first.
     """
     data = os.path.join(directory, "jacoco.exec")
     classes = os.path.join(directory, "classes")
@@ -89,6 +91,11 @@ def jacoco_xml_to_lcov(xml_path, sources):
             out.append("SF:%s\n" % path)
             for line in sourcefile.findall("line"):
                 out.append("DA:%s,%d\n" % (line.get("nr"), 1 if int(line.get("ci")) > 0 else 0))
+            for line in sourcefile.findall("line"):
+                covered, missed = int(line.get("cb", 0)), int(line.get("mb", 0))
+                ran = int(line.get("ci")) > 0
+                taken = [1] * covered + [0 if ran else None] * missed
+                out.extend(brda(int(line.get("nr")), taken))
             out.append("end_of_record\n")
     return "".join(out)
 
@@ -143,10 +150,11 @@ def gcov(meta, directory):
     The server wrote each object's .gcda file under gcda/ followed by the
     object's absolute path (GCOV_PREFIX). gcov reads it beside a copy of the
     object's .gcno file from the build tree. A header's lines are counted in
-    every object that includes it, so their counts are summed.
+    every object that includes it, so their line and branch counts are summed.
     """
     prefix = os.path.join(directory, "gcda")
     counts = {}
+    branches = {}
     # os.walk, not glob: the build tree is test-server/.build, which glob skips.
     found = [os.path.join(parent, name) for parent, _, names in os.walk(prefix)
              for name in names if name.endswith(".gcda")]
@@ -155,7 +163,7 @@ def gcov(meta, directory):
         if not os.path.exists(notes):
             continue
         shutil.copyfile(notes, data[:-len(".gcda")] + ".gcno")
-        out = run(["gcov", "--json-format", "--stdout", data], capture_output=True, text=True,
+        out = run(["gcov", "--branch-probabilities", "--json-format", "--stdout", data], capture_output=True, text=True,
                   cwd=os.path.dirname(data)).stdout
         for line in out.splitlines():
             if not line.startswith("{"):
@@ -164,14 +172,16 @@ def gcov(meta, directory):
             for source in report["files"]:
                 path = os.path.realpath(os.path.join(report["current_working_directory"], source["file"]))
                 hits = counts.setdefault(path, {})
+                taken = branches.setdefault(path, {})
                 for record in source["lines"]:
-                    hits[record["line_number"]] = hits.get(record["line_number"], 0) + record["count"]
-    out = []
-    for path in sorted(counts):
-        out.append("SF:%s\n" % path)
-        out.extend("DA:%d,%d\n" % (number, hits) for number, hits in sorted(counts[path].items()))
-        out.append("end_of_record\n")
-    return "".join(out)
+                    number = record["line_number"]
+                    hits[number] = hits.get(number, 0) + record["count"]
+                    # A throw edge is a C++ exception path, which C code never takes.
+                    edges = [b["count"] for b in record.get("branches", []) if not b.get("throw")]
+                    if edges:
+                        before = taken.get(number, [0] * len(edges))
+                        taken[number] = [a + b for a, b in zip(before, edges)] if len(before) == len(edges) else edges
+    return lines_to_lcov(counts, branches)
 
 
 def gocover(meta, directory):
@@ -244,31 +254,53 @@ def dotnet_coverage(meta, directory):
 
 def cobertura_to_lcov(xml_path):
     """lcov from a Cobertura report. A line listed by several classes (a
-    method's compiler-generated classes) keeps the highest count."""
+    method's compiler-generated classes) keeps the highest count.
+
+    A branch line's condition-coverage reads "50% (1/2)": covered of total
+    branches, without saying which, so the covered ones are listed first.
+    """
     import xml.etree.ElementTree as ElementTree
     root = ElementTree.parse(xml_path).getroot()
     bases = [source.text for source in root.iter("source") if source.text]
     counts = {}
+    branches = {}
     for cls in root.iter("class"):
         path = cls.get("filename")
         if not os.path.isabs(path):
             path = next((os.path.join(base, path) for base in bases
                          if os.path.exists(os.path.join(base, path))), path)
         hits = counts.setdefault(path, {})
+        taken = branches.setdefault(path, {})
         for line in cls.iter("line"):
             number = int(line.get("number"))
             hits[number] = max(hits.get(number, 0), int(line.get("hits")))
-    return lines_to_lcov(counts)
+            match = re.search(r"\((\d+)/(\d+)\)", line.get("condition-coverage", ""))
+            if line.get("branch", "").lower() == "true" and match:
+                covered, total = int(match.group(1)), int(match.group(2))
+                if covered >= sum(1 for t in taken.get(number, []) if t):
+                    ran = int(line.get("hits")) > 0
+                    taken[number] = [1] * covered + [0 if ran else None] * (total - covered)
+    return lines_to_lcov(counts, branches)
 
 
-def lines_to_lcov(counts):
-    """lcov from {path: {line number: hits}}."""
+def brda(number, taken):
+    """lcov BRDA lines for one source line's branches, each taken N times or
+    None when the line never ran."""
+    return ["BRDA:%d,0,%d,%s\n" % (number, i, "-" if t is None else t) for i, t in enumerate(taken)]
+
+
+def lines_to_lcov(counts, branches=None):
+    """lcov from {path: {line number: hits}} and {path: {line number: [branch taken counts]}}."""
+    branches = branches or {}
     out = []
     for path in sorted(counts):
         if not counts[path]:
             continue
         out.append("SF:%s\n" % path)
         out.extend("DA:%d,%d\n" % (number, hits) for number, hits in sorted(counts[path].items()))
+        for number, taken in sorted(branches.get(path, {}).items()):
+            ran = counts[path].get(number, 0) > 0
+            out.extend(brda(number, [t if ran else None for t in taken]))
         out.append("end_of_record\n")
     return "".join(out)
 

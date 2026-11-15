@@ -211,6 +211,9 @@ env:
   # same warm set and pull requests never churn the cache store.
   SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   CARGO_INCREMENTAL: "0"
+  # Every Rust build here measures coverage, and Rust's branch coverage
+  # needs a nightly compiler.
+  RUSTUP_TOOLCHAIN: nightly-2026-10-26
 
 jobs:
   # Resolves the refs every job checks out, including any Test-Server-Override
@@ -629,8 +632,9 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
           components: rustfmt
 
@@ -764,9 +768,9 @@ jobs:
         # build, and goes before the cargo cache, whose key includes it.
         run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
 
-      - name: Build the Rust code with line coverage
+      - name: Build the Rust code with line and branch coverage
         if: startsWith(matrix.language, 'rust')
-        run: echo "RUSTFLAGS=-C instrument-coverage --cfg testserver_coverage" >> "$GITHUB_ENV"
+        run: echo "RUSTFLAGS=-C instrument-coverage -Z coverage-options=branch --cfg testserver_coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -1022,8 +1026,9 @@ jobs:
           node-version: "22"
 
       - name: Set up the Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
           # llvm-tools turns the rust server's coverage profile into a report.
           components: rustfmt, llvm-tools-preview

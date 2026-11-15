@@ -290,11 +290,13 @@ public final class PythonLaunchPlan implements Launcher {
     }
 
     /**
-     * coverage.py settings that measure only {@code source} and write one
-     * data file per process under {@code directory}, saved on SIGTERM.
+     * coverage.py settings that measure the lines and branches of only
+     * {@code source} and write one data file per process under
+     * {@code directory}, saved on SIGTERM.
      */
     static String coverageRc(Path directory, Path source) {
         return "[run]\n"
+            + "branch = true\n"
             + "data_file = " + directory.resolve(".coverage") + "\n"
             + "parallel = true\n"
             + "sigterm = true\n"
