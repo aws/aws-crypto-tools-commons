@@ -1,19 +1,8 @@
 # Runs every library's test server with random examples added to the shared
-# input lists (tests-support Fuzz), on main only.
+# input lists (tests-support Fuzz), once a day.
 name: Test server fuzz
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "esdk/test-server/**"
-      - "mpl/test-server/**"
-      - "dbesdk/test-server/**"
-      - "primitives/test-server/**"
-      - "test-server-common/**"
-      - ".github/workflows/test-server-fuzz.yml"
-      - ".github/workflows/*-test-server-reusable.yml"
   schedule:
     - cron: "47 8 * * *"
   workflow_dispatch:
