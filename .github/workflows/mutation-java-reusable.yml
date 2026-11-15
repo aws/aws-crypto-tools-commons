@@ -1,0 +1,236 @@
+# Mutation testing of a Java library against the shared test server Tests,
+# callable by the Java library repositories.
+#
+# A mutant is a small change to the library, such as `<` turned into `<=`.
+# This job records which Tests run which library lines, starts the library's
+# Java server again with a mutant switch agent, and runs the Tests that reach
+# each mutant's line with that mutant on.
+# test-server-common/tools/mutation/mutate_java.py has the details.
+#
+# A pull request mutates only the library lines it changes, and the job fails
+# if one of those mutants survives a Test that runs its line.
+# Any other event mutates the whole library and only reports.
+# It uploads mutation-results-<library>-java-test-server (results.json) for
+# the dashboard's Mutation testing page.
+
+name: Java test server mutation testing
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner label.
+        type: string
+        default: ubuntu-latest
+      product:
+        description: The commons test server product whose Tests run, for example esdk.
+        type: string
+        required: true
+      library:
+        description: esdk, mpl, dbesdk or prim.
+        type: string
+        required: true
+      sources:
+        description: The library's source roots, comma-separated and relative to the repository.
+        type: string
+        default: src/main/java
+      commons-ref:
+        description: The aws-crypto-tools-commons ref whose Tests and tools run, unless a Test-Server-Override line names another.
+        type: string
+        default: main
+      aws-role-arn:
+        description: Role for the Tests that call AWS KMS. Those Tests fail without it and are left out.
+        type: string
+        default: ""
+    secrets:
+      repo-pat:
+        description: Read-only token for aws-crypto-tools-commons and the private language repositories.
+        required: true
+
+jobs:
+  mutation:
+    name: ${{ inputs.library }} Java test server mutation testing
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      id-token: write
+      # The resolve script reads this pull request's Test-Server-Override lines.
+      pull-requests: read
+    env:
+      LIBRARY: ${{ github.workspace }}/library
+      COMMONS: ${{ github.workspace }}/commons
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: library
+          fetch-depth: 0
+
+      - name: Check out the resolve script
+        uses: actions/checkout@v6
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ inputs.commons-ref }}
+          token: ${{ secrets.repo-pat }}
+          sparse-checkout: .github/scripts
+          path: resolve
+
+      - name: Resolve the commons ref, Test-Server-Override lines included
+        id: refs
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          EVENT_BODY: ${{ github.event.pull_request.body }}
+          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+        run: resolve/.github/scripts/resolve-test-server-refs.sh resolve
+
+      - uses: actions/checkout@v6
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ steps.refs.outputs.commons_ref }}
+          token: ${{ secrets.repo-pat }}
+          path: commons
+
+      - name: Mutate the whole library
+        if: github.event_name != 'pull_request'
+        run: echo "MUTATE=true" >> "$GITHUB_ENV"
+
+      - name: Mutate only the library lines this pull request changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          SOURCES: ${{ inputs.sources }}
+        run: |
+          git -C library fetch --no-tags origin "$BASE"
+          echo "MUTATION_ARGS=--changed-since $BASE --fail-on-survivors" >> "$GITHUB_ENV"
+          IFS=, read -ra roots <<< "$SOURCES"
+          if git -C library diff --quiet "$(git -C library merge-base "$BASE" HEAD)" -- "${roots[@]}"; then
+            echo "This pull request changes nothing in $SOURCES." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "MUTATE=false" >> "$GITHUB_ENV"
+          else
+            echo "MUTATE=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Record that there is nothing to mutate
+        if: env.MUTATE == 'false'
+        env:
+          LIBRARY_NAME: ${{ inputs.library }}
+        run: |
+          mkdir -p results
+          python3 - <<'PY'
+          import json, os
+          summary = {"repository": os.environ["GITHUB_REPOSITORY"], "commit": os.environ["GITHUB_SHA"],
+                     "language": "java", "library": os.environ["LIBRARY_NAME"], "tool": "mutate_java.py",
+                     "scope": "changed", "mutants": 0, "statuses": {}, "seconds": 0, "phases": {}}
+          with open("results/results.json", "w") as f:
+              json.dump({"summary": summary, "mutants": []}, f)
+          PY
+
+      # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator, the server and the Tests.
+      - name: Set up JDK 17 for the library build
+        if: env.MUTATE == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up JDK 21
+        if: env.MUTATE == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install stub for the unpublished test-vectors artifact
+        # The library's pom.xml declares this test-scope artifact, which is not
+        # on Maven Central. Its tests do not run here, so a placeholder jar is enough.
+        if: env.MUTATE == 'true'
+        run: |
+          tmp="$(mktemp -d)"
+          echo "placeholder for unpublished test-vectors artifact" > "$tmp/README.txt"
+          "$JAVA_HOME_17_X64/bin/jar" cf "$tmp/stub.jar" -C "$tmp" README.txt
+          mvn -q -e org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file \
+            -Dfile="$tmp/stub.jar" -DgroupId=software.amazon.cryptography \
+            -DartifactId=TestAwsCryptographicMaterialProviders -Dversion=1.7.0 -Dpackaging=jar
+
+      - name: Download the JaCoCo agent and command line
+        if: env.MUTATE == 'true'
+        env:
+          JACOCO_VERSION: 0.8.13
+        run: |
+          dir="$RUNNER_TEMP/jacoco"
+          mkdir -p "$dir"
+          base=https://repo1.maven.org/maven2/org/jacoco
+          curl -sSfL -o "$dir/jacocoagent.jar" "$base/org.jacoco.agent/$JACOCO_VERSION/org.jacoco.agent-$JACOCO_VERSION-runtime.jar"
+          curl -sSfL -o "$dir/jacococli.jar" "$base/org.jacoco.cli/$JACOCO_VERSION/org.jacoco.cli-$JACOCO_VERSION-nodeps.jar"
+          printf '%s  %s\n' \
+            47e700ccb0fdb9e27c5241353f8161938f4e53c3561dd35e063c5fe88dc3349b jacocoagent.jar \
+            8f748683833d4dc4d72cea5d6b43f49344687b831e0582c97bcb9b984e3de0a3 jacococli.jar \
+            | (cd "$dir" && sha256sum -c -)
+          echo "TESTSERVER_JACOCO_AGENT=$dir/jacocoagent.jar" >> "$GITHUB_ENV"
+          echo "TESTSERVER_JACOCO_CLI=$dir/jacococli.jar" >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials
+        if: env.MUTATE == 'true' && inputs.aws-role-arn != ''
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-west-2
+          role-to-assume: ${{ inputs.aws-role-arn }}
+          role-session-name: JavaMutationTesting
+
+      # The mutation run tries only Tests that passed here, on the unmutated library.
+      - name: Record the lines each test server test runs
+        if: env.MUTATE == 'true'
+        env:
+          TESTSERVER_COVERAGE_DIR: ${{ github.workspace }}/coverage/test-server
+          TESTSERVER_PER_TEST_COVERAGE: "1"
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          PRODUCT: ${{ inputs.product }}
+        run: |
+          repository=$(basename "$GITHUB_REPOSITORY")
+          # A failed Test (for example one that needs AWS) only drops out of the plan.
+          make -C "commons/$PRODUCT/test-server" orchestrate \
+            ORCHESTRATE_ARGS="languages=java workingTreeOverlay.$repository=$LIBRARY workingTreeLanguages=java" \
+            || echo "some Tests failed"
+          python3 commons/test-server-common/tools/per_test_coverage.py build \
+            "$TESTSERVER_COVERAGE_DIR" coverage/out
+
+      - name: Build the mutant switch agent
+        if: env.MUTATE == 'true'
+        working-directory: commons/test-server-common/tools/mutation/jvm-mutants
+        run: |
+          mvn -q -B package -Dmaven.test.skip=true
+          mvn -q -B dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
+
+      - name: Run the mutants
+        if: env.MUTATE == 'true'
+        env:
+          LIBRARY_NAME: ${{ inputs.library }}
+          SOURCES: ${{ inputs.sources }}
+        run: |
+          mkdir -p results
+          python3 commons/test-server-common/tools/mutation/mutate_java.py \
+            --repo "$LIBRARY" --repository "$GITHUB_REPOSITORY" --library "$LIBRARY_NAME" --sources "$SOURCES" \
+            --coverage-dir coverage/test-server --per-test coverage/out/java.jsonl \
+            --tools commons/test-server-common/tools/mutation/jvm-mutants \
+            --work mutation-work --out results/results.json $MUTATION_ARGS
+
+      - name: Upload the mutation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results-${{ inputs.library }}-java-test-server
+          path: results/results.json
+          if-no-files-found: error
+
+      - name: Upload the server log
+        if: failure() && env.MUTATE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-server-log-${{ inputs.library }}-java
+          path: mutation-work/server.log
+          if-no-files-found: ignore

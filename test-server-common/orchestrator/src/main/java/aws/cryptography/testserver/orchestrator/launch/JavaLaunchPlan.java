@@ -255,7 +255,11 @@ public final class JavaLaunchPlan implements Launcher {
         Optional<Path> gradleJavaHome =
             resolveJavaHome(language, "smithy-java server launch (JDK 21+)",
                 harnessJavaHome, HARNESS_JDK_VERSIONS);
-        Path coverageInitScript = startCoverage(entry, sources, libraryDir).orElse(null);
+        Map<String, Object> launch = new java.util.LinkedHashMap<>();
+        launch.put("command", serverCommand(serverDir, entry.port(), stampedVersion, modelDir, null));
+        launch.put("directory", serverDir.toString());
+        gradleJavaHome.ifPresent(home -> launch.put("java_home", home.toString()));
+        Path coverageInitScript = startCoverage(entry, sources, libraryDir, launch).orElse(null);
         ProcessBuilder server = new ProcessBuilder(
             serverCommand(serverDir, entry.port(), stampedVersion, modelDir, coverageInitScript));
         server.directory(serverDir.toFile());
@@ -375,7 +379,7 @@ public final class JavaLaunchPlan implements Launcher {
      * @return the init script, or empty when coverage is off
      */
     private static Optional<Path> startCoverage(ConfigurationEntry entry, MaterializedSources sources,
-            Path libraryDir) throws ServerLaunchException {
+            Path libraryDir, Map<String, Object> launch) throws ServerLaunchException {
         String agent = System.getenv(JACOCO_AGENT_VARIABLE);
         if (agent == null || agent.isBlank() || Coverage.root().isEmpty()) {
             return Optional.empty();
@@ -400,6 +404,8 @@ public final class JavaLaunchPlan implements Launcher {
         extras.put("sources", sourceRoots.stream().map(Path::toString).toList());
         if (perTest) {
             extras.put("jacoco_port", agentPort);
+            // Mutation testing starts the server again this way, with its mutant switch agent.
+            extras.put("launch", launch);
         }
         Optional<Path> directory = Coverage.start(entry, sources, "jacoco", extras);
         if (directory.isEmpty()) {
