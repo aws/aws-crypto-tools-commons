@@ -429,12 +429,17 @@ def reaching(holder, functions):
     return {f.name for f in functions if f.name in reached and f.is_test}
 
 
-def java_tests(commons_root, tests_dir, prefixes, errors):
-    """Test annotations in the shared JUnit Tests, each with the methods that hold it."""
+def java_tests(root, tests_dir, prefixes, errors, repository="aws/aws-crypto-tools-commons", source="test-server"):
+    """Test annotations in JUnit tests, each with the methods that hold it.
+
+    By default these are the shared Tests in aws-crypto-tools-commons; with
+    source="local" they are a Java library's own tests in its repository.
+    """
+    side = "commons" if source == "test-server" else "library"
     out = []
-    for path in sorted((commons_root / tests_dir).rglob("*.java")):
+    for path in sorted((root / tests_dir).rglob("*.java")):
         methods, blocks = shared_tests.parse_java(path)
-        rel = path.relative_to(commons_root).as_posix()
+        rel = path.relative_to(root).as_posix()
         for raw in blocks:
             if raw.kind() != "test":
                 continue
@@ -442,15 +447,15 @@ def java_tests(commons_root, tests_dir, prefixes, errors):
             block.meta, block.quote = dict(raw.meta), raw.quote
             method = shared_tests.enclosing(methods, raw.line)
             if method is None:
-                errors.append(("commons", rel, raw.line, raw.line + len(raw.meta) + len(raw.quote), "test annotation is not inside a method"))
+                errors.append((side, rel, raw.line, raw.line + len(raw.meta) + len(raw.quote), "test annotation is not inside a method"))
                 continue
             names = shared_tests.tests_reaching(method, methods)
             if not names:
-                errors.append(("commons", rel, raw.line, raw.line + len(raw.meta) + len(raw.quote), f"no test in {path.name} calls {method.name}"))
+                errors.append((side, rel, raw.line, raw.line + len(raw.meta) + len(raw.quote), f"no test in {path.name} calls {method.name}"))
                 continue
             tests = [(f"{path.stem}#{name}", lambda row, cls=path.stem, name=name: java_match(row, cls, name))
                      for name in sorted(names)]
-            out.append(TestAnnotation(block, "aws/aws-crypto-tools-commons", "test-server", tests))
+            out.append(TestAnnotation(block, repository, source, tests))
     return out
 
 
@@ -591,6 +596,8 @@ def main(argv=None):
     parser.add_argument("--local-tests", action="append", default=[],
                         help="directory under --repo-root holding Rust test files")
     parser.add_argument("--crate", default="", help="package name of the --local-tests crate")
+    parser.add_argument("--local-java-tests", action="append", default=[],
+                        help="directory under --repo-root holding the library's own JUnit tests")
     parser.add_argument("--commons-root", type=Path, help="checkout of aws-crypto-tools-commons")
     parser.add_argument("--commons-commit", default="")
     parser.add_argument("--shared-tests", action="append", default=[],
@@ -633,6 +640,8 @@ def main(argv=None):
     tests = []
     for directory in args.local_tests:
         tests += rust_tests(args.repo_root, directory, args.crate, args.repository, prefixes, errors)
+    for directory in args.local_java_tests:
+        tests += java_tests(args.repo_root, directory, prefixes, errors, args.repository, "local")
     for directory in args.shared_tests:
         tests += java_tests(args.commons_root, directory, prefixes, errors)
 

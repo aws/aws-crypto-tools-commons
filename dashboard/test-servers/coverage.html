@@ -210,7 +210,7 @@ function renderMatrix() {
     // not a failure, so it is not red.
     const tint = `color-mix(in srgb,var(--pass) ${Math.round(8 + p * 0.5)}%,transparent)`;
     const st = cov.pendingLocal ? "local" : cov.local ? "ok" : "nolocal";
-    const foot = cov.pendingLocal ? `${spinner}local…` : cov.local ? `server ${pctText(t.s, t.total)}` : `⚠ no local · server ${pctText(t.s, t.total)}`;
+    const foot = cov.localOnly ? "local tests only" : cov.pendingLocal ? `${spinner}local…` : cov.local ? `server ${pctText(t.s, t.total)}` : `⚠ no local · server ${pctText(t.s, t.total)}`;
     return `<td class="cov ${STATES[st].cls}${on}" ${click} title="${esc(STATES[st].tip)}" style="--tint:${tint}">
       <b>${pctText(t.b, t.total)}</b><small>${foot}</small></td>`;
   };
@@ -330,6 +330,28 @@ async function renderDetail() {
 }
 
 const status = msg => { $("left").innerHTML = `<div class="empty">${esc(msg)}</div>`; };
+// Libraries whose repository has no server in commons yet. Their column shows
+// the local tests' coverage alone, from the repository's own CI: the newest
+// main run, or the head of a pasted PR in that repository.
+const LOCAL_ONLY = [
+  { label:"MPL", language:"java-native", repository:"aws/aws-crypto-tools-java", path:"mpl", workflow:"ci.yml" },
+];
+async function localOnlyCovs(label) {
+  const out = [];
+  for (const e of LOCAL_ONLY.filter(e => e.label === label)) {
+    const m = ui.source.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || ui.source.match(/^([\w.-]+\/[\w.-]+)#(\d+)$/);
+    let commit = null;
+    if (m && m[1] === e.repository) commit = (await ghJson(`repos/${e.repository}/pulls/${m[2]}`)).head.sha;
+    else if (!ui.source) {
+      const runs = (await ghJson(`repos/${e.repository}/actions/workflows/${e.workflow}/runs?branch=main&status=success&per_page=1`)).workflow_runs;
+      commit = runs.length ? runs[0].head_sha : null;
+    }
+    const local = commit ? await localCoverage(e.repository, commit, { repo:null }, () => {}) : null;
+    out.push({ language:e.language, repository:e.repository, commit, server:new Map(), local, localOnly:true, path:e.path });
+  }
+  return out;
+}
+
 async function loadLibrary(label) {
   const product = PRODUCTS[label], a = ALL[label];
   const note = msg => { a.step = msg; redraw(); };
@@ -353,7 +375,10 @@ async function loadLibrary(label) {
     note("reading the server list…");
     const merge = list => list.map(c => ({ ...c, pendingLocal:c.local === undefined,
       files:mergeFiles(c, libPath[c.language] || "", claimed[c.language] || []) }));
+    const localOnly = localOnlyCovs(label).catch(() => []);
+    a.servers.push(...LOCAL_ONLY.filter(e => e.label === label).map(e => e.language));
     await fetchCoverage(product, a.run, note, list => { a.covs = merge(list); redraw(); });
+    for (const c of await localOnly) if (c.local) a.covs.push({ ...c, pendingLocal:false, files:mergeFiles(c, c.path) });
     a.phase = "done";
   } catch (err) {
     a.error = err.message || String(err);

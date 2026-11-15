@@ -61,12 +61,15 @@
 <script>
 // Mutation testing results, read in the browser from GitHub Actions.
 //
-// Each library's mutation job (aws-crypto-tools-rust's mutation.yml today)
+// Each library's mutation job (aws-crypto-tools-rust's mutation.yml, aws-crypto-tools-java's ci.yml)
 // uploads an artifact named mutation-results-<crate> holding results.json,
 // which test-server-common/tools/mutation/mutate.py writes. A survivor is a
 // small change to the library that no test failed on.
 
-const MUTATION_REPOS = [{ language:"Rust", repo:"aws/aws-crypto-tools-rust", workflow:"mutation.yml" }];
+const MUTATION_REPOS = [
+  { language:"Rust", repo:"aws/aws-crypto-tools-rust", workflow:"mutation.yml" },
+  { language:"Java", repo:"aws/aws-crypto-tools-java", workflow:"ci.yml" },
+];
 const LIBRARIES = { esdk:"ESDK", mpl:"MPL", dbesdk:"DB-ESDK", prim:"Primitives" };
 const LANGUAGES = ["Rust", "Java", "Python", ".NET", "Go", "JavaScript", "C"];
 const $ = id => document.getElementById(id);
@@ -85,6 +88,8 @@ async function prFor(entry, text) {
   const m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/);
   if (!m) return null;
   const repo = m[1] || COMMONS;
+  // Another language's PR says nothing about this repository.
+  if (repo !== entry.repo && repo !== COMMONS) return null;
   const pr = await ghJson(`repos/${repo}/pulls/${m[2]}`);
   if (repo === entry.repo) return pr;
   const named = (pr.body || "").match(new RegExp(entry.repo.replace(/[.\/]/g, "\\$&") + "#(\\d+)"));
