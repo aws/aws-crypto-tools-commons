@@ -36,6 +36,7 @@ import org.pitest.mutationtest.engine.MutationDetails;
 import org.pitest.mutationtest.engine.MutationEngine;
 import org.pitest.mutationtest.engine.gregor.config.GregorEngineFactory;
 import org.pitest.mutationtest.incremental.NullHistory;
+import org.pitest.util.PitError;
 import org.pitest.plugin.FeatureParser;
 
 /**
@@ -106,31 +107,47 @@ public final class ListMutants {
 
         Files.createDirectories(out);
         int id = 0;
+        int skipped = 0;
         try (BufferedWriter tsv = Files.newBufferedWriter(out.resolve("mutants.tsv"), StandardCharsets.UTF_8)) {
             for (ClassName name : new TreeSet<>(code.getCodeUnderTestNames())) {
-                for (MutationDetails mutant : source.createMutations(name)) {
-                    String packagePath = name.getPackage().asInternalName();
-                    Path file = sourceFile(sourceRoots, packagePath, mutant.getFilename());
-                    if (file == null) {
-                        continue;
+                List<Mutant> mutants = new ArrayList<>();
+                try {
+                    for (MutationDetails details : source.createMutations(name)) {
+                        Path file = sourceFile(sourceRoots, name.getPackage().asInternalName(), details.getFilename());
+                        if (file == null) {
+                            continue;
+                        }
+                        String relative = repo.relativize(file).toString();
+                        if (lines == null || lines.contains(relative + "\t" + details.getLineNumber())) {
+                            mutants.add(new Mutant(details, relative, mutater.getMutation(details.getId()).getBytes()));
+                        }
                     }
-                    String relative = repo.relativize(file).toString();
-                    if (lines != null && !lines.contains(relative + "\t" + mutant.getLineNumber())) {
-                        continue;
-                    }
+                } catch (PitError e) {
+                    // A class that uses a type missing from the server's class path (for example
+                    // the optional AWS SDK v1 types) cannot be rewritten. The server cannot run
+                    // the code that needs that type either.
+                    System.out.println("[ListMutants] skipped " + name.asJavaName() + ": " + e.getMessage().lines().findFirst().orElse(""));
+                    skipped++;
+                    continue;
+                }
+                for (Mutant mutant : mutants) {
+                    MutationDetails details = mutant.details();
                     id++;
                     Path dir = Files.createDirectories(out.resolve("bytes").resolve(String.valueOf(id)));
-                    Files.write(dir.resolve(name.asJavaName() + ".class"), mutater.getMutation(mutant.getId()).getBytes());
-                    tsv.write(String.join("\t", String.valueOf(id), relative,
-                        String.valueOf(mutant.getLineNumber()), mutant.getMutator(), mutant.getMethod(),
-                        mutant.getId().getLocation().getMethodDesc(),
-                        mutant.getId().getIndexes().stream().map(String::valueOf).collect(Collectors.joining(",")),
-                        name.asJavaName(), mutant.getDescription().replace('\t', ' ').replace('\n', ' ')));
+                    Files.write(dir.resolve(name.asJavaName() + ".class"), mutant.bytes());
+                    tsv.write(String.join("\t", String.valueOf(id), mutant.file(),
+                        String.valueOf(details.getLineNumber()), details.getMutator(), details.getMethod(),
+                        details.getId().getLocation().getMethodDesc(),
+                        details.getId().getIndexes().stream().map(String::valueOf).collect(Collectors.joining(",")),
+                        name.asJavaName(), details.getDescription().replace('\t', ' ').replace('\n', ' ')));
                     tsv.newLine();
                 }
             }
         }
-        System.out.println("[ListMutants] " + id + " mutants");
+        System.out.println("[ListMutants] " + id + " mutants; " + skipped + " classes skipped");
+    }
+
+    private record Mutant(MutationDetails details, String file, byte[] bytes) {
     }
 
     /** Packages, in dotted form, that hold a {@code .java} file under a source root. */
