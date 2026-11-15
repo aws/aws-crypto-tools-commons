@@ -6,8 +6,11 @@
 # one copy of the crate, and runs the tests that reach each mutant's line.
 # test-server-common/tools/mutation/mutate.py has the details.
 #
+# A pull request mutates only the crate lines it changes, and the job fails
+# if one of those mutants survives or sits on a line no test runs.
+# Any other event mutates the whole crate and only reports.
 # It uploads mutation-results-<crate> (results.json) for the dashboard's
-# Mutation testing page. It never fails because a mutant survived.
+# Mutation testing page.
 
 name: Rust mutation testing
 
@@ -30,18 +33,18 @@ on:
         description: <server dir>:<binary>, relative to the repository, for example mpl/test-server:mpl-test-server.
         type: string
         required: true
-      changed-since:
-        description: A git ref. Only mutants on lines changed since it run. Empty runs every mutant.
-        type: string
-        default: ""
       commons-ref:
-        description: The aws-crypto-tools-commons ref whose Tests and tools run.
+        description: The aws-crypto-tools-commons ref whose Tests and tools run, unless a Test-Server-Override line names another.
         type: string
         default: main
       aws-role-arn:
         description: Role for the Tests that read DynamoDB and KMS. Those Tests fail without it and are left out.
         type: string
         default: ""
+    secrets:
+      repo-pat:
+        description: Read-only token for aws-crypto-tools-commons.
+        required: true
 
 jobs:
   mutation:
@@ -50,6 +53,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # The resolve script reads this pull request's Test-Server-Override lines.
+      pull-requests: read
     env:
       RUST: ${{ github.workspace }}/rust
       COMMONS: ${{ github.workspace }}/commons
@@ -61,32 +66,93 @@ jobs:
           submodules: 'true'
           fetch-depth: 0
 
-      - uses: actions/checkout@v6
+      - name: Check out the resolve script
+        uses: actions/checkout@v6
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ inputs.commons-ref }}
+          token: ${{ secrets.repo-pat }}
+          sparse-checkout: .github/scripts
+          path: resolve
+
+      - name: Resolve the commons ref, Test-Server-Override lines included
+        id: refs
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          EVENT_BODY: ${{ github.event.pull_request.body }}
+          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_PAT: ${{ secrets.repo-pat }}
+        run: resolve/.github/scripts/resolve-test-server-refs.sh resolve
+
+      - uses: actions/checkout@v6
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ steps.refs.outputs.commons_ref }}
+          token: ${{ secrets.repo-pat }}
           path: commons
 
+      - name: Mutate the whole crate
+        if: github.event_name != 'pull_request'
+        run: echo "MUTATE=true" >> "$GITHUB_ENV"
+
+      - name: Mutate only the crate lines this pull request changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CRATE: ${{ inputs.crate }}
+        run: |
+          git -C rust fetch --no-tags origin "$BASE"
+          echo "MUTATION_ARGS=--changed-since $BASE --fail-on-survivors" >> "$GITHUB_ENV"
+          if git -C rust diff --quiet "$(git -C rust merge-base "$BASE" HEAD)" -- "$CRATE/src"; then
+            echo "This pull request changes nothing in $CRATE/src." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "MUTATE=false" >> "$GITHUB_ENV"
+          else
+            echo "MUTATE=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Record that there is nothing to mutate
+        if: env.MUTATE == 'false'
+        env:
+          CRATE: ${{ inputs.crate }}
+        run: |
+          mkdir -p results
+          python3 - <<'PY'
+          import json, os
+          summary = {"repository": os.environ["GITHUB_REPOSITORY"], "commit": os.environ["GITHUB_SHA"],
+                     "language": "rust", "library": os.environ["CRATE"], "tool": "mutate.py",
+                     "scope": "changed", "mutants": 0, "statuses": {}, "seconds": 0, "phases": {}}
+          with open("results/results.json", "w") as f:
+              json.dump({"summary": summary, "mutants": []}, f)
+          PY
+
       - name: Install CMake
+        if: env.MUTATE == 'true'
         run: sudo apt-get update && sudo apt-get install -y cmake
 
       - uses: dtolnay/rust-toolchain@stable
+        if: env.MUTATE == 'true'
         with:
           components: llvm-tools-preview
 
       - name: Install cargo-llvm-cov and cargo-nextest
+        if: env.MUTATE == 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov,cargo-nextest
 
       - name: Set up JDK 21 for the commons Tests
+        if: env.MUTATE == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Configure AWS credentials
-        if: inputs.aws-role-arn != ''
+        if: env.MUTATE == 'true' && inputs.aws-role-arn != ''
         uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: us-west-2
@@ -95,6 +161,7 @@ jobs:
 
       # The mutation tool runs only tests that passed here, on the unmutated crate.
       - name: Record the lines each test server test runs
+        if: env.MUTATE == 'true'
         env:
           TESTSERVER_COVERAGE_DIR: ${{ github.workspace }}/coverage/test-server
           TESTSERVER_PER_TEST_COVERAGE: "1"
@@ -109,6 +176,7 @@ jobs:
             "$TESTSERVER_COVERAGE_DIR" coverage/out/test-server
 
       - name: Record the lines each of the crate's own tests runs
+        if: env.MUTATE == 'true'
         working-directory: rust/${{ inputs.crate }}
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: python3 ${{ github.workspace }}/commons/test-server-common/tools/per_test_coverage.py run-test
@@ -121,23 +189,15 @@ jobs:
             "$PER_TEST_COVERAGE_DIR" "$GITHUB_WORKSPACE/coverage/out/local"
 
       - name: Restore earlier mutation results
+        if: env.MUTATE == 'true'
         uses: actions/cache/restore@v4
         with:
           path: mutation-cache.json
           key: mutation-${{ inputs.crate }}-${{ github.run_id }}
           restore-keys: mutation-${{ inputs.crate }}-
 
-      - name: Mutate every line
-        if: inputs.changed-since == ''
-        run: echo "CHANGED_SINCE_ARGS=" >> "$GITHUB_ENV"
-
-      - name: Mutate only the changed lines
-        if: inputs.changed-since != ''
-        run: |
-          git -C rust fetch --no-tags origin "${{ inputs.changed-since }}"
-          echo "CHANGED_SINCE_ARGS=--changed-since FETCH_HEAD" >> "$GITHUB_ENV"
-
       - name: Run the mutants
+        if: env.MUTATE == 'true'
         env:
           MUTATION_SCHEMATA_TARGET: ${{ github.workspace }}/target-schemata
         run: |
@@ -149,15 +209,17 @@ jobs:
             --per-test coverage/out/test-server/rust.jsonl,coverage/out/local/rust.jsonl \
             --tests-source "commons/${{ inputs.product }}/test-server/tests,commons/test-server-common/tests-support" \
             --work "$WORK" --cache mutation-cache.json --out results/results.json \
-            --servers 4 $CHANGED_SINCE_ARGS
+            --library "${{ inputs.product }}" --servers 4 $MUTATION_ARGS
 
       - name: Save the mutation results for the next run
+        if: always() && env.MUTATE == 'true'
         uses: actions/cache/save@v4
         with:
           path: mutation-cache.json
           key: mutation-${{ inputs.crate }}-${{ github.run_id }}
 
       - name: Upload the mutation results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mutation-results-${{ inputs.crate }}
