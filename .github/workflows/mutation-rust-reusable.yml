@@ -209,7 +209,7 @@ jobs:
             --per-test coverage/out/test-server/rust.jsonl,coverage/out/local/rust.jsonl \
             --tests-source "commons/${{ inputs.product }}/test-server/tests,commons/test-server-common/tests-support" \
             --work "$WORK" --cache mutation-cache.json --out results/results.json \
-            --library "${{ inputs.product }}" --servers 4 $MUTATION_ARGS
+            --library "${{ inputs.crate }}" --servers 4 $MUTATION_ARGS
 
       - name: Save the mutation results for the next run
         if: always() && env.MUTATE == 'true'
