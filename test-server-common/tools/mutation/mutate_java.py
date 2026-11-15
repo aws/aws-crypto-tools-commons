@@ -235,6 +235,7 @@ def main():
     args = parser.parse_args()
     args.work = os.path.abspath(args.work)
     args.repo = os.path.abspath(args.repo)
+    args.tools = os.path.abspath(args.tools)
     os.makedirs(args.work, exist_ok=True)
     args.jar = os.path.join(args.tools, "target", "jvm-mutants-1.0.0.jar")
     with open(os.path.join(args.tools, "target", "classpath.txt")) as f:
