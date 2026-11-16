@@ -104,9 +104,10 @@ class PythonLaunchPlanTest {
     }
 
     @Test
-    @DisplayName("the coverage settings measure the library's sources and save on SIGTERM")
+    @DisplayName("the coverage settings measure the library's lines and branches and save on SIGTERM")
     void coverageRc() {
         assertEquals("[run]\n"
+                + "branch = true\n"
                 + "data_file = /coverage/python/.coverage\n"
                 + "parallel = true\n"
                 + "sigterm = true\n"
