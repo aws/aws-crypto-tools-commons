@@ -81,25 +81,12 @@
 // cells: the library x language cells that each repository's CI fills.
 const MUTATION_REPOS = [
   { repo:"aws/aws-crypto-tools-rust", main:"main", cells:[["ESDK","Rust"], ["MPL","Rust"], ["Primitives","Rust"]] },
-  { repo:"aws/aws-encryption-sdk-java", main:"master", cells:[["ESDK","Java"]] },
   { repo:"aws/aws-crypto-tools-java", main:"main", cells:[["MPL","Java"]] },
-  { repo:"aws/aws-encryption-sdk-javascript", main:"master", cells:[["ESDK","JavaScript"], ["MPL","JavaScript"]] },
-  { repo:"aws/aws-encryption-sdk-python", main:"master", cells:[["ESDK","Python"]] },
-  { repo:"aws/aws-encryption-sdk", main:"mainline", cells:[["ESDK",".NET"], ["ESDK","Go"]] },
-  { repo:"aws/aws-encryption-sdk-c", main:"master", cells:[["ESDK","C"]] },
 ];
 // Cells with no mutation testing on purpose, and why.
-const NOT_MUTATED = {
-  "MPL|.NET": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-  "MPL|Go": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-  "MPL|Python": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-  "Primitives|Java": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-  "Primitives|.NET": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-  "Primitives|Go": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-  "Primitives|Python": "Generated from Dafny: a survivor could not be fixed in the generated code.",
-};
+const NOT_MUTATED = {};
 const LIBRARIES = { esdk:"ESDK", mpl:"MPL", dbesdk:"DB-ESDK", prim:"Primitives" };
-const LANGUAGES = { rust:"Rust", java:"Java", python:"Python", net:".NET", go:"Go", javascript:"JavaScript", c:"C" };
+const LANGUAGES = { rust:"Rust", java:"Java" };
 const SCOPES = { changed:"PR changed lines only", full:"Full library on main" };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);

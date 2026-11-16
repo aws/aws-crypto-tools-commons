@@ -14,7 +14,7 @@ results.json, written by mutate.py for Rust and by the <tool>.py converters for 
   {"summary": {
      "repository": "aws/aws-encryption-sdk-java", "commit": "<sha>",
      "language": "java", "library": "esdk",      # esdk, mpl, dbesdk or prim
-     "tool": "pit",                             # mutate.py, pit, stryker, ...
+     "tool": "pit",                             # mutate.py or pit
      "scope": "changed" or "full",              # changed: only mutants on the pull request's changed lines
      "mutants": <count>, "statuses": {"<status>": <count>},
      "seconds": <wall time>, "phases": {"<step>": <seconds>}, ...},
