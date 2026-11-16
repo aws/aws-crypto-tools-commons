@@ -81,8 +81,11 @@ public final class RustLaunchPlan implements Launcher {
     /**
      * The RUSTFLAGS of a coverage build; CI sets the same value so its cargo cache matches.
      * The cfg adds the server's {@code POST /control/coverage}, which writes one test's coverage.
+     * Branch coverage is a nightly-only option, so a coverage build needs a nightly
+     * toolchain; CI names it in RUSTUP_TOOLCHAIN.
      */
-    static final String COVERAGE_RUSTFLAGS = "-C instrument-coverage --cfg testserver_coverage";
+    static final String COVERAGE_RUSTFLAGS =
+        "-C instrument-coverage -Z coverage-options=branch --cfg testserver_coverage";
 
     private static final String SERVER_LOG_NAME = "rust-server.log";
 
