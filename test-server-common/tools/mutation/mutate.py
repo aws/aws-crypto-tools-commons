@@ -9,6 +9,7 @@ Usage:
             --work <dir> --out <results.json>
             [--changed-since <git ref>] [--servers N] [--cache <file>]
             [--sample N] [--no-select] [--no-stop] [--relaunch] [--new-jvm]
+            [--library mpl] [--fail-on-survivors]
 
 A mutant is a small change to the library, such as `<` turned into `<=`.
 A test kills a mutant when it fails with the mutant on. A mutant that no test
@@ -28,6 +29,9 @@ How this stays fast on one machine:
   - --servers N runs N mutated servers, each with its own Tests JVM.
 The --no-select, --no-stop, --relaunch and --new-jvm flags turn single steps off,
 to measure what each one saves.
+
+--fail-on-survivors exits 1 when a mutant survives or sits on a line no test runs.
+results.py describes results.json.
 """
 
 import argparse
@@ -43,6 +47,8 @@ import subprocess
 import sys
 import tempfile
 import time
+
+import results as results_file
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCHEMATA_DIR = os.path.join(HERE, "rust-schemata")
@@ -233,21 +239,6 @@ def load_coverage(paths):
     return by_line
 
 
-def changed_lines(repo, base):
-    """{file: [line, ...]} for lines added or changed since this branch left `base`."""
-    fork = run(["git", "-C", repo, "merge-base", base, "HEAD"], capture_output=True, text=True).stdout.strip()
-    diff = run(["git", "-C", repo, "diff", "-U0", fork, "--", "*.rs"], capture_output=True, text=True).stdout
-    lines, file = collections.defaultdict(list), None
-    for text in diff.splitlines():
-        if text.startswith("+++ "):
-            file = text[6:] if text.startswith("+++ b/") else None
-        elif text.startswith("@@") and file:
-            start, _, count = re.match(r"@@ -\S+ \+(\d+)(,(\d+))? @@", text).groups()
-            for line in range(int(start), int(start) + (int(count) if count is not None else 1)):
-                lines[file].append(line)
-    return dict(lines)
-
-
 def plan_tests(mutant, by_line, all_tests, args, killer):
     """The tests to try on a mutant, cheapest likely killer first. Local tests start in ~1 ms, so they go first."""
     if args.no_select:
@@ -436,6 +427,8 @@ def main():
     parser.add_argument("--no-stop", action="store_true", help="keep running tests after one kills")
     parser.add_argument("--relaunch", action="store_true", help="start a new server and JVM for every mutant")
     parser.add_argument("--new-jvm", action="store_true", help="start a new Tests JVM for every mutant")
+    parser.add_argument("--library", help="esdk, mpl, dbesdk or prim; defaults to the first crate")
+    parser.add_argument("--fail-on-survivors", action="store_true")
     args = parser.parse_args()
     args.work = os.path.abspath(args.work)
     os.makedirs(args.work, exist_ok=True)
@@ -448,7 +441,7 @@ def main():
     if args.changed_since:
         lines_file = os.path.join(args.work, "changed-lines.json")
         with open(lines_file, "w") as f:
-            json.dump(changed_lines(args.repo, args.changed_since), f)
+            json.dump(results_file.changed_lines(args.repo, args.changed_since, ["*.rs"]), f)
     with clock.phase("copy"):
         copy_repo(args.repo, os.path.join(args.work, "copy"))
         add_control_dependency(os.path.join(args.work, "copy"), args.crates)
@@ -557,6 +550,10 @@ def main():
     summary = {
         "repository": args.repository,
         "commit": run(["git", "-C", args.repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
+        "language": "rust",
+        "library": args.library or args.crates[0],
+        "tool": "mutate.py",
+        "scope": "changed" if args.changed_since else "full",
         "crates": args.crates,
         "mutants": len(mutants),
         "statuses": dict(collections.Counter(mutant["status"] for mutant in counted)),
@@ -573,7 +570,8 @@ def main():
     with open(args.out, "w") as f:
         json.dump({"summary": summary, "mutants": mutants}, f, indent=1)
     log(json.dumps(summary, indent=1))
+    return results_file.check(args.out, args.fail_on_survivors)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

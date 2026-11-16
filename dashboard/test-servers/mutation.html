@@ -35,6 +35,17 @@
   .st-error { color:#ffa198; background:color-mix(in srgb,var(--fail) 22%,transparent); cursor:help; }
   .st-empty { color:var(--dim); background:repeating-linear-gradient(45deg,var(--line) 0 4px,transparent 4px 9px); }
   .st-done { background:var(--tint); }
+  .st-none { color:var(--dim); background:var(--bg); border-style:dashed; font-style:italic; }
+  .st-na { color:var(--dim); background:repeating-linear-gradient(-45deg,transparent 0 6px,color-mix(in srgb,var(--line) 60%,transparent) 6px 7px); cursor:help; }
+  .st-nopr { color:var(--dim); border-style:dotted; font-style:italic; }
+  .st-nothere { color:var(--dim); background:color-mix(in srgb,var(--line) 35%,transparent); }
+  .st-nochange { color:var(--dim); background:color-mix(in srgb,var(--sel) 6%,transparent); }
+  .st-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .st-block { background:color-mix(in srgb,var(--fail) 30%,transparent); }
+  .scope { display:inline-block; font-size:11px; font-weight:600; padding:1px 8px; border-radius:10px; margin-left:8px; vertical-align:middle; }
+  .scope.changed { background:color-mix(in srgb,var(--sel) 25%,transparent); color:#a5d6ff; }
+  .scope.full { background:color-mix(in srgb,var(--pass) 25%,transparent); color:#7ee787; }
+  .runs { font-size:11px; color:var(--dim); margin:4px 0 0; }
   @keyframes pulse { 50% { opacity:.45; } }
   .speed td, .speed th { text-align:right; font-variant-numeric:tabular-nums; }
   .speed td:first-child, .speed th:first-child { text-align:left; }
@@ -52,8 +63,7 @@
 <body>
 <header>
   <h1>Mutation Testing</h1>
-  <label title="Empty: newest finished mutation run on the Rust repository's main. Or paste a PR (a commons PR uses the Rust PR its Test-Server-Override names), a run URL, or a branch.">PR / run <input type="text" id="source" size="40" placeholder="newest finished run on main"></label>
-  <span class="run" id="run"></span>
+  <label title="A PR in any library repository, or a commons PR (each repository uses the PR its Test-Server-Override line names), a run URL, or a branch. Fills the 'PR changed lines only' table.">PR / run <input type="text" id="source" size="40" placeholder="a PR, for the changed-lines table"></label>
 </header>
 <main id="main"><div class="quiet">Loading…</div></main>
 
@@ -61,26 +71,53 @@
 <script>
 // Mutation testing results, read in the browser from GitHub Actions.
 //
-// Each library's mutation job (aws-crypto-tools-rust's mutation.yml today)
-// uploads an artifact named mutation-results-<crate> holding results.json,
-// which test-server-common/tools/mutation/mutate.py writes. A survivor is a
-// small change to the library that no test failed on.
+// Each library repository's CI uploads artifacts named mutation-results-*
+// holding a results.json (test-server-common/tools/mutation/results.py has its shape).
+// summary.scope says what was mutated:
+//   changed: a pull request's changed lines; a survivor fails that PR's CI.
+//   full: the whole library, on a push to the default branch; reports only.
+// The first table reads the PR in the box, the second the newest push to each default branch.
 
-const MUTATION_REPOS = [{ language:"Rust", repo:"aws/aws-crypto-tools-rust", workflow:"mutation.yml" }];
+// cells: the library x language cells that each repository's CI fills.
+const MUTATION_REPOS = [
+  { repo:"aws/aws-crypto-tools-rust", main:"main", cells:[["ESDK","Rust"], ["MPL","Rust"], ["Primitives","Rust"]] },
+  { repo:"aws/aws-crypto-tools-java", main:"main", cells:[["MPL","Java"]] },
+];
+// Cells with no mutation testing on purpose, and why.
+const NOT_MUTATED = {};
 const LIBRARIES = { esdk:"ESDK", mpl:"MPL", dbesdk:"DB-ESDK", prim:"Primitives" };
-const LANGUAGES = ["Rust", "Java", "Python", ".NET", "Go", "JavaScript", "C"];
+const LANGUAGES = { rust:"Rust", java:"Java" };
+const SCOPES = { changed:"PR changed lines only", full:"Full library on main" };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
 const secs = s => s >= 3600 ? (s / 3600).toFixed(1) + " h" : s >= 60 ? (s / 60).toFixed(1) + " min" : s.toFixed(s < 10 ? 2 : 0) + " s";
+const keyOf = (lib, lang) => lib + "|" + lang;
 
-// Every cell starts as waiting and moves through loading to one end state.
-const cells = {};
-for (const lib of Object.values(LIBRARIES)) for (const lang of LANGUAGES) cells[lib + "|" + lang] = { state:"norun" };
-for (const { language } of MUTATION_REPOS) for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + language] = { state:"wait" };
-let results = [], shownRun = null, problem = null;
+// cells[scope][library|language] moves from waiting through loading to one end state.
+let cells, results, runs, problem;
+
+function reset(text) {
+  cells = {}; results = []; runs = { changed:[], full:[] }; problem = null;
+  for (const scope of Object.keys(SCOPES)) {
+    cells[scope] = {};
+    for (const lib of Object.values(LIBRARIES)) for (const lang of Object.values(LANGUAGES)) {
+      const key = keyOf(lib, lang);
+      cells[scope][key] = NOT_MUTATED[key] ? { state:"na", note:NOT_MUTATED[key] } : { state:"none" };
+    }
+    for (const { cells: owned } of MUTATION_REPOS)
+      for (const [lib, lang] of owned) cells[scope][keyOf(lib, lang)] = scope === "changed" && !text ? { state:"nopr" } : { state:"wait" };
+  }
+}
+
+function setOwned(entry, scope, cell) {
+  for (const [lib, lang] of entry.cells) {
+    const current = cells[scope][keyOf(lib, lang)].state;
+    if (["wait", "loading", "token"].includes(current)) cells[scope][keyOf(lib, lang)] = cell;
+  }
+}
 
 // The pull request in this entry's repository that the text names: the PR
-// itself, or for a commons PR the one its Test-Server-Override line names.
+// itself, or for a PR elsewhere the one its Test-Server-Override line names.
 async function prFor(entry, text) {
   const m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/);
   if (!m) return null;
@@ -91,72 +128,96 @@ async function prFor(entry, text) {
   return named ? ghJson(`repos/${entry.repo}/pulls/${named[1]}`) : undefined;
 }
 
-async function findRun(entry, text) {
-  const runs = `repos/${entry.repo}/actions/workflows/${entry.workflow}/runs`;
+// The runs whose mutation artifacts to read, newest first, or null when the text names nothing in this repository.
+async function runsFor(entry, text) {
+  const all = `repos/${entry.repo}/actions/runs`;
   const id = (text.match(/actions\/runs\/(\d+)/) || text.match(/^(\d+)$/) || [])[1];
-  if (id) return ghJson(`repos/${entry.repo}/actions/runs/${id}`);
+  if (id) {
+    if (text.includes("github.com") && !text.includes(entry.repo + "/")) return null;
+    try { return [await ghJson(`${all}/${id}`)]; } catch (e) { return null; }
+  }
   const pr = await prFor(entry, text);
-  if (pr === undefined) throw new Error(`the PR names no ${entry.repo} PR in its Test-Server-Override line`);
-  const query = pr ? `head_sha=${pr.head.sha}` : `branch=${encodeURIComponent(text || "main")}`;
-  let list = (await ghJson(`${runs}?${query}&per_page=20`)).workflow_runs;
-  // A new commit with no run yet falls back to the PR branch's newest run.
-  if (pr && !list.length) list = (await ghJson(`${runs}?branch=${encodeURIComponent(pr.head.ref)}&per_page=20`)).workflow_runs;
-  return list.find(run => run.status === "completed") || list[0] || null;
+  if (pr === undefined) return null;
+  const branch = pr ? pr.head.ref : text;
+  const list = pr ? (await ghJson(`${all}?head_sha=${pr.head.sha}&per_page=30`)).workflow_runs : [];
+  // A new commit with no run yet falls back to the branch's newest runs.
+  return list.length ? list : (await ghJson(`${all}?branch=${encodeURIComponent(branch)}&per_page=30`)).workflow_runs;
 }
 
-async function load() {
-  const text = $("source").value.trim();
-  if (!token()) {
-    problem = "Add a GitHub token on the main dashboard's Settings page to load mutation runs.";
-    for (const key of Object.keys(cells)) if (cells[key].state === "wait") cells[key] = { state:"token" };
-    render();
-    return;
-  }
-  results = []; problem = null;
-  for (const entry of MUTATION_REPOS) {
-    let run;
-    try {
-      run = await findRun(entry, text);
-    } catch (e) {
-      for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + entry.language] = { state:"error", note:e.message };
-      render();
-      continue;
-    }
-    if (!run) {
-      for (const lib of Object.values(LIBRARIES)) cells[lib + "|" + entry.language] = { state:"norun" };
-      render();
-      continue;
-    }
-    shownRun = run;
+async function mainRuns(entry) {
+  return (await ghJson(`repos/${entry.repo}/actions/runs?branch=${entry.main}&event=push&per_page=30`)).workflow_runs;
+}
+
+// Reads the mutation artifacts of the newest runs that have any.
+// A finished run without them is skipped; a run still going may add them later.
+// Results land in the table of their own scope, so a full run named in the box replaces main's.
+async function loadRuns(entry, list, scope) {
+  if (!list) { setOwned(entry, scope, { state:"nothere" }); render(); return; }
+  if (!list.length) { setOwned(entry, scope, { state:"norun" }); render(); return; }
+  setOwned(entry, scope, { state:"loading" });
+  render();
+  let running = false, found = 0, seen = new Set();
+  for (const run of list.slice(0, 10)) {
     const arts = (await ghJson(`repos/${entry.repo}/actions/runs/${run.id}/artifacts?per_page=100`)).artifacts
-      .filter(a => a.name.startsWith("mutation-results-") && !a.expired);
-    const found = new Set(arts.map(a => a.name.replace("mutation-results-", "")));
-    for (const [crate, lib] of Object.entries(LIBRARIES)) {
-      const key = lib + "|" + entry.language;
-      if (!found.has(crate)) cells[key] = run.status === "completed" ? { state:"empty" } : { state:"running" };
-      else cells[key] = { state:"loading" };
-    }
-    render();
+      .filter(a => a.name.startsWith("mutation-results-") && !a.expired && !seen.has(a.name));
+    if (run.status !== "completed") running = true;
+    if (!arts.length) continue;
     for (const art of arts) {
-      const crate = art.name.replace("mutation-results-", "");
-      const lib = LIBRARIES[crate] || crate;
-      const key = lib + "|" + entry.language;
+      seen.add(art.name);
       try {
         const data = await cachedArtifact(entry.repo, art, () => {}, async (zip, entries) => {
           const file = entries.find(e => e.name.endsWith("results.json"));
           return file ? JSON.parse(await zipText(zip, file)) : null;
         });
-        if (!data) { cells[key] = { state:"empty" }; continue; }
-        results.push({ lib, language:entry.language, repo:entry.repo, data });
-        const s = data.summary.statuses;
-        const killed = (s.killed || 0) + (s.timed_out || 0), survived = s.survived || 0;
-        cells[key] = { state:"done", killed, survived, notCovered:s.not_covered || 0 };
+        if (!data) continue;
+        place(entry, run, data);
+        found++;
       } catch (e) {
-        cells[key] = { state:"error", note:e.message };
+        setOwned(entry, scope, { state:"error", note:`${art.name}: ${e.message}` });
       }
       render();
     }
+    // One run per repository: the newest that has results.
+    if (scope === "full") break;
   }
+  setOwned(entry, scope, running ? { state:"running" } : found ? { state:"empty" } : { state:"norun" });
+  render();
+}
+
+function place(entry, run, data) {
+  const s = data.summary;
+  const scope = s.scope || (s.flags && s.flags.changed_since ? "changed" : "full");
+  const lib = LIBRARIES[s.library || (s.crates || [])[0]] || s.library;
+  const lang = LANGUAGES[s.language || "rust"] || s.language;
+  if (!cells[scope][keyOf(lib, lang)] || results.some(r => r.scope === scope && r.lib === lib && r.lang === lang)) return;
+  if (!runs[scope].some(r => r.run.id === run.id)) runs[scope].push({ repo:entry.repo, run });
+  const st = data.mutants.reduce((counts, m) => (counts[m.status] = (counts[m.status] || 0) + 1, counts), {});
+  const killed = (st.killed || 0) + (st.timed_out || 0);
+  cells[scope][keyOf(lib, lang)] = { state:"done", killed, survived:st.survived || 0, notCovered:st.not_covered || 0, scope };
+  results.push({ lib, lang, repo:entry.repo, run, scope, data });
+}
+
+async function load() {
+  const text = $("source").value.trim();
+  reset(text);
+  if (!token()) {
+    problem = "Add a GitHub token on the main dashboard's Settings page to load mutation runs.";
+    for (const scope of Object.keys(SCOPES)) for (const key of Object.keys(cells[scope]))
+      if (cells[scope][key].state === "wait") cells[scope][key] = { state:"token" };
+    render();
+    return;
+  }
+  render();
+  await Promise.all(MUTATION_REPOS.map(async entry => {
+    if (text) {
+      try {
+        await loadRuns(entry, await runsFor(entry, text), "changed");
+      } catch (e) { setOwned(entry, "changed", { state:"error", note:e.message }); render(); }
+    }
+    try {
+      await loadRuns(entry, await mainRuns(entry), "full");
+    } catch (e) { setOwned(entry, "full", { state:"error", note:e.message }); render(); }
+  }));
   render();
 }
 
@@ -165,57 +226,85 @@ function matrixCell(cell) {
     case "wait": return `<td class="st-wait">waiting</td>`;
     case "token": return `<td class="st-token">needs a token</td>`;
     case "loading": return `<td class="st-loading">loading…</td>`;
+    case "nopr": return `<td class="st-nopr">enter a PR</td>`;
+    case "nothere": return `<td class="st-nothere" title="The PR names no pull request in this repository in its Test-Server-Override line">not in this PR</td>`;
     case "norun": return `<td class="st-norun">no run yet</td>`;
+    case "none": return `<td class="st-none">not set up</td>`;
+    case "na": return `<td class="st-na" title="${esc(cell.note)}">not mutated</td>`;
     case "running": return `<td class="st-running">running</td>`;
     case "empty": return `<td class="st-empty">no results</td>`;
     case "error": return `<td class="st-error" title="${esc(cell.note)}">failed to load</td>`;
   }
   const tested = cell.killed + cell.survived;
-  const rate = tested ? cell.killed / tested : 1;
-  const tint = `color-mix(in srgb,var(--pass) ${Math.round(10 + rate * 40)}%,transparent)`;
-  return `<td class="st-done" style="--tint:${tint}" title="${cell.killed} killed, ${cell.survived} survived, ${cell.notCovered} on lines no test runs">
-    <b>${tested ? Math.round(rate * 100) + "%" : "–"}</b><small>${cell.survived} survived</small></td>`;
+  const title = `${cell.killed} killed, ${cell.survived} survived, ${cell.notCovered} on lines no test runs`;
+  const rate = tested ? Math.round(cell.killed / tested * 100) + "%" : "–";
+  if (cell.scope === "changed") {
+    if (!tested && !cell.notCovered) return `<td class="st-nochange" title="No mutant on a library line this PR changes">no changed lines</td>`;
+    const blocking = cell.survived + cell.notCovered;
+    return blocking
+      ? `<td class="st-block" title="${title}"><b>${rate}</b><small>${cell.survived} survived · ${cell.notCovered} not covered · blocks merge</small></td>`
+      : `<td class="st-pass" title="${title}"><b>${rate}</b><small>all ${cell.killed} killed</small></td>`;
+  }
+  const tint = `color-mix(in srgb,var(--pass) ${Math.round(10 + (tested ? cell.killed / tested : 1) * 40)}%,transparent)`;
+  return `<td class="st-done" style="--tint:${tint}" title="${title}"><b>${rate}</b><small>${cell.survived} survived · ${cell.notCovered} not covered</small></td>`;
+}
+
+function matrix(scope) {
+  let h = `<h2>${SCOPES[scope]}<span class="scope ${scope}">${scope === "changed" ? "blocks the PR" : "reports only"}</span></h2>`;
+  h += `<table class="matrix"><thead><tr><th></th>${Object.values(LANGUAGES).map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const lib of Object.values(LIBRARIES))
+    h += `<tr><th>${lib}</th>${Object.values(LANGUAGES).map(lang => matrixCell(cells[scope][keyOf(lib, lang)])).join("")}</tr>`;
+  h += `</tbody></table>`;
+  if (runs[scope].length)
+    h += `<div class="runs">${runs[scope].map(({ repo, run }) => `<a href="${run.html_url}" target="_blank">${esc(repo.replace("aws/", ""))} run ${run.id}</a> (${esc(run.head_branch)} ${run.head_sha.slice(0, 7)}, ${esc(run.status === "completed" ? run.conclusion : run.status)})`).join(" · ")}</div>`;
+  return h;
+}
+
+function mutantTable(title, mutants, repo, commit) {
+  let h = `<h3 style="font-size:13px;margin:10px 0 4px">${title} (${mutants.length})</h3>`;
+  h += `<table class="survivors"><thead><tr><th>line</th><th>mutation</th><th>code</th><th>function</th></tr></thead><tbody>`;
+  let file = null;
+  for (const m of mutants.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
+    if (m.file !== file) { file = m.file; h += `<tr class="file"><td colspan="4">${esc(file)}</td></tr>`; }
+    const link = `https://github.com/${repo}/blob/${commit || "HEAD"}/${m.file}#L${m.line}`;
+    h += `<tr><td><a href="${link}" target="_blank">${m.line}</a></td><td><span class="kind">${esc(m.kind || "")}</span> ${esc(m.description || "")}</td><td class="code">${esc(m.source_line || "")}</td><td>${esc(m.function || "")}</td></tr>`;
+  }
+  return h + `</tbody></table>`;
 }
 
 function render() {
-  if (shownRun) {
-    $("run").innerHTML = `<a href="${shownRun.html_url}" target="_blank">run ${shownRun.id}</a> · ${esc(shownRun.head_branch)} · ${shownRun.head_sha.slice(0, 7)} · ${esc(shownRun.status === "completed" ? shownRun.conclusion : shownRun.status)}`;
-  }
   let h = problem ? `<div class="quiet">${esc(problem)}</div>` : "";
-  h += `<h2>Kill rate</h2><div class="sub">Of the mutants on lines a test runs, the share some test fails on. A mutant on a line no test runs is counted apart.</div>`;
-  h += `<table class="matrix"><thead><tr><th></th>${LANGUAGES.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
-  for (const lib of Object.values(LIBRARIES))
-    h += `<tr><th>${lib}</th>${LANGUAGES.map(lang => matrixCell(cells[lib + "|" + lang])).join("")}</tr>`;
-  h += `</tbody></table><div class="legend">
-    <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 45%,transparent)"></i>brighter: more mutants killed</span>
-    <span><i class="sw st-norun"></i>no mutation run for this language yet</span>
-    <span><i class="sw st-empty"></i>run finished without results for this library</span>
+  h += `<div class="sub">Kill rate: of the mutants on lines a test runs, the share that some test fails on. A mutant on a line no test runs is "not covered"; on a PR it blocks the merge too.</div>`;
+  h += matrix("changed") + matrix("full");
+  h += `<div class="legend">
+    <span><i class="sw st-pass"></i>PR: every mutant killed</span>
+    <span><i class="sw st-block"></i>PR: a mutant survived or is not covered</span>
+    <span><i class="sw st-nochange"></i>PR changes no library line</span>
+    <span><i class="sw" style="background:color-mix(in srgb,var(--pass) 45%,transparent)"></i>main: brighter is more killed</span>
+    <span><i class="sw st-norun"></i>no run yet</span>
+    <span><i class="sw st-nopr"></i>no PR entered</span>
+    <span><i class="sw st-nothere"></i>the PR does not touch this repository</span>
+    <span><i class="sw st-none"></i>not set up for this language</span>
+    <span><i class="sw st-na"></i>not mutated on purpose</span>
+    <span><i class="sw st-empty"></i>run finished without results</span>
     <span><i class="sw st-running"></i>run still going</span>
     <span><i class="sw st-error"></i>could not load</span></div>`;
 
-  for (const { lib, language, repo, data } of results) {
+  for (const { lib, lang, repo, run, scope, data } of results) {
     const s = data.summary;
-    const st = s.statuses;
-    const ran = s.ran || 0, total = s.seconds;
-    h += `<h2>${lib} · ${language}: speed</h2>`;
-    h += `<div class="sub">${s.mutants} mutants written. ${st.unviable || 0} did not compile, ${st.not_covered || 0} are on lines no test runs, ${s.cached || 0} came from the cache, ${ran} ran ${s.tests_run} tests. ${s.servers} server${s.servers === 1 ? "" : "s"}.</div>`;
-    h += `<table class="speed"><thead><tr><th>step</th><th>time</th></tr></thead><tbody>`;
-    for (const [phase, t] of Object.entries(s.phases)) h += `<tr><td>${esc(phase)}</td><td>${secs(t)}</td></tr>`;
-    const decided = (st.killed || 0) + (st.survived || 0) + (st.timed_out || 0) + (st.not_covered || 0);
-    h += `<tr><th>total</th><th>${secs(total)}</th></tr>`;
-    h += `<tr><td>mutants per hour</td><td>${decided ? Math.round(decided / total * 3600).toLocaleString() : "–"}</td></tr></tbody></table>`;
-
-    const survivors = data.mutants.filter(m => m.status === "survived");
-    h += `<h2>${lib} · ${language}: survived (${survivors.length})</h2>`;
-    if (!survivors.length) { h += `<div class="quiet good">Every mutant on a tested line was killed.</div>`; continue; }
-    h += `<table class="survivors"><thead><tr><th>line</th><th>mutation</th><th>code</th><th>function</th></tr></thead><tbody>`;
-    let file = null;
-    for (const m of survivors.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
-      if (m.file !== file) { file = m.file; h += `<tr class="file"><td colspan="4">${esc(file)}</td></tr>`; }
-      const link = `https://github.com/${repo}/blob/${s.commit || "main"}/${m.file}#L${m.line}`;
-      h += `<tr><td><a href="${link}" target="_blank">${m.line}</a></td><td><span class="kind">${esc(m.kind)}</span> ${esc(m.description)}</td><td class="code">${esc(m.source_line)}</td><td>${esc(m.function)}</td></tr>`;
+    const counts = data.mutants.reduce((c, m) => (c[m.status] = (c[m.status] || 0) + 1, c), {});
+    h += `<h2>${lib} · ${lang}<span class="scope ${scope}">${SCOPES[scope]}</span></h2>`;
+    h += `<div class="sub">${data.mutants.length} mutants by ${esc(s.tool || "mutate.py")} in <a href="${run.html_url}" target="_blank">run ${run.id}</a>: ${Object.entries(counts).map(([k, v]) => `${v} ${esc(k.replace("_", " "))}`).join(", ") || "none"}.</div>`;
+    if (s.seconds !== undefined) {
+      h += `<table class="speed"><thead><tr><th>step</th><th>time</th></tr></thead><tbody>`;
+      for (const [phase, t] of Object.entries(s.phases || {})) h += `<tr><td>${esc(phase)}</td><td>${secs(t)}</td></tr>`;
+      h += `<tr><th>total</th><th>${secs(s.seconds)}</th></tr></tbody></table>`;
     }
-    h += `</tbody></table>`;
+    const survivors = data.mutants.filter(m => m.status === "survived");
+    const uncovered = data.mutants.filter(m => m.status === "not_covered");
+    if (!survivors.length && !uncovered.length) { h += `<div class="quiet good">Every mutant was killed.</div>`; continue; }
+    if (survivors.length) h += mutantTable("Survived", survivors, repo, s.commit);
+    if (uncovered.length) h += mutantTable("Not covered: no test runs the line", uncovered, repo, s.commit);
   }
   $("main").innerHTML = h;
 }
@@ -223,7 +312,6 @@ function render() {
 // The PR box is shared with the other test server pages.
 $("source").value = readSource();
 $("source").addEventListener("change", e => { writeSource(e.target.value.trim()); load(); });
-render();
 load();
 </script>
 </body>
