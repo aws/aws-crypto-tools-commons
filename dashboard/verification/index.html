@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Verification</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd; --impl:#a371f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  code { font-family:ui-monospace,monospace; font-size:12px; }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  input[type=text], select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  main { display:grid; grid-template-columns:minmax(0,1fr); height:calc(100vh - 52px); }
+  main.open { grid-template-columns:minmax(0,var(--left,1fr)) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
+  section { overflow:auto; padding:16px 20px; }
+  #detail { background:var(--panel); }
+  #divider { cursor:col-resize; background:var(--line); }
+  #divider:hover, #divider.drag { background:var(--sel); }
+  body.resizing { user-select:none; cursor:col-resize; }
+  .close { position:sticky; top:-16px; float:right; z-index:2; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; }
+  .close:hover { color:var(--text); border-color:var(--sel); }
+  .verdict { font-size:15px; font-weight:600; margin:0 0 10px; color:#56d364; }
+  .verdict.bad { color:#ffa198; } .verdict small { color:var(--dim); font-weight:400; font-size:13px; }
+  #prline { font-size:12px; color:var(--dim); margin:0 0 10px; } #prline:empty { display:none; }
+  .warnb { color:#e3b341; }
+  .summary { display:flex; gap:10px; margin:0 0 12px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:150px; cursor:pointer; }
+  .card:hover { border-color:var(--sel); } .card.on { outline:2px solid var(--sel); outline-offset:-2px; }
+  .card b { display:block; font-size:22px; font-variant-numeric:tabular-nums; } .card small { color:var(--dim); display:block; }
+  .card.bad b { color:#ffa198; } .card.na b { color:var(--dim); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:10px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .tabs { display:flex; gap:6px; margin:0 0 8px; }
+  .tab { border:1px solid var(--line); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:12px; background:var(--bg); color:var(--text); }
+  .tab.on { border-color:var(--sel); color:var(--sel); }
+  table.matrix { border-collapse:collapse; width:100%; }
+  .matrix th, .matrix td { border:1px solid var(--line); padding:0; }
+  .matrix thead th { padding:6px 8px; font-size:12px; position:sticky; top:-16px; background:var(--bg); z-index:1; text-align:center; }
+  .matrix thead th small { display:block; color:var(--dim); font-weight:400; font-size:10px; }
+  .matrix thead th:first-child { text-align:left; }
+  .matrix tbody th { text-align:left; padding:5px 8px; font-weight:500; cursor:pointer; }
+  .matrix tbody th small { display:block; color:var(--dim); font-weight:400; font-size:11px; }
+  .matrix tbody tr:hover th { color:var(--sel); }
+  .matrix tr.sel th { color:var(--sel); background:var(--panel); }
+  .matrix tr.group th { padding:10px 8px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); border-left:0; border-right:0; cursor:default; }
+  .matrix td { font-size:12px; vertical-align:middle; width:13%; }
+  .matrix td.num { text-align:center; color:var(--dim); font-variant-numeric:tabular-nums; width:52px; }
+  .matrix td.thr { color:var(--dim); font-size:11px; padding:4px 6px; width:90px; }
+  /* With the detail pane open, drop the score and threat columns so the level columns fit. */
+  main.open #matrix.targets .side { display:none; }
+  .matrix tbody td { height:1px; }
+  .cell { display:flex; align-items:center; flex-wrap:wrap; height:100%; padding:5px 8px; line-height:1.25; }
+  .cell a.pick { color:var(--text); }
+  .l-in_crate { background:color-mix(in srgb,var(--pass) 45%,transparent); }
+  .l-model_only { background:color-mix(in srgb,var(--sel) 28%,transparent); }
+  .l-compiler_lint { background:color-mix(in srgb,var(--impl) 32%,transparent); }
+  .l-trusted { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--dim) 28%,transparent) 0 3px,transparent 3px 8px); }
+  .l-deferred { background:color-mix(in srgb,var(--part) 28%,transparent); }
+  .l-not_started { border:1px dashed var(--dim); }
+  .chip { display:inline-block; font-size:11px; padding:0 7px; border-radius:8px; margin:1px 3px 1px 0; cursor:pointer; white-space:nowrap; }
+  .pill { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+  .drift { color:#e3b341; font-size:11px; }
+  h2 { font-size:16px; margin:0 0 4px; } h3 { font-size:13px; margin:18px 0 6px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:6px; }
+  .quote { background:var(--bg); border-left:3px solid var(--sel); padding:8px 12px; margin:8px 0 14px; font-size:13px; }
+  .part { display:flex; gap:8px; align-items:center; margin:4px 0; font-size:13px; }
+  .part .chip { cursor:default; min-width:110px; text-align:center; }
+  .prose { font-size:13px; }
+  .warnbox { border:1px solid var(--part); border-radius:6px; padding:6px 10px; color:#e3b341; font-size:12px; margin:10px 0; }
+  table.list { border-collapse:collapse; font-size:12px; width:100%; }
+  .list th, .list td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+  .list th { color:var(--dim); font-weight:600; }
+  .list td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .foot { color:var(--dim); font-size:12px; margin-top:14px; }
+  .empty { color:var(--dim); padding:20px 0; }
+  a.pick { cursor:pointer; text-decoration:underline dotted; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spin { display:inline-block; width:10px; height:10px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; margin-right:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Verification</h1>
+  <label title="Paste an aws-crypto-tools-rust PR to show its verification status instead of main's.">PR <input type="text" id="source" size="34" placeholder="main; or paste a Rust PR"></label>
+  <label>Origin <select id="origin">
+    <option value="">All targets</option>
+    <option value="threat">Threat-driven</option>
+    <option value="capability">Capability-driven</option>
+  </select></label>
+  <label>Find <input type="text" id="search" placeholder="e.g. commitment"></label>
+  <span class="run" id="run"></span>
+</header>
+<main>
+  <section id="left">
+    <div class="verdict" id="verdict"><i class="spin"></i>Loading…</div>
+    <div id="prline"></div>
+    <div class="summary" id="counts"></div>
+    <div class="legend" id="legend"></div>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-view="targets">By target</button>
+      <button class="tab" data-view="threats">By threat</button>
+    </div>
+    <table class="matrix" id="matrix"></table>
+    <div class="foot" id="foot"></div>
+  </section>
+  <div id="divider" title="Drag to resize; double-click to reset"></div>
+  <section id="detail"></section>
+</main>
+<script src="../test-servers/loader.js"></script>
+<script>
+// Shows docs/verification-status.json from aws-crypto-tools-rust. That file is
+// written by `cargo xtask verification-status`, which runs Verus and reads the
+// target table in docs/verus-proofs-report.md. This page only draws it.
+//
+// The one rule this page keeps: a part of a target is drawn at the level the
+// file gives it and no higher. Only in_crate is green, because only in_crate is
+// a Verus proof of shipped code. A target split across levels shows each part
+// in its own column.
+const $ = id => document.getElementById(id);
+const RUST = "aws/aws-crypto-tools-rust", FILE = "docs/verification-status.json";
+const VERIFICATION_SOURCE_KEY = "verificationSource";
+const LEVEL_NAMES = { in_crate:"In-crate proof", model_only:"Model only", compiler_lint:"Compiler and clippy",
+  trusted:"Trusted", deferred:"Deferred", not_started:"Not started" };
+const COUNT_NAMES = { esdk:"esdk", prim:"prim", verification_models:"verification models" };
+
+const ui = { view:"targets", origin:"", search:"", target:null, count:null };
+const src = { state:"loading", note:"", data:null, ref:"main", label:"main", others:[] };
+
+// ---------- loading ----------
+function parsePR(text) {
+  const m = text.match(/github\.com\/aws\/aws-crypto-tools-rust\/pull\/(\d+)/) || text.match(/^(?:aws\/aws-crypto-tools-rust)?#(\d+)$/);
+  return m ? +m[1] : null;
+}
+const readFile = async ref => JSON.parse(await ghRaw(RUST, FILE, ref));
+const notFound = err => /GitHub 404/.test(err.message || "");
+
+async function allOpenPRs() {
+  const prs = [];
+  for (let page = 1; ; page++) {
+    const got = await ghJson(`repos/${RUST}/pulls?state=open&per_page=100&page=${page}`);
+    prs.push(...got);
+    if (got.length < 100) return prs;
+  }
+}
+
+// main has no status file until a PR that adds one merges. Until then, show
+// the open PRs whose head has the file, newest first.
+async function openPRsWithFile() {
+  const prs = await allOpenPRs();
+  const found = await Promise.all(prs.map(p => readFile(p.head.sha).then(() => p, () => null)));
+  return found.filter(Boolean).sort((a, b) => b.number - a.number);
+}
+
+async function showPR(n) {
+  const p = await ghJson(`repos/${RUST}/pulls/${n}`);
+  Object.assign(src, { ref:p.head.sha, label:`PR #${p.number}`, url:p.html_url, title:p.title });
+  try { src.data = await readFile(p.head.sha); src.state = "done"; }
+  catch (err) {
+    if (!notFound(err)) throw err;
+    src.state = "none"; src.note = `PR #${p.number} has no ${FILE}.`;
+  }
+}
+
+async function load() {
+  const text = $("source").value.trim();
+  Object.assign(src, { state:"loading", note:"", data:null, url:null, title:null, others:[] });
+  render();
+  try {
+    if (text) {
+      const n = parsePR(text);
+      if (!n) { src.state = "error"; src.note = "Paste an aws-crypto-tools-rust pull request: a URL or #N."; return; }
+      await showPR(n);
+      return;
+    }
+    try {
+      src.data = await readFile("main");
+      Object.assign(src, { state:"done", ref:"main", label:"main" });
+      return;
+    } catch (err) { if (!notFound(err)) throw err; }
+    const prs = await openPRsWithFile();
+    if (!prs.length) { src.state = "none"; src.note = `Neither main nor any open PR in ${RUST} has ${FILE}.`; return; }
+    await showPR(prs[0].number);
+    src.others = prs.slice(1);
+    src.note = `main has no ${FILE} yet, so this shows the newest open PR that adds one.`;
+  } catch (err) {
+    src.state = "error"; src.note = "Could not load: " + (err.message || err);
+  } finally { render(); }
+}
+
+// ---------- helpers ----------
+// The report's cells are markdown; show only bold and code.
+const md = s => escHtml(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+const levels = () => Object.keys(src.data?.levels || LEVEL_NAMES).sort((a, b) => order(a) - order(b));
+const order = l => Object.keys(LEVEL_NAMES).indexOf(l);
+const levelName = l => LEVEL_NAMES[l] || l;
+const levelHelp = l => src.data?.levels?.[l] || "";
+const blob = f => `https://github.com/${RUST}/blob/${src.data.commit}/${f}`;
+const chip = (l, text, attrs = "") => `<span class="chip l-${l}" title="${escHtml(levelName(l) + ": " + levelHelp(l))}" ${attrs}>${escHtml(text)}</span>`;
+// Matrix columns: only levels some target has a part at. The legend still
+// lists every level with its count.
+const usedLevels = () => levels().filter(l => src.data.targets.some(t => t.parts.some(p => p.level === l)));
+const strongest = t => t.parts.map(p => p.level).sort((a, b) => order(a) - order(b))[0];
+
+function shown() {
+  const q = ui.search.toLowerCase();
+  return (src.data?.targets || []).filter(t => (!ui.origin || t.origin === ui.origin) && (!q ||
+    [t.id, t.title, t.property, t.status, t.residual, ...t.parts.map(p => p.what), ...t.threats.map(x => x.id + " " + x.description)]
+      .join(" ").toLowerCase().includes(q)));
+}
+
+const allRuns = () => (src.data?.counts || []).flatMap(c => c.runs || []);
+const countOf = c => (c.runs || []).reduce((a, r) => ({ v:a.v + r.verified, e:a.e + r.errors }), { v:0, e:0 });
+
+// ---------- drawing ----------
+function render() {
+  $("verdict").className = "verdict";
+  $("prline").innerHTML = prLine();
+  if (src.state !== "done") {
+    $("verdict").innerHTML = src.state === "loading" ? `<i class="spin"></i>Loading ${escHtml(src.label)}…`
+      : `<span class="warnb">${escHtml(src.note)}</span>`;
+    for (const id of ["counts", "legend", "matrix", "foot", "run"]) $(id).innerHTML = "";
+    document.querySelector("main").classList.remove("open");
+    return;
+  }
+  const d = src.data, runs = allRuns(), errors = runs.reduce((a, r) => a + r.errors, 0);
+  const missing = d.counts.filter(c => !c.runs);
+  const bad = errors > 0 || missing.length > 0;
+  $("verdict").className = "verdict" + (bad ? " bad" : "");
+  $("verdict").innerHTML = (errors ? `${errors} Verus errors` : missing.length ? `${missing.length} Verus count${missing.length > 1 ? "s" : ""} missing` : "0 Verus errors")
+    + ` <small>in ${runs.length} runs · ${d.targets.length} targets · ${d.targets.filter(t => t.drift).length} with YAML drift</small>`;
+  $("run").innerHTML = `generated ${ago(d.generated)} at <a href="https://github.com/${RUST}/commit/${d.commit}">${d.commit.slice(0, 8)}</a> · Verus ${escHtml(d.verus)}`;
+  $("run").title = d.generated;
+  $("counts").innerHTML = d.counts.map(countCard).join("");
+  $("legend").innerHTML = levels().map(l => {
+    const n = d.targets.filter(t => t.parts.some(p => p.level === l)).length;
+    return `<span title="${escHtml(levelHelp(l))}"><i class="sw l-${l}"></i>${levelName(l)} <b>${n}</b></span>`;
+  }).join("") + `<span class="drift">⚠ YAML status disagrees with the report</span>`;
+  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.view === ui.view));
+  $("matrix").className = "matrix " + ui.view;
+  $("matrix").innerHTML = ui.view === "targets" ? targetMatrix() : threatMatrix();
+  $("foot").innerHTML = escHtml(d.snapshot_note) + " Only green is a Verus proof of shipped code; a target split across levels shows each part in its own column.";
+  renderDetail();
+}
+
+function prLine() {
+  if (src.state === "loading" || !src.url) return "";
+  let s = `Showing <a href="${src.url}">${escHtml(src.label)}</a> ${escHtml(src.title || "")}.`;
+  if (src.note && src.state === "done") s += ` <span class="warnb">${escHtml(src.note)}</span>`;
+  if (src.others.length) s += " Also: " + src.others.map(p => `<a class="pick" data-pick="${p.number}" title="${escHtml(p.title)}">#${p.number}</a>`).join(" ");
+  return s;
+}
+
+function countCard(c) {
+  const name = COUNT_NAMES[c.name] || c.name;
+  if (!c.runs) return `<div class="card na ${ui.count === c.name ? "on" : ""}" data-count="${c.name}" title="${escHtml(c.unavailable || "")}">
+    <b>–</b><small>${escHtml(name)}: unavailable</small><small><code>${escHtml(c.cmd)}</code></small></div>`;
+  const { v, e } = countOf(c);
+  const each = c.runs.length > 2 ? `${c.runs.length} files` : c.runs.map(r => r.verified).join(" / ");
+  return `<div class="card ${e ? "bad" : ""} ${ui.count === c.name ? "on" : ""}" data-count="${c.name}">
+    <b>${c.runs.length > 2 ? v : c.runs[0].verified}</b><small>${escHtml(name)} verified · ${e} errors</small>
+    <small>${escHtml(each)} · <code>${escHtml(c.cmd)}</code></small></div>`;
+}
+
+function targetMatrix() {
+  const ls = usedLevels(), rows = shown();
+  const head = `<thead><tr><th>Target</th><th class="side">Score</th><th class="side">Threats</th>${ls.map(l =>
+    `<th title="${escHtml(levelHelp(l))}">${levelName(l)}<small>${l}</small></th>`).join("")}</tr></thead>`;
+  if (!rows.length) return head + `<tbody><tr><td colspan="${ls.length + 3}" class="empty">No target matches.</td></tr></tbody>`;
+  const groups = [["threat", "Threat-driven"], ["capability", "Capability-driven"]];
+  const body = groups.map(([o, name]) => {
+    const rs = rows.filter(t => t.origin === o).sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+    if (!rs.length) return "";
+    return `<tr class="group"><th colspan="${ls.length + 3}">${name} <small style="display:inline">${rs.length}</small></th></tr>` +
+      rs.map(t => `<tr data-target="${t.id}" class="${ui.target === t.id ? "sel" : ""}">
+        <th>${t.id}${t.drift ? ` <span class="drift" title="${escHtml(t.drift)}">⚠</span>` : ""}<small>${escHtml(t.title)}</small></th>
+        <td class="num side">${t.score ?? "–"}</td>
+        <td class="thr side">${t.threats.map(x => x.id).join(", ") || "–"}</td>
+        ${ls.map(l => {
+          const ps = t.parts.filter(p => p.level === l);
+          return `<td>${ps.length ? `<div class="cell l-${l}">${ps.map(p => escHtml(p.what)).join("; ")}</div>` : ""}</td>`;
+        }).join("")}</tr>`).join("");
+  }).join("");
+  return head + `<tbody>${body}</tbody>`;
+}
+
+// One row per threat. A cell lists the targets that back the threat with a
+// part at that level, so a threat with no green cell has no proof of shipped code.
+function threatMatrix() {
+  const ls = usedLevels(), threats = new Map();
+  for (const t of shown()) for (const x of t.threats) {
+    if (!threats.has(x.id)) threats.set(x.id, { ...x, targets:[] });
+    threats.get(x.id).targets.push(t);
+  }
+  const head = `<thead><tr><th>Threat</th><th>Best</th>${ls.map(l => `<th title="${escHtml(levelHelp(l))}">${levelName(l)}<small>${l}</small></th>`).join("")}</tr></thead>`;
+  if (!threats.size) return head + `<tbody><tr><td colspan="${ls.length + 2}" class="empty">No threat matches.</td></tr></tbody>`;
+  const cats = [...new Set([...threats.values()].map(x => x.category))].sort();
+  const body = cats.map(cat => {
+    const xs = [...threats.values()].filter(x => x.category === cat).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric:true }));
+    return `<tr class="group"><th colspan="${ls.length + 2}">${escHtml(cat)}</th></tr>` + xs.map(x => {
+      const best = x.targets.map(strongest).sort((a, b) => order(a) - order(b))[0];
+      return `<tr><th style="cursor:default">${escHtml(x.id)}<small>${escHtml(x.description)}</small></th>
+        <td class="thr">${levelName(best)}</td>
+        ${ls.map(l => {
+          const ids = x.targets.filter(t => t.parts.some(p => p.level === l));
+          return `<td>${ids.length ? `<div class="cell l-${l}">${ids.map(t =>
+            `<a class="pick" data-target="${t.id}">${t.id}</a>`).join(",&nbsp;")}</div>` : ""}</td>`;
+        }).join("")}</tr>`;
+    }).join("");
+  }).join("");
+  return head + `<tbody>${body}</tbody>`;
+}
+
+function renderDetail() {
+  const main = document.querySelector("main"), d = src.data;
+  const t = ui.target && d?.targets.find(x => x.id === ui.target);
+  const c = ui.count && d?.counts.find(x => x.name === ui.count);
+  main.classList.toggle("open", !!(t || c));
+  if (t) $("detail").innerHTML = targetDetail(t);
+  else if (c) $("detail").innerHTML = countDetail(c);
+}
+
+function targetDetail(t) {
+  return `<button class="close" data-close>✕</button>
+    <h2>${t.id} ${escHtml(t.title)}</h2>
+    <div class="sub"><span class="pill">${t.origin === "capability" ? "capability-driven" : "threat-driven"}</span>
+      ${t.score != null ? ` score ${t.score}` : ""}${t.agent ? ` · proof agent <code>${escHtml(t.agent)}</code>` : ""}</div>
+    ${t.property ? `<div class="quote">${escHtml(t.property)}</div>` : ""}
+    ${t.drift ? `<div class="warnbox">⚠ ${escHtml(t.drift)}</div>` : ""}
+    <h3>Levels</h3>
+    ${t.parts.map(p => `<div class="part">${chip(p.level, levelName(p.level))}<span>${escHtml(p.what)}</span></div>`).join("")}
+    <h3>Status</h3><div class="prose">${md(t.status)}</div>
+    <h3>Not proven</h3><div class="prose">${md(t.residual)}</div>
+    ${t.files.length ? `<h3>Files</h3>${t.files.map(f => `<div><a href="${blob(f)}"><code>${escHtml(f)}</code></a></div>`).join("")}` : ""}
+    ${t.threats.length ? `<h3>Threats</h3><table class="list"><thead><tr><th>Id</th><th>Category</th><th>Threat</th></tr></thead><tbody>${
+      t.threats.map(x => `<tr><td>${escHtml(x.id)}</td><td>${escHtml(x.category)}</td><td>${escHtml(x.description)}</td></tr>`).join("")}</tbody></table>` : ""}
+    <div class="foot">Levels, status and residual come from the target table in
+      <a href="${blob("docs/verus-proofs-report.md")}"><code>docs/verus-proofs-report.md</code></a>.
+      Property, score, threats and files come from
+      <a href="${blob("docs/verification-recommendations.md")}"><code>docs/verification-recommendations.md</code></a>${t.yaml_status ? `, whose YAML status is <code>${escHtml(t.yaml_status)}</code>` : ""}.</div>`;
+}
+
+function countDetail(c) {
+  const name = COUNT_NAMES[c.name] || c.name;
+  const body = c.runs
+    ? `<table class="list"><thead><tr><th>Run</th><th>Verified</th><th>Errors</th></tr></thead><tbody>${c.runs.map(r =>
+        `<tr><td>${escHtml(r.label)}</td><td class="n">${r.verified}</td><td class="n${r.errors ? " warnb" : ""}">${r.errors}</td></tr>`).join("")}</tbody></table>`
+    : `<div class="warnbox">No count: ${escHtml(c.unavailable || "")}</div>`;
+  return `<button class="close" data-close>✕</button><h2>${escHtml(name)}</h2>
+    <div class="sub"><code>${escHtml(c.cmd)}</code>, run at ${escHtml(src.data.generated)}</div>${body}
+    <div class="foot">Each number is a Verus obligation count from that run's <code>verification results::</code> line.</div>`;
+}
+
+// ---------- events ----------
+document.body.addEventListener("click", e => {
+  const pk = e.target.closest("[data-pick]");
+  if (pk) { $("source").value = "#" + pk.dataset.pick; localStorage.setItem(VERIFICATION_SOURCE_KEY, $("source").value); load(); return; }
+  if (e.target.closest("[data-close]")) { ui.target = ui.count = null; render(); return; }
+  const tab = e.target.closest("[data-view]");
+  if (tab) { ui.view = tab.dataset.view; render(); return; }
+  const card = e.target.closest("[data-count]");
+  if (card) { ui.count = ui.count === card.dataset.count ? null : card.dataset.count; ui.target = null; render(); return; }
+  const tr = e.target.closest("[data-target]");
+  if (tr && !$("detail").contains(tr)) { ui.target = tr.dataset.target; ui.count = null; render(); $("detail").scrollTop = 0; }
+});
+$("origin").onchange = e => { ui.origin = e.target.value; render(); };
+let typing; $("search").oninput = e => { clearTimeout(typing); typing = setTimeout(() => { ui.search = e.target.value.trim(); render(); }, 200); };
+$("source").onchange = e => { localStorage.setItem(VERIFICATION_SOURCE_KEY, e.target.value.trim()); load(); };
+
+// Drag the divider to resize the two panes; shares the other pages' width.
+(() => {
+  const main = document.querySelector("main"), div = $("divider");
+  const set = px => main.style.setProperty("--left", px ? px + "px" : "1fr");
+  set(+localStorage.getItem("leftPane") || 0);
+  div.addEventListener("mousedown", e => {
+    e.preventDefault(); div.classList.add("drag"); document.body.classList.add("resizing");
+    const move = ev => {
+      const px = Math.min(Math.max(ev.clientX - main.getBoundingClientRect().left, 240), main.clientWidth - 240);
+      set(px); localStorage.setItem("leftPane", Math.round(px));
+    };
+    const up = () => { div.classList.remove("drag"); document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  });
+  div.addEventListener("dblclick", () => { localStorage.removeItem("leftPane"); set(0); });
+})();
+
+if (!localStorage.getItem("github-dashboard-token")) {
+  $("verdict").innerHTML = `<span class="warnb">Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws).</span>`;
+} else {
+  $("source").value = localStorage.getItem(VERIFICATION_SOURCE_KEY) || "";
+  load();
+}
+</script>
+</body>
+</html>
