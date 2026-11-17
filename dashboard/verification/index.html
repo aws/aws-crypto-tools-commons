@@ -79,6 +79,30 @@
   .list th { color:var(--dim); font-weight:600; }
   .list td.n { text-align:right; font-variant-numeric:tabular-nums; }
   .foot { color:var(--dim); font-size:12px; margin-top:14px; }
+  .k-proven { background:color-mix(in srgb,var(--pass) 40%,transparent); }
+  .k-no_panic { background:color-mix(in srgb,var(--pass) 18%,transparent); }
+  .k-ghost { background:color-mix(in srgb,var(--sel) 22%,transparent); }
+  .k-trusted { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--dim) 28%,transparent) 0 3px,transparent 3px 8px); }
+  .k-verus_item { background:color-mix(in srgb,var(--impl) 18%,transparent); }
+  .k-unverified { background:color-mix(in srgb,var(--fail) 22%,transparent); }
+  table.files { border-collapse:collapse; width:100%; font-size:12px; }
+  .files th, .files td { border-bottom:1px solid var(--line); padding:3px 6px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .files th:first-child, .files td:first-child { text-align:left; }
+  .files thead th { position:sticky; top:-16px; background:var(--bg); cursor:pointer; color:var(--dim); font-weight:600; z-index:1; }
+  .files thead th.on { color:var(--sel); }
+  .files tbody tr.f { cursor:pointer; } .files tbody tr.f:hover { background:var(--panel); }
+  .files tbody tr.sel { outline:1px solid var(--sel); }
+  .files td.path { font-family:ui-monospace,monospace; }
+  .files tr.dir td { color:var(--dim); font-weight:600; background:var(--bg); }
+  .files td.z { color:var(--dim); }
+  .stack { display:inline-flex; width:120px; height:9px; background:var(--line); border-radius:2px; overflow:hidden; vertical-align:middle; }
+  .stack i { display:block; height:100%; }
+  pre.src { margin:0; font:12px/1.45 ui-monospace,monospace; }
+  pre.src div { display:grid; grid-template-columns:48px 1fr; white-space:pre; }
+  pre.src .n { color:var(--dim); text-align:right; padding-right:8px; user-select:none; }
+  pre.src .code { padding-left:6px; }
+  .jump { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:2px 8px; cursor:pointer; font-size:12px; margin:0 4px 4px 0; }
+  .jump:hover { border-color:var(--sel); }
   .empty { color:var(--dim); padding:20px 0; }
   a.pick { cursor:pointer; text-decoration:underline dotted; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -89,12 +113,13 @@
 <header>
   <h1>Verification</h1>
   <label title="Paste an aws-crypto-tools-rust PR to show its verification status instead of main's.">PR <input type="text" id="source" size="34" placeholder="main; or paste a Rust PR"></label>
-  <label>Origin <select id="origin">
+  <label id="originBox">Origin <select id="origin">
     <option value="">All targets</option>
     <option value="threat">Threat-driven</option>
     <option value="capability">Capability-driven</option>
   </select></label>
-  <label>Find <input type="text" id="search" placeholder="e.g. commitment"></label>
+  <label>Find <input type="text" id="search" placeholder="e.g. header"></label>
+  <label id="provenBox"><input type="checkbox" id="provenOnly"> Only files with proofs</label>
   <span class="run" id="run"></span>
 </header>
 <main>
@@ -104,10 +129,10 @@
     <div class="summary" id="counts"></div>
     <div class="legend" id="legend"></div>
     <div class="tabs" id="tabs">
-      <button class="tab on" data-view="targets">By target</button>
-      <button class="tab" data-view="threats">By threat</button>
+      <button class="tab on" data-view="files">By file</button>
+      <button class="tab" data-view="targets">By target</button>
     </div>
-    <table class="matrix" id="matrix"></table>
+    <table id="matrix"></table>
     <div class="foot" id="foot"></div>
   </section>
   <div id="divider" title="Drag to resize; double-click to reset"></div>
@@ -118,6 +143,10 @@
 // Shows docs/verification-status.json from aws-crypto-tools-rust. That file is
 // written by `cargo xtask verification-status`, which runs Verus and reads the
 // target table in docs/verus-proofs-report.md. This page only draws it.
+//
+// By file shows, for each source file of the Verus-enabled crates, how many
+// of its lines Verus checks. That comes from reading which code sits inside
+// verus! blocks, not from running tests, so it is not test line coverage.
 //
 // The one rule this page keeps: a part of a target is drawn at the level the
 // file gives it and no higher. Only in_crate is green, because only in_crate is
@@ -130,7 +159,13 @@ const LEVEL_NAMES = { in_crate:"In-crate proof", model_only:"Model only", compil
   trusted:"Trusted", deferred:"Deferred", not_started:"Not started" };
 const COUNT_NAMES = { esdk:"esdk", prim:"prim", verification_models:"verification models" };
 
-const ui = { view:"targets", origin:"", search:"", target:null, count:null };
+const KIND_NAMES = { proven:"Proven", no_panic:"No panic only", ghost:"Spec and proof", trusted:"Trusted",
+  verus_item:"Types in verus!", unverified:"Not checked" };
+// Fn lines Verus checks over all fn lines that ship. Spec and proof fns do
+// not ship, and types are not fns, so neither counts.
+const CHECKED = ["proven", "no_panic"], SHIPPED = ["proven", "no_panic", "trusted", "unverified"];
+const ui = { view:"files", origin:"", search:"", provenOnly:false, sort:"path", target:null, count:null, file:null };
+const sources = {};
 const src = { state:"loading", note:"", data:null, ref:"main", label:"main", others:[] };
 
 // ---------- loading ----------
@@ -206,7 +241,6 @@ const chip = (l, text, attrs = "") => `<span class="chip l-${l}" title="${escHtm
 // Matrix columns: only levels some target has a part at. The legend still
 // lists every level with its count.
 const usedLevels = () => levels().filter(l => src.data.targets.some(t => t.parts.some(p => p.level === l)));
-const strongest = t => t.parts.map(p => p.level).sort((a, b) => order(a) - order(b))[0];
 
 function shown() {
   const q = ui.search.toLowerCase();
@@ -237,15 +271,20 @@ function render() {
     + ` <small>in ${runs.length} runs · ${d.targets.length} targets · ${d.targets.filter(t => t.drift).length} with YAML drift</small>`;
   $("run").innerHTML = `generated ${ago(d.generated)} at <a href="https://github.com/${RUST}/commit/${d.commit}">${d.commit.slice(0, 8)}</a> · Verus ${escHtml(d.verus)}`;
   $("run").title = d.generated;
-  $("counts").innerHTML = d.counts.map(countCard).join("");
-  $("legend").innerHTML = levels().map(l => {
+  $("counts").innerHTML = d.counts.map(countCard).join("") + crateCards();
+  $("legend").innerHTML = ui.view === "files" ? Object.keys(KIND_NAMES).map(k =>
+    `<span title="${escHtml(d.line_kinds?.[k] || "")}"><i class="sw k-${k}"></i>${KIND_NAMES[k]}</span>`).join("") : levels().map(l => {
     const n = d.targets.filter(t => t.parts.some(p => p.level === l)).length;
     return `<span title="${escHtml(levelHelp(l))}"><i class="sw l-${l}"></i>${levelName(l)} <b>${n}</b></span>`;
   }).join("") + `<span class="drift">⚠ YAML status disagrees with the report</span>`;
   document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.view === ui.view));
-  $("matrix").className = "matrix " + ui.view;
-  $("matrix").innerHTML = ui.view === "targets" ? targetMatrix() : threatMatrix();
-  $("foot").innerHTML = escHtml(d.snapshot_note) + " Only green is a Verus proof of shipped code; a target split across levels shows each part in its own column.";
+  $("matrix").className = ui.view === "files" ? "files" : "matrix targets";
+  $("matrix").innerHTML = ui.view === "files" ? fileTable() : targetMatrix();
+  $("originBox").style.display = ui.view === "targets" ? "" : "none";
+  $("provenBox").style.display = ui.view === "files" ? "" : "none";
+  $("foot").innerHTML = ui.view === "files"
+    ? "Checked = lines of fns inside verus! (proven or no panic only) over all fn lines that ship. Spec and proof fns and types are not counted. Hover a kind in the legend for what it means."
+    : escHtml(d.snapshot_note) + " Only green is a Verus proof of shipped code; a target split across levels shows each part in its own column.";
   renderDetail();
 }
 
@@ -266,6 +305,74 @@ function countCard(c) {
   return `<div class="card ${e ? "bad" : ""} ${ui.count === c.name ? "on" : ""}" data-count="${c.name}">
     <b>${c.runs.length > 2 ? v : c.runs[0].verified}</b><small>${escHtml(name)} verified · ${e} errors</small>
     <small>${escHtml(each)} · <code>${escHtml(c.cmd)}</code></small></div>`;
+}
+
+// ---------- files ----------
+const sum = (c, ks) => ks.reduce((a, k) => a + (c[k] || 0), 0);
+const pct = c => { const n = sum(c, SHIPPED); return n ? sum(c, CHECKED) / n : null; };
+const fmtPct = p => p == null ? "–" : (p * 100).toFixed(p > 0 && p < 0.1 ? 1 : 0) + "%";
+const crateOf = f => f.path.split("/")[0];
+function totals(files) {
+  const t = {};
+  for (const f of files) for (const [k, n] of Object.entries(f.counts)) t[k] = (t[k] || 0) + n;
+  return t;
+}
+function crateCards() {
+  if (!src.data.files) return "";
+  return [...new Set(src.data.files.map(crateOf))].map(c => {
+    const fs = src.data.files.filter(f => crateOf(f) === c), t = totals(fs);
+    const withProofs = fs.filter(f => sum(f.counts, CHECKED) > 0).length;
+    return `<div class="card" data-view="files" title="Fn lines Verus checks over all fn lines that ship, in ${c}/src">
+      <b>${fmtPct(pct(t))}</b><small>${c} fn lines checked</small><small>${sum(t, CHECKED)} / ${sum(t, SHIPPED)} lines · ${withProofs} of ${fs.length} files</small></div>`;
+  }).join("");
+}
+function stack(c) {
+  const n = Object.values(c).reduce((a, b) => a + b, 0) || 1;
+  return `<span class="stack">${Object.keys(KIND_NAMES).map(k => c[k] ? `<i class="k-${k}" style="width:${c[k] / n * 100}%"></i>` : "").join("")}</span>`;
+}
+function fileTable() {
+  const d = src.data;
+  if (!d.files) return `<tbody><tr><td class="empty">This status file has no per-file data. Regenerate it with <code>cargo xtask verification-status</code>.</td></tr></tbody>`;
+  const q = ui.search.toLowerCase();
+  let fs = d.files.filter(f => (!q || f.path.toLowerCase().includes(q)) && (!ui.provenOnly || sum(f.counts, CHECKED) > 0));
+  const key = { path:f => f.path, pct:f => -(pct(f.counts) ?? -1), unverified:f => -(f.counts.unverified || 0) }[ui.sort];
+  fs = [...fs].sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : a.path.localeCompare(b.path); });
+  const cols = [["path", "File"], ["pct", "Checked"], ["", "Lines"], ...Object.keys(KIND_NAMES).map(k => [k === "unverified" ? k : "", KIND_NAMES[k]])];
+  const head = `<thead><tr>${cols.map(([k, n]) => `<th ${k ? `data-sort="${k}"` : ""} class="${ui.sort === k ? "on" : ""}">${n}</th>`).join("")}</tr></thead>`;
+  const row = f => `<tr class="f ${ui.file === f.path ? "sel" : ""}" data-file="${escHtml(f.path)}">
+    <td class="path">${escHtml(f.path)}</td><td>${fmtPct(pct(f.counts))}</td><td>${stack(f.counts)}</td>
+    ${Object.keys(KIND_NAMES).map(k => `<td class="${f.counts[k] ? "" : "z"}">${f.counts[k] || "·"}</td>`).join("")}</tr>`;
+  // Grouped by directory when sorted by path, so each folder shows its total.
+  if (ui.sort !== "path") return head + `<tbody>${fs.map(row).join("")}</tbody>`;
+  const dirOf = f => f.path.split("/").slice(0, -1).join("/");
+  const body = [...new Set(fs.map(dirOf))].map(dir => {
+    const in_ = fs.filter(f => dirOf(f) === dir), t = totals(in_);
+    return `<tr class="dir"><td>${escHtml(dir)}/</td><td>${fmtPct(pct(t))}</td><td>${stack(t)}</td>${Object.keys(KIND_NAMES).map(k => `<td>${t[k] || "·"}</td>`).join("")}</tr>` + in_.map(row).join("");
+  }).join("");
+  return head + `<tbody>${body || `<tr><td class="empty" colspan="9">No file matches.</td></tr>`}</tbody>`;
+}
+
+async function sourceOf(path) {
+  const key = src.data.commit + ":" + path;
+  return sources[key] ??= ghRaw(RUST, path, src.data.commit);
+}
+function fileDetail(f) {
+  const kindAt = new Map();
+  for (const [a, b, k] of f.runs) for (let l = a; l <= b; l++) kindAt.set(l, k);
+  const fns = f.fns.length ? f.fns.map(x => `<button class="jump k-${x.kind}" data-line="${x.first}" title="${KIND_NAMES[x.kind]}, lines ${x.first}-${x.last}">${escHtml(x.name)}</button>`).join("") : `<span class="sub">No fns.</span>`;
+  const head = `<button class="close" data-close>✕</button>
+    <h2><a href="${blob(f.path)}"><code>${escHtml(f.path)}</code></a></h2>
+    <div class="sub">${fmtPct(pct(f.counts))} of fn lines checked · ${f.lines} lines</div>
+    <div class="legend">${Object.keys(KIND_NAMES).filter(k => f.counts[k]).map(k => `<span><i class="sw k-${k}"></i>${KIND_NAMES[k]} <b>${f.counts[k]}</b></span>`).join("")}</div>
+    <h3>Fns</h3><div>${fns}</div><h3>Source</h3>`;
+  $("detail").innerHTML = head + `<div id="srcbody" class="sub"><i class="spin"></i>Loading source…</div>`;
+  sourceOf(f.path).then(text => {
+    if (ui.file !== f.path) return;
+    $("srcbody").outerHTML = `<pre class="src">${text.split("\n").map((line, i) => {
+      const k = kindAt.get(i + 1);
+      return `<div id="L${i + 1}" class="${k ? "k-" + k : ""}" title="${k ? KIND_NAMES[k] : ""}"><span class="n">${i + 1}</span><span class="code">${escHtml(line) || " "}</span></div>`;
+    }).join("")}</pre>`;
+  }, err => { if (ui.file === f.path) $("srcbody").innerHTML = `<span class="warnb">Could not load the source: ${escHtml(err.message || err)}</span>`; });
 }
 
 function targetMatrix() {
@@ -290,38 +397,14 @@ function targetMatrix() {
   return head + `<tbody>${body}</tbody>`;
 }
 
-// One row per threat. A cell lists the targets that back the threat with a
-// part at that level, so a threat with no green cell has no proof of shipped code.
-function threatMatrix() {
-  const ls = usedLevels(), threats = new Map();
-  for (const t of shown()) for (const x of t.threats) {
-    if (!threats.has(x.id)) threats.set(x.id, { ...x, targets:[] });
-    threats.get(x.id).targets.push(t);
-  }
-  const head = `<thead><tr><th>Threat</th><th>Best</th>${ls.map(l => `<th title="${escHtml(levelHelp(l))}">${levelName(l)}<small>${l}</small></th>`).join("")}</tr></thead>`;
-  if (!threats.size) return head + `<tbody><tr><td colspan="${ls.length + 2}" class="empty">No threat matches.</td></tr></tbody>`;
-  const cats = [...new Set([...threats.values()].map(x => x.category))].sort();
-  const body = cats.map(cat => {
-    const xs = [...threats.values()].filter(x => x.category === cat).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric:true }));
-    return `<tr class="group"><th colspan="${ls.length + 2}">${escHtml(cat)}</th></tr>` + xs.map(x => {
-      const best = x.targets.map(strongest).sort((a, b) => order(a) - order(b))[0];
-      return `<tr><th style="cursor:default">${escHtml(x.id)}<small>${escHtml(x.description)}</small></th>
-        <td class="thr">${levelName(best)}</td>
-        ${ls.map(l => {
-          const ids = x.targets.filter(t => t.parts.some(p => p.level === l));
-          return `<td>${ids.length ? `<div class="cell l-${l}">${ids.map(t =>
-            `<a class="pick" data-target="${t.id}">${t.id}</a>`).join(",&nbsp;")}</div>` : ""}</td>`;
-        }).join("")}</tr>`;
-    }).join("");
-  }).join("");
-  return head + `<tbody>${body}</tbody>`;
-}
-
 function renderDetail() {
   const main = document.querySelector("main"), d = src.data;
   const t = ui.target && d?.targets.find(x => x.id === ui.target);
   const c = ui.count && d?.counts.find(x => x.name === ui.count);
-  main.classList.toggle("open", !!(t || c));
+  const f = ui.file && d?.files?.find(x => x.path === ui.file);
+  main.classList.toggle("open", !!(t || c || f));
+  if (f) { if ($("detail").dataset.file !== f.path) { $("detail").dataset.file = f.path; fileDetail(f); } return; }
+  $("detail").dataset.file = "";
   if (t) $("detail").innerHTML = targetDetail(t);
   else if (c) $("detail").innerHTML = countDetail(c);
 }
@@ -361,14 +444,25 @@ function countDetail(c) {
 document.body.addEventListener("click", e => {
   const pk = e.target.closest("[data-pick]");
   if (pk) { $("source").value = "#" + pk.dataset.pick; localStorage.setItem(VERIFICATION_SOURCE_KEY, $("source").value); load(); return; }
-  if (e.target.closest("[data-close]")) { ui.target = ui.count = null; render(); return; }
+  if (e.target.closest("[data-close]")) { ui.target = ui.count = ui.file = null; render(); return; }
+  const jump = e.target.closest("[data-line]");
+  if (jump) {
+    const line = document.getElementById("L" + jump.dataset.line), pane = $("detail");
+    if (line) pane.scrollTop += line.getBoundingClientRect().top - pane.getBoundingClientRect().top - 40;
+    return;
+  }
+  const sort = e.target.closest("th[data-sort]");
+  if (sort) { ui.sort = sort.dataset.sort; render(); return; }
+  const file = e.target.closest("tr[data-file]");
+  if (file) { ui.file = file.dataset.file; ui.target = ui.count = null; render(); $("detail").scrollTop = 0; return; }
   const tab = e.target.closest("[data-view]");
   if (tab) { ui.view = tab.dataset.view; render(); return; }
   const card = e.target.closest("[data-count]");
-  if (card) { ui.count = ui.count === card.dataset.count ? null : card.dataset.count; ui.target = null; render(); return; }
+  if (card) { ui.count = ui.count === card.dataset.count ? null : card.dataset.count; ui.target = ui.file = null; render(); return; }
   const tr = e.target.closest("[data-target]");
-  if (tr && !$("detail").contains(tr)) { ui.target = tr.dataset.target; ui.count = null; render(); $("detail").scrollTop = 0; }
+  if (tr && !$("detail").contains(tr)) { ui.target = tr.dataset.target; ui.count = ui.file = null; render(); $("detail").scrollTop = 0; }
 });
+$("provenOnly").onchange = e => { ui.provenOnly = e.target.checked; render(); };
 $("origin").onchange = e => { ui.origin = e.target.value; render(); };
 let typing; $("search").oninput = e => { clearTimeout(typing); typing = setTimeout(() => { ui.search = e.target.value.trim(); render(); }, 200); };
 $("source").onchange = e => { localStorage.setItem(VERIFICATION_SOURCE_KEY, e.target.value.trim()); load(); };
