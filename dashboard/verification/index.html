@@ -12,7 +12,7 @@
   code { font-family:ui-monospace,monospace; font-size:12px; }
   header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
   header h1 { font-size:16px; margin:0 12px 0 0; }
-  input[type=text], select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
   label { color:var(--dim); display:flex; gap:6px; align-items:center; }
   .run { color:var(--dim); margin-left:auto; font-size:12px; }
   main { display:grid; grid-template-columns:minmax(0,1fr); height:calc(100vh - 52px); }
@@ -29,56 +29,39 @@
   .verdict.bad { color:#ffa198; } .verdict small { color:var(--dim); font-weight:400; font-size:13px; }
   #prline { font-size:12px; color:var(--dim); margin:0 0 10px; } #prline:empty { display:none; }
   .warnb { color:#e3b341; }
-  .summary { display:flex; gap:10px; margin:0 0 12px; flex-wrap:wrap; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:150px; cursor:pointer; }
+  .summary { display:flex; gap:10px; margin:0 0 14px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:170px; cursor:pointer; }
   .card:hover { border-color:var(--sel); } .card.on { outline:2px solid var(--sel); outline-offset:-2px; }
-  .card b { display:block; font-size:22px; font-variant-numeric:tabular-nums; } .card small { color:var(--dim); display:block; }
+  .card b { font-size:22px; font-variant-numeric:tabular-nums; } .card b small { font-size:13px; color:var(--dim); font-weight:400; }
+  .card > small { color:var(--dim); display:block; }
   .card.bad b { color:#ffa198; } .card.na b { color:var(--dim); }
+  .card svg { display:block; margin-top:4px; }
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:10px; }
   .legend span { display:flex; align-items:center; gap:5px; }
   .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
-  .tabs { display:flex; gap:6px; margin:0 0 8px; }
+  .tabs { display:flex; gap:6px; margin:0 0 10px; }
   .tab { border:1px solid var(--line); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:12px; background:var(--bg); color:var(--text); }
   .tab.on { border-color:var(--sel); color:var(--sel); }
-  table.matrix { border-collapse:collapse; width:100%; }
-  .matrix th, .matrix td { border:1px solid var(--line); padding:0; }
-  .matrix thead th { padding:6px 8px; font-size:12px; position:sticky; top:-16px; background:var(--bg); z-index:1; text-align:center; }
-  .matrix thead th small { display:block; color:var(--dim); font-weight:400; font-size:10px; }
-  .matrix thead th:first-child { text-align:left; }
-  .matrix tbody th { text-align:left; padding:5px 8px; font-weight:500; cursor:pointer; }
-  .matrix tbody th small { display:block; color:var(--dim); font-weight:400; font-size:11px; }
-  .matrix tbody tr:hover th { color:var(--sel); }
-  .matrix tr.sel th { color:var(--sel); background:var(--panel); }
-  .matrix tr.group th { padding:10px 8px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); border-left:0; border-right:0; cursor:default; }
-  .matrix td { font-size:12px; vertical-align:middle; width:13%; }
-  .matrix td.num { text-align:center; color:var(--dim); font-variant-numeric:tabular-nums; width:52px; }
-  .matrix td.thr { color:var(--dim); font-size:11px; padding:4px 6px; width:90px; }
-  /* With the detail pane open, drop the score and threat columns so the level columns fit. */
-  main.open #matrix.targets .side { display:none; }
-  .matrix tbody td { height:1px; }
-  .cell { display:flex; align-items:center; flex-wrap:wrap; height:100%; padding:5px 8px; line-height:1.25; }
-  .cell a.pick { color:var(--text); }
-  .l-in_crate { background:color-mix(in srgb,var(--pass) 45%,transparent); }
-  .l-model_only { background:color-mix(in srgb,var(--sel) 28%,transparent); }
-  .l-compiler_lint { background:color-mix(in srgb,var(--impl) 32%,transparent); }
-  .l-trusted { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--dim) 28%,transparent) 0 3px,transparent 3px 8px); }
-  .l-deferred { background:color-mix(in srgb,var(--part) 28%,transparent); }
-  .l-not_started { border:1px dashed var(--dim); }
-  .chip { display:inline-block; font-size:11px; padding:0 7px; border-radius:8px; margin:1px 3px 1px 0; cursor:pointer; white-space:nowrap; }
-  .pill { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
-  .drift { color:#e3b341; font-size:11px; }
   h2 { font-size:16px; margin:0 0 4px; } h3 { font-size:13px; margin:18px 0 6px; }
   .sub { color:var(--dim); font-size:12px; margin-bottom:6px; }
-  .quote { background:var(--bg); border-left:3px solid var(--sel); padding:8px 12px; margin:8px 0 14px; font-size:13px; }
-  .part { display:flex; gap:8px; align-items:center; margin:4px 0; font-size:13px; }
-  .part .chip { cursor:default; min-width:110px; text-align:center; }
-  .prose { font-size:13px; }
-  .warnbox { border:1px solid var(--part); border-radius:6px; padding:6px 10px; color:#e3b341; font-size:12px; margin:10px 0; }
-  table.list { border-collapse:collapse; font-size:12px; width:100%; }
-  .list th, .list td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
-  .list th { color:var(--dim); font-weight:600; }
-  .list td.n { text-align:right; font-variant-numeric:tabular-nums; }
   .foot { color:var(--dim); font-size:12px; margin-top:14px; }
+  .empty { color:var(--dim); padding:20px 0; }
+  a.pick { cursor:pointer; text-decoration:underline dotted; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spin { display:inline-block; width:10px; height:10px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; margin-right:4px; }
+  /* claims */
+  table.claims { border-collapse:collapse; width:100%; font-size:13px; }
+  .claims td { border-bottom:1px solid var(--line); padding:6px 8px; vertical-align:top; }
+  .claims tr.group td { padding:14px 8px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); border-bottom:0; }
+  .claims td.m { width:28px; text-align:center; font-size:15px; }
+  .claims td.w { width:38%; font-size:12px; }
+  .claims td.w a { margin-right:8px; display:inline-block; overflow-wrap:anywhere; }
+  main.open .claims td.w { width:50%; }
+  .m-proven { color:#56d364; } .m-model { color:#79c0ff; } .m-assumed { color:var(--dim); }
+  .claims tr.assumed td:not(.m) { color:var(--dim); }
+  details.fold > summary { cursor:pointer; font-size:12px; color:var(--dim); margin-top:14px; }
+  details.fold code { display:block; }
+  /* files */
   .k-proven { background:color-mix(in srgb,var(--pass) 40%,transparent); }
   .k-no_panic { background:color-mix(in srgb,var(--pass) 18%,transparent); }
   .k-ghost { background:color-mix(in srgb,var(--sel) 22%,transparent); }
@@ -101,24 +84,19 @@
   pre.src div { display:grid; grid-template-columns:48px 1fr; white-space:pre; }
   pre.src .n { color:var(--dim); text-align:right; padding-right:8px; user-select:none; }
   pre.src .code { padding-left:6px; }
+  pre.src div.hit { outline:1px solid var(--sel); }
   .jump { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:2px 8px; cursor:pointer; font-size:12px; margin:0 4px 4px 0; }
   .jump:hover { border-color:var(--sel); }
-  .empty { color:var(--dim); padding:20px 0; }
-  a.pick { cursor:pointer; text-decoration:underline dotted; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  .spin { display:inline-block; width:10px; height:10px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; margin-right:4px; }
+  table.list { border-collapse:collapse; font-size:12px; width:100%; }
+  .list th, .list td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; }
+  .list th { color:var(--dim); font-weight:600; } .list td.n { text-align:right; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
 <header>
   <h1>Verification</h1>
   <label title="Paste an aws-crypto-tools-rust PR to show its verification status instead of main's.">PR <input type="text" id="source" size="34" placeholder="main; or paste a Rust PR"></label>
-  <label id="originBox">Origin <select id="origin">
-    <option value="">All targets</option>
-    <option value="threat">Threat-driven</option>
-    <option value="capability">Capability-driven</option>
-  </select></label>
-  <label>Find <input type="text" id="search" placeholder="e.g. header"></label>
+  <label>Find <input type="text" id="search" placeholder="e.g. frame"></label>
   <label id="provenBox"><input type="checkbox" id="provenOnly"> Only files with proofs</label>
   <span class="run" id="run"></span>
 </header>
@@ -127,12 +105,12 @@
     <div class="verdict" id="verdict"><i class="spin"></i>Loading…</div>
     <div id="prline"></div>
     <div class="summary" id="counts"></div>
-    <div class="legend" id="legend"></div>
     <div class="tabs" id="tabs">
-      <button class="tab on" data-view="files">By file</button>
-      <button class="tab" data-view="targets">By target</button>
+      <button class="tab on" data-view="claims">What is proven</button>
+      <button class="tab" data-view="files">By file</button>
     </div>
-    <table id="matrix"></table>
+    <div class="legend" id="legend"></div>
+    <div id="body"></div>
     <div class="foot" id="foot"></div>
   </section>
   <div id="divider" title="Drag to resize; double-click to reset"></div>
@@ -140,33 +118,37 @@
 </main>
 <script src="../test-servers/loader.js"></script>
 <script>
-// Shows docs/verification-status.json from aws-crypto-tools-rust. That file is
-// written by `cargo xtask verification-status`, which runs Verus and reads the
-// target table in docs/verus-proofs-report.md. This page only draws it.
+// Shows docs/verification-status.json from aws-crypto-tools-rust, written by
+// `cargo xtask verification-status`. The page has three parts:
 //
-// By file shows, for each source file of the Verus-enabled crates, how many
-// of its lines Verus checks. That comes from reading which code sits inside
-// verus! blocks, not from running tests, so it is not test line coverage.
+// - status: whether every Verus run passed when the file was written;
+// - count: fns and fn lines of each crate inside verus! blocks, which is the
+//   only code Verus checks, over all fns that ship;
+// - claims: one plain sentence per proof, from docs/verification-claims.toml.
+//   The generator fails if a "proven" claim names a fn outside verus!, so a
+//   check mark here always points at code Verus checked.
 //
-// The one rule this page keeps: a part of a target is drawn at the level the
-// file gives it and no higher. Only in_crate is green, because only in_crate is
-// a Verus proof of shipped code. A target split across levels shows each part
-// in its own column.
+// The By file view is how the count was made: each source line colored by
+// whether Verus checks it. It is read from the source, not from running
+// tests, so it is not test line coverage.
 const $ = id => document.getElementById(id);
 const RUST = "aws/aws-crypto-tools-rust", FILE = "docs/verification-status.json";
 const VERIFICATION_SOURCE_KEY = "verificationSource";
-const LEVEL_NAMES = { in_crate:"In-crate proof", model_only:"Model only", compiler_lint:"Compiler and clippy",
-  trusted:"Trusted", deferred:"Deferred", not_started:"Not started" };
-const COUNT_NAMES = { esdk:"esdk", prim:"prim", verification_models:"verification models" };
-
+const MARKS = {
+  proven:["✓", "Proven in shipped code", "Verus proves it about the code that ships."],
+  model:["◐", "Proven on a model", "Verus proves it about a copy of the code in verification/, not the code that ships."],
+  assumed:["○", "Assumed", "The proofs rely on it. No tool checks it."],
+};
 const KIND_NAMES = { proven:"Proven", no_panic:"No panic only", ghost:"Spec and proof", trusted:"Trusted",
   verus_item:"Types in verus!", unverified:"Not checked" };
+const COUNT_NAMES = { esdk:"esdk", prim:"prim", verification_models:"verification models" };
 // Fn lines Verus checks over all fn lines that ship. Spec and proof fns do
 // not ship, and types are not fns, so neither counts.
 const CHECKED = ["proven", "no_panic"], SHIPPED = ["proven", "no_panic", "trusted", "unverified"];
-const ui = { view:"files", origin:"", search:"", provenOnly:false, sort:"path", target:null, count:null, file:null };
+
+const ui = { view:"claims", search:"", provenOnly:false, sort:"path", count:null, file:null, line:null };
+const src = { state:"loading", note:"", data:null, ref:"main", label:"main", others:[], history:[] };
 const sources = {};
-const src = { state:"loading", note:"", data:null, ref:"main", label:"main", others:[] };
 
 // ---------- loading ----------
 function parsePR(text) {
@@ -203,9 +185,22 @@ async function showPR(n) {
   }
 }
 
+// Earlier versions of the status file on the shown ref, for the trend line.
+// Versions written before the file had crate counts are skipped.
+async function loadHistory() {
+  const ref = src.ref;
+  try {
+    const commits = await ghJson(`repos/${RUST}/commits?path=${FILE}&sha=${ref}&per_page=20`);
+    const points = await Promise.all(commits.map(c => readFile(c.sha).then(d => d.crates ? d : null, () => null)));
+    if (src.ref !== ref) return;
+    src.history = points.filter(Boolean).sort((a, b) => a.generated.localeCompare(b.generated));
+    render();
+  } catch { /* the trend line is extra; the page works without it */ }
+}
+
 async function load() {
   const text = $("source").value.trim();
-  Object.assign(src, { state:"loading", note:"", data:null, url:null, title:null, others:[] });
+  Object.assign(src, { state:"loading", note:"", data:null, url:null, title:null, others:[], history:[] });
   render();
   try {
     if (text) {
@@ -226,31 +221,20 @@ async function load() {
     src.note = `main has no ${FILE} yet, so this shows the newest open PR that adds one.`;
   } catch (err) {
     src.state = "error"; src.note = "Could not load: " + (err.message || err);
-  } finally { render(); }
+  } finally {
+    render();
+    if (src.state === "done") loadHistory();
+  }
 }
 
 // ---------- helpers ----------
-// The report's cells are markdown; show only bold and code.
-const md = s => escHtml(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
-const levels = () => Object.keys(src.data?.levels || LEVEL_NAMES).sort((a, b) => order(a) - order(b));
-const order = l => Object.keys(LEVEL_NAMES).indexOf(l);
-const levelName = l => LEVEL_NAMES[l] || l;
-const levelHelp = l => src.data?.levels?.[l] || "";
-const blob = f => `https://github.com/${RUST}/blob/${src.data.commit}/${f}`;
-const chip = (l, text, attrs = "") => `<span class="chip l-${l}" title="${escHtml(levelName(l) + ": " + levelHelp(l))}" ${attrs}>${escHtml(text)}</span>`;
-// Matrix columns: only levels some target has a part at. The legend still
-// lists every level with its count.
-const usedLevels = () => levels().filter(l => src.data.targets.some(t => t.parts.some(p => p.level === l)));
-
-function shown() {
-  const q = ui.search.toLowerCase();
-  return (src.data?.targets || []).filter(t => (!ui.origin || t.origin === ui.origin) && (!q ||
-    [t.id, t.title, t.property, t.status, t.residual, ...t.parts.map(p => p.what), ...t.threats.map(x => x.id + " " + x.description)]
-      .join(" ").toLowerCase().includes(q)));
-}
-
+const blob = (f, line) => `https://github.com/${RUST}/blob/${src.data.commit}/${f}${line ? "#L" + line : ""}`;
+const sum = (c, ks) => ks.reduce((a, k) => a + (c[k] || 0), 0);
+const pct = c => { const n = sum(c, SHIPPED); return n ? sum(c, CHECKED) / n : null; };
+const fmtPct = p => p == null ? "–" : (p * 100).toFixed(p > 0 && p < 0.1 ? 1 : 0) + "%";
 const allRuns = () => (src.data?.counts || []).flatMap(c => c.runs || []);
 const countOf = c => (c.runs || []).reduce((a, r) => ({ v:a.v + r.verified, e:a.e + r.errors }), { v:0, e:0 });
+const short = p => p.replace(/^(esdk|prim)\/src\//, "$1/");
 
 // ---------- drawing ----------
 function render() {
@@ -259,32 +243,36 @@ function render() {
   if (src.state !== "done") {
     $("verdict").innerHTML = src.state === "loading" ? `<i class="spin"></i>Loading ${escHtml(src.label)}…`
       : `<span class="warnb">${escHtml(src.note)}</span>`;
-    for (const id of ["counts", "legend", "matrix", "foot", "run"]) $(id).innerHTML = "";
+    for (const id of ["counts", "legend", "body", "foot", "run"]) $(id).innerHTML = "";
     document.querySelector("main").classList.remove("open");
     return;
   }
-  const d = src.data, runs = allRuns(), errors = runs.reduce((a, r) => a + r.errors, 0);
+  const d = src.data;
+  if (!d.claims || !d.crates) {
+    $("verdict").innerHTML = `<span class="warnb">This status file is from an older generator. Regenerate it with <code>cargo xtask verification-status</code>.</span>`;
+    return;
+  }
+  const runs = allRuns(), errors = runs.reduce((a, r) => a + r.errors, 0);
   const missing = d.counts.filter(c => !c.runs);
-  const bad = errors > 0 || missing.length > 0;
-  $("verdict").className = "verdict" + (bad ? " bad" : "");
-  $("verdict").innerHTML = (errors ? `${errors} Verus errors` : missing.length ? `${missing.length} Verus count${missing.length > 1 ? "s" : ""} missing` : "0 Verus errors")
-    + ` <small>in ${runs.length} runs · ${d.targets.length} targets · ${d.targets.filter(t => t.drift).length} with YAML drift</small>`;
-  $("run").innerHTML = `generated ${ago(d.generated)} at <a href="https://github.com/${RUST}/commit/${d.commit}">${d.commit.slice(0, 8)}</a> · Verus ${escHtml(d.verus)}`;
+  $("verdict").className = "verdict" + (errors || missing.length ? " bad" : "");
+  $("verdict").innerHTML = (errors ? `✗ ${errors} Verus errors` : missing.length ? `⚠ ${missing.length} Verus run${missing.length > 1 ? "s" : ""} could not be read` : "✓ All Verus proofs pass")
+    + ` <small>${runs.length} runs · Verus ${escHtml(d.verus)}</small>`;
+  $("run").innerHTML = `generated ${ago(d.generated)} at <a href="https://github.com/${RUST}/commit/${d.commit}">${d.commit.slice(0, 8)}</a>`;
   $("run").title = d.generated;
-  $("counts").innerHTML = d.counts.map(countCard).join("") + crateCards();
-  $("legend").innerHTML = ui.view === "files" ? Object.keys(KIND_NAMES).map(k =>
-    `<span title="${escHtml(d.line_kinds?.[k] || "")}"><i class="sw k-${k}"></i>${KIND_NAMES[k]}</span>`).join("") : levels().map(l => {
-    const n = d.targets.filter(t => t.parts.some(p => p.level === l)).length;
-    return `<span title="${escHtml(levelHelp(l))}"><i class="sw l-${l}"></i>${levelName(l)} <b>${n}</b></span>`;
-  }).join("") + `<span class="drift">⚠ YAML status disagrees with the report</span>`;
+  $("counts").innerHTML = d.crates.map(crateCard).join("") + modelCard();
   document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.view === ui.view));
-  $("matrix").className = ui.view === "files" ? "files" : "matrix targets";
-  $("matrix").innerHTML = ui.view === "files" ? fileTable() : targetMatrix();
-  $("originBox").style.display = ui.view === "targets" ? "" : "none";
   $("provenBox").style.display = ui.view === "files" ? "" : "none";
-  $("foot").innerHTML = ui.view === "files"
-    ? "Checked = lines of fns inside verus! (proven or no panic only) over all fn lines that ship. Spec and proof fns and types are not counted. Hover a kind in the legend for what it means."
-    : escHtml(d.snapshot_note) + " Only green is a Verus proof of shipped code; a target split across levels shows each part in its own column.";
+  if (ui.view === "claims") {
+    $("legend").innerHTML = Object.entries(MARKS).map(([k, [icon, name, help]]) =>
+      `<span title="${escHtml(help)}"><b class="m-${k}">${icon}</b>${name} <b>${d.claims.filter(c => c.mark === k).length}</b></span>`).join("");
+    $("body").innerHTML = claimTable();
+    $("foot").innerHTML = undescribed();
+  } else {
+    $("legend").innerHTML = Object.keys(KIND_NAMES).map(k =>
+      `<span title="${escHtml(d.line_kinds?.[k] || "")}"><i class="sw k-${k}"></i>${KIND_NAMES[k]}</span>`).join("");
+    $("body").innerHTML = fileTable();
+    $("foot").innerHTML = "Checked = lines of fns inside verus! over all fn lines that ship. Spec and proof fns and types are not counted. Read from the source, not from running tests.";
+  }
   renderDetail();
 }
 
@@ -296,45 +284,73 @@ function prLine() {
   return s;
 }
 
-function countCard(c) {
-  const name = COUNT_NAMES[c.name] || c.name;
-  if (!c.runs) return `<div class="card na ${ui.count === c.name ? "on" : ""}" data-count="${c.name}" title="${escHtml(c.unavailable || "")}">
-    <b>–</b><small>${escHtml(name)}: unavailable</small><small><code>${escHtml(c.cmd)}</code></small></div>`;
-  const { v, e } = countOf(c);
-  const each = c.runs.length > 2 ? `${c.runs.length} files` : c.runs.map(r => r.verified).join(" / ");
-  return `<div class="card ${e ? "bad" : ""} ${ui.count === c.name ? "on" : ""}" data-count="${c.name}">
-    <b>${c.runs.length > 2 ? v : c.runs[0].verified}</b><small>${escHtml(name)} verified · ${e} errors</small>
-    <small>${escHtml(each)} · <code>${escHtml(c.cmd)}</code></small></div>`;
+// A small line of fns checked over time, once there are two or more versions.
+function spark(name) {
+  const pts = src.history.map(h => h.crates.find(c => c.name === name)?.fns_checked).filter(n => n != null);
+  if (pts.length < 2) return "";
+  const w = 140, h = 24, max = Math.max(...pts), min = Math.min(...pts);
+  const xy = pts.map((v, i) => `${(i / (pts.length - 1) * w).toFixed(1)},${(h - 2 - (max === min ? 0 : (v - min) / (max - min)) * (h - 4)).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}"><polyline points="${xy.join(" ")}" fill="none" stroke="#56d364" stroke-width="1.5"/></svg>`;
+}
+
+function crateCard(c) {
+  const count = src.data.counts.find(x => x.name === c.name);
+  const { e } = count ? countOf(count) : { e:0 };
+  const bad = !count?.runs || e;
+  return `<div class="card ${bad ? "bad" : ""} ${ui.count === c.name ? "on" : ""}" data-count="${c.name}" title="Fns inside verus! over all fns that ship in ${c.name}/src. Click for the Verus runs.">
+    <b>${c.fns_checked}<small> / ${c.fns_shipped} fns</small></b>
+    <small>${c.name} fns proven · ${fmtPct(c.lines_shipped ? c.lines_checked / c.lines_shipped : null)} of fn lines</small>
+    <small>${count?.runs ? `${count.runs.length} runs · ${e} errors` : "Verus run unavailable"}</small>${spark(c.name)}</div>`;
+}
+
+function modelCard() {
+  const c = src.data.counts.find(x => x.name === "verification_models");
+  if (!c) return "";
+  const passed = (c.runs || []).filter(r => !r.errors).length;
+  return `<div class="card ${!c.runs || passed < c.runs.length ? "bad" : ""} ${ui.count === c.name ? "on" : ""}" data-count="${c.name}" title="Proofs about copies of the code in verification/, not the code that ships.">
+    <b>${passed}<small> / ${(c.runs || []).length} files</small></b><small>models pass</small><small><code>${escHtml(c.cmd)}</code></small></div>`;
+}
+
+// ---------- claims ----------
+function claimTable() {
+  const q = ui.search.toLowerCase();
+  const claims = src.data.claims.filter(c => !q || (c.text + " " + c.area + " " + c.places.map(p => p.name || p.path).join(" ")).toLowerCase().includes(q));
+  if (!claims.length) return `<div class="empty">No claim matches.</div>`;
+  const areas = [...new Set(claims.map(c => c.area))];
+  return `<table class="claims"><tbody>${areas.map(a => `<tr class="group"><td colspan="3">${escHtml(a)}</td></tr>` +
+    claims.filter(c => c.area === a).map(c => `<tr class="${c.mark}">
+      <td class="m m-${c.mark}" title="${escHtml(MARKS[c.mark][1] + ": " + MARKS[c.mark][2])}">${MARKS[c.mark][0]}</td>
+      <td>${escHtml(c.text)}</td>
+      <td class="w">${c.places.map(p => p.name
+        ? `<a class="pick" data-open="${escHtml(p.path)}" data-at="${p.first}" title="${escHtml(p.path)}, lines ${p.first}-${p.last}">${escHtml(p.name)}</a>`
+        : `<a href="${blob(p.path)}">${escHtml(p.path.replace(/^verification\//, ""))}</a>`).join("") || (c.mark === "assumed" ? "not checked" : "")}</td>
+    </tr>`).join("")).join("")}</tbody></table>`;
+}
+
+function undescribed() {
+  const u = src.data.undescribed || [];
+  const head = `Claims come from <a href="${blob("docs/verification-claims.toml")}"><code>docs/verification-claims.toml</code></a>. Hover a mark for what it means.`;
+  if (!u.length) return head;
+  return head + `<details class="fold"><summary>${u.length} proven fns are not in any claim yet</summary>${u.map(id => {
+    const [path, name] = id.split("::");
+    return `<code><a class="pick" data-open="${escHtml(path)}" data-name="${escHtml(name)}">${escHtml(short(path))}::${escHtml(name)}</a></code>`;
+  }).join("")}</details>`;
 }
 
 // ---------- files ----------
-const sum = (c, ks) => ks.reduce((a, k) => a + (c[k] || 0), 0);
-const pct = c => { const n = sum(c, SHIPPED); return n ? sum(c, CHECKED) / n : null; };
-const fmtPct = p => p == null ? "–" : (p * 100).toFixed(p > 0 && p < 0.1 ? 1 : 0) + "%";
 const crateOf = f => f.path.split("/")[0];
 function totals(files) {
   const t = {};
   for (const f of files) for (const [k, n] of Object.entries(f.counts)) t[k] = (t[k] || 0) + n;
   return t;
 }
-function crateCards() {
-  if (!src.data.files) return "";
-  return [...new Set(src.data.files.map(crateOf))].map(c => {
-    const fs = src.data.files.filter(f => crateOf(f) === c), t = totals(fs);
-    const withProofs = fs.filter(f => sum(f.counts, CHECKED) > 0).length;
-    return `<div class="card" data-view="files" title="Fn lines Verus checks over all fn lines that ship, in ${c}/src">
-      <b>${fmtPct(pct(t))}</b><small>${c} fn lines checked</small><small>${sum(t, CHECKED)} / ${sum(t, SHIPPED)} lines · ${withProofs} of ${fs.length} files</small></div>`;
-  }).join("");
-}
 function stack(c) {
   const n = Object.values(c).reduce((a, b) => a + b, 0) || 1;
   return `<span class="stack">${Object.keys(KIND_NAMES).map(k => c[k] ? `<i class="k-${k}" style="width:${c[k] / n * 100}%"></i>` : "").join("")}</span>`;
 }
 function fileTable() {
-  const d = src.data;
-  if (!d.files) return `<tbody><tr><td class="empty">This status file has no per-file data. Regenerate it with <code>cargo xtask verification-status</code>.</td></tr></tbody>`;
   const q = ui.search.toLowerCase();
-  let fs = d.files.filter(f => (!q || f.path.toLowerCase().includes(q)) && (!ui.provenOnly || sum(f.counts, CHECKED) > 0));
+  let fs = src.data.files.filter(f => (!q || f.path.toLowerCase().includes(q)) && (!ui.provenOnly || sum(f.counts, CHECKED) > 0));
   const key = { path:f => f.path, pct:f => -(pct(f.counts) ?? -1), unverified:f => -(f.counts.unverified || 0) }[ui.sort];
   fs = [...fs].sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : a.path.localeCompare(b.path); });
   const cols = [["path", "File"], ["pct", "Checked"], ["", "Lines"], ...Object.keys(KIND_NAMES).map(k => [k === "unverified" ? k : "", KIND_NAMES[k]])];
@@ -342,91 +358,45 @@ function fileTable() {
   const row = f => `<tr class="f ${ui.file === f.path ? "sel" : ""}" data-file="${escHtml(f.path)}">
     <td class="path">${escHtml(f.path)}</td><td>${fmtPct(pct(f.counts))}</td><td>${stack(f.counts)}</td>
     ${Object.keys(KIND_NAMES).map(k => `<td class="${f.counts[k] ? "" : "z"}">${f.counts[k] || "·"}</td>`).join("")}</tr>`;
+  if (!fs.length) return `<div class="empty">No file matches.</div>`;
+  if (ui.sort !== "path") return `<table class="files">${head}<tbody>${fs.map(row).join("")}</tbody></table>`;
   // Grouped by directory when sorted by path, so each folder shows its total.
-  if (ui.sort !== "path") return head + `<tbody>${fs.map(row).join("")}</tbody>`;
   const dirOf = f => f.path.split("/").slice(0, -1).join("/");
   const body = [...new Set(fs.map(dirOf))].map(dir => {
     const in_ = fs.filter(f => dirOf(f) === dir), t = totals(in_);
     return `<tr class="dir"><td>${escHtml(dir)}/</td><td>${fmtPct(pct(t))}</td><td>${stack(t)}</td>${Object.keys(KIND_NAMES).map(k => `<td>${t[k] || "·"}</td>`).join("")}</tr>` + in_.map(row).join("");
   }).join("");
-  return head + `<tbody>${body || `<tr><td class="empty" colspan="9">No file matches.</td></tr>`}</tbody>`;
+  return `<table class="files">${head}<tbody>${body}</tbody></table>`;
 }
 
 async function sourceOf(path) {
   const key = src.data.commit + ":" + path;
   return sources[key] ??= ghRaw(RUST, path, src.data.commit);
 }
+function scrollToLine(n) {
+  const line = document.getElementById("L" + n), pane = $("detail");
+  if (!line) return;
+  document.querySelectorAll("pre.src div.hit").forEach(x => x.classList.remove("hit"));
+  line.classList.add("hit");
+  pane.scrollTop += line.getBoundingClientRect().top - pane.getBoundingClientRect().top - 40;
+}
 function fileDetail(f) {
   const kindAt = new Map();
   for (const [a, b, k] of f.runs) for (let l = a; l <= b; l++) kindAt.set(l, k);
   const fns = f.fns.length ? f.fns.map(x => `<button class="jump k-${x.kind}" data-line="${x.first}" title="${KIND_NAMES[x.kind]}, lines ${x.first}-${x.last}">${escHtml(x.name)}</button>`).join("") : `<span class="sub">No fns.</span>`;
-  const head = `<button class="close" data-close>✕</button>
+  $("detail").innerHTML = `<button class="close" data-close>✕</button>
     <h2><a href="${blob(f.path)}"><code>${escHtml(f.path)}</code></a></h2>
     <div class="sub">${fmtPct(pct(f.counts))} of fn lines checked · ${f.lines} lines</div>
     <div class="legend">${Object.keys(KIND_NAMES).filter(k => f.counts[k]).map(k => `<span><i class="sw k-${k}"></i>${KIND_NAMES[k]} <b>${f.counts[k]}</b></span>`).join("")}</div>
-    <h3>Fns</h3><div>${fns}</div><h3>Source</h3>`;
-  $("detail").innerHTML = head + `<div id="srcbody" class="sub"><i class="spin"></i>Loading source…</div>`;
+    <h3>Fns</h3><div>${fns}</div><h3>Source</h3><div id="srcbody" class="sub"><i class="spin"></i>Loading source…</div>`;
   sourceOf(f.path).then(text => {
     if (ui.file !== f.path) return;
     $("srcbody").outerHTML = `<pre class="src">${text.split("\n").map((line, i) => {
       const k = kindAt.get(i + 1);
       return `<div id="L${i + 1}" class="${k ? "k-" + k : ""}" title="${k ? KIND_NAMES[k] : ""}"><span class="n">${i + 1}</span><span class="code">${escHtml(line) || " "}</span></div>`;
     }).join("")}</pre>`;
+    if (ui.line) scrollToLine(ui.line);
   }, err => { if (ui.file === f.path) $("srcbody").innerHTML = `<span class="warnb">Could not load the source: ${escHtml(err.message || err)}</span>`; });
-}
-
-function targetMatrix() {
-  const ls = usedLevels(), rows = shown();
-  const head = `<thead><tr><th>Target</th><th class="side">Score</th><th class="side">Threats</th>${ls.map(l =>
-    `<th title="${escHtml(levelHelp(l))}">${levelName(l)}<small>${l}</small></th>`).join("")}</tr></thead>`;
-  if (!rows.length) return head + `<tbody><tr><td colspan="${ls.length + 3}" class="empty">No target matches.</td></tr></tbody>`;
-  const groups = [["threat", "Threat-driven"], ["capability", "Capability-driven"]];
-  const body = groups.map(([o, name]) => {
-    const rs = rows.filter(t => t.origin === o).sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-    if (!rs.length) return "";
-    return `<tr class="group"><th colspan="${ls.length + 3}">${name} <small style="display:inline">${rs.length}</small></th></tr>` +
-      rs.map(t => `<tr data-target="${t.id}" class="${ui.target === t.id ? "sel" : ""}">
-        <th>${t.id}${t.drift ? ` <span class="drift" title="${escHtml(t.drift)}">⚠</span>` : ""}<small>${escHtml(t.title)}</small></th>
-        <td class="num side">${t.score ?? "–"}</td>
-        <td class="thr side">${t.threats.map(x => x.id).join(", ") || "–"}</td>
-        ${ls.map(l => {
-          const ps = t.parts.filter(p => p.level === l);
-          return `<td>${ps.length ? `<div class="cell l-${l}">${ps.map(p => escHtml(p.what)).join("; ")}</div>` : ""}</td>`;
-        }).join("")}</tr>`).join("");
-  }).join("");
-  return head + `<tbody>${body}</tbody>`;
-}
-
-function renderDetail() {
-  const main = document.querySelector("main"), d = src.data;
-  const t = ui.target && d?.targets.find(x => x.id === ui.target);
-  const c = ui.count && d?.counts.find(x => x.name === ui.count);
-  const f = ui.file && d?.files?.find(x => x.path === ui.file);
-  main.classList.toggle("open", !!(t || c || f));
-  if (f) { if ($("detail").dataset.file !== f.path) { $("detail").dataset.file = f.path; fileDetail(f); } return; }
-  $("detail").dataset.file = "";
-  if (t) $("detail").innerHTML = targetDetail(t);
-  else if (c) $("detail").innerHTML = countDetail(c);
-}
-
-function targetDetail(t) {
-  return `<button class="close" data-close>✕</button>
-    <h2>${t.id} ${escHtml(t.title)}</h2>
-    <div class="sub"><span class="pill">${t.origin === "capability" ? "capability-driven" : "threat-driven"}</span>
-      ${t.score != null ? ` score ${t.score}` : ""}${t.agent ? ` · proof agent <code>${escHtml(t.agent)}</code>` : ""}</div>
-    ${t.property ? `<div class="quote">${escHtml(t.property)}</div>` : ""}
-    ${t.drift ? `<div class="warnbox">⚠ ${escHtml(t.drift)}</div>` : ""}
-    <h3>Levels</h3>
-    ${t.parts.map(p => `<div class="part">${chip(p.level, levelName(p.level))}<span>${escHtml(p.what)}</span></div>`).join("")}
-    <h3>Status</h3><div class="prose">${md(t.status)}</div>
-    <h3>Not proven</h3><div class="prose">${md(t.residual)}</div>
-    ${t.files.length ? `<h3>Files</h3>${t.files.map(f => `<div><a href="${blob(f)}"><code>${escHtml(f)}</code></a></div>`).join("")}` : ""}
-    ${t.threats.length ? `<h3>Threats</h3><table class="list"><thead><tr><th>Id</th><th>Category</th><th>Threat</th></tr></thead><tbody>${
-      t.threats.map(x => `<tr><td>${escHtml(x.id)}</td><td>${escHtml(x.category)}</td><td>${escHtml(x.description)}</td></tr>`).join("")}</tbody></table>` : ""}
-    <div class="foot">Levels, status and residual come from the target table in
-      <a href="${blob("docs/verus-proofs-report.md")}"><code>docs/verus-proofs-report.md</code></a>.
-      Property, score, threats and files come from
-      <a href="${blob("docs/verification-recommendations.md")}"><code>docs/verification-recommendations.md</code></a>${t.yaml_status ? `, whose YAML status is <code>${escHtml(t.yaml_status)}</code>` : ""}.</div>`;
 }
 
 function countDetail(c) {
@@ -434,36 +404,50 @@ function countDetail(c) {
   const body = c.runs
     ? `<table class="list"><thead><tr><th>Run</th><th>Verified</th><th>Errors</th></tr></thead><tbody>${c.runs.map(r =>
         `<tr><td>${escHtml(r.label)}</td><td class="n">${r.verified}</td><td class="n${r.errors ? " warnb" : ""}">${r.errors}</td></tr>`).join("")}</tbody></table>`
-    : `<div class="warnbox">No count: ${escHtml(c.unavailable || "")}</div>`;
+    : `<div class="warnb">No count: ${escHtml(c.unavailable || "")}</div>`;
   return `<button class="close" data-close>✕</button><h2>${escHtml(name)}</h2>
     <div class="sub"><code>${escHtml(c.cmd)}</code>, run at ${escHtml(src.data.generated)}</div>${body}
-    <div class="foot">Each number is a Verus obligation count from that run's <code>verification results::</code> line.</div>`;
+    <div class="foot">Each number is a count of Verus proof steps from that run's <code>verification results::</code> line, not a count of fns.</div>`;
+}
+
+function renderDetail() {
+  const main = document.querySelector("main"), d = src.data;
+  const c = ui.count && d?.counts.find(x => x.name === ui.count);
+  const f = ui.file && d?.files?.find(x => x.path === ui.file);
+  main.classList.toggle("open", !!(c || f));
+  if (f) {
+    if ($("detail").dataset.file !== f.path) { $("detail").dataset.file = f.path; fileDetail(f); }
+    else if (ui.line) scrollToLine(ui.line);
+    return;
+  }
+  $("detail").dataset.file = "";
+  if (c) $("detail").innerHTML = countDetail(c);
 }
 
 // ---------- events ----------
 document.body.addEventListener("click", e => {
   const pk = e.target.closest("[data-pick]");
   if (pk) { $("source").value = "#" + pk.dataset.pick; localStorage.setItem(VERIFICATION_SOURCE_KEY, $("source").value); load(); return; }
-  if (e.target.closest("[data-close]")) { ui.target = ui.count = ui.file = null; render(); return; }
-  const jump = e.target.closest("[data-line]");
-  if (jump) {
-    const line = document.getElementById("L" + jump.dataset.line), pane = $("detail");
-    if (line) pane.scrollTop += line.getBoundingClientRect().top - pane.getBoundingClientRect().top - 40;
-    return;
+  if (e.target.closest("[data-close]")) { ui.count = ui.file = ui.line = null; render(); return; }
+  const open = e.target.closest("[data-open]");
+  if (open) {
+    const f = src.data.files.find(x => x.path === open.dataset.open);
+    ui.file = open.dataset.open; ui.count = null;
+    ui.line = +open.dataset.at || f?.fns.find(x => x.name === open.dataset.name)?.first || null;
+    render(); return;
   }
+  const jump = e.target.closest("[data-line]");
+  if (jump) { ui.line = +jump.dataset.line; scrollToLine(ui.line); return; }
   const sort = e.target.closest("th[data-sort]");
   if (sort) { ui.sort = sort.dataset.sort; render(); return; }
   const file = e.target.closest("tr[data-file]");
-  if (file) { ui.file = file.dataset.file; ui.target = ui.count = null; render(); $("detail").scrollTop = 0; return; }
+  if (file) { ui.file = file.dataset.file; ui.line = null; ui.count = null; render(); $("detail").scrollTop = 0; return; }
   const tab = e.target.closest("[data-view]");
   if (tab) { ui.view = tab.dataset.view; render(); return; }
   const card = e.target.closest("[data-count]");
-  if (card) { ui.count = ui.count === card.dataset.count ? null : card.dataset.count; ui.target = ui.file = null; render(); return; }
-  const tr = e.target.closest("[data-target]");
-  if (tr && !$("detail").contains(tr)) { ui.target = tr.dataset.target; ui.count = ui.file = null; render(); $("detail").scrollTop = 0; }
+  if (card) { ui.count = ui.count === card.dataset.count ? null : card.dataset.count; ui.file = null; render(); }
 });
 $("provenOnly").onchange = e => { ui.provenOnly = e.target.checked; render(); };
-$("origin").onchange = e => { ui.origin = e.target.value; render(); };
 let typing; $("search").oninput = e => { clearTimeout(typing); typing = setTimeout(() => { ui.search = e.target.value.trim(); render(); }, 200); };
 $("source").onchange = e => { localStorage.setItem(VERIFICATION_SOURCE_KEY, e.target.value.trim()); load(); };
 
