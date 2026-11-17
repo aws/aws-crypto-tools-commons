@@ -36,6 +36,10 @@ on:
         description: Space-separated directories in the library repository holding Rust test files. Empty for none.
         type: string
         default: ""
+      local-java-tests:
+        description: Space-separated directories in the library repository holding Java JUnit test files. Empty for none.
+        type: string
+        default: ""
       crate:
         description: Package name of the crate whose tests are in local-tests.
         type: string
@@ -190,6 +194,7 @@ jobs:
           COMMIT: ${{ steps.library.outputs.commit }}
           SOURCE: ${{ inputs.source }}
           LOCAL_TESTS: ${{ inputs.local-tests }}
+          LOCAL_JAVA_TESTS: ${{ inputs.local-java-tests }}
           CRATE: ${{ inputs.crate }}
           PREFIXES: ${{ inputs.prefixes }}
         run: |
@@ -197,6 +202,7 @@ jobs:
           args=()
           for dir in $SOURCE; do args+=(--source "$dir"); done
           for dir in $LOCAL_TESTS; do args+=(--local-tests "$dir"); done
+          for dir in $LOCAL_JAVA_TESTS; do args+=(--local-java-tests "$dir"); done
           for prefix in $PREFIXES; do args+=(--prefix "$prefix"); done
           if [ -n "${CHANGED_SINCE:-}" ]; then args+=(--changed-since "$CHANGED_SINCE"); fi
           while IFS= read -r f; do args+=(--coverage "$f"); done < <(find artifacts -path "*per-test-coverage/$LANGUAGE.jsonl")

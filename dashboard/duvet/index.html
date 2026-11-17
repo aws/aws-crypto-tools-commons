@@ -246,7 +246,7 @@ const SOURCES = [
   { lib:"ESDK", lang:"c", repo:"aws/aws-encryption-sdk-c", why:"aws-encryption-sdk-c has some //= lines, but no duvet workflow." },
   { lib:"MPL", lang:"rust", repo:RUST, artifact:"mpl-duvet-report", dir:"mpl", reach:"duvet-test-reach-mpl-rust" },
   { lib:"MPL", lang:"dafny", repo:"aws/aws-cryptographic-material-providers-library", artifact:DAFNY_REPORT },
-  { lib:"MPL", lang:"java", repo:"aws/aws-crypto-tools-java", artifact:"mpl-duvet-report", dir:"mpl" },
+  { lib:"MPL", lang:"java", repo:"aws/aws-crypto-tools-java", artifact:"mpl-duvet-report", dir:"mpl", reach:"duvet-test-reach-mpl-java" },
   { lib:"DB-ESDK", lang:"rust", repo:RUST, artifact:"db-esdk-duvet-report", dir:"db-esdk" },
   { lib:"DB-ESDK", lang:"dafny", repo:"aws/aws-database-encryption-sdk-dynamodb", artifact:DAFNY_REPORT },
   { lib:"ESDK shim", lang:"c++", repo:RUST, artifact:"aws-esdk-cpp-duvet-report", dir:"esdk/shims/aws-esdk-cpp" },
@@ -307,15 +307,22 @@ async function readArtifact(src, art) {
   }
   return { specs, branch:art.workflow_run.head_branch, ref:art.workflow_run.head_sha, created:art.created_at,
     run:`https://github.com/${src.repo}/actions/runs/${art.workflow_run.id}`,
-    reach:src.reach ? await readReach(src, art.workflow_run.id) : null };
+    reach:src.reach ? await readReach(src, art.workflow_run.id, art.workflow_run.head_sha) : null };
 }
 
 // The duvet test reach report (test-server-common/tools/duvet_test_reach.py)
-// that the same CI run uploaded, or { missing:true } when it uploaded none.
+// that the same CI run uploaded, else another run on the same commit (in
+// aws-crypto-tools-java the report and the reach check are separate
+// workflows), or { missing:true } when none did.
 // A pull request's report checks only the annotations it changed.
-async function readReach(src, runId) {
-  const arts = (await ghJson(`repos/${src.repo}/actions/runs/${runId}/artifacts?per_page=100`)).artifacts;
-  const art = arts.find(a => a.name === src.reach && !a.expired);
+async function readReach(src, runId, sha) {
+  const named = async id => (await ghJson(`repos/${src.repo}/actions/runs/${id}/artifacts?per_page=100`)).artifacts
+    .find(a => a.name === src.reach && !a.expired);
+  let art = await named(runId);
+  if (!art && sha) {
+    const runs = (await ghJson(`repos/${src.repo}/actions/runs?head_sha=${sha}&per_page=100`)).workflow_runs;
+    for (const run of runs.filter(r => r.id !== runId)) if ((art = await named(run.id))) break;
+  }
   if (!art) return { missing:true };
   const key = `reach1:${src.repo}:${art.id}`;
   let report = await cacheGet(key);
