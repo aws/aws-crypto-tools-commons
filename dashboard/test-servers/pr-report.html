@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PR Report · Test Server Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  main { padding:16px 20px; }
+  h2 { font-size:15px; margin:18px 0 6px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:8px; }
+  .quiet { color:var(--dim); padding:24px 0; }
+  table { border-collapse:collapse; font-size:12px; }
+  th, td { border:1px solid var(--line); padding:5px 9px; }
+  thead th { color:var(--dim); font-weight:600; background:var(--bg); vertical-align:top; }
+  thead th a { font-weight:400; }
+  thead th small { display:block; color:var(--dim); font-weight:400; }
+  .matrix tbody th { text-align:left; font-weight:500; white-space:nowrap; }
+  .matrix td { text-align:center; min-width:120px; cursor:pointer; }
+  .matrix td small { display:block; color:var(--dim); font-size:10px; }
+  .matrix td.open { outline:2px solid var(--sel); outline-offset:-2px; }
+  /* One look per state. A missing run is calm grey, never red. */
+  .st-wait { color:var(--dim); border-style:dotted; }
+  .st-token { color:#e3b341; border-style:dotted; }
+  .st-loading { color:var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); animation:pulse 1.4s ease-in-out infinite; }
+  .st-pass { color:#56d364; background:color-mix(in srgb,var(--pass) 28%,transparent); }
+  .st-fail { color:#ffa198; background:color-mix(in srgb,var(--fail) 28%,transparent); }
+  .st-running { color:#e3b341; background:color-mix(in srgb,var(--part) 16%,transparent); animation:pulse 2.4s ease-in-out infinite; }
+  .st-notrun { color:var(--dim); background:var(--panel); border-style:dashed; }
+  .st-nocheck { color:var(--dim); background:repeating-linear-gradient(45deg,var(--line) 0 4px,transparent 4px 9px); }
+  .st-norun { color:var(--dim); background:var(--bg); border-style:dashed; }
+  .st-daily { color:var(--dim); background:var(--panel); }
+  .st-error { color:#ffa198; border-style:dotted; }
+  @keyframes pulse { 50% { opacity:.5; } }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin:8px 0; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid var(--line); }
+  #detail { margin-top:16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px; max-width:1200px; }
+  #detail:empty { display:none; }
+  #detail h3 { margin:0 0 6px; font-size:14px; }
+  #detail ul { margin:4px 0 8px; padding-left:18px; }
+  #detail li { margin:2px 0; }
+  #detail .code { font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; color:var(--dim); }
+  .tag { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+  .bad { color:#ffa198; }
+  .good { color:#56d364; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PR Report</h1>
+  <label title="A pull request: a URL, owner/repo#N, or #N for commons. A commons PR adds the language PRs its Test-Server-Override line names.">PR <input type="text" id="source" size="44" placeholder="paste a pull request"></label>
+</header>
+<main id="main"></main>
+
+<script src="loader.js"></script>
+<script>
+// What CI says about one pull request, as a check-by-language table.
+//
+// Every cell is the GitHub check runs on the PR's head commit whose names
+// match the row, so the page is green exactly when those checks are green.
+// A commons PR's last code block names the language PRs that test it
+// ("Test-Server-Override: owner/repo#N, ..."), and each one gets a column.
+
+// Check name -> row. A cell holds every check run whose name matches; it is
+// red if any failed, running if any is unfinished, "not run" if all were skipped.
+// artifacts names what a cell's details read from the run's uploads.
+const ROWS = [
+  { id:"tests", label:"Test server tests pass", page:"index.html", artifacts:/-test-server-reports$/,
+    match:/^(?:(?:ESDK|MPL|DB-ESDK|Primitives) )?TestServer(?: \([^)]*\))?(?: \/ |$)|^(?:ESDK|MPL|DB-ESDK|Primitives) \/ |^test-server$/ },
+  { id:"lines", label:"Line coverage of changed lines", page:"coverage.html", log:true, match:/patch coverage/i },
+  { id:"branches", label:"Branch coverage of changed lines", page:"coverage.html", log:true, match:/branch coverage/i },
+  { id:"mutants", label:"Mutants on changed lines killed", page:"mutation.html", artifacts:/^mutation-results-/,
+    match:/mutation testing$|^Choose the lines to mutate$/ },
+  { id:"reach", label:"Duvet test reach", page:"../duvet/index.html", artifacts:/^duvet-test-reach-/, match:/^duvet test reach\b/ },
+  // Fuzzing runs on the daily schedule only, never on a pull request.
+  { id:"fuzz", label:"Fuzz", page:"fuzz.html", daily:true },
+];
+
+const LANGUAGES = {
+  "aws/aws-crypto-tools-commons": "commons (every language)",
+  "aws/aws-crypto-tools-rust": "Rust",
+  "aws/aws-crypto-tools-java": "Java",
+  "aws/aws-encryption-sdk-java": "Java",
+  "aws/aws-encryption-sdk": ".NET, Go, Dafny",
+  "aws/aws-cryptographic-material-providers-library": "MPL Dafny",
+  "aws/aws-database-encryption-sdk-dynamodb": "DB-ESDK Dafny",
+  "aws/aws-encryption-sdk-python": "Python",
+  "aws/aws-encryption-sdk-javascript": "JavaScript",
+  "aws/aws-encryption-sdk-c": "C",
+};
+const FAILED = new Set(["failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"]);
+const $ = id => document.getElementById(id);
+const esc = escHtml;
+
+let columns = [], problem = null, open = null;
+const details = {};
+
+const parsePR = text => {
+  const m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/);
+  return m && { repo:m[1] || COMMONS, n:+m[2] };
+};
+
+// The PRs in the Test-Server-Override line of the body's last code block.
+function overridePRs(body) {
+  const blocks = [...(body || "").matchAll(/```[^\n]*\n([\s\S]*?)```/g)];
+  const line = blocks.length && blocks[blocks.length - 1][1].match(/Test-Server-Override:([^\n]*)/);
+  return line ? [...line[1].matchAll(/([\w.-]+\/[\w.-]+)#(\d+)/g)].map(m => ({ repo:m[1], n:+m[2] })) : [];
+}
+
+// Every page of a list endpoint; key names the list in each page.
+async function allPages(path, key) {
+  const out = [];
+  for (let page = 1; ; page++) {
+    const j = await ghJson(`${path}${path.includes("?") ? "&" : "?"}per_page=100&page=${page}`);
+    out.push(...j[key]);
+    if (j[key].length < 100 || out.length >= j.total_count) return out;
+  }
+}
+
+function cellState(runs) {
+  if (!runs.length) return "nocheck";
+  if (runs.some(r => FAILED.has(r.conclusion))) return "fail";
+  if (runs.some(r => r.status !== "completed")) return "running";
+  if (runs.every(r => r.conclusion === "skipped" || r.conclusion === "neutral")) return "notrun";
+  return "pass";
+}
+
+async function loadColumn(col) {
+  try {
+    col.pr = await ghJson(`repos/${col.repo}/pulls/${col.n}`);
+    col.sha = col.pr.head.sha;
+    const [checks, runs] = await Promise.all([
+      allPages(`repos/${col.repo}/commits/${col.sha}/check-runs`, "check_runs"),
+      allPages(`repos/${col.repo}/actions/runs?head_sha=${col.sha}`, "workflow_runs"),
+    ]);
+    // A rerun adds a check run with the same name; the newest one counts.
+    const latest = new Map();
+    for (const c of checks) if (!latest.has(c.name) || c.id > latest.get(c.name).id) latest.set(c.name, c);
+    col.checks = [...latest.values()];
+    col.runs = runs;
+    col.cells = {};
+    for (const row of ROWS) if (row.match) col.cells[row.id] = col.checks.filter(c => row.match.test(c.name));
+    col.state = "done";
+  } catch (e) {
+    col.state = "error"; col.note = e.message || String(e);
+  }
+  render();
+}
+
+async function load() {
+  const text = $("source").value.trim();
+  columns = []; problem = null; open = null;
+  if (!text) { problem = "Paste a pull request to see what its CI says."; return render(); }
+  if (!token()) { problem = "Add a GitHub token on the main dashboard's Settings page."; return render(); }
+  const want = parsePR(text);
+  if (!want) { problem = "That is not a pull request: use a URL, owner/repo#N, or #N for commons."; return render(); }
+  columns = [{ ...want, state:"loading" }];
+  render();
+  try {
+    const pr = await ghJson(`repos/${want.repo}/pulls/${want.n}`);
+    if (want.repo === COMMONS) columns.push(...overridePRs(pr.body).map(p => ({ ...p, state:"loading" })));
+  } catch (e) {
+    columns[0].state = "error"; columns[0].note = e.message || String(e);
+    return render();
+  }
+  render();
+  await Promise.all(columns.map(loadColumn));
+}
+
+const LOOK = {
+  pass:["passed"], fail:["failed"], running:["running"], notrun:["not run"],
+  nocheck:["no such check"], norun:["no CI run yet"], daily:["daily only"],
+};
+function cell(col, row) {
+  const at = ` data-col="${columns.indexOf(col)}" data-row="${row.id}"`;
+  const on = open && open.col === col && open.row === row ? " open" : "";
+  if (row.daily) return `<td class="st-daily${on}"${at} title="Fuzzing runs on the daily schedule, not on pull requests">daily only</td>`;
+  if (col.state === "loading") return `<td class="st-loading">loading…</td>`;
+  if (col.state === "error") return `<td class="st-error" title="${esc(col.note)}">could not load</td>`;
+  const runs = col.cells[row.id];
+  const state = col.checks.length ? cellState(runs) : "norun";
+  const finished = runs.filter(r => r.status === "completed" && r.conclusion !== "skipped").length;
+  const small = state === "pass" || state === "fail" ? `<small>${finished} check${finished === 1 ? "" : "s"}</small>`
+    : state === "running" ? `<small>${runs.filter(r => r.status !== "completed").length} going</small>` : "";
+  return `<td class="st-${state}${on}"${at}>${LOOK[state][0]}${small}</td>`;
+}
+
+function render() {
+  if (problem || !columns.length) { $("main").innerHTML = `<div class="quiet">${esc(problem || "")}</div>`; return; }
+  let h = `<div class="sub">Each cell is the GitHub check runs on the PR's head commit for that row. Click a cell for its runs, failing steps and findings.</div>`;
+  h += `<table class="matrix"><thead><tr><th></th>${columns.map(c => {
+    const name = `${c.repo.split("/")[1]}#${c.n}`;
+    const link = `<a href="https://github.com/${c.repo}/pull/${c.n}" target="_blank">${esc(name)}</a>`;
+    return `<th>${esc(LANGUAGES[c.repo] || c.repo.split("/")[1])}<small>${link}${c.sha ? " · " + c.sha.slice(0, 7) : ""}</small></th>`;
+  }).join("")}</tr></thead><tbody>`;
+  for (const row of ROWS) h += `<tr><th>${esc(row.label)}</th>${columns.map(c => cell(c, row)).join("")}</tr>`;
+  h += `</tbody></table><div class="legend">
+    <span><i class="sw st-pass"></i>passed</span>
+    <span><i class="sw st-fail"></i>failed</span>
+    <span><i class="sw st-running"></i>still running</span>
+    <span><i class="sw st-notrun"></i>skipped on this commit</span>
+    <span><i class="sw st-nocheck"></i>this repository has no such check</span>
+    <span><i class="sw st-norun"></i>no CI run on this commit yet</span>
+    <span><i class="sw st-daily"></i>runs daily, not on PRs</span></div>`;
+  h += `<div id="detail">${open ? detailHtml() : ""}</div>`;
+  $("main").innerHTML = h;
+}
+
+// ---------- details ----------
+const blob = (repo, sha, path, line) => `https://github.com/${repo}/blob/${sha}/${path}${line ? "#L" + line : ""}`;
+const runLabel = r => r.status !== "completed" ? r.status.replace("_", " ") : r.conclusion;
+
+function detailHtml() {
+  const { col, row } = open, d = details[key(col, row)];
+  const full = `${row.page}?run=${encodeURIComponent(`https://github.com/${col.repo}/pull/${col.n}`)}`;
+  let h = `<h3>${esc(row.label)} · ${esc(LANGUAGES[col.repo] || col.repo)} <small><a href="${full}">open the full page</a></small></h3>`;
+  if (row.daily) return h + `<div class="sub">Fuzzing runs on main once a day and is not a pull request check. The Fuzz tab shows the newest daily run.</div>`;
+  const runs = col.cells[row.id] || [];
+  if (!runs.length) return h + `<div class="sub">No check run on ${col.sha.slice(0, 7)} matches this row.</div>`;
+  h += `<ul>${runs.map(r => `<li><a href="${r.html_url}" target="_blank">${esc(r.name)}</a> · <span class="${FAILED.has(r.conclusion) ? "bad" : r.conclusion === "success" ? "good" : ""}">${esc(runLabel(r))}</span>`
+    + (d && d.steps && d.steps[r.id] ? ` · failing step: <b>${esc(d.steps[r.id].join(", "))}</b>` : "") + `</li>`).join("")}</ul>`;
+  if (!d || d.state === "loading") return h + `<div class="sub">Loading findings…</div>`;
+  if (d.state === "error") return h + `<div class="sub bad">Could not load findings: ${esc(d.note)}</div>`;
+  return h + d.html;
+}
+const key = (col, row) => `${col.repo}#${col.n}@${col.sha}|${row.id}`;
+
+async function loadDetail(col, row) {
+  const k = key(col, row);
+  if (details[k] || row.daily || !col.cells[row.id].length) return;
+  const d = details[k] = { state:"loading", steps:{} };
+  render();
+  try {
+    const runs = col.cells[row.id];
+    // A GitHub Actions check run's id is its job id, and the job lists its steps.
+    await Promise.all(runs.filter(r => FAILED.has(r.conclusion) && r.app?.slug === "github-actions").map(async r => {
+      const job = await ghJson(`repos/${col.repo}/actions/jobs/${r.id}`);
+      d.steps[r.id] = job.steps.filter(s => FAILED.has(s.conclusion)).map(s => s.name);
+    }));
+    const suites = new Set(runs.map(r => r.check_suite?.id));
+    const wfRuns = col.runs.filter(w => suites.has(w.check_suite_id));
+    let arts = [];
+    if (row.artifacts) for (const w of wfRuns) {
+      const list = await allPages(`repos/${col.repo}/actions/runs/${w.id}/artifacts`, "artifacts");
+      arts.push(...list.filter(a => row.artifacts.test(a.name) && !a.expired).map(a => ({ ...a, run:w })));
+    }
+    d.html = await FINDINGS[row.id](col, runs, arts);
+    d.state = "done";
+  } catch (e) {
+    d.state = "error"; d.note = e.message || String(e);
+  }
+  render();
+}
+
+const none = what => `<div class="sub">${what}</div>`;
+const FINDINGS = {
+  async tests(col, runs, arts) {
+    if (!arts.length) return none("The runs uploaded no test server reports.");
+    let h = "";
+    const products = [...new Set(arts.map(a => a.name.replace(/-test-server-reports$/, "")))];
+    for (const product of products) {
+      const run = arts.find(a => a.name === product + "-test-server-reports").run;
+      const res = await fetchResults(product, runInfo(col.repo, run), () => {});
+      if (!res.cases.length) { h += none(`${esc(product.toUpperCase())}: the report has no test results.`); continue; }
+      const totals = res.langs.map((l, i) => [l, res.cases.reduce((t, c) => t.map((n, j) => n + c.r[i][j]), [0, 0, 0, 0, 0])]);
+      h += `<div><b>${esc(product.toUpperCase())}</b> · ${totals.map(([l, t]) => `${esc(l)}: ${t[0]} passed, <span class="${t[1] ? "bad" : ""}">${t[1]} failed</span>, ${t[2] + t[3] + t[4]} skipped`).join(" · ")}</div>`;
+      const failed = res.cases.filter(c => c.r.some(r => r[1]));
+      if (failed.length) h += `<ul>${failed.slice(0, 40).map(c => `<li>${esc(c.c)} · ${esc(c.n)}${Object.entries(c.err).map(([l, m]) => `<div class="code">${esc(l)}: ${esc(m.slice(0, 300))}</div>`).join("")}</li>`).join("")}</ul>`
+        + (failed.length > 40 ? none(`and ${failed.length - 40} more`) : "");
+    }
+    return h;
+  },
+  lines: coverageLog,
+  branches: coverageLog,
+  async mutants(col, runs, arts) {
+    if (!arts.length) return none("The runs uploaded no mutation results.");
+    let h = "";
+    for (const art of arts) {
+      const data = await cachedArtifact(col.repo, art, () => {}, async (zip, entries) => {
+        const file = entries.find(e => e.name.endsWith("results.json"));
+        return file ? JSON.parse(await zipText(zip, file)) : null;
+      });
+      if (!data) { h += none(`${esc(art.name)} has no results.json.`); continue; }
+      const s = data.summary.statuses, survivors = data.mutants.filter(m => m.status === "survived");
+      h += `<div><b>${esc(art.name.replace("mutation-results-", ""))}</b> · ${(s.killed || 0) + (s.timed_out || 0)} killed, <span class="${survivors.length ? "bad" : ""}">${survivors.length} survived</span>, ${s.not_covered || 0} on lines no test runs</div>`;
+      if (survivors.length) h += `<ul>${survivors.map(m => `<li><a href="${blob(col.repo, data.summary.commit || col.sha, m.file, m.line)}" target="_blank">${esc(m.file)}:${m.line}</a> <span class="tag">${esc(m.kind)}</span> ${esc(m.description)}<div class="code">${esc(m.source_line)}</div></li>`).join("")}</ul>`;
+    }
+    return h;
+  },
+  async reach(col, runs, arts) {
+    if (!arts.length) return none("The runs uploaded no duvet test reach report.");
+    let h = "";
+    for (const art of arts) {
+      // Same cache key as the Duvet page, which reads these reports too.
+      const k = `reach1:${col.repo}:${art.id}`;
+      let report = await cacheGet(k);
+      if (!report) {
+        const zip = await (await gh(`repos/${col.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+        const e = zipEntries(zip).find(x => x.name.endsWith(".json"));
+        report = e ? JSON.parse(await zipText(zip, e)) : null;
+        await cachePut(k, report);
+      }
+      if (!report) { h += none(`${esc(art.name)} has no report.`); continue; }
+      const c = report.counts;
+      h += `<div><b>${esc(report.library)} · ${esc(report.language)}</b> (${report.mode === "changed" ? "annotations this PR changes" : "every annotation"}) · ${c.ok} run their code, <span class="${c["never-reaches"] ? "bad" : ""}">${c["never-reaches"]} never do</span>, ${c["no-region"]} have no code under the annotation, ${c["not-run"]} not run</div>`;
+      const bad = report.findings.filter(f => f.state !== "ok");
+      if (bad.length) h += `<ul>${bad.map(f => {
+        const t = f.test_annotation, sha = t.commit || (t.repository === col.repo ? col.sha : "main");
+        const code = (f.implementations || []).filter(i => i.region).map(i => `<a href="${blob(report.repository, report.commit || col.sha, i.path, i.region[0])}" target="_blank">${esc(i.path.split("/").pop())}:${i.region[0]}–${i.region[1]}</a>`).join(", ");
+        return `<li><span class="tag">${esc(f.state)}</span> <a href="${blob(t.repository, sha, t.path, t.line)}" target="_blank">${esc(t.path)}:${t.line}</a> ${esc(f.requirement.target)}${code ? ` · code: ${code}` : ""}${f.detail ? `<div class="code">${esc(f.detail)}</div>` : ""}</li>`;
+      }).join("")}</ul>`;
+      if (report.errors.length) h += `<ul>${report.errors.map(e => `<li class="bad">${esc(e)}</li>`).join("")}</ul>`;
+    }
+    return h;
+  },
+};
+
+// diff-cover prints one "<file> (<n>%): Missing lines <ranges>" line per file
+// with uncovered changed lines. The job log is the only place it writes them.
+async function coverageLog(col, runs) {
+  let h = "";
+  for (const r of runs.filter(r => r.status === "completed" && r.conclusion !== "skipped" && r.app?.slug === "github-actions")) {
+    let text;
+    try { text = await (await gh(`repos/${col.repo}/actions/jobs/${r.id}/logs`)).text(); }
+    catch (e) { h += none(`${esc(r.name)}: could not read the job log (${esc(e.message)}). Open the run instead.`); continue; }
+    const rows = text.split("\n").map(l => l.replace(/^\S+Z /, ""));
+    const missing = rows.map(l => l.match(/^(\S+) \(([\d.]+)%\): Missing lines (.+)$/)).filter(Boolean);
+    const total = rows.map(l => l.match(/^Coverage: ([\d.]+)%/)).filter(Boolean).pop();
+    h += `<div><b>${esc(r.name)}</b> · ${total ? `${total[1]}% of changed lines covered` : "no diff-cover summary in the log"}</div>`;
+    if (missing.length) h += `<ul>${missing.map(m => `<li><a href="${blob(col.repo, col.sha, m[1], m[3].split(/[-,]/)[0])}" target="_blank">${esc(m[1])}</a> (${m[2]}%): lines ${esc(m[3])}</li>`).join("")}</ul>`;
+  }
+  return h || none("No finished run to read.");
+}
+
+$("main").addEventListener("click", e => {
+  const td = e.target.closest("td[data-row]");
+  if (!td) return;
+  const col = columns[+td.dataset.col], row = ROWS.find(r => r.id === td.dataset.row);
+  if (col.state !== "done" && !row.daily) return;
+  open = open && open.col === col && open.row === row ? null : { col, row };
+  render();
+  if (open) loadDetail(col, row);
+});
+
+// The PR box is shared with the other test server pages.
+$("source").value = readSource();
+$("source").addEventListener("change", e => { writeSource(e.target.value.trim()); load(); });
+load();
+</script>
+</body>
+</html>
