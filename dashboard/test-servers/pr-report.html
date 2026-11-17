@@ -82,6 +82,13 @@ const ROWS = [
   { id:"mutants", label:"Mutants on changed lines killed", page:"mutation.html", artifacts:/^mutation-results-/,
     match:/mutation testing$|^Choose the lines to mutate$/ },
   { id:"reach", label:"Duvet test reach", page:"../duvet/index.html", artifacts:/^duvet-test-reach-/, match:/^duvet test reach\b/ },
+  { id:"build", label:"Build and unit tests", match:/^Build and test\b/ },
+  { id:"lint", label:"Format and lint", match:/^Format and lint\b/ },
+  { id:"pertest", label:"Per-test coverage recorded", match:/^Per-test coverage\b/ },
+  { id:"duvet", label:"Duvet report", match:/^Duvet report\b/ },
+  { id:"api", label:"API compatibility (report only)", match:/^API compatibility\b/ },
+  { id:"deps", label:"Dependency review", match:/^Dependency review$/ },
+  { id:"required", label:"Required gate", match:/^pr-ci-all-required$/ },
   // Fuzzing runs on the daily schedule only, never on a pull request.
   { id:"fuzz", label:"Fuzz", page:"fuzz.html", daily:true },
 ];
@@ -223,7 +230,8 @@ const runLabel = r => r.status !== "completed" ? r.status.replace("_", " ") : r.
 function detailHtml() {
   const { col, row } = open, d = details[key(col, row)];
   const full = `${row.page}?run=${encodeURIComponent(`https://github.com/${col.repo}/pull/${col.n}`)}`;
-  let h = `<h3>${esc(row.label)} · ${esc(LANGUAGES[col.repo] || col.repo)} <small><a href="${full}">open the full page</a></small></h3>`;
+  const link = row.page ? ` <small><a href="${full}">open the full page</a></small>` : "";
+  let h = `<h3>${esc(row.label)} · ${esc(LANGUAGES[col.repo] || col.repo)}${link}</h3>`;
   if (row.daily) return h + `<div class="sub">Fuzzing runs on main once a day and is not a pull request check. The Fuzz tab shows the newest daily run.</div>`;
   const runs = col.cells[row.id] || [];
   if (!runs.length) return h + `<div class="sub">No check run on ${col.sha.slice(0, 7)} matches this row.</div>`;
@@ -254,7 +262,8 @@ async function loadDetail(col, row) {
       const list = await allPages(`repos/${col.repo}/actions/runs/${w.id}/artifacts`, "artifacts");
       arts.push(...list.filter(a => row.artifacts.test(a.name) && !a.expired).map(a => ({ ...a, run:w })));
     }
-    d.html = await FINDINGS[row.id](col, runs, arts);
+    // A row with no findings reader shows only its check runs and failing steps.
+    d.html = FINDINGS[row.id] ? await FINDINGS[row.id](col, runs, arts) : "";
     d.state = "done";
   } catch (e) {
     d.state = "error"; d.note = e.message || String(e);
