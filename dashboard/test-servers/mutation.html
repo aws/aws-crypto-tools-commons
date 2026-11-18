@@ -133,7 +133,13 @@ async function runsFor(entry, text) {
   const all = `repos/${entry.repo}/actions/runs`;
   const id = (text.match(/actions\/runs\/(\d+)/) || text.match(/^(\d+)$/) || [])[1];
   if (id) {
-    if (text.includes("github.com") && !text.includes(entry.repo + "/")) return null;
+    if (/^https?:\/\//i.test(text)) {
+      let u;
+      try { u = new URL(text); } catch (e) { return null; }
+      if (u.hostname.toLowerCase() !== "github.com") return null;
+      const expectedPrefix = `/${entry.repo.toLowerCase()}/`;
+      if (!u.pathname.toLowerCase().startsWith(expectedPrefix)) return null;
+    }
     try { return [await ghJson(`${all}/${id}`)]; } catch (e) { return null; }
   }
   const pr = await prFor(entry, text);
