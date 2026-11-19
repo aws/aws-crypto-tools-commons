@@ -55,5 +55,3 @@ jobs:
       # The MPL repository's CI role does not trust this repository; this one
       # does, and reads the hierarchical keyring fixtures.
       aws-role-arn: arn:aws:iam::370957321024:role/GitHub-CI-Public-ESDK-Dafny-Role-us-west-2
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}

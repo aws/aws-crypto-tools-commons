@@ -44,9 +44,6 @@ jobs:
       # Test only the pairs involving this repository's languages; omit for the
       # full matrix.
       focus: ${{ github.event_name == 'pull_request' && 'rust,rust-cpp' || '' }}
-    secrets:
-      # Read access to aws-crypto-tools-commons and every private language repository.
-      repo-pat: ${{ secrets.COMMONS_REPO_PAT }}
 ```
 
 The checkout supplies only the `checkout-languages` (default: `focus`); the

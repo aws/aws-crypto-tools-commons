@@ -72,20 +72,9 @@
 # the test-vectors stub install (its `jar` tool) and as the documented
 # 17-class toolchain should explicit wiring be added later.
 #
-# PRIVATE JAVA-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
-# clones aws-crypto-tools-java per the Java Configuration_Entry's
-# Server_Location (`git clone git@github.com:aws/aws-crypto-tools-java.git`,
-# the SSH URL from config/server-config.json). aws-crypto-tools-java is a
-# PRIVATE repo, and in GitHub Actions the default GITHUB_TOKEN / checkout
-# token only grants access to THIS repo — so that cross-repo clone fails
-# without extra auth. The "Configure git auth" step below rewrites the SSH URL
-# to authenticated HTTPS for the duration of the job via git insteadOf, using
-# the LANGUAGE_REPO_PAT secret with READ-ONLY scope (Requirement 6.6): a
-# fine-grained PAT with `Contents: Read` on aws-crypto-tools-java, or a
-# classic PAT with `repo`. This is the mirror image of the Java repo
-# workflow's COMMONS_REPO_PAT pattern. (aws-encryption-sdk-python is PUBLIC
-# and cloned via its HTTPS URL, so it needs no auth and is untouched by the
-# SSH-URL rewrite.)
+# REPOSITORY ACCESS: every repository the run clones is public. The server
+# configs give some sources as SSH URLs, which a "Rewrite the server repos'
+# SSH URLs to public HTTPS" step turns into unauthenticated HTTPS clones.
 #
 # AWS/KMS (ONLINE, REQUIRED): the KMS_Scenarios are REQUIRED and call real AWS
 # KMS, so the orchestrated run cannot pass without usable credentials
@@ -176,9 +165,9 @@ on:
     secrets:
       repo-pat:
         description: >-
-          Read-only token for the private repositories the run clones
-          (aws-crypto-tools-commons, aws-crypto-tools-rust, ...).
-        required: true
+          Unused. Accepted so callers that still pass it keep working; every
+          repository the run reads is public.
+        required: false
 
 # Callers must grant these.
 permissions:
@@ -215,7 +204,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
           sparse-checkout: .github/scripts
       - name: Resolve refs
         id: refs
@@ -229,7 +217,6 @@ jobs:
           INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
           INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
           GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
         run: .github/scripts/resolve-test-server-refs.sh resolve
 
   # Resolves each heavy server's key and lists the servers with no prebuilt
@@ -275,7 +262,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -288,7 +274,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -310,51 +295,13 @@ jobs:
                 git -C language-repo config "submodule.$name.ignore" all
               done
 
-      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
-        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) and aws-crypto-tools-rust (the
-        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/server-config.json).
-        # GitHub Actions' default token only reaches THIS repo, so that
-        # cross-repo private clone needs its own credential. We supply a
-        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
-        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/server-config.json or the Makefile changes. The public
-        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
-        #
-        # SECURITY NOTES:
-        #   - The PAT is passed only via the step `env:` below (never inlined
-        #     in the script), and GitHub automatically masks the secret value
-        #     in logs. We do NOT use `set -x`, so the configured URL is not
-        #     echoed.
-        #   - The token is written only to the ephemeral runner's global git
-        #     config (~/.gitconfig), which is discarded when the job ends.
-        #   - This rewrite is CI-ONLY. Local development is unaffected and
-        #     keeps using the SSH URL as-is.
-        #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
-        #     with `Contents: Read` on each repo, or a classic PAT with the
-        #     `repo` scope).
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
+      - name: Rewrite the server repos' SSH URLs to public HTTPS
+        # config/server-config.json gives the servers' source as SSH URLs and
+        # CI runners have no SSH keys; the repositories are public, so no token.
         run: |
           set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
-            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
-            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
-            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
-            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
-            echo "'repo' scope)." >&2
-            exit 1
-          fi
-          # Rewrite the SSH URL used in config/server-config.json to
-          # authenticated HTTPS so `git clone git@github.com:aws/...`
-          # transparently becomes an authenticated HTTPS clone.
           git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+            url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Identify the runner platform
         # Keys every prebuilt output and dependency cache: binaries link
@@ -403,7 +350,7 @@ jobs:
             if from_checkout "$1"; then git -C language-repo rev-parse HEAD; return; fi
             url=$(field "$1" url); ref=$(field "$1" ref)
             # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
-            # this repo) does not replace the private-repo PAT.
+            # this repo) is not sent to the other repository.
             sha=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || sha=""
             echo "${sha:-unresolved-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
           }
@@ -471,7 +418,6 @@ jobs:
         id: matrix
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_net: ${{ steps.keys.outputs.key_net }}
           KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
           KEY_go: ${{ steps.keys.outputs.key_go }}
@@ -479,8 +425,7 @@ jobs:
           KEY_rustcpp: ${{ steps.keys.outputs.key_rustcpp }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
+          token() { echo "$RUN_TOKEN"; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
@@ -539,7 +484,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -552,7 +496,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -651,51 +594,13 @@ jobs:
         if: matrix.language == 'go'
         run: go install golang.org/x/tools/cmd/goimports@v0.36.0
 
-      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
-        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) and aws-crypto-tools-rust (the
-        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/server-config.json).
-        # GitHub Actions' default token only reaches THIS repo, so that
-        # cross-repo private clone needs its own credential. We supply a
-        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
-        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/server-config.json or the Makefile changes. The public
-        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
-        #
-        # SECURITY NOTES:
-        #   - The PAT is passed only via the step `env:` below (never inlined
-        #     in the script), and GitHub automatically masks the secret value
-        #     in logs. We do NOT use `set -x`, so the configured URL is not
-        #     echoed.
-        #   - The token is written only to the ephemeral runner's global git
-        #     config (~/.gitconfig), which is discarded when the job ends.
-        #   - This rewrite is CI-ONLY. Local development is unaffected and
-        #     keeps using the SSH URL as-is.
-        #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
-        #     with `Contents: Read` on each repo, or a classic PAT with the
-        #     `repo` scope).
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
+      - name: Rewrite the server repos' SSH URLs to public HTTPS
+        # config/server-config.json gives the servers' source as SSH URLs and
+        # CI runners have no SSH keys; the repositories are public, so no token.
         run: |
           set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
-            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
-            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
-            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
-            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
-            echo "'repo' scope)." >&2
-            exit 1
-          fi
-          # Rewrite the SSH URL used in config/server-config.json to
-          # authenticated HTTPS so `git clone git@github.com:aws/...`
-          # transparently becomes an authenticated HTTPS clone.
           git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+            url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
@@ -933,7 +838,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -946,7 +850,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -1078,51 +981,13 @@ jobs:
           restore-keys: |
             ${{ needs.plan.outputs.platform }}-gradle-v2-
 
-      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
-        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) and aws-crypto-tools-rust (the
-        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/server-config.json).
-        # GitHub Actions' default token only reaches THIS repo, so that
-        # cross-repo private clone needs its own credential. We supply a
-        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
-        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/server-config.json or the Makefile changes. The public
-        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
-        #
-        # SECURITY NOTES:
-        #   - The PAT is passed only via the step `env:` below (never inlined
-        #     in the script), and GitHub automatically masks the secret value
-        #     in logs. We do NOT use `set -x`, so the configured URL is not
-        #     echoed.
-        #   - The token is written only to the ephemeral runner's global git
-        #     config (~/.gitconfig), which is discarded when the job ends.
-        #   - This rewrite is CI-ONLY. Local development is unaffected and
-        #     keeps using the SSH URL as-is.
-        #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
-        #     with `Contents: Read` on each repo, or a classic PAT with the
-        #     `repo` scope).
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
+      - name: Rewrite the server repos' SSH URLs to public HTTPS
+        # config/server-config.json gives the servers' source as SSH URLs and
+        # CI runners have no SSH keys; the repositories are public, so no token.
         run: |
           set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
-            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
-            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
-            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
-            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
-            echo "'repo' scope)." >&2
-            exit 1
-          fi
-          # Rewrite the SSH URL used in config/server-config.json to
-          # authenticated HTTPS so `git clone git@github.com:aws/...`
-          # transparently becomes an authenticated HTTPS clone.
           git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+            url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Resolve language-repo commit pins (cache keys)
         # The materialized-sources caches below are keyed on the resolved tip
@@ -1142,7 +1007,7 @@ jobs:
             ref=$(jq -r --arg l "$language" \
               '.entries[] | select(.language==$l) | .serverLocation.ref' "$config")
             # Outside the checkout, so its GITHUB_TOKEN auth header (scoped to
-            # this repo) does not replace the private-repo PAT.
+            # this repo) is not sent to the other repository.
             tip=$(cd "$RUNNER_TEMP" && git ls-remote "$url" "refs/heads/$ref" | cut -f1) || tip=""
             if [ -z "$tip" ]; then
               echo "::warning::could not resolve $url @ $ref — the $name sources cache misses this run"
@@ -1317,7 +1182,7 @@ jobs:
         # required: a failed fetch fails the job.
         shell: bash
         env:
-          REPO_PAT: ${{ secrets.repo-pat }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           DIR="$RUNNER_TEMP/released-vectors"
           mkdir -p "$DIR"
@@ -1331,7 +1196,7 @@ jobs:
           # Messages the Java and Python MasterKeyProvider APIs write today, from the
           # newest green aws-encryption-sdk Daily CI run. Too large to vendor
           # (~9 MB of raw-AES ciphertexts each).
-          read -r run_id sha < <(GH_TOKEN="$REPO_PAT" gh run list -R aws/aws-encryption-sdk \
+          read -r run_id sha < <(gh run list -R aws/aws-encryption-sdk \
             --workflow daily_ci.yml --branch mainline --status success -L 1 \
             --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"') || true
           if [ -z "${run_id:-}" ]; then
@@ -1340,7 +1205,7 @@ jobs:
           fi
           for writer in java_mkp python_mkp; do
             for attempt in 1 2 3; do
-              GH_TOKEN="$REPO_PAT" gh run download "$run_id" -R aws/aws-encryption-sdk \
+              gh run download "$run_id" -R aws/aws-encryption-sdk \
                 -n "ubuntu-22.04_vector_artifact_${writer}_legacy_format_${sha}" \
                 -D "$DIR/daily-${writer}" && break
               if [ "$attempt" = 3 ]; then
@@ -1468,7 +1333,6 @@ jobs:
       - name: Fetch the prebuilt servers into their clones
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_net: ${{ needs.plan.outputs.key_net }}
           KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
           KEY_go: ${{ needs.plan.outputs.key_go }}
@@ -1477,8 +1341,7 @@ jobs:
           PATHS_rustcpp: ${{ needs.plan.outputs.paths_rustcpp }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
+          token() { echo "$RUN_TOKEN"; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
