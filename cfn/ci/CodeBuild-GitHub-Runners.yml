@@ -8,10 +8,8 @@
 # overflow to on-demand compute; CodeBuild has no on-demand macOS compute, so
 # macOS jobs beyond the fleet's capacity queue.
 #
-# Prerequisite: a Secrets Manager secret, in the stack's region, holding a
-# GitHub personal access token (scopes repo, admin:repo_hook) of a user who is
-# admin on every listed repository. Its value must be
-#   {"ServerType":"GITHUB","AuthType":"PERSONAL_ACCESS_TOKEN","Token":"<token>"}
+# Prerequisite: a CodeConnections GitHub connection, in the stack's region,
+# whose AWS Connector for GitHub app install covers every listed repository.
 #
 # Deploy:
 #   aws cloudformation deploy \
@@ -19,7 +17,7 @@
 #     --stack-name CryptoTools-CodeBuild-GitHub-Runners \
 #     --template-file cfn/ci/CodeBuild-GitHub-Runners.yml \
 #     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
-#     --parameter-overrides GitHubTokenSecretArn=<secret-arn>
+#     --parameter-overrides GitHubConnectionArn=<connection-arn>
 #
 # A workflow job selects a runner with:
 #   runs-on: codebuild-<ProjectPrefix>-<linux|macos|windows>-<repo-name>-${{ github.run_id }}-${{ github.run_attempt }}
@@ -37,9 +35,9 @@ Parameters:
     Description: Prefix of each fleet and runner project name.
     Default: CryptoToolsCI
     AllowedPattern: '^[A-Za-z][A-Za-z0-9_-]*$'
-  GitHubTokenSecretArn:
+  GitHubConnectionArn:
     Type: String
-    Description: ARN of the Secrets Manager secret holding the GitHub token.
+    Description: ARN of the CodeConnections connection to GitHub.
   BuildTimeoutMinutes:
     Type: Number
     Description: Maximum minutes one runner build (one workflow job) may run.
@@ -173,8 +171,11 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${BuildLogGroup}:log-stream:*
               - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: !Ref GitHubTokenSecretArn
+                Action:
+                  - codeconnections:GetConnection
+                  - codeconnections:GetConnectionToken
+                  - codeconnections:UseConnection
+                Resource: !Ref GitHubConnectionArn
 
   LinuxFleet:
     Type: AWS::CodeBuild::Fleet
@@ -228,8 +229,8 @@ Resources:
             # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
             ReportBuildStatus: false
             Auth:
-              Type: SECRETS_MANAGER
-              Resource: !Ref GitHubTokenSecretArn
+              Type: CODECONNECTIONS
+              Resource: !Ref GitHubConnectionArn
           Environment:
             Type: LINUX_CONTAINER
             ComputeType: !Ref LinuxComputeType
@@ -264,8 +265,8 @@ Resources:
             # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
             ReportBuildStatus: false
             Auth:
-              Type: SECRETS_MANAGER
-              Resource: !Ref GitHubTokenSecretArn
+              Type: CODECONNECTIONS
+              Resource: !Ref GitHubConnectionArn
           Environment:
             Type: MAC_ARM
             ComputeType: !Ref MacComputeType
@@ -299,8 +300,8 @@ Resources:
             # The Actions job reports its own check; a CodeBuild commit status would duplicate it.
             ReportBuildStatus: false
             Auth:
-              Type: SECRETS_MANAGER
-              Resource: !Ref GitHubTokenSecretArn
+              Type: CODECONNECTIONS
+              Resource: !Ref GitHubConnectionArn
           Environment:
             Type: WINDOWS_SERVER_2019_CONTAINER
             ComputeType: !Ref WindowsComputeType
