@@ -72,10 +72,6 @@ on:
           own codebuild-<project>-<run_id>-<run_attempt> label.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
-    secrets:
-      repo-pat:
-        description: Not used. Callers may omit it.
-        required: false
 
 permissions:
   contents: read
