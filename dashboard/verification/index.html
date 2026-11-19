@@ -59,6 +59,12 @@
   main.open .claims td.w { width:50%; }
   .m-proven { color:#56d364; } .m-model { color:#79c0ff; } .m-assumed { color:var(--dim); }
   .claims tr.assumed td:not(.m) { color:var(--dim); }
+  .claims td.tid { width:230px; }
+  .claims td.tid b { display:block; } .claims td.tid small { color:var(--dim); }
+  .claims .cl { display:flex; gap:6px; margin:1px 0; }
+  .claims .cl b { flex:none; width:14px; text-align:center; }
+  .claims .cl a { color:var(--text); }
+  .claims tr.bare td { color:var(--dim); }
   details.fold > summary { cursor:pointer; font-size:12px; color:var(--dim); margin-top:14px; }
   details.fold code { display:block; }
   /* files */
@@ -107,6 +113,7 @@
     <div class="summary" id="counts"></div>
     <div class="tabs" id="tabs">
       <button class="tab on" data-view="claims">What is proven</button>
+      <button class="tab" data-view="threats">By threat</button>
       <button class="tab" data-view="files">By file</button>
     </div>
     <div class="legend" id="legend"></div>
@@ -127,6 +134,11 @@
 // - claims: one plain sentence per proof, from docs/verification-claims.toml.
 //   The generator fails if a "proven" claim names a fn outside verus!, so a
 //   check mark here always points at code Verus checked.
+//
+// By threat lists every threat in docs/threat-model.md with the claims that
+// help against it. A claim names its threats in verification-claims.toml. A
+// threat gets the best mark of its claims, so a threat backed only by an
+// assumed claim shows an empty circle, and one with no claim shows a dash.
 //
 // The By file view is how the count was made: each source line colored by
 // whether Verus checks it. It is read from the source, not from running
@@ -267,6 +279,13 @@ function render() {
       `<span title="${escHtml(help)}"><b class="m-${k}">${icon}</b>${name} <b>${d.claims.filter(c => c.mark === k).length}</b></span>`).join("");
     $("body").innerHTML = claimTable();
     $("foot").innerHTML = undescribed();
+  } else if (ui.view === "threats") {
+    const rows = threatRows(), best = m => rows.filter(r => r.best === m).length;
+    $("legend").innerHTML = Object.entries(MARKS).map(([k, [icon, name, help]]) =>
+      `<span title="${escHtml(help)}"><b class="m-${k}">${icon}</b>${name} <b>${best(k)}</b></span>`).join("")
+      + `<span title="No claim names this threat.">– Nothing <b>${best(null)}</b></span>`;
+    $("body").innerHTML = threatTable(rows);
+    $("foot").innerHTML = `Threats come from <a href="${blob("docs/threat-model.md")}"><code>docs/threat-model.md</code></a>. A threat shows the best mark of the claims that name it.`;
   } else {
     $("legend").innerHTML = Object.keys(KIND_NAMES).map(k =>
       `<span title="${escHtml(d.line_kinds?.[k] || "")}"><i class="sw k-${k}"></i>${KIND_NAMES[k]}</span>`).join("");
@@ -335,6 +354,32 @@ function undescribed() {
     const [path, name] = id.split("::");
     return `<code><a class="pick" data-open="${escHtml(path)}" data-name="${escHtml(name)}">${escHtml(short(path))}::${escHtml(name)}</a></code>`;
   }).join("")}</details>`;
+}
+
+// ---------- threats ----------
+const MARK_ORDER = ["proven", "model", "assumed"];
+function threatRows() {
+  return (src.data.threats || []).map(t => {
+    const cs = src.data.claims.filter(c => (c.threats || []).includes(t.id))
+      .sort((a, b) => MARK_ORDER.indexOf(a.mark) - MARK_ORDER.indexOf(b.mark));
+    return { ...t, claims:cs, best:cs[0]?.mark || null };
+  });
+}
+function threatTable(rows) {
+  const q = ui.search.toLowerCase();
+  rows = rows.filter(r => !q || (r.id + " " + r.name + " " + r.claims.map(c => c.text).join(" ")).toLowerCase().includes(q));
+  if (!rows.length) return `<div class="empty">No threat matches.</div>`;
+  const cats = [...new Set(rows.map(r => r.category))];
+  const place = c => c.places.find(p => p.name);
+  return `<table class="claims"><tbody>${cats.map(cat => `<tr class="group"><td colspan="3">${escHtml(cat)}</td></tr>` +
+    rows.filter(r => r.category === cat).map(r => `<tr class="${r.best ? "" : "bare"}">
+      <td class="m ${r.best ? "m-" + r.best : ""}" title="${r.best ? escHtml(MARKS[r.best][1]) : "No claim names this threat"}">${r.best ? MARKS[r.best][0] : "–"}</td>
+      <td class="tid"><b>${escHtml(r.id)}</b><small>${escHtml(r.name)}</small></td>
+      <td>${r.claims.length ? r.claims.map(c => {
+        const p = place(c);
+        const text = p ? `<a class="pick" data-open="${escHtml(p.path)}" data-at="${p.first}">${escHtml(c.text)}</a>` : escHtml(c.text);
+        return `<div class="cl"><b class="m-${c.mark}" title="${escHtml(MARKS[c.mark][1])}">${MARKS[c.mark][0]}</b><span>${text}</span></div>`;
+      }).join("") : "Nothing proven or assumed."}</td></tr>`).join("")).join("")}</tbody></table>`;
 }
 
 // ---------- files ----------
