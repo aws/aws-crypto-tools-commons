@@ -2,7 +2,6 @@
   "product": "esdk",
   "features": [
     "streaming",
-    "MPL",
     "hierarchical",
     "raw-aes",
     "raw-rsa",
@@ -17,6 +16,7 @@
     "aws-kms-rsa",
     "aws-kms-ecdh",
     "required-encryption-context",
+    "default-cmm-reproduced-encryption-context",
     "caching"
   ]
 }

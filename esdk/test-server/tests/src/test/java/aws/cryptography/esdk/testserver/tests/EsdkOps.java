@@ -12,6 +12,12 @@ import aws.cryptography.esdk.testserver.client.model.EncryptStreamInput;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 /**
  * Shared single-leg {@code Encrypt}/{@code Decrypt} helpers over the one generated
@@ -30,7 +36,48 @@ import java.util.Map;
  */
 final class EsdkOps {
 
+    /** Client ids from {@link #sharedClient}, one per (endpoint, config). */
+    private static final Map<Map.Entry<URI, ESDKClientConfig>, CompletableFuture<String>> SHARED_CLIENTS =
+        new ConcurrentHashMap<>();
+
+    /**
+     * Runs the RPCs whose results several tests wait on. A JUnit worker that blocks on a result
+     * can be handed another test that waits on the same result, so the result must be computed
+     * on a thread outside JUnit's pool or the worker can end up waiting on itself.
+     */
+    private static final ExecutorService SHARED_RPCS = Executors.newCachedThreadPool(task -> {
+        Thread thread = new Thread(task, "esdk-shared-rpc");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private EsdkOps() {
+    }
+
+    /**
+     * The id of one client per (endpoint, config), created on first use and reused after. Only
+     * for clients with no state across calls (no caching CMM), since every caller shares it.
+     */
+    static String sharedClient(URI endpoint, ESDKClientConfig config) {
+        return await(SHARED_CLIENTS.computeIfAbsent(Map.entry(endpoint, config),
+            key -> shared(() -> createClient(key.getKey(), key.getValue()))));
+    }
+
+    /** Start {@code rpc} on the shared-RPC pool; {@link #await} its result. */
+    static <T> CompletableFuture<T> shared(Supplier<T> rpc) {
+        return CompletableFuture.supplyAsync(rpc, SHARED_RPCS);
+    }
+
+    /** The result of a {@link #shared} RPC, rethrowing the RPC's own exception. */
+    static <T> T await(CompletableFuture<T> result) {
+        try {
+            return result.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            throw e;
+        }
     }
 
     /** {@code CreateClient(config)} on {@code endpoint}, returning the client id. */
@@ -86,6 +133,53 @@ final class EsdkOps {
         }
         EncryptInput request = input.build();
         return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
+    }
+
+    /**
+     * Encrypt {@code plaintext} on {@code endpoint} with the existing client {@code clientId},
+     * applying the optional encryption context, algorithm suite and frame length; return the
+     * ciphertext bytes.
+     */
+    static byte[] encryptWithClient(URI endpoint, String clientId, byte[] plaintext,
+                                    Map<String, String> encryptionContext, ESDKAlgorithmSuiteId suite,
+                                    Long frameLength) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        EncryptInput.Builder input = EncryptInput.builder()
+            .clientId(clientId)
+            .plaintext(ByteBuffer.wrap(plaintext));
+        if (encryptionContext != null && !encryptionContext.isEmpty()) {
+            input.encryptionContext(encryptionContext);
+        }
+        if (suite != null) {
+            input.algorithmSuiteId(suite);
+        }
+        if (frameLength != null) {
+            input.frameLength(frameLength);
+        }
+        EncryptInput request = input.build();
+        return toArray(TestServerClients.withRetry(() -> client.encrypt(request)).getCiphertext());
+    }
+
+    /** Decrypt {@code ciphertext} on {@code endpoint} with an existing client; return the plaintext bytes. */
+    static byte[] decryptWithClient(URI endpoint, String clientId, byte[] ciphertext) {
+        return decryptWithClient(endpoint, clientId, ciphertext, Map.of());
+    }
+
+    /**
+     * Decrypt {@code ciphertext} on {@code endpoint} with an existing client, supplying the
+     * optional reproduced encryption context; return the plaintext bytes.
+     */
+    static byte[] decryptWithClient(URI endpoint, String clientId, byte[] ciphertext,
+                                    Map<String, String> encryptionContext) {
+        ESDKTestServerClient client = TestServerClients.forEndpoint(endpoint);
+        DecryptInput.Builder input = DecryptInput.builder()
+            .clientId(clientId)
+            .ciphertext(ByteBuffer.wrap(ciphertext));
+        if (encryptionContext != null && !encryptionContext.isEmpty()) {
+            input.encryptionContext(encryptionContext);
+        }
+        DecryptInput request = input.build();
+        return toArray(TestServerClients.withRetry(() -> client.decrypt(request)).getPlaintext());
     }
 
     /** Decrypt {@code ciphertext} on {@code endpoint} under {@code config}; return the plaintext bytes. */

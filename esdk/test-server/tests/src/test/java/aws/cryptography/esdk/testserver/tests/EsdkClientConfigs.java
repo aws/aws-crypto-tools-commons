@@ -34,6 +34,7 @@ import java.security.KeyPairGenerator;
 import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -65,8 +66,7 @@ import java.util.Set;
  * credential-free; it feeds the arbitrary-plaintext property tests, which stay
  * offline. The <strong>Caching CMM</strong> scenarios wrap a Default CMM over a Raw
  * AES, Raw RSA, or AWS KMS keyring and require the {@code caching} Feature and that
- * keyring's Feature, not {@code MPL}: a caching CMM need not be an MPL one (the
- * ESDK for Java's wraps master key providers).
+ * keyring's Feature.
  */
 public final class EsdkClientConfigs {
 
@@ -176,6 +176,20 @@ public final class EsdkClientConfigs {
             .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
             .maxEncryptedDataKeys(maxEncryptedDataKeys)
             .cmm(defaultCmm(multiKeyring(rawAesKeyring(), List.of(rawAesKeyringB()))))
+            .build();
+    }
+
+    /**
+     * @return a Raw-AES / Default-CMM config over the multi-keyring's generator keyring alone,
+     *     with the encrypted-data-key count capped at {@code maxEncryptedDataKeys}. Decrypts a
+     *     {@link #rawAesMulti()} message without multi-keyring support, so the cap is
+     *     exercisable on targets that support only single raw-AES keyrings.
+     */
+    public static ESDKClientConfig rawAesWithMaxEdks(long maxEncryptedDataKeys) {
+        return ESDKClientConfig.builder()
+            .commitmentPolicy(ESDKCommitmentPolicy.REQUIRE_ENCRYPT_REQUIRE_DECRYPT)
+            .maxEncryptedDataKeys(maxEncryptedDataKeys)
+            .cmm(defaultCmm(rawAesKeyring()))
             .build();
     }
 
@@ -345,8 +359,7 @@ public final class EsdkClientConfigs {
         /**
          * Convenience constructor for the common case where one config builds both
          * the encrypt and decrypt client (no distinct decrypt config). Requires the
-         * {@code MPL} Feature — a standard MPL keyring (Raw-AES/RSA or a direct KMS
-         * keyring), which the Java and Python servers build.
+         * Features of the keyrings and CMMs in {@code config}.
          */
         public Scenario(
             String label,
@@ -354,12 +367,12 @@ public final class EsdkClientConfigs {
             ESDKAlgorithmSuiteId algorithmSuiteId,
             List<String> requiredEncryptionContextKeys) {
             this(label, config, algorithmSuiteId, requiredEncryptionContextKeys, null,
-                Set.of("MPL"));
+                featuresOf(config));
         }
 
         /**
          * Convenience constructor for a scenario with a distinct decrypt config
-         * (e.g. {@code AwsKmsDiscovery}); requires the {@code MPL} Feature.
+         * (e.g. {@code AwsKmsDiscovery}); requires the Features of both configs.
          */
         public Scenario(
             String label,
@@ -368,7 +381,7 @@ public final class EsdkClientConfigs {
             List<String> requiredEncryptionContextKeys,
             ESDKClientConfig decryptConfig) {
             this(label, config, algorithmSuiteId, requiredEncryptionContextKeys, decryptConfig,
-                Set.of("MPL"));
+                union(featuresOf(config), featuresOf(decryptConfig)));
         }
 
         /**
@@ -473,20 +486,20 @@ public final class EsdkClientConfigs {
             // keyring on both legs.
             new Scenario("rawEcdh(static)+default",
                 require(defaultCmm(rawEcdhStaticKeyring())), null, List.of(), null,
-                Set.of("MPL", "raw-ecdh")),
+                Set.of("raw-ecdh")),
 
             // Raw-ECDH static on encrypt; the recipient decrypts by discovery.
             new Scenario("rawEcdh(static->discovery)+default",
                 require(defaultCmm(rawEcdhStaticKeyring())), null, List.of(),
                 require(defaultCmm(rawEcdhDiscoveryKeyring())),
-                Set.of("MPL", "raw-ecdh")),
+                Set.of("raw-ecdh")),
 
             // Raw-ECDH ephemeral sender key on encrypt; the recipient decrypts by
             // discovery.
             new Scenario("rawEcdh(ephemeral->discovery)+default",
                 require(defaultCmm(rawEcdhEphemeralKeyring())), null, List.of(),
                 require(defaultCmm(rawEcdhDiscoveryKeyring())),
-                Set.of("MPL", "raw-ecdh")),
+                Set.of("raw-ecdh")),
 
             // Caching CMM over a Default CMM / Raw-AES keyring on both legs.
             new Scenario("rawAes+caching",
@@ -645,6 +658,76 @@ public final class EsdkClientConfigs {
             new Scenario("awsKms+caching",
                 require(cachingCmm(defaultCmm(awsKmsKeyring(kms.symmetricKeyArn())), null)),
                 null, List.of(), null, Set.of("aws-kms", "caching")));
+    }
+
+    /**
+     * The Feature_Catalog Features a client config needs: one per keyring and
+     * non-default CMM it contains, recursing into multi-keyring members and
+     * wrapping CMMs. A server that supports exactly those Features runs the
+     * scenario.
+     */
+    static Set<String> featuresOf(ESDKClientConfig config) {
+        Set<String> features = new LinkedHashSet<>();
+        if (config != null) {
+            addCmmFeatures(config.getCmm(), features);
+        }
+        return Set.copyOf(features);
+    }
+
+    private static void addCmmFeatures(CryptographicMaterialsManager cmm, Set<String> out) {
+        if (cmm == null) {
+            return;
+        }
+        if (cmm.getDefault() != null) {
+            addKeyringFeatures(cmm.getDefault().getKeyring(), out);
+        } else if (cmm.getRequiredEncryptionContext() != null) {
+            out.add("required-encryption-context");
+            addCmmFeatures(cmm.getRequiredEncryptionContext().getUnderlyingCMM(), out);
+        } else if (cmm.getCaching() != null) {
+            out.add("caching");
+            addCmmFeatures(cmm.getCaching().getUnderlyingCMM(), out);
+        }
+    }
+
+    private static void addKeyringFeatures(Keyring keyring, Set<String> out) {
+        if (keyring == null) {
+            return;
+        }
+        if (keyring.getRawAes() != null) {
+            out.add("raw-aes");
+        } else if (keyring.getRawRsa() != null) {
+            out.add("raw-rsa");
+        } else if (keyring.getAwsKms() != null) {
+            out.add("aws-kms");
+        } else if (keyring.getAwsKmsMrk() != null) {
+            out.add("aws-kms-mrk");
+        } else if (keyring.getAwsKmsMultiKeyring() != null) {
+            out.add("aws-kms-multi");
+        } else if (keyring.getAwsKmsMrkMultiKeyring() != null) {
+            out.add("aws-kms-mrk-multi");
+        } else if (keyring.getAwsKmsDiscovery() != null) {
+            out.add("aws-kms-discovery");
+        } else if (keyring.getAwsKmsMrkDiscovery() != null) {
+            out.add("aws-kms-mrk-discovery");
+        } else if (keyring.getAwsKmsRsa() != null) {
+            out.add("aws-kms-rsa");
+        } else if (keyring.getAwsKmsHierarchical() != null) {
+            out.add("hierarchical");
+        } else if (keyring.getMulti() != null) {
+            out.add("multi");
+            addKeyringFeatures(keyring.getMulti().getGenerator(), out);
+            if (keyring.getMulti().hasChildKeyrings()) {
+                for (Keyring child : keyring.getMulti().getChildKeyrings()) {
+                    addKeyringFeatures(child, out);
+                }
+            }
+        }
+    }
+
+    private static Set<String> union(Set<String> a, Set<String> b) {
+        Set<String> out = new LinkedHashSet<>(a);
+        out.addAll(b);
+        return Set.copyOf(out);
     }
 
     private static Keyring awsKmsKeyring(String kmsKeyId) {

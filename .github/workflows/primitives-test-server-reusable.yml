@@ -3,7 +3,7 @@
 #
 # A run builds and launches every configured Primitives Language_Server, runs
 # the Tests over the server pairs, and fails on any failed Test. The native
-# rust server lives in aws-crypto-tools-rust (prim-test-server/); the java,
+# rust server lives in aws-crypto-tools-rust (prim/test-server/); the java,
 # net, python, go, and rust-dafny servers live in
 # aws-cryptographic-material-providers-library (test-server/<lang>-v<major>-server/).
 # The java, net, and python servers build on the MPL's own AtomicPrimitives
@@ -15,8 +15,9 @@
 # JOBS: `plan` keys every server on its commit and lists the ones with no
 # prebuilt output; `prebuild` builds only
 # those, one runner each, and publishes each output as an artifact named by its
-# key; `primitives-test-server` does its setup in parallel with `prebuild`,
-# waits for it, fetches every output into its clone, and runs the Tests. The
+# key; `primitives-test-server` starts once `prebuild` has finished (or was
+# skipped because nothing needed building), fetches every output into its
+# clone, and runs the Tests. The
 # build stamps make every fetched server launch without rebuilding, so the
 # test job needs neither Dafny nor the Rust, Go, or smithy-dafny toolchains.
 # Each Dafny transpile runs alone on its own runner.
@@ -83,12 +84,6 @@ on:
           project only picks up jobs from the repo it is connected to.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
-    secrets:
-      repo-pat:
-        description: >-
-          Read-only token for the private repositories the run clones
-          (aws-crypto-tools-rust).
-        required: true
 
 # Callers must grant these.
 permissions:
@@ -129,7 +124,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
           sparse-checkout: .github/scripts
       - name: Resolve refs
         id: refs
@@ -143,7 +137,6 @@ jobs:
           INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
           INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
           GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
         run: .github/scripts/resolve-test-server-refs.sh resolve
 
   # Resolves each prebuilt server's key and lists the servers with no prebuilt
@@ -185,7 +178,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -198,7 +190,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Set up Python (its version keys the python server output)
@@ -207,27 +198,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
-        # The run clones aws-crypto-tools-rust via the SSH URL in its
-        # Configuration_Entry; GitHub Actions' default token only reaches the
-        # calling repository, so the PAT rewrites that URL to authenticated
-        # HTTPS. The PAT is passed only via `env:` (masked in logs), is
-        # written only to the ephemeral runner's ~/.gitconfig, and needs only
-        # READ access to aws-crypto-tools-rust contents.
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the repo-pat secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-rust clone the run performs WILL FAIL without it." >&2
-            echo "Pass a token with read access to aws-crypto-tools-rust contents (a fine-grained" >&2
-            echo "PAT with 'Contents: Read', or a classic PAT with the 'repo' scope)." >&2
-            exit 1
-          fi
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Identify the runner platform
         # Keys every prebuilt output and dependency cache: binaries link
@@ -301,16 +274,16 @@ jobs:
           java_project="$mpl/$(dirname "$(dirname "$(library_path java)")")"
           python_library="$mpl/$(library_path python)"
           m2=$HOME/.m2/repository/software/amazon/cryptography
-          emit rust rust "" \
+          emit rust rust "-coverage" \
             "$rust/target/release/primitives-test-server" \
             "$rust/.primitives-build-stamp"
-          emit rustdafny rust-dafny "" \
+          emit rustdafny rust-dafny "-coverage" \
             "$rustdafny/target/release/primitives-test-server" \
             "$rustdafny/.primitives-build-stamp"
           emit net net "-dafny$DAFNY_VERSION" \
             "$net/bin/Release/net8.0" \
             "$net/.primitives-build-stamp"
-          emit go go "" \
+          emit go go "-coverage" \
             "$go/primitives-test-server" \
             "$go/.primitives-build-stamp"
           # The transpiled library installed in the local Maven repository,
@@ -340,7 +313,6 @@ jobs:
         id: matrix
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_rust: ${{ steps.keys.outputs.key_rust }}
           KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
           KEY_net: ${{ steps.keys.outputs.key_net }}
@@ -349,14 +321,12 @@ jobs:
           KEY_python: ${{ steps.keys.outputs.key_python }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
             local repo id
             for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
-              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+              id=$(GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
                 -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
                 2>/dev/null) || id=""
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
@@ -399,12 +369,23 @@ jobs:
       OUT_KEY: ${{ matrix.language == 'rust' && needs.plan.outputs.key_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'java' && needs.plan.outputs.key_java || needs.plan.outputs.key_python }}
       OUT_PATHS: ${{ matrix.language == 'rust' && needs.plan.outputs.paths_rust || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'java' && needs.plan.outputs.paths_java || needs.plan.outputs.paths_python }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -417,7 +398,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -476,6 +456,9 @@ jobs:
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up .NET (the .NET build; the Dafny tool)
         if: env.DAFNY_BUILD == 'true'
@@ -507,14 +490,9 @@ jobs:
         if: matrix.language == 'python'
         run: python -m pip install black==25.1 docformatter==1.7.7
 
-      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
@@ -538,6 +516,17 @@ jobs:
           # does.
           (cd "$mpl/smithy-dafny/codegen" && JAVA_HOME="$JAVA_HOME_17_X64" ./gradlew --version)
 
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
         # are cleaned before saving, so every branch reuses the dependencies.
@@ -557,9 +546,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ needs.plan.outputs.platform }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-primitives-go-coverage-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ needs.plan.outputs.platform }}-primitives-go-
+            ${{ needs.plan.outputs.platform }}-primitives-go-coverage-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -612,7 +601,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ needs.plan.outputs.platform }}-primitives-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-primitives-go-coverage-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
@@ -621,22 +610,63 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ needs.plan.outputs.platform }}-primitives-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.mpl_root)) }}
 
-  # Starts alongside the prebuild job; its setup overlaps the builds, and it
-  # waits for their outputs just before the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   primitives-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: [resolve, plan]
+    needs: [resolve, plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.resolve.result == 'success'
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
     runs-on: ${{ inputs.runner }}
     env:
       LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Download the JaCoCo agent and command line
+        # The Java launch plan runs each Java server with the agent, and
+        # coverage_report.py turns the agent's data into lcov with the
+        # command line.
+        env:
+          JACOCO_VERSION: 0.8.13
+        run: |
+          dir="$RUNNER_TEMP/jacoco"
+          mkdir -p "$dir"
+          base=https://repo1.maven.org/maven2/org/jacoco
+          curl -sSfL -o "$dir/jacocoagent.jar" "$base/org.jacoco.agent/$JACOCO_VERSION/org.jacoco.agent-$JACOCO_VERSION-runtime.jar"
+          curl -sSfL -o "$dir/jacococli.jar" "$base/org.jacoco.cli/$JACOCO_VERSION/org.jacoco.cli-$JACOCO_VERSION-nodeps.jar"
+          printf '%s  %s\n' \
+            47e700ccb0fdb9e27c5241353f8161938f4e53c3561dd35e063c5fe88dc3349b jacocoagent.jar \
+            8f748683833d4dc4d72cea5d6b43f49344687b831e0582c97bcb9b984e3de0a3 jacococli.jar \
+            | (cd "$dir" && sha256sum -c -)
+          echo "TESTSERVER_JACOCO_AGENT=$dir/jacocoagent.jar" >> "$GITHUB_ENV"
+          echo "TESTSERVER_JACOCO_CLI=$dir/jacococli.jar" >> "$GITHUB_ENV"
+
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -649,7 +679,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -684,6 +713,18 @@ jobs:
           printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
           dotnet --version
 
+      - name: Install dotnet-coverage
+        # The .NET launch plan runs each .NET server under dotnet-coverage
+        # collect, and coverage_report.py merges its data into a report.
+        env:
+          DOTNET_COVERAGE_VERSION: 18.12.0
+        run: |
+          dir="$RUNNER_TEMP/dotnet-coverage"
+          dotnet tool install dotnet-coverage --version "$DOTNET_COVERAGE_VERSION" --tool-path "$dir"
+          echo "TESTSERVER_DOTNET_COVERAGE=$dir/dotnet-coverage" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_NOLOGO=1" >> "$GITHUB_ENV"
+
       - name: Restore the Gradle caches (orchestrator + Java server)
         id: gradle-cache
         uses: actions/cache/restore@v4
@@ -700,14 +741,9 @@ jobs:
           restore-keys: |
             ${{ needs.plan.outputs.platform }}-primitives-gradle-
 
-      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Install Smithy CLI
         # Needed by `make validate`; pinned official release.
@@ -731,36 +767,9 @@ jobs:
         working-directory: primitives/test-server
         run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 3600))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = "done" ] && break
-              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
-
       - name: Fetch the prebuilt servers into their clones
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_rust: ${{ needs.plan.outputs.key_rust }}
           KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
           KEY_net: ${{ needs.plan.outputs.key_net }}
@@ -769,14 +778,12 @@ jobs:
           KEY_python: ${{ needs.plan.outputs.key_python }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
             local repo id
             for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
-              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+              id=$(GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
                 -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
                 2>/dev/null) || id=""
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
@@ -805,7 +812,7 @@ jobs:
             [ -n "$found" ] || continue
             read -r repo id <<<"$found"
             echo "$language: $repo artifact $id"
-            GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
+            GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
             unpack "$RUNNER_TEMP/prebuilt/$language.tgz" "$RUNNER_TEMP/prebuilt/$language.root"
           done
@@ -841,6 +848,20 @@ jobs:
           python3 test-server-common/tools/ci_summary.py \
             primitives/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up llvm-tools for the coverage reports
+        # Turns the Rust servers' coverage profiles into reports.
+        if: always()
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
+        if: always()
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" primitives/test-server/build/coverage
+
       - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
@@ -848,6 +869,7 @@ jobs:
           name: primitives-test-server-reports
           path: |
             primitives/test-server/build/resolution-record.json
+            primitives/test-server/build/coverage
             test-server-common/orchestrator/build/resolution-record.json
             primitives/test-server/build/launch/*/*.log
             primitives/test-server/tests/build/reports/tests

@@ -15,7 +15,7 @@
 # lives under this Makefile's sibling `build/` directory, gitignored.
 #
 # The per-language Language_Servers are NOT hosted here: the Rust server lives
-# in aws-crypto-tools-rust under mpl-test-server/, and the orchestrated run
+# in aws-crypto-tools-rust under mpl/test-server/, and the orchestrated run
 # resolves each server from its entry's Server_Location in
 # config/server-config.json.
 #
@@ -55,7 +55,7 @@ ORCH_DIR   := $(abspath $(MAKEFILE_DIR)/../../test-server-common/orchestrator)
 
 # ----------------------------------------------------------------------------
 # Local aws-crypto-tools-rust checkout — the source of the Rust Language_Server
-# (mpl-test-server/).
+# (mpl/test-server/).
 # ----------------------------------------------------------------------------
 # `make orchestrate` passes this as a workingTreeOverlay (keyed by the repo
 # name) to the orchestrator, so the Rust server component resolves to the local

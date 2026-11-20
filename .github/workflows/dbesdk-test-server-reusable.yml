@@ -10,9 +10,9 @@
 #   prebuild compiles only those servers, one per runner, and saves each built
 #            binary as a workflow artifact named after its source commit.
 #   dbesdk-test-server
-#            runs at the same time as prebuild: it does its own setup and builds
-#            the fast java server, then waits for prebuild, downloads each
-#            pre-built binary into its source tree, and runs the tests. A small
+#            runs once prebuild has finished (or was skipped because nothing
+#            needed building): it does its own setup, builds the fast java
+#            server, downloads each pre-built binary into its source tree, and runs the tests. A small
 #            build-stamp file saved beside each binary lets a downloaded server
 #            start without being recompiled.
 #
@@ -209,7 +209,7 @@ jobs:
           emit net net "$(tip net)" \
             "$net/bin/Release/net8.0" \
             "$net/.dbesdk-build-stamp"
-          emit rust rust "$(tip rust)" \
+          emit rust rust "$(tip rust)-coverage" \
             "$rust/target/release/dbesdk-test-server" \
             "$rust/.dbesdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
@@ -276,6 +276,18 @@ jobs:
       OUT_KEY: ${{ matrix.language == 'net' && needs.plan.outputs.key_net || needs.plan.outputs.key_rust }}
       OUT_PATHS: ${{ matrix.language == 'net' && needs.plan.outputs.paths_net || needs.plan.outputs.paths_rust }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
@@ -299,6 +311,9 @@ jobs:
       - name: Set up the Rust toolchain
         if: matrix.language == 'rust'
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up Go (aws-lc-sys native build)
         if: matrix.language == 'rust'
@@ -353,6 +368,17 @@ jobs:
         # The caches below restore into the clone, so it exists first.
         working-directory: dbesdk/test-server
         run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
+
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and the workspace's Cargo.lock; our own crates
@@ -420,11 +446,16 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ needs.plan.outputs.platform }}-dbesdk-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.net_dir)) }}
 
-  # Starts alongside the prebuild job; its setup and the java build overlap the
-  # heavy builds, and it waits for their outputs just before the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   dbesdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: plan
+    needs: [plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
     runs-on: ${{ inputs.runner }}
 
     env:
@@ -439,6 +470,42 @@ jobs:
       KMS_CI_ROLE_ARN: ${{ vars.DBESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/dbesdk-test-server-ci-kms-role' }}
 
     steps:
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Download the JaCoCo agent and command line
+        # The Java launch plan runs each Java server with the agent, and
+        # coverage_report.py turns the agent's data into lcov with the
+        # command line.
+        env:
+          JACOCO_VERSION: 0.8.13
+        run: |
+          dir="$RUNNER_TEMP/jacoco"
+          mkdir -p "$dir"
+          base=https://repo1.maven.org/maven2/org/jacoco
+          curl -sSfL -o "$dir/jacocoagent.jar" "$base/org.jacoco.agent/$JACOCO_VERSION/org.jacoco.agent-$JACOCO_VERSION-runtime.jar"
+          curl -sSfL -o "$dir/jacococli.jar" "$base/org.jacoco.cli/$JACOCO_VERSION/org.jacoco.cli-$JACOCO_VERSION-nodeps.jar"
+          printf '%s  %s\n' \
+            47e700ccb0fdb9e27c5241353f8161938f4e53c3561dd35e063c5fe88dc3349b jacocoagent.jar \
+            8f748683833d4dc4d72cea5d6b43f49344687b831e0582c97bcb9b984e3de0a3 jacococli.jar \
+            | (cd "$dir" && sha256sum -c -)
+          echo "TESTSERVER_JACOCO_AGENT=$dir/jacocoagent.jar" >> "$GITHUB_ENV"
+          echo "TESTSERVER_JACOCO_CLI=$dir/jacococli.jar" >> "$GITHUB_ENV"
+
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Checkout aws-crypto-tools-commons (tests, model, orchestrator)
         # Name the repository explicitly: when another repository calls this
         # workflow, checkout would default to that repo, but the tests, model,
@@ -466,6 +533,9 @@ jobs:
 
       - name: Set up the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up Go
         # Only used to build the rust server's aws-lc-sys native code.
@@ -489,6 +559,18 @@ jobs:
           set -euo pipefail
           printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
           dotnet --version
+
+      - name: Install dotnet-coverage
+        # The .NET launch plan runs each .NET server under dotnet-coverage
+        # collect, and coverage_report.py merges its data into a report.
+        env:
+          DOTNET_COVERAGE_VERSION: 18.12.0
+        run: |
+          dir="$RUNNER_TEMP/dotnet-coverage"
+          dotnet tool install dotnet-coverage --version "$DOTNET_COVERAGE_VERSION" --tool-path "$dir"
+          echo "TESTSERVER_DOTNET_COVERAGE=$dir/dotnet-coverage" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_NOLOGO=1" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator + Java server)
         id: gradle-cache
@@ -584,32 +666,6 @@ jobs:
           path: ${{ needs.plan.outputs.dir_java }}
           key: ${{ needs.plan.outputs.platform }}-dbesdk-sources-v1-java-${{ needs.plan.outputs.tip_java }}
 
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 2700))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = "done" ] && break
-              if [ "$state" = "failed" ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
-
       - name: Materialize the sources (clones only)
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
@@ -685,6 +741,20 @@ jobs:
           python3 test-server-common/tools/ci_summary.py \
             dbesdk/test-server/tests/build/test-results >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up llvm-tools for the coverage reports
+        # Turns the Rust servers' coverage profiles into reports.
+        if: always()
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
+        if: always()
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" dbesdk/test-server/build/coverage
+
       - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
@@ -694,6 +764,7 @@ jobs:
             test-server-common/orchestrator/build/resolution-record.json
             test-server-common/orchestrator/build/launch/*/*.log
             dbesdk/test-server/build/resolution-record.json
+            dbesdk/test-server/build/coverage
             dbesdk/test-server/build/launch/*/*.log
             dbesdk/test-server/tests/build/reports/tests
             dbesdk/test-server/tests/build/test-results
