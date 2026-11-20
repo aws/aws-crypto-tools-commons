@@ -29,6 +29,10 @@ dependencies {
     testImplementation("software.amazon.smithy.java:client-rpcv2-cbor:$smithyJavaVersion")
     testImplementation("software.amazon.smithy.java:client-http:$smithyJavaVersion")
 
+    // --- FakeDynamoDb: reads a real record, serves it as DynamoDB JSON ------
+    testImplementation("software.amazon.awssdk:dynamodb:2.29.52")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
+
     // --- Test frameworks ----------------------------------------------------
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")

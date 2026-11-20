@@ -271,6 +271,10 @@ structure CreateKeyStoreClientRequest {
     /// Region of the key store's DynamoDB client.
     @required
     ddbClientRegion: String
+
+    /// URL the key store's DynamoDB client sends its requests to, in place of
+    /// the region's endpoint.
+    ddbEndpoint: String
 }
 
 /// Mirrors the key store's KMSConfiguration.
