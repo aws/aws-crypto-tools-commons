@@ -467,7 +467,7 @@ public class AwsKmsHierarchicalKeyringTest {
     // -----------------------------------------------------------------------
 
     /** Asked for BRANCH_KEY_ID's active key, the client returns another branch key's. */
-    @ParameterizedTest(name = "[hierarchical] active key read rejects another branch key's record {0}")
+    @ParameterizedTest(name = "[hierarchical] active key read rejects a record of another branch key {0}")
     @MethodSource("targets")
     void activeKeyReadRejectsOtherBranchKeysRecord(LanguageServerTarget target) {
         FeatureGate.require(Set.of("hierarchical"), target);
