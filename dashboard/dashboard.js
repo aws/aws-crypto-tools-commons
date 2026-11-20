@@ -44,7 +44,7 @@ class GitHubDashboard {
         // If URL has a hash, switch to that section; otherwise load dashboard
         if (window.location.hash) {
             const section = window.location.hash.slice(1);
-            if (['dashboard', 'pull-requests', 'issues', 'actions', 'duvet', 'test-servers', 'settings'].includes(section)) {
+            if (['dashboard', 'pull-requests', 'issues', 'actions', 'duvet', 'test-servers', 'verification', 'settings'].includes(section)) {
                 this.switchSection(section);
             } else {
                 this.switchSection('dashboard');
@@ -245,6 +245,13 @@ class GitHubDashboard {
             // The duvet page fetches its own reports, so load the frame once.
             const frame = document.getElementById('duvetFrame');
             if (!frame.getAttribute('src')) frame.src = 'duvet/index.html';
+            return;
+        }
+
+        if (section === 'verification') {
+            // The verification page fetches its own status file, so load the frame once.
+            const frame = document.getElementById('verificationFrame');
+            if (!frame.getAttribute('src')) frame.src = 'verification/index.html';
             return;
         }
 

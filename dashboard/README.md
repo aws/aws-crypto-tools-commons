@@ -13,7 +13,8 @@ The page calls the GitHub API from your browser. Paste a classic GitHub token (`
 ├── config.js         # Repository list and token storage
 ├── dashboard.js      # Dashboard functionality
 ├── styles.css        # Styling
-└── test-servers/     # Test Server Results tab
+├── test-servers/     # Test Server Results tab
+└── verification/     # Verus proof status from aws-crypto-tools-rust's docs/verification-status.json
 ```
 
 To add a repository, add an entry to `REPOSITORIES` in `config.js`.
