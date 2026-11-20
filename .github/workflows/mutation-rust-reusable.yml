@@ -41,10 +41,6 @@ on:
         description: Role for the Tests that read DynamoDB and KMS. Those Tests fail without it and are left out.
         type: string
         default: ""
-    secrets:
-      repo-pat:
-        description: Read-only token for aws-crypto-tools-commons.
-        required: true
 
 jobs:
   mutation:
@@ -71,7 +67,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ inputs.commons-ref }}
-          token: ${{ secrets.repo-pat }}
           sparse-checkout: .github/scripts
           path: resolve
 
@@ -85,14 +80,12 @@ jobs:
           EVENT_BODY: ${{ github.event.pull_request.body }}
           INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
           GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
         run: resolve/.github/scripts/resolve-test-server-refs.sh resolve
 
       - uses: actions/checkout@v6
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ steps.refs.outputs.commons_ref }}
-          token: ${{ secrets.repo-pat }}
           path: commons
 
       - name: Mutate the whole crate
