@@ -25,7 +25,6 @@
 #       HEAD_REF               github.head_ref
 #       INPUT_COMMONS_REF, INPUT_LANGUAGE_REPOSITORY, INPUT_LANGUAGE_REF
 #       GH_TOKEN               reads this repository's pull request
-#       REPO_PAT               reads the private repositories' refs
 #   resolve-test-server-refs.sh apply
 #     Points every server-config.json entry of each repository in
 #     LANGUAGE_BRANCHES at its branch. Run from the commons checkout.
@@ -68,10 +67,10 @@ resolve() {
 
   for item in ${refs[@]+"${refs[@]}"}; do
     read -r repo number <<< "$item"
-    remote="https://x-access-token:${REPO_PAT}@github.com/$repo.git"
+    remote="https://github.com/$repo.git"
     sha=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote "$remote" "refs/pull/$number/head" | cut -f1)
     if [ -z "$sha" ]; then
-      echo "::error::Test-Server-Override: $repo#$number has no head commit, or the token cannot read $repo."
+      echo "::error::Test-Server-Override: $repo#$number has no head commit."
       exit 1
     fi
     if [ "$repo" = "$REPOSITORY" ]; then
@@ -85,7 +84,7 @@ resolve() {
     fi
     # The servers clone by branch name. A token that cannot read pull requests
     # falls back to the branch at the head commit.
-    branch=$(GH_TOKEN=$REPO_PAT gh api "repos/$repo/pulls/$number" --jq 'select(.head.repo.full_name == .base.repo.full_name) | .head.ref' 2>/dev/null) || branch=""
+    branch=$(gh api "repos/$repo/pulls/$number" --jq 'select(.head.repo.full_name == .base.repo.full_name) | .head.ref' 2>/dev/null) || branch=""
     if [ -z "$branch" ]; then
       heads=$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "$remote")
       branch=$(awk -v s="$sha" '$1 == s { sub("refs/heads/", "", $2); print $2; exit }' <<< "$heads")
@@ -101,7 +100,7 @@ resolve() {
   # The pull request's own repository runs every server it hosts from the
   # pull request's branch, not only the ones built from the checkout.
   if [ "$REPOSITORY" != "$COMMONS" ] && [ -n "${HEAD_REF:-}" ] &&
-     [ -n "$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "https://x-access-token:${REPO_PAT}@github.com/$REPOSITORY.git" "$HEAD_REF")" ]; then
+     [ -n "$(cd "${RUNNER_TEMP:-/tmp}" && git ls-remote --heads "https://github.com/$REPOSITORY.git" "$HEAD_REF")" ]; then
     branches+="$REPOSITORY $HEAD_REF"$'\n'
   fi
 

@@ -40,8 +40,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * <p>Both round-trips generate cases over every pair and gate on the scenario's
  * required Feature(s) via {@link FeatureGate#require} as the first statement in the
  * body (Requirements 9.1, 9.2): the blob round-trip requires the scenario's keyring
- * Feature(s) — {@code MPL} for the raw/KMS scenarios, {@code hierarchical} for the
- * hierarchical scenario — and the stream round-trip additionally requires the
+ * Feature(s) — {@code raw-ecdh} for the raw ECDH scenarios, {@code hierarchical}
+ * for the hierarchical scenario — and the stream round-trip additionally requires the
  * {@code streaming} Feature. When every combination language declares every
  * required Feature supported the test runs (Requirement 9.4); a language declaring
  * any of them unsupported skips it visibly — before any Language_Server operation
@@ -121,8 +121,7 @@ class MaterialsRoundTripTests {
     @ParameterizedTest(name = "blob[{1}] {0}")
     @MethodSource("blobCases")
     void blobRoundTrip(TargetPair pair, Scenario scenario) {
-        // Gate on the scenario's required Feature(s) — MPL for the raw/KMS keyring
-        // scenarios, hierarchical for the hierarchical scenario. A combination
+        // Gate on the scenario's required keyring Feature(s). A combination
         // language declaring any required Feature unsupported skips visibly, before
         // any Language_Server operation (Requirements 9.1, 9.5).
         FeatureGate.require(scenario.features(), pair);
