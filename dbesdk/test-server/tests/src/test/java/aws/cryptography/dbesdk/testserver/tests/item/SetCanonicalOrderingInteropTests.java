@@ -14,13 +14,17 @@ import aws.cryptography.dbesdk.testserver.client.model.AttributeValue;
 import aws.cryptography.dbesdk.testserver.client.model.CryptoAction;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemOutput;
+import aws.cryptography.testserver.tests.DynamoDbInputs;
+import aws.cryptography.testserver.tests.Example;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -63,6 +67,14 @@ class SetCanonicalOrderingInteropTests {
         return DbeTestHelpers.pairs().stream();
     }
 
+    static Stream<Arguments> stringSets() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.stringSets());
+    }
+
+    static Stream<Arguments> binarySets() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.binarySets());
+    }
+
     private static Map<String, CryptoAction> pkPlusEncryptedValue() {
         Map<String, CryptoAction> actions = new LinkedHashMap<>();
         actions.put(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
@@ -96,19 +108,20 @@ class SetCanonicalOrderingInteropTests {
         return ByteBuffer.wrap(out);
     }
 
-    @ParameterizedTest(name = "string set UTF-16 astral order {0}")
-    @MethodSource("testPairs")
-    void stringSetUtf16AstralOrder(TargetPair pair) {
+    @ParameterizedTest(name = "string set UTF-16 astral order {0} {1}")
+    @MethodSource("stringSets")
+    void stringSetUtf16AstralOrder(Example<List<String>> strings, TargetPair pair) {
         assertValueRoundTrips(pair,
-            AttributeValue.builder().ss(List.of(AMP, BMP, ASTRAL)).build());
+            AttributeValue.builder().ss(strings.value()).build());
     }
 
-    @ParameterizedTest(name = "binary set prefix order {0}")
-    @MethodSource("testPairs")
-    void binarySetPrefixOrder(TargetPair pair) {
+    @ParameterizedTest(name = "binary set prefix order {0} {1}")
+    @MethodSource("binarySets")
+    void binarySetPrefixOrder(Example<List<String>> hexValues, TargetPair pair) {
         // [1] < [1,0] < [2] : prefix-aware lexicographic, supplied out of order.
-        assertValueRoundTrips(pair,
-            AttributeValue.builder().bs(List.of(bytes(1), bytes(2), bytes(1, 0))).build());
+        assertValueRoundTrips(pair, AttributeValue.builder().bs(hexValues.value().stream()
+            .map(hex -> ByteBuffer.wrap(HexFormat.of().parseHex(hex)))
+            .toList()).build());
     }
 
     @ParameterizedTest(name = "sets inside list independently sorted {0}")

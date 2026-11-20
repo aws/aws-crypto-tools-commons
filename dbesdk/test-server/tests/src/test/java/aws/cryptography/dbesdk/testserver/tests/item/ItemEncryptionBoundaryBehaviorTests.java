@@ -22,6 +22,8 @@ import aws.cryptography.dbesdk.testserver.client.model.CryptoAction;
 import aws.cryptography.dbesdk.testserver.client.model.DBESDKTestServerException;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemOutput;
+import aws.cryptography.testserver.tests.DynamoDbInputs;
+import aws.cryptography.testserver.tests.Example;
 import aws.cryptography.testserver.tests.TargetPair;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import java.util.LinkedHashMap;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -63,6 +66,10 @@ class ItemEncryptionBoundaryBehaviorTests {
 
     static Stream<TargetPair> testPairs() {
         return DbeTestHelpers.pairs().stream();
+    }
+
+    static Stream<Arguments> attributeNames() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.attributeNames());
     }
 
     /**
@@ -146,11 +153,10 @@ class ItemEncryptionBoundaryBehaviorTests {
      * A byte-length off-by-N bug here would misplace bytes in the canonical
      * hash and silently corrupt the tag.
      */
-    @ParameterizedTest(name = "UTF-8 attribute name round-trip preserves plaintext {0}")
-    @MethodSource("testPairs")
-    void utf8AttributeNameRoundTripPreservesPlaintext(TargetPair pair) {
-        // "café" = 4 chars, 5 UTF-8 bytes (é is 2 bytes) — char vs byte length differ
-        final String utf8AttrName = "caf\u00e9";
+    @ParameterizedTest(name = "UTF-8 attribute name round-trip preserves plaintext {0} {1}")
+    @MethodSource("attributeNames")
+    void utf8AttributeNameRoundTripPreservesPlaintext(Example<String> attributeName, TargetPair pair) {
+        final String utf8AttrName = attributeName.value();
         Map<String, CryptoAction> actions = new LinkedHashMap<>();
         actions.put(PK, CryptoAction.SIGN_AND_INCLUDE_IN_ENCRYPTION_CONTEXT);
         actions.put(SECRET, CryptoAction.ENCRYPT_AND_SIGN);
@@ -161,7 +167,7 @@ class ItemEncryptionBoundaryBehaviorTests {
         plaintext.put(PK, AttributeValue.builder().s("utf8-key").build());
         plaintext.put(SECRET, AttributeValue.builder().s("utf8-secret").build());
         plaintext.put(PUBLIC, AttributeValue.builder().s("utf8-public").build());
-        plaintext.put(utf8AttrName, AttributeValue.builder().s("caf\u00e9-value").build());
+        plaintext.put(utf8AttrName, AttributeValue.builder().s(utf8AttrName + "-value").build());
 
         DBESDKTestServerClient encryptClient =
             DbeTestServerClients.forEndpoint(pair.encryptEndpoint());

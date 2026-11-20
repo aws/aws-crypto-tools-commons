@@ -57,11 +57,20 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
+    // Per-test coverage zeroes each server's counters between tests, so the tests must run one at a time.
+    if (System.getenv("TESTSERVER_PER_TEST_COVERAGE") != null) {
+        systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+    }
     // FeatureGateLog writes every feature-gate decision here, next to the
     // JUnit XML, so the uploaded reports show which features each run needed.
     systemProperty(
         "testserver.featureGateLog",
         layout.buildDirectory.file("test-results/feature-gate-log.jsonl").get().asFile.path,
+    )
+    // Fuzz writes each random example here when TESTSERVER_FUZZ is set.
+    systemProperty(
+        "testserver.fuzzLog",
+        layout.buildDirectory.file("test-results/fuzz-log.jsonl").get().asFile.path,
     )
     // The vector suites hold ~260k dynamic tests and their messages; the 512 MiB
     // default leaves the test JVM spending most of its time in GC.

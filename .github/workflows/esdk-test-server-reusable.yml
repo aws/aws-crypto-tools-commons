@@ -158,6 +158,20 @@ on:
           project only picks up jobs from the repo it is connected to.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+      fuzz:
+        description: >-
+          How many random examples to add to each shared input list
+          (TESTSERVER_FUZZ). Empty runs only the fixed examples.
+        type: string
+        default: ""
+      fuzz-seed:
+        description: The seed for the random examples (TESTSERVER_FUZZ_SEED). Empty picks a new one.
+        type: string
+        default: ""
+      report-artifact:
+        description: Name of the uploaded test report artifact.
+        type: string
+        default: esdk-test-server-reports
 
 # Callers must grant these.
 permissions:
@@ -176,6 +190,9 @@ env:
   # same warm set and pull requests never churn the cache store.
   SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   CARGO_INCREMENTAL: "0"
+  # Every Rust build here measures coverage, and Rust's branch coverage
+  # needs a nightly compiler.
+  RUSTUP_TOOLCHAIN: nightly-2026-10-26
 
 jobs:
   # Resolves the refs every job checks out, including any Test-Server-Override
@@ -372,7 +389,7 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
-          emit rustdafny rust-dafny "$esdk_tip-coverage" \
+          emit rustdafny rust-dafny "$esdk_tip-branch-coverage" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
           # "-coverage": built with line coverage on, so apart from older
@@ -380,10 +397,10 @@ jobs:
           emit go go "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          emit rust rust "$(tip rust)-coverage" \
+          emit rust rust "$(tip rust)-branch-coverage" \
             "$rust/esdk/test-server/target/release/esdk-test-server" \
             "$rust/esdk/test-server/.esdk-build-stamp"
-          emit rustcpp rust-cpp "$(tip rust-cpp)-coverage" \
+          emit rustcpp rust-cpp "$(tip rust-cpp)-branch-coverage" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
@@ -543,8 +560,9 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
           components: rustfmt
 
@@ -636,9 +654,9 @@ jobs:
         # build, and goes before the cargo cache, whose key includes it.
         run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
 
-      - name: Build the Rust code with line coverage
+      - name: Build the Rust code with line and branch coverage
         if: startsWith(matrix.language, 'rust')
-        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+        run: echo "RUSTFLAGS=-C instrument-coverage -Z coverage-options=branch --cfg testserver_coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
@@ -892,8 +910,9 @@ jobs:
           node-version: "22"
 
       - name: Set up the Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
           # llvm-tools turns the rust server's coverage profile into a report.
           components: rustfmt, llvm-tools-preview
@@ -1393,6 +1412,8 @@ jobs:
           # GC collects on one thread and keeps the server near one core.
           DOTNET_gcServer: "1"
           FOCUS: ${{ inputs.focus }}
+          TESTSERVER_FUZZ: ${{ inputs.fuzz }}
+          TESTSERVER_FUZZ_SEED: ${{ inputs.fuzz-seed }}
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
           ESDK_TESTSERVER_KMS_MRK2_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK2_ARN }}
@@ -1410,12 +1431,53 @@ jobs:
           done
           make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
 
+      - name: Pick the Tests the per-test pass records
+        if: inputs.focus != ''
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
+          PRODUCT: esdk
+          LANGUAGE_DIR: language-repo
+        run: .github/scripts/select-per-test-tests.sh
+
+      - name: Record the lines each test runs
+        # A second pass over the focus language's own pairs, one test at a time,
+        # so each server's coverage can be split by test. The pass above stays parallel.
+        if: inputs.focus != '' && env.PER_TEST_RUN == 'true'
+        working-directory: esdk/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          TESTSERVER_COVERAGE_DIR: ${{ runner.temp }}/per-test-coverage-raw
+          TESTSERVER_PER_TEST_COVERAGE: "1"
+          FOCUS: ${{ inputs.focus }}
+        run: |
+          # This pass rewrites the JUnit results and the resolution record, and the
+          # uploaded reports must show the full run above, so they are put back after.
+          saved="$RUNNER_TEMP/full-run"
+          kept=(tests/build/test-results build/resolution-record.json ../../test-server-common/orchestrator/build/resolution-record.json)
+          mkdir -p "$saved"
+          for i in "${!kept[@]}"; do
+            if [ -e "${kept[$i]}" ]; then cp -r "${kept[$i]}" "$saved/$i"; fi
+          done
+          status=0
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=$FOCUS ${PER_TEST_TESTS:+tests=$PER_TEST_TESTS}" || status=$?
+          for i in "${!kept[@]}"; do
+            if [ -e "$saved/$i" ]; then rm -rf "${kept[$i]}" && cp -r "$saved/$i" "${kept[$i]}"; fi
+          done
+          exit "$status"
+
       - name: Write the line coverage reports
         # build/coverage/<language>.lcov (paths relative to the library's
         # repository) and <language>.json (that repository and commit), for
         # the dashboard to merge with the repository's own test coverage.
         if: always()
         run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" esdk/test-server/build/coverage
+
+      - name: Write the per-test line coverage
+        # build/per-test-coverage/<language>.jsonl: the lines each test ran.
+        if: always()
+        run: python3 test-server-common/tools/per_test_coverage.py build "$RUNNER_TEMP/per-test-coverage-raw" esdk/test-server/build/per-test-coverage
 
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
@@ -1430,10 +1492,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: esdk-test-server-reports
+          name: ${{ inputs.report-artifact }}
           path: |
             esdk/test-server/build/resolution-record.json
             esdk/test-server/build/coverage
+            esdk/test-server/build/per-test-coverage
             esdk/test-server/build/launch/*/*.log
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results

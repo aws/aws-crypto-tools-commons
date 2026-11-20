@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fuzz · Test Server Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --none:#3a3f4b; --skip:#6e7681; --sel:#388bfd;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  select, input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .sub .warn { color:#e3b341; }
+  main { padding:16px 20px; height:calc(100vh - 52px); overflow:auto; }
+  h2 { font-size:15px; margin:22px 0 4px; }
+  h2:first-child { margin-top:0; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:8px; max-width:1100px; }
+  .empty { color:var(--dim); padding:20px 0; }
+  #status:empty, #banner:empty { display:none; }
+  #status { color:var(--dim); padding:20px 0; }
+  #status.bad { color:#ffa198; }
+  .banner { border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:13px; max-width:1100px; }
+  .banner.calm { color:var(--dim); border:1px dashed var(--line); }
+  .banner.going { color:var(--text); border:1px solid var(--sel); background:color-mix(in srgb,var(--sel) 12%,transparent); }
+  .rerun { display:grid; grid-template-columns:max-content 1fr; gap:4px 10px; align-items:center; font-size:12px; margin:6px 0 12px; }
+  .rerun code { font:12px ui-monospace,monospace; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:3px 8px; user-select:all; }
+  .rerun button { background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 8px; cursor:pointer; margin-left:6px; font-size:11px; }
+  .rerun button:hover { color:var(--text); border-color:var(--sel); }
+  .summary { display:flex; gap:10px; margin:8px 0 12px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-width:170px; max-width:320px; }
+  .card b { display:block; font-size:18px; font-variant-numeric:tabular-nums; }
+  .card small { color:var(--dim); display:block; }
+  .card .bad { color:#ffa198; } .card .warn { color:#e3b341; }
+  .card.st-grey { border-style:dashed; color:var(--dim); }
+  .card.st-grey b { font-size:13px; font-weight:500; color:var(--dim); }
+  .card.st-error { border-color:var(--fail); background:color-mix(in srgb,var(--fail) 18%,transparent); }
+  .card.st-error b { font-size:13px; color:#ffa198; }
+  .card.st-error small { color:#ffa198; overflow-wrap:anywhere; }
+  .card.st-loading { border-color:var(--sel); animation:pulse 1.4s ease-in-out infinite; }
+  .card.st-loading b { font-size:13px; font-weight:500; color:var(--sel); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes pulse { 50% { opacity:.55; } }
+  .spin { display:inline-block; width:9px; height:9px; margin-right:5px; border:2px solid var(--sel); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; }
+  table.grid { border-collapse:collapse; font-size:12px; }
+  .grid th, .grid td { border:1px solid var(--line); padding:3px 8px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .grid thead th { color:var(--dim); font-weight:600; background:var(--bg); position:sticky; top:-16px; z-index:1; }
+  .grid tbody th { text-align:left; font-weight:500; }
+  .grid tr.lib th { text-transform:uppercase; letter-spacing:.04em; font-size:11px; color:var(--dim); background:var(--bg); padding-top:10px; }
+  .grid tr.family th { font-weight:600; }
+  .grid tr.list th { padding-left:22px; font-family:ui-monospace,monospace; }
+  .grid tr.test th { padding-left:40px; font-family:ui-monospace,monospace; color:var(--dim); font-weight:400; }
+  .grid td.bad { color:#ffa198; } .grid td.warn { color:#e3b341; } .grid td.zero { color:var(--dim); }
+  .matrix td { min-width:84px; padding:0; text-align:center; }
+  .matrix tbody th { font-family:ui-monospace,monospace; }
+  .matrix tbody th small { color:var(--dim); font-family:system-ui,sans-serif; }
+  .cell { display:block; padding:4px 6px; cursor:help; font-size:12px; }
+  .cell small { display:block; font-size:10px; color:var(--dim); }
+  .s-pass { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .s-part { background:color-mix(in srgb,var(--part) 35%,transparent); }
+  .s-fail { background:color-mix(in srgb,var(--fail) 40%,transparent); }
+  .s-none { color:var(--dim); border:1px dashed var(--line); font-size:11px; }
+  .s-zero { background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fail) 35%,transparent) 0 6px,transparent 6px 12px); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin:6px 0 10px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .filters { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 10px; font-size:12px; }
+  table.values { border-collapse:collapse; font-size:12px; width:100%; }
+  .values th, .values td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+  .values thead th { color:var(--dim); font-weight:600; background:var(--bg); position:sticky; top:-16px; z-index:1; white-space:nowrap; }
+  .values tbody tr.row { cursor:pointer; }
+  .values tbody tr.row:hover td { background:var(--panel); }
+  .values tr.open td { background:var(--panel); }
+  .values td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .values td.value { font-family:ui-monospace,monospace; white-space:pre-wrap; word-break:break-all; max-width:520px; }
+  .values td.value i { color:var(--dim); }
+  .values td.chipcell { text-align:center; padding:4px 2px; }
+  .chip { display:inline-block; min-width:30px; padding:0 6px; border-radius:8px; border:1px solid var(--line); font-size:11px; text-align:center; }
+  .chip.na { color:var(--dim); border-style:dashed; }
+  tr.detail td { padding:6px 10px 12px 24px; background:var(--panel); }
+  .detail .meta { color:var(--dim); margin-bottom:6px; }
+  .detail .meta code { color:var(--text); font:11px ui-monospace,monospace; }
+  .cases { border-collapse:collapse; font-size:12px; }
+  .cases td, .cases th { padding:2px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  .cases th { color:var(--dim); font-weight:600; }
+  .cases td.m { font-family:ui-monospace,monospace; }
+  .cases pre { margin:0; white-space:pre-wrap; word-break:break-word; font:11px ui-monospace,monospace; max-width:700px; }
+  .cases pre.bad { color:#ffa198; } .cases pre.skip { color:var(--dim); }
+  .pill { font-size:11px; padding:1px 7px; border-radius:10px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+  .pill.bad { color:#ffa198; border-color:var(--fail); }
+  .pill.warn { color:#e3b341; border-color:var(--part); }
+  .pill.good { color:#56d364; border-color:var(--pass); }
+  .more { padding:6px; color:var(--sel); cursor:pointer; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fuzz</h1>
+  <label>Library <select id="lib"></select></label>
+  <label title="Empty: newest finished Test server fuzz run on commons main. Or paste a PR (URL, owner/repo#N, or #N for commons), a commit SHA, a branch, or a run.">PR / commit <input type="text" id="source" size="34" placeholder="newest fuzz run on commons main"></label>
+</header>
+<main>
+  <div id="status"></div>
+  <div id="page">
+    <div id="banner"></div>
+    <h2>Overview</h2>
+    <div id="overview"></div>
+    <h2>Families</h2>
+    <div class="sub">Each input class makes random values for some lists. The test classes under a list are the ones that asked for it, so they are the parts that got fuzz tested.</div>
+    <div id="families"></div>
+    <h2>Servers</h2>
+    <div class="sub">One row per test class and list. A cell counts that server's random test cases. A pair test counts for both servers in the pair. Hover a cell for its counts.</div>
+    <div class="legend">
+      <span><i class="sw s-pass"></i>all pass</span>
+      <span><i class="sw s-part"></i>some skipped</span>
+      <span><i class="sw s-fail"></i>some fail</span>
+      <span><i class="sw s-zero"></i>none passed</span>
+      <span><i class="sw s-none"></i>no random cases on this server</span>
+    </div>
+    <div id="matrix"></div>
+    <h2>Random values</h2>
+    <div class="filters">
+      <label>Family <select id="family"></select></label>
+      <label>List <select id="list"></select></label>
+      <label>Status <select id="status-filter">
+        <option value="">any</option><option value="fail">has failures</option><option value="skip">has skips</option>
+        <option value="pass">all passed</option><option value="none">not run</option>
+      </select></label>
+    </div>
+    <div id="values"></div>
+  </div>
+</main>
+
+<script src="loader.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const FUZZ_WORKFLOW = "test-server-fuzz.yml";
+const FUZZ_PAGE = `https://github.com/${COMMONS}/actions/workflows/${FUZZ_WORKFLOW}`;
+// Fuzz puts the example's number and seed in each random example's name, as in "fuzz 12 seed=42: empty ARN part 3".
+const MARK = /\bfuzz (\d+) seed=(-?\d+):/;
+
+const ui = { source:readSource(), lib:"", family:"", list:"", status:"", open:null, shown:200 };
+// RUN: the fuzz run shown, or null when there is none.
+// LIBS: library label -> { phase, step, error, data }.
+let RUN = null;
+const LIBS = {};
+
+// ---------- GitHub ----------
+// Every page of a GitHub list; key names the array in each response.
+async function ghAll(path, key) {
+  const out = [];
+  for (let page = 1; ; page++) {
+    const items = (await ghJson(`${path}${path.includes("?") ? "&" : "?"}per_page=100&page=${page}`))[key];
+    out.push(...items);
+    if (items.length < 100) return out;
+  }
+}
+
+// Newest first. A repository without the fuzz workflow answers 404, which means it has no fuzz runs.
+async function fuzzRuns(repo, query) {
+  try { return (await ghJson(`repos/${repo}/actions/workflows/${FUZZ_WORKFLOW}/runs?${query}&per_page=30`)).workflow_runs; }
+  catch (err) { if (/^GitHub 404/.test(err.message)) return []; throw err; }
+}
+
+// Turns what the user typed into a fuzz run, the way resolveRun does for the other pages:
+//   empty -> commons main
+//   a pull request -> its head commit, else its branch
+//   a run -> that run if it is a fuzz run, else the fuzz run on its commit
+//   a commit SHA or a branch name (commons)
+// The newest finished run wins. A run still going is shown only when none has finished.
+async function resolveFuzzRun(text) {
+  text = text.trim();
+  let m, repo = COMMONS, sha = null, branch = text ? null : "main";
+  if ((m = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/) || text.match(/^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/))) {
+    repo = m[1] || COMMONS;
+    const pr = await ghJson(`repos/${repo}/pulls/${m[2]}`);
+    sha = pr.head.sha; branch = pr.head.ref;
+  } else if ((m = text.match(/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)/)) || /^\d+$/.test(text)) {
+    repo = m ? m[1] : COMMONS;
+    const run = await ghJson(`repos/${repo}/actions/runs/${m ? m[2] : text}`);
+    if ((run.path || "").includes(FUZZ_WORKFLOW)) return { ...runInfo(repo, run), going:run.status !== "completed" };
+    sha = run.head_sha;
+  } else if (/^[0-9a-f]{7,40}$/i.test(text)) {
+    sha = text.length === 40 ? text : (await ghJson(`repos/${repo}/commits/${text}`)).sha;
+  } else if (text) {
+    branch = text;
+  }
+  const onSha = sha ? await fuzzRuns(repo, "head_sha=" + sha) : [];
+  const runs = onSha.length ? onSha : branch ? await fuzzRuns(repo, "branch=" + encodeURIComponent(branch)) : [];
+  if (!runs.length) return null;
+  const run = runs.find(r => r.status === "completed") || runs[0];
+  const info = { ...runInfo(repo, run), going:run.status !== "completed" };
+  if (sha && !onSha.length) info.note = `older commit: ${sha.slice(0, 7)} has no fuzz run yet`;
+  else if (runs[0] !== run) info.note = "a newer fuzz run is still going";
+  return info;
+}
+
+// ---------- parsing ----------
+// One random testcase from JUnit XML, or null for a testcase that is not a random example.
+function fuzzCase(attrs, body) {
+  const name = attr(attrs, "name"), mark = name && name.match(MARK);
+  if (!mark) return null;
+  const t = name.match(TARGETS);
+  const sk = body && body.match(/<skipped\b([^>]*)/), fl = body && body.match(/<(failure|error)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/);
+  // A failure without a message attribute has its text, usually a stack trace, as the element body.
+  const msg = sk ? attr(sk[1], "message") || "" : fl ? attr(fl[2], "message") || unxml(fl[3] || "").trim() : "";
+  return { cls:attr(attrs, "classname"), name, method:name.slice(0, mark.index).trim(),
+    labels:t ? [t[1], t[2]].filter(Boolean) : [], st:sk ? "skip" : fl ? "fail" : "pass", msg:msg.slice(0, 1500) };
+}
+
+// A fuzz report zip -> { log: the fuzz-log.jsonl lines, or null when the zip has none; cases: random testcases }.
+async function parseFuzzZip(zip, entries) {
+  const logEntry = entries.find(e => /test-results\/fuzz-log\.jsonl$/.test(e.name));
+  const log = logEntry ? (await zipText(zip, logEntry)).split("\n").filter(Boolean).map(line => JSON.parse(line)) : null;
+  const cases = [];
+  for (const e of entries.filter(e => /test-results\/.*TEST-[^/]*\.xml$/.test(e.name)))
+    await scanTestcases(entryStream(zip, e), (attrs, body) => { const c = fuzzCase(attrs, body); if (c) cases.push(c); });
+  return { log, cases };
+}
+
+// The character after the example's name must not be a letter or digit,
+// so "empty ARN part 3" does not match a testcase for "empty ARN part 31".
+function namesExample(testName, exampleName) {
+  const i = testName.indexOf(exampleName);
+  return i >= 0 && !/\w/.test(testName[i + exampleName.length] || "");
+}
+
+// Every parsed zip of one library -> one entry per (list, index), each with the testcases that ran it.
+// A test class can log the same list more than once, and several test classes can use one list.
+function combine(label, parts) {
+  const byKey = new Map();
+  const logged = parts.some(p => p.log);
+  for (const d of parts.flatMap(p => p.log || [])) {
+    const k = d.list + "\u0000" + d.index;
+    let e = byKey.get(k);
+    // The seed is a Java long, which a JSON number can't hold exactly in JavaScript, so it is read from the name.
+    if (!e) byKey.set(k, e = { lib:label, family:d.family || "(unknown)", list:d.list, index:d.index, what:d.what, name:d.name,
+      seed:(d.name.match(MARK) || [])[2] ?? String(d.seed), length:d.length, value:d.value, tests:new Set(), cases:[] });
+    if (d.test) e.tests.add(d.test);
+  }
+  const lookup = new Map();
+  for (const e of byKey.values()) for (const t of e.tests) {
+    const k = t + "\u0000" + `fuzz ${e.index} seed=${e.seed}:`;
+    (lookup.get(k) || lookup.set(k, []).get(k)).push(e);
+  }
+  const cases = parts.flatMap(p => p.cases);
+  for (const c of cases) {
+    const hits = (lookup.get(c.cls + "\u0000" + c.name.match(MARK)[0]) || []).filter(e => namesExample(c.name, e.name));
+    hits.forEach(e => e.cases.push(c));
+  }
+  const entries = [...byKey.values()].map(e => ({ ...e, tests:[...e.tests].sort() }));
+  const langs = sortLangs(new Set(cases.flatMap(c => c.labels.map(langOf))));
+  return { lib:label, logged, entries, cases, langs };
+}
+
+// ---------- counting ----------
+const servedBy = (c, lang) => c.labels.some(l => langOf(l) === lang);
+// [passed, failed, skipped] over cases, or over the cases one server took part in.
+function tally(cases, lang) {
+  const t = [0, 0, 0];
+  for (const c of cases) if (!lang || servedBy(c, lang)) t[c.st === "pass" ? 0 : c.st === "fail" ? 1 : 2]++;
+  return t;
+}
+const statusOf = e => { const [p, f, k] = tally(e.cases); return f ? "fail" : k ? "skip" : p ? "pass" : "none"; };
+const RANK = { fail:0, skip:1, none:2, pass:3 };
+const cellClass = ([p, f, k]) => !(p + f + k) ? "s-none" : f ? "s-fail" : !p ? "s-zero" : k ? "s-part" : "s-pass";
+const shortClass = cls => cls.split(".").pop();
+
+const loaded = () => Object.keys(PRODUCTS).filter(l => (!ui.lib || ui.lib === l) && LIBS[l]?.data).map(l => LIBS[l].data);
+const entriesInScope = () => loaded().flatMap(d => d.entries);
+const langsInScope = () => sortLangs(new Set(loaded().flatMap(d => d.langs)));
+
+// The seeds in a library's log and the most examples any one list got, which is TESTSERVER_FUZZ.
+function seedAndCount(d) {
+  const seeds = [...new Set(d.entries.map(e => e.seed))];
+  const count = d.entries.reduce((n, e) => Math.max(n, e.index + 1), 0);
+  return { seeds, count };
+}
+
+// ---------- rendering ----------
+function renderOverview() {
+  const r = RUN;
+  let h = r ? `<div class="sub">${runLine(r)}</div>` : "";
+  const known = Object.keys(PRODUCTS).filter(l => LIBS[l]?.data?.entries.length);
+  const all = known.map(l => seedAndCount(LIBS[l].data));
+  const seeds = [...new Set(all.flatMap(x => x.seeds))], counts = [...new Set(all.map(x => x.count))];
+  h += `<div class="sub">${seeds.length ? `Seed <b>${seeds.map(escHtml).join(", ")}</b> · <b>${counts.join(", ")}</b> random values per list` : "Seed and count: none of the loaded libraries logged a random value yet."}</div>`;
+  h += `<div class="rerun"><span>Run it again locally, from an aws-crypto-tools-commons checkout:</span><span></span>`;
+  for (const [label, product] of Object.entries(PRODUCTS)) {
+    const d = LIBS[label]?.data, x = d && d.entries.length ? seedAndCount(d) : null;
+    const cmd = `TESTSERVER_FUZZ=${x ? x.count : "<count>"} TESTSERVER_FUZZ_SEED=${x ? x.seeds[0] : "<seed>"} make -C ${product}/test-server orchestrate`;
+    h += `<span>${label}</span><span><code>${escHtml(cmd)}</code><button data-copy="${escHtml(cmd)}">Copy</button></span>`;
+  }
+  h += `<span>In CI:</span><span>Actions &gt; <a href="${FUZZ_PAGE}" target="_blank">Test server fuzz</a> &gt; Run workflow, with count <b>${counts[0] ?? "200"}</b> and seed <b>${seeds[0] ? escHtml(seeds[0]) : "the seed to repeat"}</b>.</span></div>`;
+  h += `<div class="summary">${Object.keys(PRODUCTS).map(libCard).join("")}</div>`;
+  $("overview").innerHTML = h;
+}
+
+// One card per library, in the state its load reached.
+function libCard(label) {
+  const a = LIBS[label] || { phase:"norun" };
+  const card = (cls, title, sub) => `<div class="card ${cls}"><small>${label}</small><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  if (a.phase === "norun") return card("st-grey", "no fuzz run", "");
+  if (a.phase === "loading") return card("st-loading", `<i class="spin"></i>loading`, escHtml(a.step || ""));
+  if (a.phase === "waiting") return card("st-loading", `<i class="spin"></i>still running`, "Its fuzz reports are not uploaded yet.");
+  if (a.phase === "noart") return card("st-grey", a.error || "no fuzz artifact in this run", `This run uploaded no ${PRODUCTS[label]}-test-server-fuzz-reports.`);
+  if (a.phase === "error") return card("st-error", "failed to load", escHtml(a.error));
+  const d = a.data, [p, f, k] = tally(d.cases);
+  if (!d.logged && !d.cases.length) return card("st-grey", "fuzzing was off", "The reports have no fuzz-log.jsonl, so this run made no random values.");
+  const off = d.logged ? "" : "<small>No fuzz-log.jsonl: random values are not listed.</small>";
+  return `<div class="card"><small>${label}</small><b>${p.toLocaleString()} passed</b>
+    <small><span class="${f ? "bad" : ""}">${f.toLocaleString()} failed</span> · <span class="${k ? "warn" : ""}">${k.toLocaleString()} skipped</span> · ${d.entries.length.toLocaleString()} random values</small>${off}</div>`;
+}
+
+function renderFamilies() {
+  const libs = loaded().filter(d => d.entries.length);
+  if (!libs.length) { $("families").innerHTML = `<div class="empty">No random values to show.</div>`; return; }
+  const num = (n, cls) => `<td class="${n ? cls : "zero"}">${n.toLocaleString()}</td>`;
+  const row = (cls, name, values, cases, title = "") => {
+    const [p, f, k] = tally(cases);
+    return `<tr class="${cls}"><th title="${escHtml(title)}">${escHtml(name)}</th><td>${values.toLocaleString()}</td><td>${(p + f + k).toLocaleString()}</td>${num(f, "bad")}${num(k, "warn")}</tr>`;
+  };
+  let h = `<table class="grid"><thead><tr><th>Family · list · test class</th><th>values</th><th>cases run</th><th>failed</th><th>skipped</th></tr></thead><tbody>`;
+  for (const d of libs) {
+    if (!ui.lib) h += `<tr class="lib"><th colspan="5">${d.lib}</th></tr>`;
+    for (const [family, inFamily] of groupBy(d.entries, e => e.family)) {
+      h += row("family", family, inFamily.length, inFamily.flatMap(e => e.cases));
+      for (const [list, inList] of groupBy(inFamily, e => e.list)) {
+        h += row("list", list, inList.length, inList.flatMap(e => e.cases));
+        for (const t of [...new Set(inList.flatMap(e => e.tests))].sort())
+          h += row("test", shortClass(t), inList.filter(e => e.tests.includes(t)).length, inList.flatMap(e => e.cases.filter(c => c.cls === t)), t);
+      }
+    }
+  }
+  $("families").innerHTML = h + `</tbody></table>`;
+}
+
+const groupBy = (items, key) => {
+  const m = new Map();
+  for (const x of items) { const k = key(x); (m.get(k) || m.set(k, []).get(k)).push(x); }
+  return [...m].sort((a, b) => a[0].localeCompare(b[0]));
+};
+
+function renderMatrix() {
+  const libs = loaded().filter(d => d.entries.length), langs = langsInScope();
+  if (!libs.length) { $("matrix").innerHTML = `<div class="empty">No random cases to show.</div>`; return; }
+  let h = `<table class="grid matrix"><thead><tr><th>Test class · list</th>${langs.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const d of libs) {
+    if (!ui.lib) h += `<tr class="lib"><th colspan="${langs.length + 1}">${d.lib}</th></tr>`;
+    const rows = new Map();
+    for (const e of d.entries) for (const t of e.tests) {
+      const k = shortClass(t) + "\u0000" + e.list;
+      const r = rows.get(k) || rows.set(k, { t, list:e.list, cases:[] }).get(k);
+      r.cases.push(...e.cases.filter(c => c.cls === t));
+    }
+    for (const r of [...rows.values()].sort((a, b) => shortClass(a.t).localeCompare(shortClass(b.t)) || a.list.localeCompare(b.list))) {
+      h += `<tr><th title="${escHtml(r.t)}">${escHtml(shortClass(r.t))} <small>${escHtml(r.list)}</small></th>`;
+      for (const l of langs) {
+        const [p, f, k] = tally(r.cases, l), n = p + f + k;
+        const tip = n ? `${l}, ${shortClass(r.t)}, ${r.list}: ${p} passed, ${f} failed, ${k} skipped, of ${n} random cases`
+          : `${l} ran no random cases of ${r.list} in ${shortClass(r.t)}`;
+        const text = !n ? "—" : f ? `✗<small>${f} failed</small>` : !p ? `0 passed<small>${k} skipped</small>` : k ? `✓<small>${k} skipped</small>` : `✓<small>${p}</small>`;
+        h += `<td><span class="cell ${cellClass([p, f, k])}" title="${escHtml(tip)}">${text}</span></td>`;
+      }
+      h += `</tr>`;
+    }
+  }
+  $("matrix").innerHTML = h + `</tbody></table>`;
+}
+
+function fillFilters() {
+  const entries = entriesInScope();
+  const opts = (values, chosen, all) => `<option value="">${all}</option>` + values.map(v => `<option ${v === chosen ? "selected" : ""}>${escHtml(v)}</option>`).join("");
+  const families = [...new Set(entries.map(e => e.family))].sort();
+  if (!families.includes(ui.family)) ui.family = "";
+  const lists = [...new Set(entries.filter(e => !ui.family || e.family === ui.family).map(e => e.list))].sort();
+  if (!lists.includes(ui.list)) ui.list = "";
+  $("family").innerHTML = opts(families, ui.family, "all");
+  $("list").innerHTML = opts(lists, ui.list, "all");
+}
+
+function renderValues() {
+  fillFilters();
+  const langs = langsInScope();
+  const rows = entriesInScope()
+    .filter(e => (!ui.family || e.family === ui.family) && (!ui.list || e.list === ui.list))
+    .map(e => ({ e, st:statusOf(e) }))
+    .filter(x => !ui.status || (ui.status === "skip" ? tally(x.e.cases)[2] > 0 : x.st === ui.status))
+    .sort((a, b) => RANK[a.st] - RANK[b.st] || a.e.lib.localeCompare(b.e.lib) || a.e.list.localeCompare(b.e.list) || a.e.index - b.e.index);
+  if (!rows.length) { $("values").innerHTML = `<div class="empty">No random values to show.</div>`; return; }
+  const width = 4 + (ui.lib ? 0 : 1) + (ui.list ? 0 : 1) + langs.length;
+  let h = `<table class="values"><thead><tr>${ui.lib ? "" : "<th>library</th>"}${ui.list ? "" : "<th>list</th>"}<th>#</th><th>what was changed</th><th>value</th><th>length</th>${langs.map(l => `<th style="text-align:center">${l}</th>`).join("")}</tr></thead><tbody>`;
+  for (const { e } of rows.slice(0, ui.shown)) {
+    const id = `${e.lib}|${e.list}|${e.index}`, open = ui.open === id;
+    const value = e.value === "" ? "<i>empty</i>" : e.value == null ? "<i>null</i>" : escHtml(e.value);
+    h += `<tr class="row ${open ? "open" : ""}" data-id="${escHtml(id)}">${ui.lib ? "" : `<td>${e.lib}</td>`}${ui.list ? "" : `<td>${escHtml(e.list)}</td>`}
+      <td class="num">${e.index}</td><td>${escHtml(e.what)}</td><td class="value">${value}</td><td class="num">${e.length ?? ""}</td>`;
+    for (const l of langs) {
+      const t = tally(e.cases, l), [p, f, k] = t;
+      h += `<td class="chipcell">${p + f + k ? `<span class="chip ${cellClass(t)}" title="${l}: ${p} passed, ${f} failed, ${k} skipped">${f ? "✗" : !p ? "skip" : k ? "!" : "✓"}</span>` : `<span class="chip na" title="${l} ran no testcase for this value">—</span>`}</td>`;
+    }
+    h += `</tr>`;
+    if (open) h += `<tr class="detail"><td colspan="${width}">${valueDetail(e)}</td></tr>`;
+  }
+  if (rows.length > ui.shown) h += `<tr><td colspan="${width}"><div class="more" data-more>Show ${Math.min(500, rows.length - ui.shown)} more of ${(rows.length - ui.shown).toLocaleString()}</div></td></tr>`;
+  $("values").innerHTML = h + `</tbody></table>`;
+}
+
+function valueDetail(e) {
+  const pill = { pass:`<span class="pill good">passed</span>`, fail:`<span class="pill bad">failed</span>`, skip:`<span class="pill warn">skipped</span>` };
+  let h = `<div class="meta">${escHtml(e.family)} · ${escHtml(e.list)} · <code>${escHtml(e.name)}</code> · used by ${e.tests.map(t => `<code title="${escHtml(t)}">${escHtml(shortClass(t))}</code>`).join(", ") || "no test class in the log"}</div>`;
+  if (!e.cases.length) return h + `<div class="empty" style="padding:4px 0">No testcase in this run's reports ran this value.</div>`;
+  h += `<table class="cases"><tr><th>test method</th><th>server or pair</th><th>status</th><th>message</th></tr>`;
+  const sorted = [...e.cases].sort((a, b) => RANK[a.st] - RANK[b.st] || a.method.localeCompare(b.method) || a.labels.join().localeCompare(b.labels.join()));
+  for (const c of sorted)
+    h += `<tr><td class="m" title="${escHtml(c.cls)}">${escHtml(shortClass(c.cls))}.${escHtml(c.method || "(no method name)")}</td><td>${escHtml(c.labels.join(" → ") || "—")}</td><td>${pill[c.st]}</td>
+      <td>${c.msg ? `<pre class="${c.st === "fail" ? "bad" : "skip"}">${escHtml(c.msg)}</pre>` : ""}</td></tr>`;
+  return h + `</table>`;
+}
+
+function renderBanner() {
+  const where = ui.source ? `"${escHtml(ui.source)}"` : "commons main";
+  $("banner").innerHTML = !RUN
+    ? `<div class="banner calm">No Test server fuzz run yet for ${where}. Start one from <a href="${FUZZ_PAGE}" target="_blank">Actions &gt; Test server fuzz</a> &gt; Run workflow.</div>`
+    : RUN.going
+    ? `<div class="banner going"><i class="spin"></i>This run is still going. A library shows as still running until its fuzz reports are uploaded. Reload the page to check again.</div>`
+    : "";
+}
+
+// Progress messages arrive often; draw at most once a frame.
+let drawQueued = false;
+function redraw() {
+  if (drawQueued) return;
+  drawQueued = true;
+  requestAnimationFrame(() => { drawQueued = false; render(); });
+}
+function render() {
+  renderBanner(); renderOverview(); renderFamilies(); renderMatrix(); renderValues();
+}
+
+// ---------- loading ----------
+async function loadLibrary(label, artifacts) {
+  const a = LIBS[label], product = PRODUCTS[label];
+  const note = msg => { a.step = msg; redraw(); };
+  try {
+    const mine = (await artifacts).filter(x => x.name === `${product}-test-server-fuzz-reports`);
+    const live = mine.filter(x => !x.expired);
+    if (!live.length) {
+      a.phase = RUN.going ? "waiting" : "noart";
+      a.error = mine.length ? "fuzz artifact expired" : "";
+    } else {
+      // A run can upload several artifacts under one name, one per job, and all of them are its results.
+      const parts = await Promise.all(live.map(art => cachedArtifact(RUN.repo, art, note, parseFuzzZip, "fuzz1")));
+      a.data = combine(label, parts);
+      a.phase = "done";
+    }
+  } catch (err) {
+    a.phase = "error"; a.error = err.message || String(err);
+  }
+  redraw();
+}
+
+async function load() {
+  const status = (msg, bad) => { $("status").className = bad ? "bad" : ""; $("status").textContent = msg; $("page").style.display = msg ? "none" : ""; };
+  if (!token()) { status("Add a GitHub token on the dashboard's Settings page (classic, repo scope, SSO-authorized for aws)."); return; }
+  for (const k in LIBS) delete LIBS[k];
+  ui.open = null; ui.shown = 200;
+  status("Finding the fuzz run…");
+  try { RUN = await resolveFuzzRun(ui.source); }
+  catch (err) { status("Load failed: " + (err.message || err), true); return; }
+  status("");
+  if (!RUN) { render(); return; }
+  for (const label of Object.keys(PRODUCTS)) LIBS[label] = { phase:"loading", step:"listing the run's artifacts…" };
+  render();
+  const artifacts = ghAll(`repos/${RUN.repo}/actions/runs/${RUN.databaseId}/artifacts`, "artifacts");
+  // Every library at once; each one's downloads are cached by artifact id.
+  await Promise.all(Object.keys(PRODUCTS).map(label => loadLibrary(label, artifacts)));
+}
+
+$("lib").innerHTML = `<option value="">All libraries</option>` + Object.keys(PRODUCTS).map(n => `<option>${n}</option>`).join("");
+$("lib").onchange = e => { ui.lib = e.target.value; ui.open = null; ui.shown = 200; render(); };
+$("source").value = ui.source;
+$("source").onchange = e => { ui.source = e.target.value.trim(); writeSource(ui.source); load(); };
+$("family").onchange = e => { ui.family = e.target.value; ui.list = ""; ui.shown = 200; renderValues(); };
+$("list").onchange = e => { ui.list = e.target.value; ui.shown = 200; renderValues(); };
+$("status-filter").onchange = e => { ui.status = e.target.value; ui.shown = 200; renderValues(); };
+$("values").addEventListener("click", e => {
+  if (e.target.closest("[data-more]")) { ui.shown += 500; renderValues(); return; }
+  const tr = e.target.closest("tr.row");
+  if (tr) { ui.open = ui.open === tr.dataset.id ? null : tr.dataset.id; renderValues(); }
+});
+// The clipboard can be blocked inside the dashboard's frame; then the command is selected for a manual copy.
+$("overview").addEventListener("click", async e => {
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied"; }
+  catch { getSelection().selectAllChildren(b.previousElementSibling); b.textContent = "Press Ctrl+C"; }
+  setTimeout(() => { b.textContent = "Copy"; }, 1500);
+});
+
+load();
+</script>
+</body>
+</html>

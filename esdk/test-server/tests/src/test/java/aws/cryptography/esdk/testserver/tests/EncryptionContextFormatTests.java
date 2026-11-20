@@ -1,5 +1,8 @@
 package aws.cryptography.esdk.testserver.tests;
 
+import aws.cryptography.testserver.tests.EncryptionContextInputs;
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
@@ -16,11 +19,15 @@ import aws.cryptography.esdk.testserver.client.model.ESDKClientConfig;
 import aws.cryptography.esdk.testserver.client.model.ESDKCommitmentPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -59,6 +66,13 @@ class EncryptionContextFormatTests {
         return LanguageServerRegistry.shared().targets();
     }
 
+    /** The empty context has no keys to order; emptyEncryptionContextSerializesToZeroLength covers it. */
+    static Stream<Arguments> nonEmptyContextsWithEachLanguageServer() {
+        return ExampleCases.withEachLanguageServer(EncryptionContextInputs.validEncryptionContexts().stream()
+            .filter(example -> !example.value().isEmpty())
+            .toList());
+    }
+
     /**
      * The single keyring both endpoints support (Raw-AES, else hierarchical), gated so the pair is
      * a visible skip when they share none. Resolved before producing a message.
@@ -91,35 +105,26 @@ class EncryptionContextFormatTests {
      * EC-030: the header AAD lists the encryption-context keys in ascending unsigned-byte
      * order, as length-prefixed pairs after a 2-byte pair count.
      */
-    @ParameterizedTest(name = "ecKeysCanonicallyOrdered {0}")
-    @MethodSource("targets")
-    void encryptionContextKeysAreCanonicallyOrdered(LanguageServerTarget target) {
-        ESDKClientConfig config = configFor(new TargetPair(target, target));
-        // Insert keys out of order; the wire form must sort them.
-        Map<String, String> ec = new java.util.LinkedHashMap<>();
-        ec.put("zebra", "1");
-        ec.put("alpha", "2");
-        ec.put("mango", "3");
-        byte[] ciphertext = EsdkOps.encrypt(target.endpoint(), config, PLAINTEXT, ec, SUITE, null);
+    @ParameterizedTest(name = "ecKeysCanonicallyOrdered {0} {1}")
+    @MethodSource("nonEmptyContextsWithEachLanguageServer")
+    void encryptionContextKeysAreCanonicallyOrdered(Example<Map<String, String>> context,
+            LanguageServerTarget languageServer) {
+        ESDKClientConfig config = configFor(new TargetPair(languageServer, languageServer));
+        Map<String, String> ec = context.value();
+        byte[] ciphertext = EsdkOps.encrypt(languageServer.endpoint(), config, PLAINTEXT, ec, SUITE, null);
         EsdkMessage message = EsdkMessage.parse(ciphertext);
-        assertTrue(message.aadLength > 0, target + ": non-empty EC must produce a non-empty AAD");
+        assertTrue(message.aadLength > 0, languageServer + ": non-empty EC must produce a non-empty AAD");
+        assertEquals(ec.size(), u16(ciphertext, message.aadContentOffset),
+            languageServer + ": AAD must declare " + ec.size() + " key-value pairs");
+        assertEquals(sortedByUtf8Bytes(ec.keySet().stream().toList()), parseAadKeys(message),
+            languageServer + ": encryption-context keys must be serialized in ascending unsigned-byte order");
+    }
 
-        int pos = message.aadContentOffset;
-        int pairCount = u16(ciphertext, pos);
-        pos += 2;
-        assertEquals(3, pairCount, target + ": AAD must declare 3 key-value pairs");
-
-        List<String> keys = new ArrayList<>();
-        for (int i = 0; i < pairCount; i++) {
-            int keyLen = u16(ciphertext, pos);
-            pos += 2;
-            keys.add(new String(ciphertext, pos, keyLen, StandardCharsets.UTF_8));
-            pos += keyLen;
-            int valLen = u16(ciphertext, pos);
-            pos += 2 + valLen;
-        }
-        assertEquals(List.of("alpha", "mango", "zebra"), keys,
-            target + ": encryption-context keys must be serialized in ascending unsigned-byte order");
+    /** {@code keys} in ascending order of their UTF-8 bytes, each byte compared as unsigned. */
+    private static List<String> sortedByUtf8Bytes(List<String> keys) {
+        return keys.stream()
+            .sorted(Comparator.comparing((String key) -> key.getBytes(StandardCharsets.UTF_8), Arrays::compareUnsigned))
+            .toList();
     }
 
     /**

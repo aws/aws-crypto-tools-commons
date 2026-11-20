@@ -1,1 +1,2 @@
 aws.cryptography.testserver.tests.FeatureGateLog
+aws.cryptography.testserver.tests.PerTestCoverage
