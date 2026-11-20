@@ -69,6 +69,24 @@
         "ref": "main",
         "path": "test-server/net-v4-server"
       }
+    },
+    {
+      "language": "rust-native",
+      "majorVersion": 1,
+      "port": 8104,
+      "configPath": "db-esdk-test-server",
+      "libraryRepository": {
+        "name": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "branch": "main",
+        "path": "db-esdk"
+      },
+      "serverLocation": {
+        "repository": "aws-crypto-tools-rust",
+        "url": "git@github.com:aws/aws-crypto-tools-rust.git",
+        "ref": "main",
+        "path": "db-esdk-test-server"
+      }
     }
   ]
 }

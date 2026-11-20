@@ -242,7 +242,13 @@ orchestrate: check-java ## Run the complete cross-language Commons_Run (all serv
 	@# (e.g. `make orchestrate TESTS=TamperTest`). Empty runs every test.
 	@# ORCHESTRATE_ARGS passes extra key=value tokens through, e.g.
 	@# `make orchestrate ORCHESTRATE_ARGS="languages=rust stopAfter=launch"`.
-	@cd "$(ORCH_DIR)" && GRADLE_OPTS="-Dorg.gradle.daemon=false $$GRADLE_OPTS" ./gradlew --console=plain run \
+	@# Every launched server inherits AWS_REGION / AWS_DEFAULT_REGION (the KMS region unless the
+	@# caller set one), so no SDK falls back to resolving its region from instance metadata,
+	@# which fails intermittently (.NET: "No RegionEndpoint or ServiceURL configured").
+	@cd "$(ORCH_DIR)" && \
+		AWS_REGION="$${AWS_REGION:-$(DBESDK_TESTSERVER_KMS_REGION)}" \
+		AWS_DEFAULT_REGION="$${AWS_DEFAULT_REGION:-$${AWS_REGION:-$(DBESDK_TESTSERVER_KMS_REGION)}}" \
+		GRADLE_OPTS="-Dorg.gradle.daemon=false $$GRADLE_OPTS" ./gradlew --console=plain run \
 		-Dtestserver.root=$(MAKEFILE_DIR) \
 		$(if $(ORCH_ARGS),--args="$(ORCH_ARGS)")
 

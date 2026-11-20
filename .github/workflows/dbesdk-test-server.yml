@@ -74,3 +74,5 @@ jobs:
       commons-ref: ${{ inputs.commons-ref || '' }}
       dbe-repository: ${{ inputs.dbe-repository || '' }}
       dbe-ref: ${{ inputs.dbe-ref || '' }}
+    secrets:
+      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
