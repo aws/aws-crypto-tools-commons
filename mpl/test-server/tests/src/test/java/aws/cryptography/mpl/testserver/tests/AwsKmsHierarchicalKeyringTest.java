@@ -501,6 +501,37 @@ public class AwsKmsHierarchicalKeyringTest {
     }
 
     // -----------------------------------------------------------------------
+    // A branch key read that fails, then succeeds
+    // (StormTracker.dfy CheckNewEntry)
+    //
+    // The keyring's default cache marks a key in flight while one caller
+    // reads it. When that read fails, nothing is put in the cache. Once the
+    // grace interval has passed, the next caller for the same key leads a new
+    // read, even after the in-flight TTL (10 seconds by default) has passed.
+    // -----------------------------------------------------------------------
+
+    /** OnEncrypt fails while DynamoDB fails, then succeeds once it answers, after the in-flight TTL. */
+    @ParameterizedTest(name = "[hierarchical] a failed branch key read is read again after the in-flight TTL {0}")
+    @MethodSource("targets")
+    void failedBranchKeyReadIsReadAgainAfterInFlightTtl(LanguageServerTarget target)
+            throws InterruptedException {
+        FeatureGate.require(Set.of("hierarchical"), target);
+        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+
+        try (FakeDynamoDb ddb = FakeDynamoDb.serving(KEY_STORE_REGION, KEY_STORE_TABLE_NAME,
+                BRANCH_KEY_ID, "branch:ACTIVE")) {
+            String keyringId = fakeDdbKeyring(client, ddb);
+            ddb.setFailing(true);
+            assertOnEncryptFails(client, keyringId);
+
+            Thread.sleep(12_000);
+            ddb.setFailing(false);
+            EncryptionMaterials encrypted = onEncrypt(client, keyringId, initializeEncryption(client, EC));
+            assertHierarchyEdk(encrypted.getEncryptedDataKeys().get(0), BRANCH_KEY_ID);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

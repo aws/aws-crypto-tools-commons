@@ -25,7 +25,13 @@ final class FakeDynamoDb implements AutoCloseable {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    private static final byte[] NOT_FOUND = ("{\"__type\":"
+        + "\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\","
+        + "\"message\":\"FakeDynamoDb is set to fail\"}").getBytes(StandardCharsets.UTF_8);
+
     private final HttpServer server;
+
+    private volatile boolean failing;
 
     private FakeDynamoDb(Map<String, AttributeValue> item) throws IOException {
         byte[] body = JSON.writeValueAsBytes(Map.of("Item", wire(item)));
@@ -35,7 +41,10 @@ final class FakeDynamoDb implements AutoCloseable {
             String target = exchange.getRequestHeaders().getFirst("X-Amz-Target");
             byte[] response = body;
             int status = 200;
-            if (!"DynamoDB_20120810.GetItem".equals(target)) {
+            if (failing) {
+                status = 400;
+                response = NOT_FOUND;
+            } else if (!"DynamoDB_20120810.GetItem".equals(target)) {
                 status = 400;
                 response = ("{\"__type\":\"com.amazon.coral.validate#ValidationException\","
                     + "\"message\":\"FakeDynamoDb only serves GetItem, not " + target + "\"}")
@@ -66,6 +75,11 @@ final class FakeDynamoDb implements AutoCloseable {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /** While {@code failing} is true, answer every request with ResourceNotFoundException. */
+    void setFailing(boolean failing) {
+        this.failing = failing;
     }
 
     String endpoint() {
