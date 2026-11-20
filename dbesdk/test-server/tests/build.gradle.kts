@@ -57,6 +57,12 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
+    // FeatureGateLog writes every feature-gate decision here, next to the
+    // JUnit XML, so the uploaded reports show which features each run needed.
+    systemProperty(
+        "testserver.featureGateLog",
+        layout.buildDirectory.file("test-results/feature-gate-log.jsonl").get().asFile.path,
+    )
     useJUnitPlatform {
         // jqwik registers its own JUnit Platform engine; include it explicitly.
         includeEngines("jqwik", "junit-jupiter")

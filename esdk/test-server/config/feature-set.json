@@ -2,7 +2,6 @@
   "product": "esdk",
   "features": [
     "streaming",
-    "MPL",
     "hierarchical",
     "raw-aes",
     "raw-rsa",

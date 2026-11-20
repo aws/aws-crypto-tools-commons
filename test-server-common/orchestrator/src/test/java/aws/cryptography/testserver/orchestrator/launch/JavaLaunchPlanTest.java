@@ -86,7 +86,52 @@ class JavaLaunchPlanTest {
                 "--args=8091",
                 "-PesdkVersion=0.0.0-testserver-20260701123456",
                 "-PmodelDir=" + MODEL),
-            JavaLaunchPlan.serverCommand(SERVER, 8091, "0.0.0-testserver-20260701123456", MODEL));
+            JavaLaunchPlan.serverCommand(SERVER, 8091, "0.0.0-testserver-20260701123456", MODEL, null));
+    }
+
+    @Test
+    @DisplayName("with coverage on, the server build also runs the coverage init script")
+    void serverCommandWithCoverage() {
+        Path script = Path.of("/coverage/java/jacoco.init.gradle");
+        assertEquals(
+            List.of(SERVER.resolve("gradlew").toString(), "runServer", "--args=8091",
+                "-PmodelDir=" + MODEL, "-I", script.toString()),
+            JavaLaunchPlan.serverCommand(SERVER, 8091, null, MODEL, script));
+    }
+
+    @Test
+    @DisplayName("the agent records the top-most library packages and the default-package classes")
+    void coverageIncludes(@TempDir Path tempDir) throws IOException {
+        Path java = tempDir.resolve("src/main/java");
+        Path dafny = tempDir.resolve("src/main/dafny-generated");
+        Files.createDirectories(java.resolve("com/example/lib/inner"));
+        Files.writeString(java.resolve("com/example/lib/A.java"), "");
+        Files.writeString(java.resolve("com/example/lib/inner/B.java"), "");
+        Files.createDirectories(dafny.resolve("Module"));
+        Files.writeString(dafny.resolve("Module/C.java"), "");
+        Files.writeString(dafny.resolve("Top.java"), "");
+        Files.createDirectories(tempDir.resolve("src/main/resources/com/example"));
+        Files.writeString(tempDir.resolve("src/main/resources/com/example/x.properties"), "");
+
+        List<Path> roots = JavaLaunchPlan.sourceRoots(tempDir);
+
+        assertEquals(List.of(dafny, java, tempDir.resolve("src/main/resources")), roots);
+        assertEquals("Module.*:Top:Top$*:com.example.lib.*", JavaLaunchPlan.includes(roots));
+    }
+
+    @Test
+    @DisplayName("the init script adds the agent to every JavaExec task, quoted for Groovy")
+    void coverageInitScript() {
+        String argument = JavaLaunchPlan.agentArgument(Path.of("/jacoco/agent.jar"),
+            Path.of("/coverage/java"), "com.example.*");
+        assertEquals("-javaagent:/jacoco/agent.jar=destfile=/coverage/java/jacoco.exec,append=true,"
+            + "classdumpdir=/coverage/java/classes,includes=com.example.*", argument);
+        assertEquals("allprojects {\n"
+                + "    tasks.withType(JavaExec).configureEach {\n"
+                + "        jvmArgs 'C:\\\\a\\'b'\n"
+                + "    }\n"
+                + "}\n",
+            JavaLaunchPlan.initScript("C:\\a'b"));
     }
 
     // ------------------------------------------------------------------

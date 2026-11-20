@@ -89,7 +89,21 @@ public final class FeatureGate {
         // Deterministic ordering for messages, whatever Set implementation the
         // caller hands us.
         List<String> requiredFeatures = List.copyOf(new TreeSet<>(features));
+        try {
+            gate(requiredFeatures, targets, declarations);
+        } catch (TestAbortedException e) {
+            FeatureGateLog.record(targets, requiredFeatures, "skipped");
+            throw e;
+        } catch (RuntimeException | AssertionError e) {
+            FeatureGateLog.record(targets, requiredFeatures, "error");
+            throw e;
+        }
+        FeatureGateLog.record(targets, requiredFeatures, "run");
+    }
 
+    private static void gate(
+            List<String> requiredFeatures, List<LanguageServerTarget> targets,
+            FeatureDeclarations declarations) {
         // 1. Unknown Feature vs the catalog is a test FAILURE, checked before
         //    any declaration lookup. An unconfigured catalog
         //    surfaces here as the registry's configuration error.

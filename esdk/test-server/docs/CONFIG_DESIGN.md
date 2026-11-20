@@ -150,7 +150,7 @@ Requirement 4: The TestServer MUST account for differences in feature support be
 {
   "product": "esdk",
   "features": [
-    "streaming", "MPL", "hierarchical",
+    "streaming", "hierarchical",
     "raw-aes", "raw-rsa", "raw-ecdh", "multi",
     "aws-kms", "aws-kms-multi", "aws-kms-discovery",
     "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery",
@@ -169,7 +169,7 @@ Requirement 4: The TestServer MUST account for differences in feature support be
     "raw-aes"
   ],
   "unsupportedFeatures": [
-    "streaming", "MPL", "raw-rsa", "raw-ecdh", "multi",
+    "streaming", "raw-rsa", "raw-ecdh", "multi",
     "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk",
     "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa",
     "aws-kms-ecdh", "required-encryption-context", "caching"
@@ -336,7 +336,7 @@ Commons `config/feature-set.json`:
 {
   "product": "esdk",
   "features": [
-    "streaming", "MPL", "hierarchical",
+    "streaming", "hierarchical",
     "raw-aes", "raw-rsa", "raw-ecdh", "multi",
     "aws-kms", "aws-kms-multi", "aws-kms-discovery",
     "aws-kms-mrk", "aws-kms-mrk-multi", "aws-kms-mrk-discovery",
@@ -390,7 +390,7 @@ Per-server `feature-config.json`:
     "raw-aes"
   ],
   "unsupportedFeatures": [
-    "streaming", "MPL", "raw-rsa", "raw-ecdh", "multi",
+    "streaming", "raw-rsa", "raw-ecdh", "multi",
     "aws-kms", "aws-kms-multi", "aws-kms-discovery", "aws-kms-mrk",
     "aws-kms-mrk-multi", "aws-kms-mrk-discovery", "aws-kms-rsa",
     "aws-kms-ecdh", "required-encryption-context", "caching"

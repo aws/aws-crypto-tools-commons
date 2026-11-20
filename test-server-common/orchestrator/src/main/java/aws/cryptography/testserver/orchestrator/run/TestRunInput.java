@@ -41,6 +41,10 @@ import java.util.stream.Collectors;
  *                       for languages whose declaration carries the capability
  * @param referenceImplementation the validated reference implementation
  *                       language; never blank
+ * @param knownBugs      language → exhibited bug ids
+ * @param dryRun         run the Tests with {@code testserver.dryRun}: no
+ *                       server is reachable, and each Test stops at its first
+ *                       server call
  */
 public record TestRunInput(
     List<TestTarget> targets,
@@ -48,7 +52,8 @@ public record TestRunInput(
     List<String> featureCatalog,
     Map<String, List<String>> rawRsaPaddingSchemes,
     String referenceImplementation,
-    Map<String, List<String>> knownBugs
+    Map<String, List<String>> knownBugs,
+    boolean dryRun
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -71,6 +76,18 @@ public record TestRunInput(
                 copiedBugs.put(language, List.copyOf(ids)));
         }
         knownBugs = Collections.unmodifiableMap(copiedBugs);
+    }
+
+    /** A run against launched servers. */
+    public TestRunInput(
+            List<TestTarget> targets,
+            Map<String, Map<String, Boolean>> features,
+            List<String> featureCatalog,
+            Map<String, List<String>> rawRsaPaddingSchemes,
+            String referenceImplementation,
+            Map<String, List<String>> knownBugs) {
+        this(targets, features, featureCatalog, rawRsaPaddingSchemes,
+            referenceImplementation, knownBugs, false);
     }
 
     /**

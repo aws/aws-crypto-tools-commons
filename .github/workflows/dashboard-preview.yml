@@ -1,0 +1,20 @@
+name: Dashboard preview
+
+# Uploads the dashboard from a pull request, so a reviewer can download it
+# and open it locally.
+on:
+  pull_request:
+    paths: ["dashboard/**", ".github/workflows/dashboard-preview.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-preview
+          path: dashboard

@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The C++-shim {@code Language_Server} launch plan: builds the rpcv2Cbor server
@@ -142,12 +144,18 @@ public final class CppShimLaunchPlan implements Launcher {
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         Path shimLibrary = shimDir.resolve(DEFAULT_TARGET_DIR).resolve("release")
             .resolve(System.mapLibraryName("aws_" + product + "_cpp"));
+        Optional<Path> coverage = Coverage.start(entry, sources, "llvm", Map.of("objects", List.of(
+            shimLibrary.toAbsolutePath().normalize().toString(),
+            binary.toAbsolutePath().normalize().toString())));
+        Map<String, String> buildEnvironment = coverage.isPresent()
+            ? Map.of("RUSTFLAGS", RustLaunchPlan.COVERAGE_RUSTFLAGS) : Map.of();
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary, shimLibrary))) {
             runBuildStep(language, "cargo build --release (aws-esdk-cpp shim)",
-                buildCommand(cargo), shimDir, true);
+                buildCommand(cargo), shimDir, true, buildEnvironment);
 
             // 3. Build the server.
-            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false,
+                buildEnvironment);
             stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
@@ -163,6 +171,9 @@ public final class CppShimLaunchPlan implements Launcher {
             server.environment().get(libraryPathVariable)));
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
+        // The instrumented shim library and server each write a profile here when the server exits.
+        coverage.ifPresent(dir -> server.environment().put("LLVM_PROFILE_FILE",
+            dir.resolve("%p-%m.profraw").toString()));
         return subprocessLauncher.launch(language, entry.port(), server);
     }
 
@@ -220,14 +231,15 @@ public final class CppShimLaunchPlan implements Launcher {
     }
 
     /**
-     * Run the synchronous build to completion in {@code buildDir}. A build that
+     * Run the synchronous build to completion in {@code buildDir}, with
+     * {@code environment} added to the inherited one. A build that
      * cannot start, is interrupted, or exits non-zero is a {@code BUILD} launch
      * failure naming the step and carrying the tool output. When
      * {@code clearCargoTargetDir} is set, {@code CARGO_TARGET_DIR} is removed
      * from the step's environment so the output lands in {@code buildDir/target}.
      */
     private void runBuildStep(String language, String step, List<String> command, Path buildDir,
-            boolean clearCargoTargetDir) throws ServerLaunchException {
+            boolean clearCargoTargetDir, Map<String, String> environment) throws ServerLaunchException {
         Instant startedAt = Instant.now();
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
@@ -236,6 +248,7 @@ public final class CppShimLaunchPlan implements Launcher {
             if (clearCargoTargetDir) {
                 builder.environment().remove("CARGO_TARGET_DIR");
             }
+            builder.environment().putAll(environment);
 
             Process process;
             try {

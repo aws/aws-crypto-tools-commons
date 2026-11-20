@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
 
 /**
  * The Java {@code Language_Server} launch plan (task 6.2, Requirements 1.7,
@@ -95,6 +96,9 @@ public final class JavaLaunchPlan implements Launcher {
 
     private static final DateTimeFormatter STAMP_TIMESTAMP =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
+
+    /** The environment variable naming the JaCoCo agent jar; coverage needs it. */
+    static final String JACOCO_AGENT_VARIABLE = "TESTSERVER_JACOCO_AGENT";
 
     private static final String SERVER_LOG_NAME = "java-server.log";
     private static final String MAC_JAVA_HOME_TOOL = "/usr/libexec/java_home";
@@ -248,8 +252,9 @@ public final class JavaLaunchPlan implements Launcher {
         Optional<Path> gradleJavaHome =
             resolveJavaHome(language, "smithy-java server launch (JDK 21+)",
                 harnessJavaHome, HARNESS_JDK_VERSIONS);
+        Path coverageInitScript = startCoverage(entry, sources, libraryDir).orElse(null);
         ProcessBuilder server = new ProcessBuilder(
-            serverCommand(serverDir, entry.port(), stampedVersion, modelDir));
+            serverCommand(serverDir, entry.port(), stampedVersion, modelDir, coverageInitScript));
         server.directory(serverDir.toFile());
         gradleJavaHome.ifPresent(home ->
             server.environment().put("JAVA_HOME", home.toString()));
@@ -332,10 +337,11 @@ public final class JavaLaunchPlan implements Launcher {
      * wrapper, run in the resolved server directory. {@code -PesdkVersion} +
      * {@code mavenLocal()} make the server consume the stamped live install;
      * {@code -PmodelDir} points the (relocated) server build at the commons
-     * model directory.
+     * model directory. {@code initScript}, when not null, is passed with
+     * {@code -I} (the coverage init script).
      */
     static List<String> serverCommand(Path serverDir, int port, String stampedVersion,
-            Path modelDir) {
+            Path modelDir, Path initScript) {
         List<String> command = new ArrayList<>();
         command.add(serverDir.resolve("gradlew").toString());
         command.add("runServer");
@@ -344,7 +350,129 @@ public final class JavaLaunchPlan implements Launcher {
             command.add("-PesdkVersion=" + stampedVersion);
         }
         command.add("-PmodelDir=" + modelDir);
+        if (initScript != null) {
+            command.add("-I");
+            command.add(initScript.toString());
+        }
         return command;
+    }
+
+    // ------------------------------------------------------------------
+    // Line coverage (JaCoCo).
+    // ------------------------------------------------------------------
+
+    /**
+     * When coverage is on and {@value #JACOCO_AGENT_VARIABLE} names the
+     * JaCoCo agent jar, prepares the coverage directory and writes a Gradle
+     * init script that runs the server's {@code JavaExec} JVM with the agent.
+     * The init script reaches the server JVM itself, not Gradle's own JVM.
+     * The agent records only the library's classes and dumps them, so the
+     * report reads the exact class files the server ran.
+     *
+     * @return the init script, or empty when coverage is off
+     */
+    private static Optional<Path> startCoverage(ConfigurationEntry entry, MaterializedSources sources,
+            Path libraryDir) throws ServerLaunchException {
+        String agent = System.getenv(JACOCO_AGENT_VARIABLE);
+        if (agent == null || agent.isBlank() || Coverage.root().isEmpty()) {
+            return Optional.empty();
+        }
+        List<Path> sourceRoots;
+        String includes;
+        try {
+            sourceRoots = sourceRoots(libraryDir);
+            includes = includes(sourceRoots);
+        } catch (IOException e) {
+            throw new ServerLaunchException(entry.language(), ServerLaunchException.Category.BUILD,
+                "failed to list the " + entry.language() + " library sources under " + libraryDir
+                    + ": " + e.getMessage(), e);
+        }
+        if (includes.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<Path> directory = Coverage.start(entry, sources, "jacoco",
+            Map.of("sources", sourceRoots.stream().map(Path::toString).toList()));
+        if (directory.isEmpty()) {
+            return Optional.empty();
+        }
+        Path script = directory.get().resolve("jacoco.init.gradle");
+        try {
+            Files.writeString(script,
+                initScript(agentArgument(Path.of(agent), directory.get(), includes)));
+        } catch (IOException e) {
+            throw new ServerLaunchException(entry.language(), ServerLaunchException.Category.BUILD,
+                "failed to write the " + entry.language() + " coverage init script " + script
+                    + ": " + e.getMessage(), e);
+        }
+        return Optional.of(script);
+    }
+
+    /** The library's Java source roots: each directory under {@code src/main}. */
+    static List<Path> sourceRoots(Path libraryDir) throws IOException {
+        Path main = libraryDir.resolve("src").resolve("main");
+        if (!Files.isDirectory(main)) {
+            return List.of();
+        }
+        try (var children = Files.list(main)) {
+            return children.filter(Files::isDirectory).map(path -> path.toAbsolutePath().normalize())
+                .sorted().toList();
+        }
+    }
+
+    /**
+     * The JaCoCo {@code includes} pattern for every class whose source is
+     * under {@code sourceRoots}: {@code <package>.*} for each top-most
+     * package holding a {@code .java} file, and {@code <Name>} plus
+     * {@code <Name>$*} for each class in the default package.
+     */
+    static String includes(List<Path> sourceRoots) throws IOException {
+        TreeSet<String> packages = new TreeSet<>();
+        TreeSet<String> patterns = new TreeSet<>();
+        for (Path root : sourceRoots) {
+            List<Path> files;
+            try (var walk = Files.walk(root)) {
+                files = walk.filter(path -> path.toString().endsWith(".java")).toList();
+            }
+            for (Path file : files) {
+                Path relative = root.relativize(file);
+                if (relative.getParent() == null) {
+                    String name = relative.toString().replaceFirst("\\.java$", "");
+                    patterns.add(name);
+                    patterns.add(name + "$*");
+                } else {
+                    packages.add(relative.getParent().toString()
+                        .replace(root.getFileSystem().getSeparator(), "."));
+                }
+            }
+        }
+        String parent = null;
+        for (String pkg : packages) {
+            if (parent == null || !pkg.startsWith(parent + ".")) {
+                patterns.add(pkg + ".*");
+                parent = pkg;
+            }
+        }
+        return String.join(":", patterns);
+    }
+
+    /**
+     * {@code -javaagent:<agent>=destfile=<dir>/jacoco.exec,append=true,
+     * classdumpdir=<dir>/classes,includes=<includes>}. The agent writes the
+     * data file when the JVM exits, SIGTERM included.
+     */
+    static String agentArgument(Path agent, Path directory, String includes) {
+        return "-javaagent:" + agent + "=destfile=" + directory.resolve("jacoco.exec")
+            + ",append=true,classdumpdir=" + directory.resolve("classes") + ",includes=" + includes;
+    }
+
+    /** A Gradle init script adding {@code jvmArgument} to every {@code JavaExec} task. */
+    static String initScript(String jvmArgument) {
+        String quoted = "'" + jvmArgument.replace("\\", "\\\\").replace("'", "\\'") + "'";
+        return "allprojects {\n"
+            + "    tasks.withType(JavaExec).configureEach {\n"
+            + "        jvmArgs " + quoted + "\n"
+            + "    }\n"
+            + "}\n";
     }
 
     // ------------------------------------------------------------------
