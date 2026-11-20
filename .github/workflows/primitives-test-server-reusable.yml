@@ -84,12 +84,6 @@ on:
           project only picks up jobs from the repo it is connected to.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
-    secrets:
-      repo-pat:
-        description: >-
-          Read-only token for the private repositories the run clones
-          (aws-crypto-tools-rust).
-        required: true
 
 # Callers must grant these.
 permissions:
@@ -130,7 +124,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
           sparse-checkout: .github/scripts
       - name: Resolve refs
         id: refs
@@ -144,7 +137,6 @@ jobs:
           INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
           INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
           GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
         run: .github/scripts/resolve-test-server-refs.sh resolve
 
   # Resolves each prebuilt server's key and lists the servers with no prebuilt
@@ -186,7 +178,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -199,7 +190,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Set up Python (its version keys the python server output)
@@ -208,27 +198,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
-        # The run clones aws-crypto-tools-rust via the SSH URL in its
-        # Configuration_Entry; GitHub Actions' default token only reaches the
-        # calling repository, so the PAT rewrites that URL to authenticated
-        # HTTPS. The PAT is passed only via `env:` (masked in logs), is
-        # written only to the ephemeral runner's ~/.gitconfig, and needs only
-        # READ access to aws-crypto-tools-rust contents.
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the repo-pat secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-rust clone the run performs WILL FAIL without it." >&2
-            echo "Pass a token with read access to aws-crypto-tools-rust contents (a fine-grained" >&2
-            echo "PAT with 'Contents: Read', or a classic PAT with the 'repo' scope)." >&2
-            exit 1
-          fi
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Identify the runner platform
         # Keys every prebuilt output and dependency cache: binaries link
@@ -341,7 +313,6 @@ jobs:
         id: matrix
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_rust: ${{ steps.keys.outputs.key_rust }}
           KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
           KEY_net: ${{ steps.keys.outputs.key_net }}
@@ -350,14 +321,12 @@ jobs:
           KEY_python: ${{ steps.keys.outputs.key_python }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
             local repo id
             for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
-              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+              id=$(GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
                 -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
                 2>/dev/null) || id=""
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
@@ -417,7 +386,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -430,7 +398,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -523,14 +490,9 @@ jobs:
         if: matrix.language == 'python'
         run: python -m pip install black==25.1 docformatter==1.7.7
 
-      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
@@ -705,7 +667,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -718,7 +679,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -781,14 +741,9 @@ jobs:
           restore-keys: |
             ${{ needs.plan.outputs.platform }}-primitives-gradle-
 
-      - name: Configure git auth for the private language repo (aws-crypto-tools-rust) (read-only PAT)
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Install Smithy CLI
         # Needed by `make validate`; pinned official release.
@@ -815,7 +770,6 @@ jobs:
       - name: Fetch the prebuilt servers into their clones
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_rust: ${{ needs.plan.outputs.key_rust }}
           KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
           KEY_net: ${{ needs.plan.outputs.key_net }}
@@ -824,14 +778,12 @@ jobs:
           KEY_python: ${{ needs.plan.outputs.key_python }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
             local repo id
             for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
-              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+              id=$(GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
                 -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
                 2>/dev/null) || id=""
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
@@ -860,7 +812,7 @@ jobs:
             [ -n "$found" ] || continue
             read -r repo id <<<"$found"
             echo "$language: $repo artifact $id"
-            GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
+            GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
             unpack "$RUNNER_TEMP/prebuilt/$language.tgz" "$RUNNER_TEMP/prebuilt/$language.root"
           done

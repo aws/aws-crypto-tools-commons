@@ -72,10 +72,6 @@ on:
           own codebuild-<project>-<run_id>-<run_attempt> label.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
-    secrets:
-      repo-pat:
-        description: Read-only token for the private repositories (aws-crypto-tools-commons, ...).
-        required: true
 
 permissions:
   contents: read
@@ -95,7 +91,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
           sparse-checkout: .github/scripts
       - name: Resolve refs
         id: refs
@@ -109,7 +104,6 @@ jobs:
           INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
           INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
           GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
         run: .github/scripts/resolve-test-server-refs.sh resolve
 
   annotations:
@@ -124,7 +118,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ needs.resolve.outputs.commons_ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
 
       - name: Point Test-Server-Override repositories at their pull request branches
         env:
@@ -136,7 +129,6 @@ jobs:
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
           ref: ${{ needs.resolve.outputs.language_ref }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
           path: language-repo
 
       - name: Set up JDK 21 (Temurin) for the orchestrator
