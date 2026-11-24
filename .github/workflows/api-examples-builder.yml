@@ -1,0 +1,28 @@
+# Unit tests for the script that api-examples.yml runs for each language repository.
+
+name: API examples builder
+
+on:
+  pull_request:
+    paths:
+      - "api-examples/**"
+      - ".github/workflows/api-examples-builder.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "api-examples/**"
+      - ".github/workflows/api-examples-builder.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: builder unit tests
+    runs-on: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s api-examples -v
