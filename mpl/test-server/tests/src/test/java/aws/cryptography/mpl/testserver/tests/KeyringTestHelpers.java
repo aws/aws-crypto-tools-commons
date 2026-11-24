@@ -109,6 +109,16 @@ final class KeyringTestHelpers {
             "OnDecrypt must return the data key that OnEncrypt made");
     }
 
+    /**
+     * Check that a keyring works, not just that it was created.
+     * OnEncrypt must make a data key and an EDK, and OnDecrypt must get the same data key back from that EDK.
+     */
+    static void assertUsableKeyring(MPLTestServerClient mpl, String keyringId, AlgorithmSuiteId suite,
+            Map<String, String> encryptionContext) {
+        assertKeyringRoundTrips(mpl, keyringId, initializeEncryption(mpl, suite, encryptionContext),
+            initializeDecryption(mpl, suite, encryptionContext));
+    }
+
     /** Start an OnEncrypt call that must fail. {@link OnEncryptFailure#withError} runs it. */
     static OnEncryptFailure assertOnEncryptFails() {
         return new OnEncryptFailure();
