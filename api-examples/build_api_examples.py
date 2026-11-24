@@ -5,10 +5,16 @@ A language repo's discovery step writes surface.json: every public way to build
 or call each API of one library. Tests mark the customer-facing part of a test
 with these comments:
 
-    // api-example: api=aws-kms-keyring way=kms_key_id takes=String kind=pass
+    // api-example: api=aws-kms-keyring way=kms_key_id kind=pass have="a string"
     // snippet-start
-    let keyring = AwsKmsKeyring::builder().kms_key_id(key_arn).build()?;
+    let keyring = AwsKmsKeyring::builder().kms_key_id("my-key-arn").build()?;
     // snippet-end
+
+have= is what the customer starts from, in words that fit every language
+("a string", "bytes in memory", "nothing"). On the dashboard, snippets from
+different languages with the same have share a line. pass and omitted markers
+need it. A missing marker without it gets "nothing", and a reject marker
+without it gets "a bad value". takes= optionally names the input type.
 
 This script reads both and writes api-examples.json for the dashboard. Each way
 gets the dashboard row it belongs on, so that rows line up across languages:
@@ -19,7 +25,8 @@ gets the dashboard row it belongs on, so that rows line up across languages:
     set_kms_key_id, and every Java kmsKeyId overload, land on the row kmsKeyId.
   - extra:<option>, for a way that matches nothing in the model.
 Each API also lists its rows: construct, then operations and members in model
-order (members that this language does not offer included), then extras.
+order (members that this language does not offer included), then extras. Each
+row lists the haves of its snippets in the order they appear in the source.
 
 It fails when:
   - a way has no kind=pass snippet,
@@ -27,18 +34,22 @@ It fails when:
   - a setter's option has neither a kind=missing snippet (required) nor a
     kind=omitted snippet (optional), or has both,
   - a marker names an api or way that surface.json does not have, or is
-    malformed.
+    malformed (for example a pass or omitted marker with no have=).
 api-examples.json is written either way, so the dashboard can show the gaps.
 
 Usage:
   build_api_examples.py --surface surface.json --src tests [more dirs...] \
       --repo aws/aws-crypto-tools-rust --commit <sha> --out api-examples.json \
-      [--names smithy-names.json]
+      [--run-id <id> --run-attempt <n>] [--names smithy-names.json]
+
+--run-id and --run-attempt name the CI run whose tests compiled and ran the
+snippets. The dashboard links each snippet to that run.
 """
 
 import argparse
 import json
 import re
+import shlex
 import sys
 import textwrap
 from pathlib import Path
@@ -47,7 +58,9 @@ MARKER = re.compile(r"^\s*//\s*api-example:(.*)$")
 START = re.compile(r"^\s*//\s*snippet-start\s*$")
 END = re.compile(r"^\s*//\s*snippet-end\s*$")
 KINDS = {"pass", "missing", "omitted", "reject"}
-KEYS = {"api", "way", "takes", "kind"}
+KEYS = {"api", "way", "takes", "kind", "have"}
+NEEDS_HAVE = {"pass", "omitted"}
+DEFAULT_HAVE = {"missing": "nothing", "reject": "a bad value"}
 NO_NAMES = {"members": [], "operations": [], "aliases": {}}
 
 
@@ -74,6 +87,13 @@ def row_of(way, names):
     return found or "extra:" + key
 
 
+def haves_of(row, ways):
+    """The haves of a row's snippets, in source order."""
+    examples = sorted((e for w in ways if w["row"] == row for e in w["examples"]),
+                      key=lambda e: (e["file"], e["line"]))
+    return list(dict.fromkeys(e["have"] for e in examples))
+
+
 def rows_of(ways, names):
     rows = []
     # A client method such as encrypt is called, not constructed.
@@ -84,16 +104,18 @@ def rows_of(ways, names):
     for w in ways:
         if w["row"].startswith("extra:") and all(r["key"] != w["row"] for r in rows):
             rows.append({"key": w["row"], "label": w["row"][len("extra:"):], "kind": "extra"})
+    for r in rows:
+        r["haves"] = haves_of(r["key"], ways)
     return rows
 
 
 class Snippet:
-    def __init__(self, api, way, kind, takes, code, file, line):
-        self.api, self.way, self.kind, self.takes = api, way, kind, takes
+    def __init__(self, api, way, kind, have, takes, code, file, line):
+        self.api, self.way, self.kind, self.have, self.takes = api, way, kind, have, takes
         self.code, self.file, self.line = code, file, line
 
     def to_json(self):
-        out = {"kind": self.kind}
+        out = {"kind": self.kind, "have": self.have}
         if self.takes is not None:
             out["takes"] = self.takes
         out.update({"code": self.code, "file": self.file, "line": self.line})
@@ -122,7 +144,11 @@ def read_snippets(path, shown_path):
             continue
         marker_line = i + 1
         fields, bad = {}, []
-        for token in m.group(1).split():
+        try:
+            tokens = shlex.split(m.group(1))
+        except ValueError:
+            tokens = None
+        for token in tokens or []:
             key, eq, value = token.partition("=")
             if not eq or key not in KEYS or key in fields:
                 bad.append(token)
@@ -142,6 +168,9 @@ def read_snippets(path, shown_path):
             continue
         i = end + 1
         problems = []
+        if tokens is None:
+            errors.append((marker_line, "a quote is not closed"))
+            continue
         if bad:
             problems.append("unknown or repeated fields: " + " ".join(bad))
         for key in ("api", "way", "kind"):
@@ -149,15 +178,16 @@ def read_snippets(path, shown_path):
                 problems.append(f"no {key}=")
         if fields.get("kind") and fields["kind"] not in KINDS:
             problems.append(f"kind={fields['kind']} is not one of {', '.join(sorted(KINDS))}")
-        if fields.get("kind") == "pass" and not fields.get("takes"):
-            problems.append("kind=pass needs takes=")
+        if fields.get("kind") in NEEDS_HAVE and not fields.get("have"):
+            problems.append(f"kind={fields['kind']} needs have=")
         if start == end:
             problems.append("the snippet is empty")
         if problems:
             errors.append((marker_line, "; ".join(problems)))
             continue
         code = textwrap.dedent("\n".join(lines[start:end])).strip("\n")
-        snippets.append(Snippet(fields["api"], fields["way"], fields["kind"],
+        have = fields.get("have") or DEFAULT_HAVE.get(fields["kind"])
+        snippets.append(Snippet(fields["api"], fields["way"], fields["kind"], have,
                                 fields.get("takes"), code, shown_path, start + 1))
     return snippets, errors
 
@@ -179,10 +209,11 @@ def scan(src_dirs, root):
     return snippets, errors
 
 
-def build(surface, snippets, marker_errors, repo, commit, names):
+def build(surface, snippets, marker_errors, repo, commit, names, run=None):
     """Return (api-examples document, failures). Each failure is a dict with api, way and why.
 
     names is this library's part of smithy-names.json: {api id: entry}.
+    run is {"id", "attempt"} of the CI run that ran the snippet tests, or None.
     """
     failures = []
     for file, line, msg in marker_errors:
@@ -251,11 +282,12 @@ def build(surface, snippets, marker_errors, repo, commit, names):
                                  "file": s.file, "line": s.line})
 
     doc = {
-        "schema": 2,
+        "schema": 3,
         "language": surface.get("language"),
         "library": surface.get("library"),
         "repo": repo,
         "commit": commit,
+        "run": run,
         "apis": apis,
         "uncovered": failures,
     }
@@ -276,6 +308,8 @@ def main(argv=None):
     p.add_argument("--repo", required=True, help="owner/name of the language repo")
     p.add_argument("--commit", required=True)
     p.add_argument("--out", required=True, type=Path)
+    p.add_argument("--run-id", type=int)
+    p.add_argument("--run-attempt", type=int, default=1)
     p.add_argument("--names", type=Path, default=Path(__file__).with_name("smithy-names.json"))
     args = p.parse_args(argv)
 
@@ -284,7 +318,8 @@ def main(argv=None):
         sys.exit(f"{args.surface}: schema must be 1, got {surface.get('schema')!r}")
     snippets, errors = scan(args.src, Path.cwd().resolve())
     names = json.loads(args.names.read_text())["libraries"].get(surface.get("library"), {})
-    doc, failures = build(surface, snippets, errors, args.repo, args.commit, names)
+    run = {"id": args.run_id, "attempt": args.run_attempt} if args.run_id else None
+    doc, failures = build(surface, snippets, errors, args.repo, args.commit, names, run)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(doc, indent=2) + "\n")
 

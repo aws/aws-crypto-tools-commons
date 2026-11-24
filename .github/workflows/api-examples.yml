@@ -4,12 +4,14 @@
 #
 # Discovery needs the language's own toolchain (nightly rustdoc, Gradle, etc.),
 # so the caller runs it in an earlier job and uploads surface.json as an
-# artifact. This workflow downloads that artifact, checks out the calling
-# commit, and runs api-examples/build_api_examples.py. The job fails when a way
-# has no snippet; api-examples.json is uploaded either way.
+# artifact. That job must run the snippet tests first: the dashboard shows
+# api-examples.json as proof that the snippets compiled and passed in this run.
+# This workflow downloads that artifact, checks out the calling commit, and runs
+# api-examples/build_api_examples.py. The job fails when a way has no snippet;
+# api-examples.json is uploaded either way.
 #
 #   api-examples-mpl:
-#     needs: discover-mpl   # uploads an artifact named mpl-surface
+#     needs: discover-mpl   # runs the snippet tests, then uploads mpl-surface
 #     uses: aws/aws-crypto-tools-commons/.github/workflows/api-examples.yml@main
 #     with:
 #       library: mpl
@@ -96,10 +98,13 @@ jobs:
           SURFACE: ${{ runner.temp }}/surface/${{ inputs.surface-path }}
           SRC: ${{ inputs.src }}
           REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -o pipefail
           python3 ../commons/api-examples/build_api_examples.py \
             --surface "$SURFACE" --src $SRC --repo "$REPOSITORY" --commit "$(git rev-parse HEAD)" \
+            --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" \
             --out "$RUNNER_TEMP/out/api-examples.json" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload api-examples.json
