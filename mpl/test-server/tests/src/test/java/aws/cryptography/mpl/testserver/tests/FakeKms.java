@@ -1,5 +1,6 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -11,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -132,6 +134,27 @@ final class FakeKms implements AutoCloseable {
 
     String endpoint() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    /**
+     * A KMS client for a keyring that sends its KMS calls here.
+     * The SDK needs a Region to sign requests, and FakeKms ignores signatures.
+     */
+    KmsClientConfig client() {
+        return KmsClientConfig.builder().region("us-west-2").endpoint(endpoint()).build();
+    }
+
+    /**
+     * Answer one GenerateDataKey and one Decrypt for {@code keyArn}, with the same 32-byte data key.
+     * That is enough for {@link Keyring#assertUsable()} with an AES-256 suite.
+     */
+    FakeKms answerOneRoundTrip(String keyArn) {
+        byte[] dataKey = new byte[32];
+        Arrays.fill(dataKey, (byte) 9);
+        byte[] ciphertext = new byte[64];
+        Arrays.fill(ciphertext, (byte) 9);
+        return reply(GENERATE_DATA_KEY, Reply.generateDataKey(keyArn, dataKey, ciphertext))
+            .reply(DECRYPT, Reply.decrypt(keyArn, dataKey));
     }
 
     @Override

@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -32,7 +33,9 @@ import org.junit.platform.commons.support.ReflectionSupport;
  *       and it records the decision in feature-gate-log.jsonl.
  *       Then it builds the test server client.
  *       In a dry run, building the client stops the run and logs it as one that would run.</li>
- *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.</li>
+ *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.
+ *       It also gives a new {@link FakeKms} for each {@code FakeKms} parameter.</li>
+ *   <li>After the test body, {@link Run#afterEach} stops each FakeKms.</li>
  * </ol>
  */
 final class KeyringTestExtension implements TestTemplateInvocationContextProvider {
@@ -79,7 +82,8 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
     }
 
     /** One run of a test: one input on one language server, or on one pair of language servers. */
-    private static final class Run implements TestTemplateInvocationContext, BeforeEachCallback, ParameterResolver {
+    private static final class Run
+            implements TestTemplateInvocationContext, BeforeEachCallback, ParameterResolver, AfterEachCallback {
 
         /** The input of a test that has no {@link KeyringTest#inputs()}. */
         static final Object NO_INPUT = new Object();
@@ -92,6 +96,8 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
         private final Object languageServer;
         /** One per {@code Mpl} parameter, in parameter order. Set by {@link #beforeEach}. */
         private List<Mpl> mpls;
+        /** One per {@code FakeKms} parameter. {@link #afterEach} stops them. */
+        private final List<FakeKms> fakeKmses = new ArrayList<>();
 
         Run(Set<String> features, KeyringTest settings, Method testMethod, Object input, Object languageServer) {
             this.features = features;
@@ -136,16 +142,22 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
             }
         }
 
-        /** An {@code Mpl}, or a parameter that the input fits. */
+        /** An {@code Mpl}, a {@code FakeKms}, or a parameter that the input fits. */
         @Override
         public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
             Class<?> type = parameterContext.getParameter().getType();
-            return type == Mpl.class || (input != NO_INPUT && boxed(type).isInstance(input));
+            return type == Mpl.class || type == FakeKms.class
+                || (input != NO_INPUT && boxed(type).isInstance(input));
         }
 
         @Override
         public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
             Parameter parameter = parameterContext.getParameter();
+            if (parameter.getType() == FakeKms.class) {
+                FakeKms fakeKms = new FakeKms();
+                fakeKmses.add(fakeKms);
+                return fakeKms;
+            }
             if (parameter.getType() != Mpl.class) {
                 return input;
             }
@@ -173,6 +185,14 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
                 return Boolean.class;
             }
             return type;
+        }
+
+        @Override
+        public void afterEach(ExtensionContext context) {
+            for (FakeKms fakeKms : fakeKmses) {
+                fakeKms.close();
+            }
+            fakeKmses.clear();
         }
 
         /** How many {@code Mpl} parameters come before parameter {@code index}. */

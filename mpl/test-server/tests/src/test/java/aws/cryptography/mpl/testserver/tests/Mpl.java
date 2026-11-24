@@ -6,11 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
+import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
 import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterialsInput;
+import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.testserver.tests.ExpectedError;
 import aws.cryptography.testserver.tests.KnownBugGate;
@@ -55,6 +57,11 @@ final class Mpl {
     /** Start building a Raw AES keyring. */
     RawAesKeyringBuilder rawAesKeyring() {
         return new RawAesKeyringBuilder();
+    }
+
+    /** Start building an AWS KMS keyring. */
+    AwsKmsKeyringBuilder awsKmsKeyring() {
+        return new AwsKmsKeyringBuilder();
     }
 
     /** New encryption materials with the test class's suite and encryption context, and no data key yet. */
@@ -114,6 +121,48 @@ final class Mpl {
         MPLClientError error = assertThrows(MPLClientError.class, create);
         MplErrors.expectError(languageServer, error).matches(expected);
         return error;
+    }
+
+    /**
+     * The settings of an AWS KMS keyring. {@link #create()} sends them to the MPL.
+     * A setting that the test does not set reaches the MPL as missing.
+     */
+    final class AwsKmsKeyringBuilder {
+        private final CreateAwsKmsKeyringInput.Builder input = CreateAwsKmsKeyringInput.builder();
+
+        private AwsKmsKeyringBuilder() {
+        }
+
+        /** A key ARN, key ID, alias name or alias ARN. */
+        AwsKmsKeyringBuilder kmsKeyId(String kmsKeyId) {
+            input.kmsKeyId(kmsKeyId);
+            return this;
+        }
+
+        /** How the test server builds the keyring's KMS client, such as {@link FakeKms#client()}. */
+        AwsKmsKeyringBuilder kmsClient(KmsClientConfig kmsClient) {
+            input.kmsClient(kmsClient);
+            return this;
+        }
+
+        AwsKmsKeyringBuilder grantTokens(List<String> grantTokens) {
+            input.grantTokens(grantTokens);
+            return this;
+        }
+
+        /** Create the keyring, which must succeed. */
+        Keyring create() {
+            CreateAwsKmsKeyringInput request = input.build();
+            return new Keyring(Mpl.this, MplTestServerClients.withRetry(() ->
+                testServer.createAwsKmsKeyring(request)).getKeyringId());
+        }
+
+        /** Create the keyring, which must fail with {@code expected}. */
+        MPLClientError createFails(ExpectedError expected) {
+            CreateAwsKmsKeyringInput request = input.build();
+            return Mpl.this.createFails(() -> MplTestServerClients.withRetry(() ->
+                testServer.createAwsKmsKeyring(request)), expected);
+        }
     }
 
     /** The settings of a Raw AES keyring. {@link #create()} sends them to the MPL. */
