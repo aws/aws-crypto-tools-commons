@@ -112,6 +112,15 @@ class PickerTest(unittest.TestCase):
         self.assertIn("//= spec/doc.md#sec", out)
         self.assertNotIn("specification/", out)
 
+    def test_reads_keyring_tests_and_their_known_bugs(self):
+        tests = TESTS.replace('@ParameterizedTest(name = "runs {0}")\n    @MethodSource("targets")',
+                              '@KeyringTest(feature = "raw-aes", name = "runs {0}")', 1)
+        tests = tests.replace("KnownBugGate.gateDeclared(", "mpl.knownBug(", 1)
+        code, out = self.run_picker(tests)
+        self.assertEqual(0, code)
+        self.assertIn("//# The thing MUST be blue.", out)
+        self.assertNotIn("The lid MUST be green.", out)
+
     def test_refuses_an_implementation_annotation(self):
         tests = TESTS.replace("//= type=test\n        //# The thing MUST be blue.",
                               "//# The thing MUST be blue.", 1)
