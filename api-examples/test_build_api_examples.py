@@ -11,25 +11,68 @@ from pathlib import Path
 import build_api_examples as builder
 import smithy_names
 
-
-def setter(way_id, option):
-    return {"id": way_id, "option": option, "kind": "setter", "signature": "..."}
+API = "raw-aes-keyring"
 
 
-def surface(*ways, api="aws-kms-keyring"):
+def setter(way_id, option, **extra):
+    return {"id": way_id, "option": option, "kind": "setter", "signature": "...", **extra}
+
+
+BUILDER = {"id": "builder", "option": None, "kind": "constructor", "signature": "..."}
+
+
+def surface(*ways, api=API):
     return {"schema": 1, "language": "rust", "library": "mpl",
-            "apis": [{"id": api, "group": "Keyrings", "name": "AWS KMS keyring",
-                      "type": "aws_mpl::AwsKmsKeyring", "ways": list(ways)}]}
+            "apis": [{"id": api, "group": "Keyrings", "name": "Raw AES keyring",
+                      "type": "aws_mpl::RawAesKeyring", "ways": [BUILDER, *ways]}]}
 
 
-def marker(fields, code="let keyring = builder.kms_key_id(arn);"):
-    return f"""    setup();
-    // api-example: {fields}
-    // snippet-start
-    {code}
-    // snippet-end
-    assert_ok(keyring);
-"""
+def frame(extra="", setup=()):
+    lines = [f"    // api-example: api={API} frame way=builder {extra}".rstrip()]
+    if setup:
+        lines += [f"    {s}" for s in setup] + ["    // api-example: call"]
+    lines += ["    let keyring = RawAesKeyring::builder()",
+              "        // api-example: options",
+              "        .key_name(\"name\")",
+              "        // api-example: tail",
+              "        .build()?;",
+              "    // api-example: end",
+              "    check(keyring);"]
+    return "\n".join(lines) + "\n"
+
+
+def fragment(way, have, line, fields="", setup=()):
+    lines = [f"    // api-example: api={API} way={way} have=\"{have}\" {fields}".rstrip()]
+    if setup:
+        lines += [f"    {s}" for s in setup] + ["    // api-example: call"]
+    lines += ["    let keyring = RawAesKeyring::builder()",
+              "        // api-example: setter",
+              f"        {line}",
+              "        .build()?;",
+              "    // api-example: end"]
+    return "\n".join(lines) + "\n"
+
+
+def left_out(ways, fields=""):
+    return (f"    // api-example: api={API} way={ways} left-out {fields}".rstrip() + "\n"
+            "    let result = RawAesKeyring::builder().build();\n"
+            "    // api-example: end\n")
+
+
+def together(ways, error):
+    return (f"    // api-example: api={API} way={ways} together fails={error}\n"
+            "    let result = RawAesKeyring::builder().a(1).b(2).build();\n"
+            "    // api-example: end\n")
+
+
+def required(way):
+    """A required option with one default choice."""
+    return (fragment(way, "a string", f".{way}(\"x\")", "default")
+            + left_out(way, "fails=validation"))
+
+
+def optional(way):
+    return fragment(way, "a string", f".{way}(\"x\")") + left_out(way)
 
 
 class TempDirTest(unittest.TestCase):
@@ -44,30 +87,32 @@ class TempDirTest(unittest.TestCase):
         os.chdir(self.cwd)
         self.dir.cleanup()
 
-    def run_builder(self, surface_doc, tests, names=None):
+    def write_tests(self, tests):
+        (self.root / "tests").mkdir(exist_ok=True)
+        for name, text in tests.items():
+            (self.root / "tests" / name).write_text(text)
+
+    def run_builder(self, surface_doc, tests, names=None, extra=()):
         """Write surface.json, names.json and tests/<name> files, run main.
 
         names is {api id: entry} for the surface's library. Returns (exit code, output doc, stdout).
         """
         (self.root / "surface.json").write_text(json.dumps(surface_doc))
         (self.root / "names.json").write_text(json.dumps({"libraries": {"mpl": names or {}}}))
-        for name, text in tests.items():
-            path = self.root / "tests" / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text)
-        (self.root / "tests").mkdir(exist_ok=True)
+        self.write_tests(tests)
         out = io.StringIO()
         with redirect_stdout(out):
             code = builder.main(["--surface", "surface.json", "--src", "tests", "--repo", "aws/r",
                                  "--commit", "abc", "--run-id", "7", "--run-attempt", "2",
-                                 "--out", "api-examples.json", "--names", "names.json"])
+                                 "--out", "api-examples.json", "--names", "names.json", *extra])
         return code, json.loads((self.root / "api-examples.json").read_text()), out.getvalue()
 
 
-class BuilderTest(TempDirTest):
+def whys(doc):
+    return {(f["api"], f["way"], f["why"]) for f in doc["uncovered"]}
 
-    def whys(self, doc):
-        return {(f["api"], f["way"], f["why"]) for f in doc["uncovered"]}
+
+class BuilderTest(TempDirTest):
 
     def test_empty_surface_passes(self):
         code, doc, _ = self.run_builder({"schema": 1, "language": "java", "library": "mpl", "apis": []}, {})
@@ -75,113 +120,164 @@ class BuilderTest(TempDirTest):
         self.assertEqual(doc["apis"], [])
         self.assertEqual(doc["uncovered"], [])
 
-    def test_covered_setter_records_snippet_and_required(self):
-        code, doc, _ = self.run_builder(surface(setter("kms_key_id", "kmsKeyId")), {
-            "kms.rs": marker("api=aws-kms-keyring way=kms_key_id takes=String kind=pass have='a string'")
-                      + marker("api=aws-kms-keyring way=kms_key_id kind=missing", "let r = builder.build();"),
+    def test_frame_and_fragment_record_their_parts(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName")), {
+            "raw.rs": frame(setup=["let esdk = Client::default();"])
+                      + fragment("key_name", "a string from your config", ".key_name(key_name)",
+                                 "takes=String default", setup=["let key_name: String = config().key_name;"])
+                      + left_out("key_name", "fails=validation"),
         })
         self.assertEqual(code, 0, doc["uncovered"])
-        way = doc["apis"][0]["ways"][0]
-        self.assertTrue(way["required"])
-        self.assertEqual(way["examples"][0], {"kind": "pass", "have": "a string", "takes": "String",
-                                              "code": "let keyring = builder.kms_key_id(arn);",
-                                              "file": "tests/kms.rs", "line": 4})
-        self.assertEqual((doc["repo"], doc["commit"], doc["run"]), ("aws/r", "abc", {"id": 7, "attempt": 2}))
+        api = doc["apis"][0]
+        self.assertEqual(api["frame"], {"way": "builder", "setup": ["let esdk = Client::default();"],
+                                        "head": ["let keyring = RawAesKeyring::builder()"],
+                                        "tail": ["    .build()?;"], "one_of": [], "file": "tests/raw.rs", "line": 1})
+        [choice] = api["choices"]
+        self.assertEqual(choice, {
+            "row": "extra:keyName", "way": "key_name", "have": "a string from your config",
+            "setup": ["let key_name: String = config().key_name;"], "setter": "    .key_name(key_name)",
+            "expect": "ok", "error": None, "default": True, "takes": "String", "alts": [],
+            "file": "tests/raw.rs", "line": 11})
+        self.assertEqual(api["left_out"], [{"rows": ["extra:keyName"], "expect": "fails", "error": "validation",
+                                            "file": "tests/raw.rs", "line": 19}])
+        self.assertTrue(api["ways"][1]["required"])
+        self.assertEqual((doc["schema"], doc["repo"], doc["commit"], doc["run"]),
+                         (4, "aws/r", "abc", {"id": 7, "attempt": 2}))
 
-    def test_way_without_pass_snippet_fails(self):
-        code, doc, out = self.run_builder(surface({"id": "builder", "option": None, "kind": "constructor"}), {})
+    def test_alt_is_shown_inside_its_main_choice(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName"), setter("set_key_name", "keyName")), {
+            "raw.rs": frame() + required("key_name")
+                      + fragment("set_key_name", "a string", ".set_key_name(Some(\"x\".into()))", "alt"),
+        })
+        self.assertEqual(code, 0, doc["uncovered"])
+        [choice] = doc["apis"][0]["choices"]
+        self.assertEqual([a["setter"] for a in choice["alts"]], ["    .set_key_name(Some(\"x\".into()))"])
+
+    def test_alt_without_a_main_choice_fails(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName"), setter("set_key_name", "keyName")), {
+            "raw.rs": required("key_name")
+                      + fragment("set_key_name", "a map", ".set_key_name(None)", "alt"),
+        })
         self.assertEqual(code, 1)
-        self.assertIn(("aws-kms-keyring", "builder", "no pass snippet"), self.whys(doc))
-        self.assertIn("aws-kms-keyring builder: no pass snippet", out)
+        self.assertIn((API, "set_key_name", "an alt with have='a map', which no main choice has"), whys(doc))
+
+    def test_way_without_a_working_fragment_and_api_without_frame_fail(self):
+        code, doc, out = self.run_builder(surface(setter("key_name", "keyName")), {
+            "raw.rs": fragment("key_name", "an empty string", ".key_name(\"\")", "fails=validation")
+                      + left_out("key_name"),
+        })
+        self.assertEqual(code, 1)
+        self.assertEqual(whys(doc), {(API, None, "no frame"), (API, "builder", "no frame or example"),
+                                     (API, "key_name", "no fragment that works")})
+        self.assertIn(f"{API} key_name: no fragment that works", out)
 
     def test_overload_without_matching_takes_fails(self):
-        way = {"id": "wrappingKey", "option": "wrappingKey", "kind": "method",
-               "overloads": ["byte[]", "SecretKey"]}
+        way = setter("wrappingKey", "wrappingKey", overloads=["byte[]", "SecretKey"])
         code, doc, _ = self.run_builder(surface(way), {
-            "Raw.java": marker("api=aws-kms-keyring way=wrappingKey takes=byte[] kind=pass have='bytes in memory'"),
+            "Raw.java": frame() + fragment("wrappingKey", "bytes in memory", ".wrappingKey(bytes)",
+                                           "takes=byte[] default")
+                        + left_out("wrappingKey", "fails=validation"),
         })
         self.assertEqual(code, 1)
-        self.assertEqual(self.whys(doc),
-                         {("aws-kms-keyring", "wrappingKey", "no pass snippet with takes=SecretKey")})
+        self.assertEqual(whys(doc), {(API, "wrappingKey", "no fragment with takes=SecretKey")})
 
-    def test_setter_without_missing_or_omitted_fails(self):
-        code, doc, _ = self.run_builder(surface(setter("grant_tokens", "grantTokens")), {
-            "kms.rs": marker("api=aws-kms-keyring way=grant_tokens takes=Vec<String> kind=pass have='a list'"),
+    def test_option_without_left_out_block_fails(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName")), {
+            "raw.rs": frame() + fragment("key_name", "a string", ".key_name(\"x\")"),
         })
         self.assertEqual(code, 1)
-        self.assertEqual(self.whys(doc), {("aws-kms-keyring", "grant_tokens",
-                                           "no missing or omitted snippet, so required is unknown")})
+        self.assertEqual(whys(doc), {(API, "key_name", "no left-out block, so required is unknown")})
 
-    def test_omitted_snippet_on_one_way_marks_shared_option_optional(self):
-        code, doc, _ = self.run_builder(surface(setter("grant_tokens", "grantTokens"),
-                                                setter("set_grant_tokens", "grantTokens")), {
-            "kms.rs": marker("api=aws-kms-keyring way=grant_tokens takes=Vec<String> kind=pass have='a list'")
-                      + marker("api=aws-kms-keyring way=set_grant_tokens takes=Option<Vec<String>> kind=pass have='a list'")
-                      + marker("api=aws-kms-keyring way=grant_tokens kind=omitted have=nothing"),
+    def test_left_out_that_fails_and_one_that_works_fails(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName"), setter("set_key_name", "keyName")), {
+            "raw.rs": frame() + required("key_name") + left_out("set_key_name"),
+        })
+        self.assertEqual(code, 1)
+        self.assertIn((API, "key_name", "a left-out block that fails and one that works, so required is unclear"),
+                      whys(doc))
+
+    def test_optional_option_needs_no_default_and_required_one_does(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName"), setter("ttl", "ttl")), {
+            "raw.rs": frame() + optional("ttl")
+                      + fragment("key_name", "a string", ".key_name(\"x\")")
+                      + left_out("key_name", "fails=validation"),
+        })
+        self.assertEqual(code, 1)
+        self.assertEqual(whys(doc), {(API, "key_name", "a required option needs a default choice")})
+        self.assertEqual([w.get("required") for w in doc["apis"][0]["ways"]], [None, True, False])
+
+    def test_one_of_group_needs_left_out_and_together_blocks(self):
+        ways = (setter("keyring", "keyring"), setter("cmm", "cmm"))
+        code, doc, _ = self.run_builder(surface(*ways), {
+            "e.rs": frame("one-of=keyring,cmm")
+                    + fragment("keyring", "a keyring", ".keyring(k)", "default") + left_out("keyring")
+                    + fragment("cmm", "a CMM", ".cmm(c)") + left_out("cmm"),
+        })
+        self.assertEqual(code, 1)
+        self.assertEqual(whys(doc), {(API, "keyring,cmm", "a one-of group needs a left-out block that fails"),
+                                     (API, "keyring,cmm", "a one-of group needs a together block")})
+        code, doc, _ = self.run_builder(surface(*ways), {
+            "e.rs": frame("one-of=keyring,cmm")
+                    + fragment("keyring", "a keyring", ".keyring(k)", "default") + left_out("keyring")
+                    + fragment("cmm", "a CMM", ".cmm(c)") + left_out("cmm")
+                    + left_out("keyring,cmm", "fails=validation") + together("keyring,cmm", "validation"),
         })
         self.assertEqual(code, 0, doc["uncovered"])
-        self.assertEqual([w["required"] for w in doc["apis"][0]["ways"]], [False, False])
+        self.assertEqual(doc["apis"][0]["frame"]["one_of"], ["extra:keyring", "extra:cmm"])
 
-    def test_missing_and_omitted_on_one_option_fails(self):
-        code, doc, _ = self.run_builder(surface(setter("kms_key_id", "kmsKeyId")), {
-            "kms.rs": marker("api=aws-kms-keyring way=kms_key_id takes=String kind=pass have='a string'")
-                      + marker("api=aws-kms-keyring way=kms_key_id kind=missing")
-                      + marker("api=aws-kms-keyring way=kms_key_id kind=omitted have=nothing"),
-        })
-        self.assertEqual(code, 1)
-        self.assertEqual(self.whys(doc), {("aws-kms-keyring", "kms_key_id",
-                                           "both missing and omitted snippets, so required is unclear")})
-
-    def test_marker_for_unknown_way_fails(self):
+    def test_marker_for_unknown_way_fails_with_its_place(self):
         code, doc, _ = self.run_builder({"schema": 1, "language": "rust", "library": "mpl", "apis": []}, {
-            "old.rs": marker("api=aws-kms-keyring way=gone takes=String kind=pass have='a string'"),
+            "old.rs": "\n" + fragment("gone", "a string", ".gone(1)"),
         })
         self.assertEqual(code, 1)
         [failure] = doc["uncovered"]
         self.assertEqual((failure["api"], failure["way"], failure["file"], failure["line"]),
-                         ("aws-kms-keyring", "gone", "tests/old.rs", 4))
+                         (API, "gone", "tests/old.rs", 2))
 
     def test_malformed_markers_fail(self):
         code, doc, _ = self.run_builder({"schema": 1, "language": "rust", "library": "mpl", "apis": []}, {
-            "a.rs": "// api-example: api=x way=y kind=pass takes=String\nlet a = 1;\n",
-            "b.rs": "// api-example: api=x way=y kind=pass takes=String\n// snippet-start\nlet a = 1;\n",
-            "c.rs": marker("api=x way=y kind=pass takes=String"),
-            "d.rs": marker("api=x way=y kind=fine takes=String"),
-            "e.rs": marker("api=x way=y kind=omitted"),
-            "f.rs": marker('api=x way=y kind=pass have="a string'),
+            "a.rs": f"// api-example: api={API} way=x have=a\nlet a = 1;\n",
+            "b.rs": f"// api-example: api={API} way=x have=\"a string\n// api-example: end\n",
+            "c.rs": f"// api-example: api={API} way=x\n// api-example: setter\n.x(1)\n// api-example: end\n",
+            "d.rs": f"// api-example: api={API} way=x kind=pass have=a\n// api-example: end\n",
+            "e.rs": f"// api-example: api={API} frame way=x\n// api-example: setter\n.x(1)\n// api-example: end\n",
+            "f.rs": f"// api-example: api={API} way=x have=a\n// api-example: setter\n// api-example: end\n",
+            "g.rs": "// api-example: end\n",
         })
         self.assertEqual(code, 1)
         self.assertEqual(sorted((f["file"], f["why"]) for f in doc["uncovered"]), [
-            ("tests/a.rs", "no // snippet-start on the line after the marker"),
-            ("tests/b.rs", "no // snippet-end before the next marker or end of file"),
-            ("tests/c.rs", "kind=pass needs have="),
-            ("tests/d.rs", "kind=fine is not one of missing, omitted, pass, reject"),
-            ("tests/e.rs", "kind=omitted needs have="),
-            ("tests/f.rs", "a quote is not closed"),
+            ("tests/a.rs", "no // api-example: end before the next marker or end of file"),
+            ("tests/b.rs", "a quote is not closed"),
+            ("tests/c.rs", "a fragment needs have="),
+            ("tests/d.rs", "unknown or repeated fields: kind=pass"),
+            ("tests/e.rs", "a frame has no setter line"),
+            ("tests/f.rs", "no setter line after // api-example: setter"),
+            ("tests/g.rs", "a // api-example: tag outside a block"),
         ])
-        self.assertEqual({f["file"]: f["line"] for f in doc["uncovered"]}["tests/c.rs"], 2)
 
-    def test_quoted_have_keeps_its_spaces_and_left_out_markers_get_a_default(self):
-        code, doc, _ = self.run_builder(surface(setter("kms_key_id", "kmsKeyId")), {
-            "kms.rs": marker('api=aws-kms-keyring way=kms_key_id kind=pass have="a string from your config"')
-                      + marker("api=aws-kms-keyring way=kms_key_id kind=missing")
-                      + marker("api=aws-kms-keyring way=kms_key_id kind=reject have='an empty string'")
-                      + marker("api=aws-kms-keyring way=kms_key_id kind=reject"),
-        })
+    def test_template_and_combo_results_go_into_the_output(self):
+        (self.root / "combos.template").write_text(
+            "notes\n@@ new-test\nfn {{name}}() {\n    {{code}}\n}\n@@ todo\ntodo!()\n@@ ok\nresult.unwrap();\n")
+        (self.root / "combos.json").write_text(json.dumps({"schema": 1, "apis": [{
+            "api": API, "mode": "all", "total": 2, "combos": [
+                {"name": "a_001", "choices": {"keyName": "a string"}, "expect": "ok", "error": None, "outcome": "pass"},
+                {"name": "a_002", "choices": {"keyName": None}, "expect": "fails", "error": "validation",
+                 "outcome": "pass"},
+                {"name": "a_003", "choices": {"keyName": None}, "expect": "ok", "error": None, "outcome": None}]}]}))
+        code, doc, out = self.run_builder(surface(setter("key_name", "keyName")), {"raw.rs": frame() + required("key_name")},
+                                          extra=["--template", "combos.template", "--combos", "combos.json"])
         self.assertEqual(code, 0, doc["uncovered"])
-        self.assertEqual([e["have"] for e in doc["apis"][0]["ways"][0]["examples"]],
-                         ["a string from your config", "nothing", "an empty string", "a bad value"])
+        self.assertEqual(doc["templates"], {"new-test": "fn {{name}}() {\n    {{code}}\n}", "todo": "todo!()"})
+        combos = doc["apis"][0]["combos"]
+        self.assertEqual((combos["mode"], combos["total"]), ("all", 2))
+        self.assertEqual([(r["name"], r["choices"]) for r in combos["results"]],
+                         [("a_001", {"extra:keyName": "a string"}), ("a_002", {"extra:keyName": None})])
+        self.assertIn("2 calls built and run", out)
 
 
 def names_entry(members=(), operations=(), aliases=None):
     return {"shape": "ns#Input", "members": list(members), "operations": list(operations),
             "aliases": aliases or {}}
-
-
-def covered(*way_ids):
-    """Markers that fully cover setter ways."""
-    return "".join(marker(f"api=aws-kms-keyring way={w} takes=String kind=pass have='a string'")
-                   + marker(f"api=aws-kms-keyring way={w} kind=missing") for w in way_ids)
 
 
 class RowTest(TempDirTest):
@@ -194,76 +290,56 @@ class RowTest(TempDirTest):
 
     def test_rust_setter_pair_lands_on_the_smithy_member_row(self):
         code, doc, _ = self.run_builder(
-            surface(setter("kms_key_id", "kmsKeyId"), setter("set_kms_key_id", "kmsKeyId")),
-            {"kms.rs": covered("kms_key_id", "set_kms_key_id")},
-            {"aws-kms-keyring": names_entry(["kmsKeyId"])})
+            surface(setter("key_name", "keyName"), setter("set_key_name", "keyName")),
+            {"raw.rs": frame() + required("key_name")
+                       + fragment("set_key_name", "a string", ".set_key_name(Some(x))", "alt")},
+            {API: names_entry(["keyName"])})
         self.assertEqual(code, 0, doc["uncovered"])
-        self.assertEqual(self.way_rows(doc), {"kms_key_id": "kmsKeyId", "set_kms_key_id": "kmsKeyId"})
+        self.assertEqual(self.way_rows(doc), {"builder": "construct", "key_name": "keyName", "set_key_name": "keyName"})
 
     def test_option_matches_member_that_differs_only_in_underscores(self):
         code, doc, _ = self.run_builder(
             surface(setter("set_net_v4_0_0_retry_policy", "netV400RetryPolicy")),
-            {"kms.rs": covered("set_net_v4_0_0_retry_policy")},
-            {"aws-kms-keyring": names_entry(["netV4_0_0_RetryPolicy"])})
-        self.assertEqual(self.way_rows(doc), {"set_net_v4_0_0_retry_policy": "netV4_0_0_RetryPolicy"})
+            {"raw.rs": frame() + optional("set_net_v4_0_0_retry_policy")},
+            {API: names_entry(["netV4_0_0_RetryPolicy"])})
+        self.assertEqual(code, 0, doc["uncovered"])
+        self.assertEqual(self.way_rows(doc)["set_net_v4_0_0_retry_policy"], "netV4_0_0_RetryPolicy")
 
     def test_alias_maps_a_renamed_option_to_its_member(self):
-        code, doc, _ = self.run_builder(surface(setter("ttl", "ttl")), {"kms.rs": covered("ttl")},
-                                        {"aws-kms-keyring": names_entry(["ttlSeconds"], aliases={"ttl": "ttlSeconds"})})
-        self.assertEqual(self.way_rows(doc), {"ttl": "ttlSeconds"})
+        code, doc, _ = self.run_builder(surface(setter("ttl", "ttl")), {"raw.rs": frame() + optional("ttl")},
+                                        {API: names_entry(["ttlSeconds"], aliases={"ttl": "ttlSeconds"})})
+        self.assertEqual(self.way_rows(doc)["ttl"], "ttlSeconds")
         self.assertEqual(self.rows(doc), [("construct", "construct"), ("ttlSeconds", "member")])
 
-    def test_every_constructor_way_lands_on_the_construct_row(self):
-        ways = [{"id": i, "option": None, "kind": "constructor"} for i in ("builder", "from_conf", "default")]
-        code, doc, _ = self.run_builder(surface(*ways), {
-            "c.rs": "".join(marker(f"api=aws-kms-keyring way={i} takes=Config kind=pass have='a config'") for i in
-                            ("builder", "from_conf", "default")),
-        }, {"aws-kms-keyring": names_entry(["kmsKeyId"])})
-        self.assertEqual(set(self.way_rows(doc).values()), {"construct"})
-
     def test_method_lands_on_its_operation_row_and_api_has_no_construct_row(self):
-        code, doc, _ = self.run_builder(
-            surface({"id": "encrypt", "option": None, "kind": "method"}, setter("plaintext", "plaintext")), {
-                "e.rs": marker("api=aws-kms-keyring way=encrypt takes=Vec<u8> kind=pass have='bytes in memory'") + covered("plaintext"),
-            }, {"aws-kms-keyring": names_entry(["plaintext", "keyring"], ["Encrypt"])})
+        encrypt = {"id": "encrypt", "option": None, "kind": "method", "signature": "..."}
+        s = surface(setter("plaintext", "plaintext"))
+        s["apis"][0]["ways"] = [encrypt, setter("plaintext", "plaintext")]
+        code, doc, _ = self.run_builder(s, {
+            "e.rs": frame().replace("way=builder", "way=encrypt") + required("plaintext"),
+        }, {API: names_entry(["plaintext", "keyring"], ["Encrypt"])})
         self.assertEqual(code, 0, doc["uncovered"])
         self.assertEqual(self.way_rows(doc), {"encrypt": "Encrypt", "plaintext": "plaintext"})
         self.assertEqual(self.rows(doc), [("Encrypt", "operation"), ("plaintext", "member"), ("keyring", "member")])
 
-    def test_rows_follow_model_order_and_keep_members_no_way_offers(self):
-        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName"), setter("key_namespace", "keyNamespace")),
-                                        {"kms.rs": covered("key_name", "key_namespace")},
-                                        {"aws-kms-keyring": names_entry(["keyNamespace", "wrappingKey", "keyName"])})
-        self.assertEqual(self.rows(doc), [("construct", "construct"), ("keyNamespace", "member"),
-                                          ("wrappingKey", "member"), ("keyName", "member")])
-
-    def test_option_not_in_the_model_is_an_extra_row_and_does_not_fail(self):
-        code, doc, _ = self.run_builder(surface(setter("grant_tokens", "grantTokens"), setter("set_grant_tokens", "grantTokens")),
-                                        {"kms.rs": covered("grant_tokens", "set_grant_tokens")},
-                                        {"aws-kms-keyring": names_entry(["kmsKeyId"])})
-        self.assertEqual(code, 0, doc["uncovered"])
-        self.assertEqual(self.way_rows(doc), {"grant_tokens": "extra:grantTokens", "set_grant_tokens": "extra:grantTokens"})
-        self.assertEqual(self.rows(doc), [("construct", "construct"), ("kmsKeyId", "member"),
-                                          ("extra:grantTokens", "extra")])
-
-    def test_row_lists_haves_in_source_order_across_its_ways(self):
-        # set_kms_key_id comes first in surface.json but second in the source.
+    def test_rows_follow_model_order_and_list_haves_in_source_order(self):
         code, doc, _ = self.run_builder(
-            surface(setter("set_kms_key_id", "kmsKeyId"), setter("kms_key_id", "kmsKeyId")), {
-                "kms.rs": marker("api=aws-kms-keyring way=kms_key_id kind=pass have='a string'")
-                          + marker("api=aws-kms-keyring way=set_kms_key_id kind=pass have='a value that may be missing'")
-                          + marker("api=aws-kms-keyring way=kms_key_id kind=pass have='a string'")
-                          + marker("api=aws-kms-keyring way=kms_key_id kind=missing"),
-            }, {"aws-kms-keyring": names_entry(["kmsKeyId", "grantTokens"])})
+            surface(setter("key_name", "keyName")), {
+                "raw.rs": frame() + fragment("key_name", "a string from your config", ".key_name(k)")
+                          + fragment("key_name", "a string", ".key_name(\"x\")", "default")
+                          + left_out("key_name", "fails=validation"),
+            }, {API: names_entry(["keyNamespace", "keyName"])})
         self.assertEqual(code, 0, doc["uncovered"])
         self.assertEqual({r["key"]: r["haves"] for r in doc["apis"][0]["rows"]}, {
-            "construct": [], "grantTokens": [],
-            "kmsKeyId": ["a string", "a value that may be missing", "nothing"],
-        })
+            "construct": [], "keyNamespace": [], "keyName": ["a string from your config", "a string"]})
 
-    def test_api_missing_from_names_file_has_construct_and_extra_rows(self):
-        code, doc, _ = self.run_builder(surface(setter("kms_key_id", "kmsKeyId")), {"kms.rs": covered("kms_key_id")})
-        self.assertEqual(self.rows(doc), [("construct", "construct"), ("extra:kmsKeyId", "extra")])
+    def test_option_not_in_the_model_is_an_extra_row_and_does_not_fail(self):
+        code, doc, _ = self.run_builder(surface(setter("grant_tokens", "grantTokens")),
+                                        {"raw.rs": frame() + optional("grant_tokens")},
+                                        {API: names_entry(["kmsKeyId"])})
+        self.assertEqual(code, 0, doc["uncovered"])
+        self.assertEqual(self.rows(doc), [("construct", "construct"), ("kmsKeyId", "member"),
+                                          ("extra:grantTokens", "extra")])
 
 
 class SmithyNamesTest(unittest.TestCase):
