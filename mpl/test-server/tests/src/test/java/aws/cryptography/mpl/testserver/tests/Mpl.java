@@ -117,7 +117,7 @@ final class Mpl {
     }
 
     /** Run {@code create}, and check that the MPL rejects the keyring settings with {@code expected}. */
-    private MPLClientError createFails(Executable create, ExpectedError expected) {
+    private MPLClientError createFailsWith(Executable create, ExpectedError expected) {
         MPLClientError error = assertThrows(MPLClientError.class, create);
         MplErrors.expectError(languageServer, error).matches(expected);
         return error;
@@ -200,9 +200,9 @@ final class Mpl {
         }
 
         /** Create the keyring, which must fail with {@code expected}. */
-        MPLClientError createFails(ExpectedError expected) {
+        MPLClientError createFailsWith(ExpectedError expected) {
             CreateRawAesKeyringInput request = input.build();
-            return Mpl.this.createFails(() -> MplTestServerClients.withRetry(() ->
+            return Mpl.this.createFailsWith(() -> MplTestServerClients.withRetry(() ->
                 testServer.createRawAesKeyring(request)), expected);
         }
     }
