@@ -13,6 +13,7 @@ The page calls the GitHub API from your browser. Paste a classic GitHub token (`
 ├── config.js         # Repository list and token storage
 ├── dashboard.js      # Dashboard functionality
 ├── styles.css        # Styling
+├── api-examples/     # API Examples tab
 └── test-servers/     # Test Server Results tab
 ```
 
