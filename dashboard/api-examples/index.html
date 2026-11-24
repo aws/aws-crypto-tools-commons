@@ -11,8 +11,10 @@
   a { color:var(--sel); }
   header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
   header h1 { font-size:16px; margin:0 12px 0 0; }
-  input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  input[type=text], select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:inherit; }
   label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .tabs { display:flex; gap:4px; } .tabs button { background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:4px 12px; cursor:pointer; font:inherit; }
+  .tabs button.on { color:var(--text); border-color:var(--sel); }
   main { display:grid; grid-template-columns:260px minmax(0,1fr); height:calc(100vh - 52px); }
   nav, section { overflow:auto; }
   nav { border-right:1px solid var(--line); background:var(--panel); padding:10px 0; }
@@ -25,23 +27,29 @@
   h2.api { font-size:16px; margin:0 0 2px; } .sub { color:var(--dim); font-size:12px; margin-bottom:10px; }
   .sources { font-size:12px; color:var(--dim); margin:0 0 12px; display:flex; flex-direction:column; gap:2px; }
   .sources b { color:var(--text); font-weight:500; } .warn { color:#e3b341; } .bad { color:#ffa198; }
-  .grid { border-collapse:collapse; width:100%; table-layout:fixed; }
-  .grid th, .grid td { border:1px solid var(--line); padding:6px 10px; vertical-align:top; }
-  .grid thead th { position:sticky; top:-16px; background:var(--bg); z-index:1; font-size:12px; text-align:left; }
-  .grid col.have { width:200px; }
-  .grid tbody th { text-align:left; font-weight:400; padding-left:24px; }
-  .grid tr.opt th { padding:12px 10px 4px; font-weight:600; background:var(--panel); }
-  .grid tr.opt th code { color:var(--dim); font-weight:400; margin-left:8px; font-size:11px; }
-  .grid tr.opt .gap { display:block; color:#ffa198; font-weight:400; font-size:12px; margin-top:2px; }
-  .badge { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); margin-left:8px; font-weight:400; }
+  .play { display:grid; grid-template-columns:minmax(320px, 1fr) minmax(360px, 1.2fr); gap:16px; align-items:start; }
+  .cards { display:flex; flex-direction:column; gap:8px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--panel); }
+  .card.removed { opacity:.6; }
+  .card .head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; margin-bottom:6px; }
+  .card .head code { color:var(--dim); font-size:11px; }
+  .card select { width:100%; }
+  .card .st { font-size:12px; margin-top:4px; display:flex; gap:8px; flex-wrap:wrap; }
+  .st.ok, .st.fails { color:#56d364; } .st.untested { color:#e3b341; } .st.absent, .st.none { color:var(--dim); }
+  .card .alt { font-size:11px; color:var(--dim); margin-top:3px; } .card .alt code { color:var(--text); }
+  .card button { margin-top:6px; background:var(--bg); color:var(--sel); border:1px solid var(--line); border-radius:6px; padding:2px 8px; cursor:pointer; font:inherit; font-size:12px; }
+  .badge { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); font-weight:400; }
   .badge.required { color:#ffa198; border-color:var(--fail); } .badge.optional { color:#56d364; border-color:var(--pass); }
-  .snip { margin:0 0 8px; }
-  .snip .meta { font-size:11px; color:var(--dim); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:3px; }
-  .snip .meta .fails { color:#ffa198; }
-  .proof { font-size:11px; color:var(--dim); display:flex; gap:8px; flex-wrap:wrap; }
-  .proof code { color:var(--text); }
-  pre { margin:0; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; overflow:auto; font:12px/1.45 ui-monospace,monospace; }
-  .na, .nd { color:var(--dim); font-size:12px; }
+  .tag { font-size:10px; padding:0 6px; border-radius:8px; font-weight:600; }
+  .tag.new { background:#1f6feb; color:#fff; } .tag.removed { background:#6e7681; color:#fff; } .tag.changed { background:#9e6a03; color:#fff; }
+  .side { position:sticky; top:0; display:flex; flex-direction:column; gap:10px; }
+  pre { margin:0; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow:auto; font:12px/1.45 ui-monospace,monospace; }
+  .verdict { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--panel); font-size:13px; }
+  .verdict.ok, .verdict.fails { border-color:var(--pass); } .verdict.untested { border-color:var(--part); }
+  .verdict .why { font-weight:600; } .verdict ul { margin:4px 0 0; padding-left:18px; font-size:12px; color:var(--dim); }
+  .verdict .ci { font-size:12px; margin-top:4px; }
+  .others h4 { margin:4px 0; font-size:12px; color:var(--dim); font-weight:600; }
+  .others .meta { font-size:11px; color:var(--dim); display:flex; gap:8px; margin:6px 0 3px; }
   .empty { color:var(--dim); padding:20px 0; }
   details.problems { font-size:12px; margin:0 0 12px; } details.problems summary { cursor:pointer; color:#ffa198; }
   details.problems li { color:var(--dim); }
@@ -50,16 +58,19 @@
 <body>
 <header>
   <h1>API Examples</h1>
-  <label title="Read each repo's api-examples artifacts from this branch instead of its default branch.">Branch <input type="text" id="branch" size="28" placeholder="each repo's default branch"></label>
+  <label title="A branch name reads every repo's api-examples artifacts from that branch. owner/repo#number reads that pull request's artifacts. Either one is compared with the default branch.">Branch or PR <input type="text" id="branch" size="32" placeholder="each repo's default branch"></label>
+  <div class="tabs" id="tabs"></div>
 </header>
 <main>
   <nav id="nav"></nav>
   <section id="main"></section>
 </main>
 <script src="../test-servers/loader.js"></script>
+<script src="playground.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = escHtml;
+const P = window.Playground;
 
 // Each language repo's CI uploads api-examples-<library>-<language>
 // (.github/workflows/api-examples.yml). A new language is one more line here.
@@ -71,9 +82,11 @@ const LIBRARIES = { MPL:"mpl", ESDK:"esdk" };
 const GROUPS = ["Keyrings", "CMMs", "Client"];
 const LANGS = SOURCES.map(s => s.language);
 
-// docs["mpl|rust"] = { state, why, doc, art }
+// docs["mpl|rust"] = { state, why, doc, base, branch, art }
+// base is the default branch's file, when the page compares a branch or PR with it.
 const docs = {};
-const state = { lib:"MPL", api:null };
+// picks["MPL|raw-aes-keyring"] = { option row: have, or null to leave it out }
+const state = { lib:"MPL", api:null, lang:LANGS[0], picks:{} };
 
 // ---------- loading ----------
 async function entryText(zip, e) {
@@ -94,124 +107,113 @@ async function findArtifact(repo, name, branch) {
   return null;
 }
 
+async function readDoc(repo, name, branch) {
+  const art = await findArtifact(repo, name, branch);
+  if (!art) return { why:`no ${name} artifact from ${branch} in ${repo}` };
+  const cacheKey = `apiex4:${repo}:${art.id}`;
+  let doc = await cacheGet(cacheKey);
+  if (!doc) {
+    const zip = await (await gh(`repos/${repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+    const e = zipEntries(zip).find(x => x.name.endsWith("api-examples.json"));
+    if (!e) throw new Error("the artifact has no api-examples.json");
+    doc = JSON.parse(await entryText(zip, e));
+    await cachePut(cacheKey, doc);
+  }
+  if (doc.schema !== 4) return { why:`${name} from ${branch} has schema ${doc.schema}; rerun that repo's CI to get schema 4` };
+  // The run that wrote the file ran the example tests first, so its link is the proof that they compile and pass.
+  if (!doc.run) return { why:`${name} from ${branch} names no CI run, so nothing shows its examples compile` };
+  return { doc };
+}
+
 const defaultBranch = {};
+const prHead = {};
+
+// Which branch to read for one repo, and whether to compare it with the default branch.
+async function target(src) {
+  const text = $("branch").value.trim(), pr = P.parsePr(text);
+  const main = defaultBranch[src.repo] ??= (await ghJson(`repos/${src.repo}`)).default_branch;
+  if (pr && pr.repo === src.repo) {
+    const key = `${pr.repo}#${pr.number}`;
+    const head = prHead[key] ??= (await ghJson(`repos/${pr.repo}/pulls/${pr.number}`)).head.ref;
+    return { branch:head, main, compare:true };
+  }
+  if (pr || !text) return { branch:main, main, compare:false };
+  return { branch:text, main, compare:text !== main };
+}
+
 async function load(src, lib) {
   const key = `${lib}|${src.language}`, name = `api-examples-${lib}-${src.language}`;
   const d = docs[key] = { state:"loading" };
   try {
-    const branch = $("branch").value.trim()
-      || (defaultBranch[src.repo] ??= (await ghJson(`repos/${src.repo}`)).default_branch);
-    const art = await findArtifact(src.repo, name, branch);
-    if (!art) { d.state = "none"; d.why = `no ${name} artifact from ${branch} in ${src.repo}`; return; }
-    const cacheKey = `apiex3:${src.repo}:${art.id}`;
-    let doc = await cacheGet(cacheKey);
-    if (!doc) {
-      const zip = await (await gh(`repos/${src.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
-      const e = zipEntries(zip).find(x => x.name.endsWith("api-examples.json"));
-      if (!e) throw new Error("the artifact has no api-examples.json");
-      doc = JSON.parse(await entryText(zip, e));
-      await cachePut(cacheKey, doc);
-    }
-    if (doc.schema !== 3) { d.state = "error"; d.why = `${name} has schema ${doc.schema}; rerun that repo's CI to get schema 3`; return; }
-    // The run that wrote the file ran the snippet tests first, so its link is the proof that they compile and pass.
-    if (!doc.run) { d.state = "error"; d.why = `${name} names no CI run, so nothing shows its snippets compile`; return; }
-    Object.assign(d, { state:"done", doc, branch });
+    const t = await target(src);
+    const [head, base] = await Promise.all([readDoc(src.repo, name, t.branch),
+      t.compare ? readDoc(src.repo, name, t.main) : null]);
+    if (!head.doc) { d.state = "none"; d.why = head.why; return; }
+    Object.assign(d, { state:"done", doc:head.doc, branch:t.branch, base:base?.doc || null,
+      baseWhy:t.compare && !base?.doc ? base.why : null });
   } catch (err) {
     d.state = "error"; d.why = "could not load: " + (err.message || err);
-  } finally { draw(); }
+  } finally {
+    // A file that loads late can bring the default choices, so start each call again.
+    state.picks = {};
+    draw();
+  }
 }
 
 function loadAll() {
   for (const k of Object.keys(docs)) delete docs[k];
+  state.picks = {};
   for (const lib of Object.values(LIBRARIES)) for (const src of SOURCES) load(src, lib);
   draw();
 }
 
 // ---------- model ----------
 const loaded = (lib, lang) => docs[`${lib}|${lang}`]?.state === "done";
+const docsOf = (lib, which = "doc") => Object.fromEntries(LANGS.filter(l => loaded(lib, l)).map(l => [l, docs[`${lib}|${l}`][which]]));
+const comparing = lib => LANGS.some(l => loaded(lib, l) && docs[`${lib}|${l}`].base);
 
-// Every API of one library, merged across languages by api id.
-function apisOf(lib) {
-  const apis = new Map();
-  for (const lang of LANGS) {
-    if (!loaded(lib, lang)) continue;
-    for (const api of docs[`${lib}|${lang}`].doc.apis) {
-      const a = apis.get(api.id) || { id:api.id, group:api.group, name:api.name, byLang:{} };
-      a.byLang[lang] = api;
-      apis.set(api.id, a);
-    }
-  }
-  return [...apis.values()];
+// The default branch's file stands in for a language that has no base file,
+// so that only the branch or PR's own changes get tags.
+function diffOf(lib) {
+  if (!comparing(lib)) return null;
+  const head = docsOf(lib), base = docsOf(lib, "base");
+  for (const l of Object.keys(head)) base[l] ??= head[l];
+  return P.diffApis(P.apisOf(base, LANGS), P.apisOf(head, LANGS), LANGS);
 }
 
-// An API's option groups, in the order that api-examples.json lists its rows:
-// Construct, then the Smithy operations and members, then extras. Each
-// language's ways go in the group that their "row" field names, so Rust x and
-// set_x and every Java overload of x share one group. A group has one line per
-// "have" (what the customer starts from), in the order that the languages list
-// them, so the same starting point lines up across languages.
-function groupsOf(api) {
-  const groups = new Map();
-  for (const lang of LANGS) {
-    const a = api.byLang[lang];
-    if (!a) continue;
-    for (const r of a.rows) {
-      const g = groups.get(r.key) || groups.set(r.key, { ...r, haves:[], byLang:{} }).get(r.key);
-      for (const h of r.haves) if (!g.haves.includes(h)) g.haves.push(h);
-    }
-    for (const w of a.ways) groups.get(w.row).byLang[lang] = [...(groups.get(w.row).byLang[lang] || []), w];
-  }
-  return [...groups.values()];
-}
-
-// One language's snippets for one have line, or why there are none.
-function cellOf(lib, group, have, lang) {
-  if (!loaded(lib, lang)) return { st:"nd" };
-  const shown = (group.byLang[lang] || []).flatMap(w => w.examples.filter(e => e.have === have).map(e => ({ way:w, e })));
-  return shown.length ? { st:"ex", shown } : { st:"na" };
-}
+const problemsOf = (lib, lang, apiId) => loaded(lib, lang)
+  ? docs[`${lib}|${lang}`].doc.uncovered.filter(f => !f.api || !apiId || f.api === apiId) : [];
 
 // "branchKeyId" -> "Branch key ID".
 const UPPER = new Set(["id", "kms", "aes", "rsa", "ecdh", "cmm", "ttl", "ddb", "arn"]);
-function describe(group) {
-  if (group.kind !== "member" && group.kind !== "extra") return group.label;
-  const words = group.label.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase().split(/\s+/)
+function describe(label) {
+  const words = label.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase().split(/\s+/)
     .map(w => UPPER.has(w) ? w.toUpperCase() : w);
   return words.join(" ").replace(/^./, c => c.toUpperCase());
 }
 
-function badge(group) {
-  if (group.kind === "extra") return `<span class="badge" title="not in the Smithy model">extra in ${esc(LANGS.filter(l => group.byLang[l]).join(", "))}</span>`;
-  const req = LANGS.flatMap(l => (group.byLang[l] || []).filter(w => w.kind === "setter").map(w => [l, w.required]));
-  if (!req.length) return "";
-  const vals = new Set(req.map(r => r[1]));
-  if (vals.size === 1 && vals.has(true)) return `<span class="badge required">required</span>`;
-  if (vals.size === 1 && vals.has(false)) return `<span class="badge optional">optional</span>`;
-  const by = v => [...new Set(req.filter(r => r[1] === v).map(r => r[0]))].join(", ");
-  const parts = [[true, "required"], [false, "optional"], [undefined, "unknown"]].filter(([v]) => vals.has(v)).map(([v, n]) => `${n} in ${by(v)}`);
-  return `<span class="badge">${esc(parts.join("; "))}</span>`;
-}
-
-// Problems in one language's file that belong on an API's page. Marker problems
-// with no api are listed on every page.
-const problemsOf = (lib, lang, apiId) => loaded(lib, lang)
-  ? docs[`${lib}|${lang}`].doc.uncovered.filter(f => !f.api || !apiId || f.api === apiId) : [];
+const tag = t => t ? `<span class="tag ${t}">${t}</span>` : "";
 
 // ---------- drawing ----------
+function drawTabs() {
+  $("tabs").innerHTML = LANGS.map(l => `<button data-lang="${l}" class="${l === state.lang ? "on" : ""}">${esc(l)}</button>`).join("");
+}
+
 function drawNav() {
   let html = "";
   for (const [label, lib] of Object.entries(LIBRARIES)) {
     html += `<h2>${label}</h2>`;
-    const apis = apisOf(lib);
+    const diff = diffOf(lib);
+    const apis = [...P.apisOf(docsOf(lib), LANGS), ...(diff?.removedApis || [])];
     const groups = [...GROUPS, ...new Set(apis.map(a => a.group).filter(g => !GROUPS.includes(g)))];
     for (const g of groups) {
-      const inGroup = apis.filter(a => a.group === g).sort((a, b) => a.name.localeCompare(b.name));
+      const inGroup = P.navOrder(apis.filter(a => a.group === g), diff);
       if (!inGroup.length) continue;
       html += `<h3>${esc(g)}</h3>`;
       for (const a of inGroup) {
         const n = LANGS.reduce((sum, l) => sum + problemsOf(lib, l, a.id).filter(f => f.api).length, 0);
         const on = state.lib === label && state.api === a.id;
-        html += `<a class="${on ? "on" : ""}" data-lib="${label}" data-api="${esc(a.id)}">${esc(a.name)}${n ? `<small title="ways with no snippet, and marker problems">${n}</small>` : ""}</a>`;
+        html += `<a class="${on ? "on" : ""}" data-lib="${label}" data-api="${esc(a.id)}"><span>${esc(a.name)} ${tag(diff?.api[a.id])}</span>${n ? `<small title="ways with no example, and marker problems">${n}</small>` : ""}</a>`;
       }
     }
     if (!apis.length) html += `<div class="sub" style="margin:0 24px">no APIs loaded</div>`;
@@ -221,78 +223,117 @@ function drawNav() {
 
 const runUrl = doc => `https://github.com/${doc.repo}/actions/runs/${doc.run.id}/attempts/${doc.run.attempt}`;
 
+function link(doc, file, line, text = `${file}:${line}`) {
+  return `<a href="https://github.com/${doc.repo}/blob/${doc.commit}/${esc(file)}#L${line}" target="_blank" title="${esc(file)}:${line}">${esc(text)}</a>`;
+}
+
 function sourcesLine(lib) {
   return `<div class="sources">` + SOURCES.map(src => {
     const d = docs[`${lib}|${src.language}`] || { state:"loading" };
     if (d.state === "loading") return `<div><b>${src.language}</b> loading...</div>`;
     if (d.state !== "done") return `<div><b>${src.language}</b> <span class="${d.state === "error" ? "bad" : "warn"}">${esc(d.why)}</span></div>`;
     const n = d.doc.uncovered.length, problems = n ? ` · <span class="bad">${n} problems</span>` : "";
-    return `<div><b>${src.language}</b> <a href="${runUrl(d.doc)}" target="_blank">${esc(src.repo.split("/")[1])}@${esc(d.branch)} · ${d.doc.commit.slice(0, 7)}</a>${problems}</div>`;
+    const base = d.base ? ` · compared with ${esc(d.base.commit.slice(0, 7))} on the default branch`
+      : d.baseWhy ? ` · <span class="warn">not compared: ${esc(d.baseWhy)}</span>` : "";
+    return `<div><b>${src.language}</b> <a href="${runUrl(d.doc)}" target="_blank">${esc(src.repo.split("/")[1])}@${esc(d.branch)} · ${d.doc.commit.slice(0, 7)}</a>${problems}${base}</div>`;
   }).join("") + `</div>`;
 }
 
 function problemList(lib, apiId) {
   const items = LANGS.flatMap(lang => problemsOf(lib, lang, apiId).map(f => {
     const doc = docs[`${lib}|${lang}`].doc;
-    return `<li>${lang}: ${esc(f.api ? f.api + " " + f.way + ": " : "")}${esc(f.why)}${f.file ? ` (${link(doc, f.file, f.line)})` : ""}</li>`;
+    return `<li>${lang}: ${esc(f.api ? f.api + " " + (f.way || "") + ": " : "")}${esc(f.why)}${f.file ? ` (${link(doc, f.file, f.line)})` : ""}</li>`;
   }));
   return items.length ? `<details class="problems"><summary>${items.length} problems</summary><ul>${items.join("")}</ul></details>` : "";
 }
 
-function link(doc, file, line, lines = 1, text = `${file}:${line}`) {
-  const end = lines > 1 ? `-L${line + lines - 1}` : "";
-  return `<a href="https://github.com/${doc.repo}/blob/${doc.commit}/${esc(file)}#L${line}${end}" target="_blank" title="${esc(file)}:${line}">${esc(text)}</a>`;
+function requiredBadge(option, lang) {
+  const req = new Set((option.byLang[lang]?.ways || []).map(w => w.required));
+  if (req.size !== 1) return "";
+  if (req.has(true)) return `<span class="badge required">required in ${esc(lang)}</span>`;
+  if (req.has(false)) return `<span class="badge optional">optional in ${esc(lang)}</span>`;
+  return "";
 }
 
-const FAILS = { missing:"fails without it", reject:"rejected" };
-
-function cellHtml(lib, lang, cell) {
-  const d = docs[`${lib}|${lang}`];
-  if (cell.st === "nd") return `<span class="nd">${esc(d?.why || "loading")}</span>`;
-  if (cell.st === "na") return `<span class="na">not offered</span>`;
-  const doc = d.doc;
-  return cell.shown.map(({ way, e }) => `<div class="snip">
-      <div class="meta"><code>${esc(way.id)}</code>${FAILS[e.kind] ? `<span class="fails">${FAILS[e.kind]}</span>` : ""}${link(doc, e.file, e.line, e.code.split("\n").length, "test ↗")}</div>
-      <pre>${esc(e.code)}</pre></div>`).join("")
-    + `<div class="proof"><a href="${runUrl(doc)}" target="_blank">✅ CI run ↗</a><code>${doc.commit.slice(0, 7)}</code></div>`;
+function cardHtml(ctx, option, i) {
+  const { api, lang, picks, diff, doc } = ctx;
+  const have = picks[option.key] ?? null;
+  const s = P.status(option, have, lang);
+  const haveTag = h => diff?.have[`${api.id}|${option.key}|${h}`] === "new" ? " [new]" : "";
+  const choices = [`<option value="">leave it out</option>`, ...option.haves.map((h, j) =>
+    `<option value="${j}" ${h === have ? "selected" : ""}>${esc(P.choiceLabel(option, h, lang) + haveTag(h))}</option>`)];
+  for (const h of diff?.removedHaves[`${api.id}|${option.key}`] || []) choices.push(`<option disabled>${esc(h)} [removed]</option>`);
+  const choice = have === null ? null : P.choiceOf(option, have, lang);
+  const alts = (choice?.alts || []).map(a => `<div class="alt">or: <code>${esc(a.setter.trim())}</code> ${doc ? link(doc, a.file, a.line, "test ↗") : ""}</div>`).join("");
+  const where = s.where && doc ? link(doc, s.where.file, s.where.line, "test ↗") : "";
+  const copy = (s.kind === "untested" || s.kind === "absent") && doc?.templates?.["new-test"]
+    ? `<button data-copy="${i}">Copy as a new test</button>` : "";
+  return `<div class="card">
+    <div class="head"><b>${esc(describe(option.label))}</b><code>${esc(option.label)}</code>${requiredBadge(option, lang)}${tag(diff?.option[`${api.id}|${option.key}`])}</div>
+    <select data-option="${i}">${choices.join("")}</select>
+    <div class="st ${s.kind}"><span>${esc(s.label)}</span>${where}</div>${alts}${copy}</div>`;
 }
 
-// Ways that a language has in a group but no snippet shows.
-function gaps(group) {
-  return LANGS.flatMap(l => (group.byLang[l] || []).filter(w => !w.examples.some(e => e.kind === "pass")).map(w => `${l}: ${w.id} has no snippet`));
+function removedCard(option) {
+  return `<div class="card removed"><div class="head"><b>${esc(describe(option.label))}</b><code>${esc(option.label)}</code>${tag("removed")}</div></div>`;
 }
+
+function verdictHtml(ctx) {
+  const { api, options, picks, lang, doc } = ctx;
+  const v = P.verdict(api, options, picks, lang);
+  if (!doc) return `<div class="verdict"><span class="why">${esc(v.text)}</span></div>`;
+  const tests = [...new Map(v.links.map(l => [`${l.file}:${l.line}`, l])).values()]
+    .map(l => `<li>${link(doc, l.file, l.line)}</li>`).join("");
+  const combos = api.byLang[lang]?.combos;
+  const ci = v.combo
+    ? (v.combo.outcome === "pass" ? `✅ this exact call compiled and ran in CI (<code>${esc(v.combo.name)}</code>)`
+      : `❌ this exact call did not behave as expected in CI (<code>${esc(v.combo.name)}</code>)`)
+    : combos ? `this exact call is not one of the ${combos.results.length} calls CI ran${combos.mode === "pairwise" ? ` (a pairwise sample of ${combos.total})` : ""}` : "";
+  return `<div class="verdict ${v.kind}"><div class="why">${esc(v.text)}</div>
+    ${ci ? `<div class="ci">${ci}</div>` : ""}
+    <ul>${tests}<li><a href="${runUrl(doc)}" target="_blank">✅ CI run ↗</a> <code>${doc.commit.slice(0, 7)}</code></li></ul></div>`;
+}
+
+function othersHtml(ctx) {
+  const { api, lang, doc } = ctx;
+  const ex = api.byLang[lang]?.examples || [];
+  if (!ex.length) return "";
+  return `<div class="others"><h4>Other ways in ${esc(lang)}</h4>` + ex.map(e =>
+    `<div class="meta"><code>${esc(e.way)}</code><span>${esc(e.have)}</span>${link(doc, e.file, e.line, "test ↗")}</div><pre>${esc(e.code)}</pre>`).join("") + `</div>`;
+}
+
+let ctx = null;
 
 function drawMain() {
-  const lib = LIBRARIES[state.lib], apis = apisOf(lib);
+  const lib = LIBRARIES[state.lib], diff = diffOf(lib);
+  const apis = P.apisOf(docsOf(lib), LANGS);
   const api = apis.find(a => a.id === state.api);
   let html = sourcesLine(lib);
   if (!api) {
-    $("main").innerHTML = html + problemList(lib, null) + `<div class="empty">${apis.length ? "Pick an API on the left." : "No API examples loaded for " + state.lib + "."}</div>`;
+    const gone = diff?.removedApis.find(a => a.id === state.api);
+    const why = gone ? `${gone.name} is removed in this branch or PR.` : apis.length ? "Pick an API on the left." : `No API examples loaded for ${state.lib}.`;
+    $("main").innerHTML = html + problemList(lib, null) + `<div class="empty">${esc(why)}</div>`;
+    ctx = null;
     return;
   }
-  const types = LANGS.filter(l => api.byLang[l]).map(l => `${l}: <code>${esc(api.byLang[l].type || "")}</code>`).join(" · ");
-  html += `<h2 class="api">${esc(api.name)}</h2><div class="sub">${esc(state.lib)} · ${esc(api.group)} · ${types}</div>`;
+  const lang = state.lang, options = P.optionsOf(api, LANGS);
+  const pickKey = `${state.lib}|${api.id}`;
+  const picks = state.picks[pickKey] ??= P.startPicks(options, lang, LANGS);
+  const doc = loaded(lib, lang) ? docs[`${lib}|${lang}`].doc : null;
+  ctx = { api, options, picks, lang, diff, doc };
+  const type = api.byLang[lang]?.type;
+  html += `<h2 class="api">${esc(api.name)} ${tag(diff?.api[api.id])}</h2><div class="sub">${esc(state.lib)} · ${esc(api.group)}${type ? ` · <code>${esc(type)}</code>` : ""}</div>`;
   html += problemList(lib, api.id);
-  html += `<table class="grid"><colgroup><col class="have">${LANGS.map(() => "<col>").join("")}</colgroup>`
-    + `<thead><tr><th>You have...</th>${LANGS.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
-  for (const group of groupsOf(api)) {
-    const name = group.kind === "member" || group.kind === "extra" ? `<code>${esc(group.label)}</code>` : "";
-    const gap = gaps(group).map(g => `<span class="gap">${esc(g)}</span>`).join("");
-    html += `<tr class="opt"><th colspan="${LANGS.length + 1}">${esc(describe(group))}${name}${badge(group)}${gap}</th></tr>`;
-    if (!group.haves.length) {
-      html += `<tr><th></th>${LANGS.map(l => `<td>${cellHtml(lib, l, cellOf(lib, group, null, l))}</td>`).join("")}</tr>`;
-      continue;
-    }
-    for (const have of group.haves) {
-      html += `<tr><th>${esc(have)}</th>${LANGS.map(l => `<td>${cellHtml(lib, l, cellOf(lib, group, have, l))}</td>`).join("")}</tr>`;
-    }
-  }
-  $("main").innerHTML = html + `</tbody></table>`;
+  const code = P.codeOf(api, options, picks, lang);
+  const removed = (diff?.removedOptions[api.id] || []).map(removedCard).join("");
+  html += `<div class="play"><div class="cards">${options.map((o, i) => cardHtml(ctx, o, i)).join("")}${removed}</div>
+    <div class="side"><pre>${code ? esc(code.join("\n")) : `${esc(lang)} has no ${esc(api.name)}`}</pre>${verdictHtml(ctx)}${doc ? othersHtml(ctx) : ""}</div></div>`;
+  $("main").innerHTML = html;
 }
 
 function draw() {
-  if (!state.api) state.api = apisOf(LIBRARIES[state.lib])[0]?.id || null;
-  drawNav(); drawMain();
+  if (!state.api) state.api = P.navOrder(P.apisOf(docsOf(LIBRARIES[state.lib]), LANGS), diffOf(LIBRARIES[state.lib]))[0]?.id || null;
+  drawTabs(); drawNav(); drawMain();
 }
 
 // ---------- events ----------
@@ -302,11 +343,36 @@ $("nav").addEventListener("click", e => {
   Object.assign(state, { lib:a.dataset.lib, api:a.dataset.api });
   draw();
 });
-$("branch").value = new URLSearchParams(location.search).get("branch") || "";
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-lang]");
+  if (!b) return;
+  state.lang = b.dataset.lang;
+  draw();
+});
+$("main").addEventListener("change", e => {
+  const sel = e.target.closest("select[data-option]");
+  if (!sel || !ctx) return;
+  const option = ctx.options[Number(sel.dataset.option)];
+  ctx.picks[option.key] = sel.value === "" ? null : option.haves[Number(sel.value)];
+  drawMain();
+});
+$("main").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-copy]");
+  if (!b || !ctx) return;
+  const option = ctx.options[Number(b.dataset.copy)];
+  const text = P.newTest(ctx.api, ctx.options, option, ctx.picks[option.key] ?? null, ctx.lang);
+  await navigator.clipboard.writeText(text);
+  b.textContent = "Copied";
+});
+
+const query = new URLSearchParams(location.search);
+$("branch").value = query.get("pr") || query.get("branch") || "";
 $("branch").addEventListener("change", () => {
-  const q = new URLSearchParams(location.search);
-  $("branch").value.trim() ? q.set("branch", $("branch").value.trim()) : q.delete("branch");
+  const q = new URLSearchParams(location.search), text = $("branch").value.trim();
+  q.delete("pr"); q.delete("branch");
+  if (text) q.set(P.parsePr(text) ? "pr" : "branch", text);
   history.replaceState(null, "", "?" + q);
+  state.api = null;
   loadAll();
 });
 loadAll();

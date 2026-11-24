@@ -1,0 +1,2034 @@
+{
+  "schema": 4,
+  "language": "rust",
+  "library": "mpl",
+  "repo": "aws/aws-crypto-tools-rust",
+  "commit": "43ba214889a73bf0b3e04f3c1ff40dcc8cbe999b",
+  "run": {
+    "id": 1,
+    "attempt": 1
+  },
+  "templates": {
+    "new-test": "#[tokio::test]\nasync fn {{name}}() -> Result<(), Error> {\n    {{code}}\n    // TODO: check the result.\n    Ok(())\n}",
+    "todo": "todo!()"
+  },
+  "apis": [
+    {
+      "id": "hierarchical-keyring",
+      "group": "Keyrings",
+      "name": "Hierarchical keyring",
+      "type": "aws_crypto_mpl::keyring::HierarchicalKeyring",
+      "ways": [
+        {
+          "id": "builder",
+          "option": null,
+          "kind": "constructor",
+          "signature": "pub fn builder() -> HierarchicalKeyringBuilder",
+          "row": "construct"
+        },
+        {
+          "id": "key_store",
+          "option": "keyStore",
+          "kind": "setter",
+          "signature": "pub fn key_store(self, key_store: impl IntoShared<SharedKeyStore>) -> Self",
+          "row": "keyStore",
+          "required": true
+        },
+        {
+          "id": "set_key_store",
+          "option": "keyStore",
+          "kind": "setter",
+          "signature": "pub fn set_key_store(self, key_store: Option<SharedKeyStore>) -> Self",
+          "row": "keyStore",
+          "required": true
+        },
+        {
+          "id": "ttl",
+          "option": "ttl",
+          "kind": "setter",
+          "signature": "pub fn ttl(self, ttl: Duration) -> Self",
+          "row": "ttlSeconds",
+          "required": true
+        },
+        {
+          "id": "set_ttl",
+          "option": "ttl",
+          "kind": "setter",
+          "signature": "pub fn set_ttl(self, ttl: Option<Duration>) -> Self",
+          "row": "ttlSeconds",
+          "required": true
+        },
+        {
+          "id": "branch_key_id",
+          "option": "branchKeyId",
+          "kind": "setter",
+          "signature": "pub fn branch_key_id(self, branch_key_id: impl Into<String>) -> Self",
+          "row": "branchKeyId",
+          "required": false
+        },
+        {
+          "id": "set_branch_key_id",
+          "option": "branchKeyId",
+          "kind": "setter",
+          "signature": "pub fn set_branch_key_id(self, branch_key_id: Option<String>) -> Self",
+          "row": "branchKeyId",
+          "required": false
+        },
+        {
+          "id": "branch_key_id_supplier",
+          "option": "branchKeyIdSupplier",
+          "kind": "setter",
+          "signature": "pub fn branch_key_id_supplier(self, supplier: impl IntoShared<SharedBranchKeyIdSupplier>) -> Self",
+          "row": "branchKeyIdSupplier",
+          "required": false
+        },
+        {
+          "id": "set_branch_key_id_supplier",
+          "option": "branchKeyIdSupplier",
+          "kind": "setter",
+          "signature": "pub fn set_branch_key_id_supplier(self, supplier: Option<SharedBranchKeyIdSupplier>) -> Self",
+          "row": "branchKeyIdSupplier",
+          "required": false
+        },
+        {
+          "id": "cache",
+          "option": "cache",
+          "kind": "setter",
+          "signature": "pub fn cache(self, cache: impl IntoShared<SharedCmc>) -> Self",
+          "row": "cache",
+          "required": false
+        },
+        {
+          "id": "set_cache",
+          "option": "cache",
+          "kind": "setter",
+          "signature": "pub fn set_cache(self, cache: Option<SharedCmc>) -> Self",
+          "row": "cache",
+          "required": false
+        },
+        {
+          "id": "partition_id",
+          "option": "partitionId",
+          "kind": "setter",
+          "signature": "pub fn partition_id(self, partition_id: impl Into<String>) -> Self",
+          "row": "partitionId",
+          "required": false
+        },
+        {
+          "id": "set_partition_id",
+          "option": "partitionId",
+          "kind": "setter",
+          "signature": "pub fn set_partition_id(self, partition_id: Option<String>) -> Self",
+          "row": "partitionId",
+          "required": false
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "branchKeyId",
+          "label": "branchKeyId",
+          "kind": "member",
+          "haves": [
+            "a string",
+            "a string from your config"
+          ]
+        },
+        {
+          "key": "branchKeyIdSupplier",
+          "label": "branchKeyIdSupplier",
+          "kind": "member",
+          "haves": [
+            "a branch key ID supplier"
+          ]
+        },
+        {
+          "key": "keyStore",
+          "label": "keyStore",
+          "kind": "member",
+          "haves": [
+            "a key store"
+          ]
+        },
+        {
+          "key": "ttlSeconds",
+          "label": "ttlSeconds",
+          "kind": "member",
+          "haves": [
+            "a duration",
+            "zero"
+          ]
+        },
+        {
+          "key": "cache",
+          "label": "cache",
+          "kind": "member",
+          "haves": [
+            "a default cache",
+            "a local cache",
+            "a storm-tracking cache",
+            "a storm-tracking cache with a grace period longer than the TTL"
+          ]
+        },
+        {
+          "key": "partitionId",
+          "label": "partitionId",
+          "kind": "member",
+          "haves": [
+            "a string",
+            "a string from your config"
+          ]
+        }
+      ],
+      "frame": {
+        "way": "builder",
+        "setup": [],
+        "head": [
+          "let hierarchical_keyring = HierarchicalKeyring::builder()"
+        ],
+        "tail": [
+          "    .build()",
+          "    .await?;"
+        ],
+        "one_of": [
+          "branchKeyId",
+          "branchKeyIdSupplier"
+        ],
+        "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+        "line": 9
+      },
+      "choices": [
+        {
+          "row": "keyStore",
+          "way": "key_store",
+          "have": "a key store",
+          "setup": [
+            "let dynamodb_key_store = make_dynamodb_key_store().await;"
+          ],
+          "setter": "    .key_store(dynamodb_key_store)",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 28,
+          "takes": "DynamoDbKeyStore",
+          "alts": [
+            {
+              "way": "set_key_store",
+              "setup": [
+                "let key_store: Option<SharedKeyStore> =",
+                "    Some(SharedKeyStore::new(make_dynamodb_key_store().await));"
+              ],
+              "setter": "    .set_key_store(key_store)",
+              "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+              "line": 48
+            }
+          ]
+        },
+        {
+          "row": "ttlSeconds",
+          "way": "ttl",
+          "have": "a duration",
+          "setup": [],
+          "setter": "    .ttl(Duration::from_secs(600))",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 82,
+          "takes": "Duration",
+          "alts": [
+            {
+              "way": "set_ttl",
+              "setup": [],
+              "setter": "    .set_ttl(Some(Duration::from_secs(600)))",
+              "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+              "line": 93
+            }
+          ]
+        },
+        {
+          "row": "ttlSeconds",
+          "way": "ttl",
+          "have": "zero",
+          "setup": [],
+          "setter": "    .ttl(Duration::ZERO)",
+          "expect": "fails",
+          "error": "validation",
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 104,
+          "takes": "Duration",
+          "alts": []
+        },
+        {
+          "row": "branchKeyId",
+          "way": "branch_key_id",
+          "have": "a string",
+          "setup": [],
+          "setter": "    .branch_key_id(\"my-branch-key-id\")",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 128,
+          "takes": "&str",
+          "alts": [
+            {
+              "way": "set_branch_key_id",
+              "setup": [],
+              "setter": "    .set_branch_key_id(Some(\"my-branch-key-id\".to_string()))",
+              "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+              "line": 158
+            }
+          ]
+        },
+        {
+          "row": "branchKeyId",
+          "way": "branch_key_id",
+          "have": "a string from your config",
+          "setup": [
+            "let branch_key_id: String = app_config().branch_key_id;"
+          ],
+          "setter": "    .branch_key_id(branch_key_id)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 142,
+          "takes": "String",
+          "alts": []
+        },
+        {
+          "row": "branchKeyIdSupplier",
+          "way": "branch_key_id_supplier",
+          "have": "a branch key ID supplier",
+          "setup": [],
+          "setter": "    .branch_key_id_supplier(TenantBranchKeyIdSupplier)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 187,
+          "takes": "BranchKeyIdSupplier",
+          "alts": [
+            {
+              "way": "set_branch_key_id_supplier",
+              "setup": [
+                "let supplier: Option<SharedBranchKeyIdSupplier> =",
+                "    Some(SharedBranchKeyIdSupplier::new(TenantBranchKeyIdSupplier));"
+              ],
+              "setter": "    .set_branch_key_id_supplier(supplier)",
+              "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+              "line": 198
+            }
+          ]
+        },
+        {
+          "row": "cache",
+          "way": "cache",
+          "have": "a default cache",
+          "setup": [
+            "let default_cmc = DefaultCmc::builder().entry_capacity(100).build()?;"
+          ],
+          "setter": "    .cache(default_cmc)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 251,
+          "takes": "DefaultCmc",
+          "alts": [
+            {
+              "way": "set_cache",
+              "setup": [
+                "let cache: Option<SharedCmc> = Some(SharedCmc::new(",
+                "    DefaultCmc::builder().entry_capacity(100).build()?,",
+                "));"
+              ],
+              "setter": "    .set_cache(cache)",
+              "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+              "line": 290
+            }
+          ]
+        },
+        {
+          "row": "cache",
+          "way": "cache",
+          "have": "a local cache",
+          "setup": [
+            "let local_cmc = LocalCmc::builder().entry_capacity(100).build()?;"
+          ],
+          "setter": "    .cache(local_cmc)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 264,
+          "takes": "LocalCmc",
+          "alts": []
+        },
+        {
+          "row": "cache",
+          "way": "cache",
+          "have": "a storm-tracking cache",
+          "setup": [
+            "let storm_tracking_cmc = StormTrackingCmc::builder().entry_capacity(100).build()?;"
+          ],
+          "setter": "    .cache(storm_tracking_cmc)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 277,
+          "takes": "StormTrackingCmc",
+          "alts": []
+        },
+        {
+          "row": "cache",
+          "way": "cache",
+          "have": "a storm-tracking cache with a grace period longer than the TTL",
+          "setup": [
+            "let storm_tracking_cmc = StormTrackingCmc::builder()",
+            "    .entry_capacity(100)",
+            "    .grace_period(Duration::from_secs(3600))",
+            "    .build()?;"
+          ],
+          "setter": "    .cache(storm_tracking_cmc)",
+          "expect": "fails",
+          "error": "validation",
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 306,
+          "takes": "StormTrackingCmc",
+          "alts": []
+        },
+        {
+          "row": "partitionId",
+          "way": "partition_id",
+          "have": "a string",
+          "setup": [],
+          "setter": "    .partition_id(\"my-partition-id\")",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 337,
+          "takes": "&str",
+          "alts": [
+            {
+              "way": "set_partition_id",
+              "setup": [],
+              "setter": "    .set_partition_id(Some(\"my-partition-id\".to_string()))",
+              "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+              "line": 361
+            }
+          ]
+        },
+        {
+          "row": "partitionId",
+          "way": "partition_id",
+          "have": "a string from your config",
+          "setup": [
+            "let partition_id: String = app_config().partition_id;"
+          ],
+          "setter": "    .partition_id(partition_id)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 348,
+          "takes": "String",
+          "alts": []
+        }
+      ],
+      "left_out": [
+        {
+          "rows": [
+            "keyStore"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 69
+        },
+        {
+          "rows": [
+            "ttlSeconds"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 115
+        },
+        {
+          "rows": [
+            "branchKeyId"
+          ],
+          "expect": "ok",
+          "error": null,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 173
+        },
+        {
+          "rows": [
+            "branchKeyIdSupplier"
+          ],
+          "expect": "ok",
+          "error": null,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 212
+        },
+        {
+          "rows": [
+            "branchKeyId",
+            "branchKeyIdSupplier"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 226
+        },
+        {
+          "rows": [
+            "cache"
+          ],
+          "expect": "ok",
+          "error": null,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 323
+        },
+        {
+          "rows": [
+            "partitionId"
+          ],
+          "expect": "ok",
+          "error": null,
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 372
+        }
+      ],
+      "together": [
+        {
+          "rows": [
+            "branchKeyId",
+            "branchKeyIdSupplier"
+          ],
+          "error": "validation",
+          "file": "mpl/tests/api_examples/hierarchical_keyring.rs",
+          "line": 235
+        }
+      ],
+      "examples": [],
+      "combos": {
+        "mode": "pairwise",
+        "total": 540,
+        "results": [
+          {
+            "choices": {
+              "keyStore": "a key store",
+              "ttlSeconds": "a duration",
+              "branchKeyId": "a string",
+              "branchKeyIdSupplier": null,
+              "cache": null,
+              "partitionId": null
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_001"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": null,
+              "branchKeyId": null,
+              "branchKeyIdSupplier": null,
+              "cache": "a default cache",
+              "partitionId": "a string"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_002"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "a duration",
+              "branchKeyId": "a string from your config",
+              "branchKeyIdSupplier": "a branch key ID supplier",
+              "cache": "a local cache",
+              "partitionId": "a string from your config"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_003"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "zero",
+              "branchKeyId": "a string",
+              "branchKeyIdSupplier": "a branch key ID supplier",
+              "cache": "a storm-tracking cache",
+              "partitionId": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_004"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": null,
+              "branchKeyId": "a string from your config",
+              "branchKeyIdSupplier": "a branch key ID supplier",
+              "cache": null,
+              "partitionId": "a string"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_005"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": null,
+              "branchKeyId": "a string",
+              "branchKeyIdSupplier": null,
+              "cache": "a storm-tracking cache with a grace period longer than the TTL",
+              "partitionId": "a string from your config"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_006"
+          },
+          {
+            "choices": {
+              "keyStore": "a key store",
+              "ttlSeconds": null,
+              "branchKeyId": null,
+              "branchKeyIdSupplier": "a branch key ID supplier",
+              "cache": "a local cache",
+              "partitionId": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "hierarchical_keyring_007"
+          },
+          {
+            "choices": {
+              "keyStore": "a key store",
+              "ttlSeconds": "zero",
+              "branchKeyId": "a string from your config",
+              "branchKeyIdSupplier": null,
+              "cache": "a default cache",
+              "partitionId": "a string from your config"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "hierarchical_keyring_008"
+          },
+          {
+            "choices": {
+              "keyStore": "a key store",
+              "ttlSeconds": null,
+              "branchKeyId": null,
+              "branchKeyIdSupplier": null,
+              "cache": "a storm-tracking cache",
+              "partitionId": "a string"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_009"
+          },
+          {
+            "choices": {
+              "keyStore": "a key store",
+              "ttlSeconds": "a duration",
+              "branchKeyId": null,
+              "branchKeyIdSupplier": "a branch key ID supplier",
+              "cache": "a storm-tracking cache with a grace period longer than the TTL",
+              "partitionId": "a string"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "hierarchical_keyring_010"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "a duration",
+              "branchKeyId": "a string",
+              "branchKeyIdSupplier": "a branch key ID supplier",
+              "cache": "a default cache",
+              "partitionId": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_011"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "a duration",
+              "branchKeyId": "a string from your config",
+              "branchKeyIdSupplier": null,
+              "cache": "a storm-tracking cache",
+              "partitionId": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "hierarchical_keyring_012"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "zero",
+              "branchKeyId": null,
+              "branchKeyIdSupplier": null,
+              "cache": null,
+              "partitionId": "a string from your config"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_013"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "zero",
+              "branchKeyId": "a string",
+              "branchKeyIdSupplier": null,
+              "cache": "a local cache",
+              "partitionId": "a string"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_014"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": "zero",
+              "branchKeyId": "a string from your config",
+              "branchKeyIdSupplier": null,
+              "cache": "a storm-tracking cache with a grace period longer than the TTL",
+              "partitionId": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_015"
+          },
+          {
+            "choices": {
+              "keyStore": null,
+              "ttlSeconds": null,
+              "branchKeyId": null,
+              "branchKeyIdSupplier": null,
+              "cache": "a storm-tracking cache",
+              "partitionId": "a string from your config"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "hierarchical_keyring_016"
+          }
+        ]
+      }
+    },
+    {
+      "id": "raw-aes-keyring",
+      "group": "Keyrings",
+      "name": "Raw AES keyring",
+      "type": "aws_crypto_mpl::keyring::RawAesKeyring",
+      "ways": [
+        {
+          "id": "builder",
+          "option": null,
+          "kind": "constructor",
+          "signature": "pub fn builder() -> RawAesKeyringBuilder",
+          "row": "construct"
+        },
+        {
+          "id": "key_namespace",
+          "option": "keyNamespace",
+          "kind": "setter",
+          "signature": "pub fn key_namespace(self, key_namespace: impl Into<String>) -> Self",
+          "row": "keyNamespace",
+          "required": true
+        },
+        {
+          "id": "set_key_namespace",
+          "option": "keyNamespace",
+          "kind": "setter",
+          "signature": "pub fn set_key_namespace(self, key_namespace: Option<String>) -> Self",
+          "row": "keyNamespace",
+          "required": true
+        },
+        {
+          "id": "key_name",
+          "option": "keyName",
+          "kind": "setter",
+          "signature": "pub fn key_name(self, key_name: impl Into<String>) -> Self",
+          "row": "keyName",
+          "required": true
+        },
+        {
+          "id": "set_key_name",
+          "option": "keyName",
+          "kind": "setter",
+          "signature": "pub fn set_key_name(self, key_name: Option<String>) -> Self",
+          "row": "keyName",
+          "required": true
+        },
+        {
+          "id": "wrapping_key",
+          "option": "wrappingKey",
+          "kind": "setter",
+          "signature": "pub fn wrapping_key(self, wrapping_key: impl Into<Vec<u8>>) -> Self",
+          "row": "wrappingKey",
+          "required": true
+        },
+        {
+          "id": "set_wrapping_key",
+          "option": "wrappingKey",
+          "kind": "setter",
+          "signature": "pub fn set_wrapping_key(self, wrapping_key: Option<Vec<u8>>) -> Self",
+          "row": "wrappingKey",
+          "required": true
+        },
+        {
+          "id": "wrapping_alg",
+          "option": "wrappingAlg",
+          "kind": "setter",
+          "signature": "pub fn wrapping_alg(self, wrapping_alg: AesWrappingAlg) -> Self",
+          "row": "wrappingAlg",
+          "required": true
+        },
+        {
+          "id": "set_wrapping_alg",
+          "option": "wrappingAlg",
+          "kind": "setter",
+          "signature": "pub fn set_wrapping_alg(self, wrapping_alg: Option<AesWrappingAlg>) -> Self",
+          "row": "wrappingAlg",
+          "required": true
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "keyNamespace",
+          "label": "keyNamespace",
+          "kind": "member",
+          "haves": [
+            "a string",
+            "a string from your config"
+          ]
+        },
+        {
+          "key": "keyName",
+          "label": "keyName",
+          "kind": "member",
+          "haves": [
+            "a string",
+            "a string from your config"
+          ]
+        },
+        {
+          "key": "wrappingKey",
+          "label": "wrappingKey",
+          "kind": "member",
+          "haves": [
+            "bytes from a secret store",
+            "bytes in memory",
+            "a key of the wrong length"
+          ]
+        },
+        {
+          "key": "wrappingAlg",
+          "label": "wrappingAlg",
+          "kind": "member",
+          "haves": [
+            "one of the listed choices"
+          ]
+        }
+      ],
+      "frame": {
+        "way": "builder",
+        "setup": [],
+        "head": [
+          "let raw_aes_keyring = RawAesKeyring::builder()"
+        ],
+        "tail": [
+          "    .build()?;"
+        ],
+        "one_of": [],
+        "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+        "line": 49
+      },
+      "choices": [
+        {
+          "row": "keyNamespace",
+          "way": "key_namespace",
+          "have": "a string",
+          "setup": [],
+          "setter": "    .key_namespace(\"my-key-namespace\")",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 65,
+          "takes": "&str",
+          "alts": [
+            {
+              "way": "set_key_namespace",
+              "setup": [],
+              "setter": "    .set_key_namespace(Some(\"my-key-namespace\".to_string()))",
+              "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+              "line": 89
+            }
+          ]
+        },
+        {
+          "row": "keyNamespace",
+          "way": "key_namespace",
+          "have": "a string from your config",
+          "setup": [
+            "let key_namespace: String = app_config().key_namespace;"
+          ],
+          "setter": "    .key_namespace(key_namespace)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 76,
+          "takes": "String",
+          "alts": []
+        },
+        {
+          "row": "keyName",
+          "way": "key_name",
+          "have": "a string",
+          "setup": [],
+          "setter": "    .key_name(\"my-key-name\")",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 113,
+          "takes": "&str",
+          "alts": [
+            {
+              "way": "set_key_name",
+              "setup": [],
+              "setter": "    .set_key_name(Some(\"my-key-name\".to_string()))",
+              "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+              "line": 137
+            }
+          ]
+        },
+        {
+          "row": "keyName",
+          "way": "key_name",
+          "have": "a string from your config",
+          "setup": [
+            "let key_name: String = app_config().key_name;"
+          ],
+          "setter": "    .key_name(key_name)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 124,
+          "takes": "String",
+          "alts": []
+        },
+        {
+          "row": "wrappingKey",
+          "way": "wrapping_key",
+          "have": "bytes from a secret store",
+          "setup": [
+            "let wrapping_key: Vec<u8> = wrapping_key_from_secret_store();"
+          ],
+          "setter": "    .wrapping_key(wrapping_key)",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 161,
+          "takes": "Vec<u8>",
+          "alts": [
+            {
+              "way": "set_wrapping_key",
+              "setup": [
+                "let wrapping_key: Option<Vec<u8>> = Some(wrapping_key_from_secret_store());"
+              ],
+              "setter": "    .set_wrapping_key(wrapping_key)",
+              "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+              "line": 187
+            }
+          ]
+        },
+        {
+          "row": "wrappingKey",
+          "way": "wrapping_key",
+          "have": "bytes in memory",
+          "setup": [
+            "let wrapping_key: &[u8] = &[0x01; 32];"
+          ],
+          "setter": "    .wrapping_key(wrapping_key)",
+          "expect": "ok",
+          "error": null,
+          "default": false,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 174,
+          "takes": "&[u8]",
+          "alts": []
+        },
+        {
+          "row": "wrappingKey",
+          "way": "wrapping_key",
+          "have": "a key of the wrong length",
+          "setup": [
+            "let wrapping_key: Vec<u8> = vec![0x01; 16];"
+          ],
+          "setter": "    .wrapping_key(wrapping_key)",
+          "expect": "fails",
+          "error": "validation",
+          "default": false,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 200,
+          "takes": "Vec<u8>",
+          "alts": []
+        },
+        {
+          "row": "wrappingAlg",
+          "way": "wrapping_alg",
+          "have": "one of the listed choices",
+          "setup": [],
+          "setter": "    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)",
+          "expect": "ok",
+          "error": null,
+          "default": true,
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 226,
+          "takes": "AesWrappingAlg",
+          "alts": [
+            {
+              "way": "set_wrapping_alg",
+              "setup": [],
+              "setter": "    .set_wrapping_alg(Some(AesWrappingAlg::AlgAes256GcmIv12Tag16))",
+              "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+              "line": 240
+            }
+          ]
+        }
+      ],
+      "left_out": [
+        {
+          "rows": [
+            "keyNamespace"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 100
+        },
+        {
+          "rows": [
+            "keyName"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 148
+        },
+        {
+          "rows": [
+            "wrappingKey"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 213
+        },
+        {
+          "rows": [
+            "wrappingAlg"
+          ],
+          "expect": "fails",
+          "error": "validation",
+          "file": "mpl/tests/api_examples/raw_aes_keyring.rs",
+          "line": 251
+        }
+      ],
+      "together": [],
+      "examples": [],
+      "combos": {
+        "mode": "all",
+        "total": 72,
+        "results": [
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_001"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_002"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_003"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_004"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_005"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_006"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_007"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": null,
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_008"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_009"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_010"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_011"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_012"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_013"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_014"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_015"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_016"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_017"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_018"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_019"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_020"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_021"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_022"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_023"
+          },
+          {
+            "choices": {
+              "keyNamespace": null,
+              "keyName": "a string from your config",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_024"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_025"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_026"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_027"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_028"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_029"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_030"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_031"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": null,
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_032"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_033"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_034"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_035"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_036"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_037"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_038"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_039"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_040"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_041"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_042"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_043"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_044"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_045"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_046"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_047"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string",
+              "keyName": "a string from your config",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_048"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_049"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_050"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_051"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_052"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_053"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_054"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_055"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": null,
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_056"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_057"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_058"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_059"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_060"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_061"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_062"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_063"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_064"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": null,
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_065"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": null,
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_066"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_067"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes from a secret store",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_068"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_069"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": "bytes in memory",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_070"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": null
+            },
+            "expect": "fails",
+            "error": null,
+            "outcome": "pass",
+            "name": "raw_aes_keyring_071"
+          },
+          {
+            "choices": {
+              "keyNamespace": "a string from your config",
+              "keyName": "a string from your config",
+              "wrappingKey": "a key of the wrong length",
+              "wrappingAlg": "one of the listed choices"
+            },
+            "expect": "fails",
+            "error": "validation",
+            "outcome": "pass",
+            "name": "raw_aes_keyring_072"
+          }
+        ]
+      }
+    },
+    {
+      "id": "default-cmm",
+      "group": "CMMs",
+      "name": "Default CMM",
+      "type": "aws_crypto_mpl::cmm::DefaultCmm",
+      "ways": [
+        {
+          "id": "new",
+          "option": null,
+          "kind": "constructor",
+          "signature": "pub fn new(keyring: impl IntoShared<SharedKeyring>) -> Self",
+          "row": "construct"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "keyring",
+          "label": "keyring",
+          "kind": "member",
+          "haves": []
+        }
+      ],
+      "frame": {
+        "way": "new",
+        "setup": [
+          "let raw_aes_keyring = make_raw_aes_keyring();"
+        ],
+        "head": [
+          "let default_cmm = DefaultCmm::new(raw_aes_keyring);"
+        ],
+        "tail": [],
+        "one_of": [],
+        "file": "mpl/tests/api_examples/default_cmm.rs",
+        "line": 9
+      },
+      "choices": [],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "new",
+          "row": "construct",
+          "have": "a hierarchical keyring",
+          "code": "let hierarchical_keyring = HierarchicalKeyring::builder()\n    .key_store(dynamodb_key_store)\n    .branch_key_id(\"my-branch-key-id\")\n    .ttl(Duration::from_secs(600))\n    .build()\n    .await?;\nlet default_cmm = DefaultCmm::new(hierarchical_keyring);",
+          "file": "mpl/tests/api_examples/default_cmm.rs",
+          "line": 37,
+          "takes": "HierarchicalKeyring"
+        }
+      ],
+      "combos": {
+        "mode": "all",
+        "total": 1,
+        "results": [
+          {
+            "choices": {},
+            "expect": "ok",
+            "error": null,
+            "outcome": "pass",
+            "name": "default_cmm_001"
+          }
+        ]
+      }
+    }
+  ],
+  "uncovered": []
+}
