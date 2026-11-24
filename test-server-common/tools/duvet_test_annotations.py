@@ -11,8 +11,8 @@ them to one file the language's duvet config reads as a test source.
 An annotation is dropped when:
   - its test does not reach a server call for the language (a feature-gate or
     other skip), or
-  - its test calls KnownBugGate.gateDeclared with a bug id the language lists
-    in its bug-config.json, or
+  - its test calls KnownBugGate.gateDeclared (or Mpl.knownBug) with a bug id
+    the language lists in its bug-config.json, or
   - with --spec-root, its quote is not in that section of the language's spec
     (duvet fails the whole report on such a quote).
 
@@ -34,13 +34,13 @@ import sys
 from pathlib import Path
 
 TEST_ANNOTATIONS = {"@Test", "@ParameterizedTest", "@RepeatedTest", "@TestFactory",
-                    "@TestTemplate", "@Property", "@Example"}
+                    "@TestTemplate", "@Property", "@Example", "@KeyringTest"}
 META_KEYS = {"type", "reason", "tracking-issue", "feature", "level", "format"}
 METHOD = re.compile(
     r"^\s*(?:(?:public|protected|private|static|final|synchronized|abstract|default)\s+)*"
     r"(?:<[^>]*>\s+)?[\w.$<>\[\],? ]+?\s+(\w+)\s*\(")
 NOT_METHOD = re.compile(r"^\s*(?:return|new|if|for|while|switch|catch|throw|else|do|try|case)\b")
-GATE_DECLARED = re.compile(r'gateDeclared\(\s*"([^"]+)"')
+GATE_DECLARED = re.compile(r'(?:gateDeclared|knownBug)\(\s*"([^"]+)"')
 CALL = re.compile(r"\b(\w+)\s*\(")
 GATE_ID_SEGMENT = re.compile(r"\[(\w[\w-]*):([^\]]*)\]")
 TEST_SEGMENTS = {"method", "test-template", "test-factory", "property", "example"}

@@ -51,8 +51,6 @@ jobs:
       focus: ${{ inputs.focus || '' }}
       language-repository: ${{ inputs.language-repository || '' }}
       language-ref: ${{ inputs.language-ref || '' }}
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
 
   duvet-test-reach:
     name: duvet test reach
@@ -65,5 +63,3 @@ jobs:
       language-repository: aws/aws-crypto-tools-rust
       source: esdk/src
       artifacts: esdk-test-server-reports
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}

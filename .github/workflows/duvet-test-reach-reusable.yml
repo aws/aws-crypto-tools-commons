@@ -64,10 +64,6 @@ on:
           codebuild-<project>-<run_id>-<run_attempt> label.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
-    secrets:
-      repo-pat:
-        description: Read-only token for the private repositories (aws-crypto-tools-commons, ...).
-        required: true
 
 permissions:
   contents: read
@@ -94,7 +90,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ inputs.commons-ref }}
-          token: ${{ secrets.repo-pat }}
           sparse-checkout: .github/scripts
           path: resolve
 
@@ -109,7 +104,6 @@ jobs:
           EVENT_BODY: ${{ github.event.pull_request.body }}
           INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
           GH_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
         run: resolve/.github/scripts/resolve-test-server-refs.sh resolve
 
       - name: Check out aws-crypto-tools-commons at the resolved ref
@@ -118,7 +112,6 @@ jobs:
         with:
           repository: aws/aws-crypto-tools-commons
           ref: ${{ steps.refs.outputs.commons_ref }}
-          token: ${{ secrets.repo-pat }}
           path: commons
 
       - name: Download the coverage artifacts
@@ -174,7 +167,6 @@ jobs:
         with:
           repository: ${{ steps.library.outputs.repository }}
           ref: ${{ steps.library.outputs.commit }}
-          token: ${{ secrets.repo-pat }}
           path: library
 
       - name: Check only the annotations this pull request changes in the library repository

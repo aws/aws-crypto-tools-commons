@@ -47,8 +47,6 @@ jobs:
       fuzz: ${{ needs.settings.outputs.count }}
       fuzz-seed: ${{ needs.settings.outputs.seed }}
       report-artifact: esdk-test-server-fuzz-reports
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
 
   mpl:
     name: MPL
@@ -60,8 +58,6 @@ jobs:
       report-artifact: mpl-test-server-fuzz-reports
       # The same role the MPL TestServer workflow uses.
       aws-role-arn: arn:aws:iam::370957321024:role/GitHub-CI-Public-ESDK-Dafny-Role-us-west-2
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
 
   dbesdk:
     name: DB-ESDK
@@ -81,5 +77,3 @@ jobs:
       fuzz: ${{ needs.settings.outputs.count }}
       fuzz-seed: ${{ needs.settings.outputs.seed }}
       report-artifact: primitives-test-server-fuzz-reports
-    secrets:
-      repo-pat: ${{ secrets.LANGUAGE_REPO_PAT }}
