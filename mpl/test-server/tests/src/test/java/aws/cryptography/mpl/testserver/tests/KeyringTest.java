@@ -19,7 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * void onEncryptMakesDataKey(Mpl mpl) {
  *     Keyring keyring = mpl.rawAesKeyring().keyNamespace("ns").keyName("name")
  *         .wrappingKey(key).wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16).create();
- *     keyring.assertUsable();
+ *     keyring.assertEncryptsAndDecrypts();
  * }
  * }</pre>
  *

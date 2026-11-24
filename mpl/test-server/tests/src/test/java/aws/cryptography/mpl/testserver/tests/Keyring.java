@@ -54,7 +54,7 @@ final class Keyring {
     }
 
     /** OnEncrypt, which must fail with {@code expected}. */
-    MPLClientError onEncryptFails(EncryptionMaterials materials, ExpectedError expected) {
+    MPLClientError onEncryptFailsWith(EncryptionMaterials materials, ExpectedError expected) {
         OnEncryptInput input = onEncryptInput(materials);
         MPLClientError error = assertThrows(MPLClientError.class, () ->
             MplTestServerClients.withRetry(() -> mpl.testServer().onEncrypt(input)));
@@ -63,7 +63,7 @@ final class Keyring {
     }
 
     /** OnDecrypt, which must fail with {@code expected}. */
-    MPLClientError onDecryptFails(DecryptionMaterials materials, List<EncryptedDataKey> encryptedDataKeys,
+    MPLClientError onDecryptFailsWith(DecryptionMaterials materials, List<EncryptedDataKey> encryptedDataKeys,
             ExpectedError expected) {
         OnDecryptInput input = onDecryptInput(materials, encryptedDataKeys);
         MPLClientError error = assertThrows(MPLClientError.class, () ->
@@ -77,7 +77,7 @@ final class Keyring {
      * OnEncrypt on new materials must make a data key and an encrypted data key (EDK).
      * OnDecrypt must then get the same data key back from that EDK.
      */
-    void assertUsable() {
+    void assertEncryptsAndDecrypts() {
         EncryptionMaterials encryptionMaterials = mpl.newEncryptionMaterials();
         DecryptionMaterials decryptionMaterials = mpl.newDecryptionMaterials();
         EncryptionMaterials encrypted = onEncrypt(encryptionMaterials);
