@@ -158,9 +158,9 @@ final class Mpl {
         }
 
         /** Create the keyring, which must fail with {@code expected}. */
-        MPLClientError createFails(ExpectedError expected) {
+        MPLClientError createFailsWith(ExpectedError expected) {
             CreateAwsKmsKeyringInput request = input.build();
-            return Mpl.this.createFails(() -> MplTestServerClients.withRetry(() ->
+            return Mpl.this.createFailsWith(() -> MplTestServerClients.withRetry(() ->
                 testServer.createAwsKmsKeyring(request)), expected);
         }
     }

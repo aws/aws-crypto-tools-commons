@@ -146,9 +146,9 @@ final class FakeKms implements AutoCloseable {
 
     /**
      * Answer one GenerateDataKey and one Decrypt for {@code keyArn}, with the same 32-byte data key.
-     * That is enough for {@link Keyring#assertUsable()} with an AES-256 suite.
+     * That is enough for {@link Keyring#assertEncryptsAndDecrypts()} with an AES-256 suite.
      */
-    FakeKms answerOneRoundTrip(String keyArn) {
+    FakeKms allowOneEncryptAndDecrypt(String keyArn) {
         byte[] dataKey = new byte[32];
         Arrays.fill(dataKey, (byte) 9);
         byte[] ciphertext = new byte[64];
