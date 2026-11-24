@@ -115,7 +115,7 @@ async function load(src, lib) {
       || (defaultBranch[src.repo] ??= (await ghJson(`repos/${src.repo}`)).default_branch);
     const art = await findArtifact(src.repo, name, branch);
     if (!art) { d.state = "none"; d.why = `no ${name} artifact from ${branch} in ${src.repo}`; return; }
-    const cacheKey = `apiex1:${src.repo}:${art.id}`;
+    const cacheKey = `apiex2:${src.repo}:${art.id}`;
     let doc = await cacheGet(cacheKey);
     if (!doc) {
       const zip = await (await gh(`repos/${src.repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
@@ -124,6 +124,7 @@ async function load(src, lib) {
       doc = JSON.parse(await entryText(zip, e));
       await cachePut(cacheKey, doc);
     }
+    if (doc.schema !== 2) { d.state = "error"; d.why = `${name} has schema ${doc.schema}; rerun that repo's CI to get schema 2`; return; }
     Object.assign(d, { state:"done", doc, art, branch });
   } catch (err) {
     d.state = "error"; d.why = "could not load: " + (err.message || err);
@@ -137,8 +138,6 @@ function loadAll() {
 }
 
 // ---------- model ----------
-const camel = id => id.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
-const KIND_ORDER = { constructor:0, setter:1, method:2 };
 
 // Every API of one library, merged across languages by api id.
 function apisOf(lib) {
@@ -155,53 +154,54 @@ function apisOf(lib) {
   return [...apis.values()];
 }
 
-// An API's options: ways across languages that share an option name (or, for
-// ways that are not options, a way id) land in one option. Each option has
-// one row per input type that some language shows, plus rows for left-out
-// and rejected snippets.
-function optionsOf(api) {
-  const opts = new Map();
-  for (const lang of LANGS) for (const w of api.byLang[lang]?.ways || []) {
-    const key = w.option || camel(w.id);
-    const o = opts.get(key) || { key, rank:9, byLang:{} };
-    o.rank = Math.min(o.rank, KIND_ORDER[w.kind] ?? 9);
-    (o.byLang[lang] ||= []).push(w);
-    opts.set(key, o);
+// An API's rows, in the order that api-examples.json lists them: Construct,
+// then the Smithy operations and members, then extras. Each language's ways
+// go in the row that their "row" field names, so Rust x and set_x and every
+// Java overload of x share one row. A row has one sub-row per input type that
+// some language shows, plus sub-rows for left-out and rejected snippets.
+function rowsOf(api) {
+  const rows = new Map();
+  for (const lang of LANGS) {
+    const a = api.byLang[lang];
+    if (!a) continue;
+    for (const r of a.rows) if (!rows.has(r.key)) rows.set(r.key, { ...r, byLang:{} });
+    for (const w of a.ways) (rows.get(w.row).byLang[lang] ||= []).push(w);
   }
-  for (const o of opts.values()) {
-    const rows = new Map(), add = (kind, takes, label) => rows.has(kind + takes) || rows.set(kind + takes, { kind, takes, label });
-    const ways = Object.values(o.byLang).flat();
+  for (const row of rows.values()) {
+    const subs = new Map(), add = (kind, takes, label) => subs.has(kind + takes) || subs.set(kind + takes, { kind, takes, label });
+    const ways = Object.values(row.byLang).flat();
     for (const w of ways) for (const e of w.examples) if (e.kind === "pass") add("pass", e.takes, e.takes);
     for (const w of ways) for (const t of w.overloads || []) add("pass", t, t);
-    if (!rows.size) add("pass", "", "any input");
+    if (!subs.size) add("pass", "", "any input");
     if (ways.some(w => w.kind === "setter")) add("leftout", "", "left out");
     for (const w of ways) for (const e of w.examples) if (e.kind === "reject") add("reject", e.takes || "", "rejects " + (e.takes || "a bad value"));
-    o.rows = [...rows.values()];
+    row.subs = [...subs.values()];
   }
-  return [...opts.values()].sort((a, b) => a.rank - b.rank);
+  return [...rows.values()];
 }
 
-const matches = (row, e) => row.kind === "pass" ? e.kind === "pass" && (row.takes === "" || e.takes === row.takes)
-  : row.kind === "leftout" ? e.kind === "missing" || e.kind === "omitted"
-  : e.kind === "reject" && (e.takes || "") === row.takes;
+const matches = (sub, e) => sub.kind === "pass" ? e.kind === "pass" && (sub.takes === "" || e.takes === sub.takes)
+  : sub.kind === "leftout" ? e.kind === "missing" || e.kind === "omitted"
+  : e.kind === "reject" && (e.takes || "") === sub.takes;
 
 // One cell: "nd" when the language has no data, "na" when it has no such
 // way or input type, "ex" when a snippet shows it, "un" when the way exists
-// but has no snippet for this row.
-function cellOf(lib, o, row, lang) {
+// but has no snippet for this sub-row.
+function cellOf(lib, row, sub, lang) {
   if (docs[`${lib}|${lang}`]?.state !== "done") return { st:"nd" };
-  const ways = o.byLang[lang];
+  const ways = row.byLang[lang];
   if (!ways) return { st:"na" };
-  const shown = ways.map(w => ({ way:w, examples:w.examples.filter(e => matches(row, e)) })).filter(x => x.examples.length);
+  const shown = ways.map(w => ({ way:w, examples:w.examples.filter(e => matches(sub, e)) })).filter(x => x.examples.length);
   if (shown.length) return { st:"ex", shown, ways };
   const noPass = ways.every(w => !w.examples.some(e => e.kind === "pass"));
-  const uncovered = row.kind === "pass" ? noPass || ways.some(w => (w.overloads || []).includes(row.takes))
-    : row.kind === "leftout" && ways.some(w => w.kind === "setter");
+  const uncovered = sub.kind === "pass" ? noPass || ways.some(w => (w.overloads || []).includes(sub.takes))
+    : sub.kind === "leftout" && ways.some(w => w.kind === "setter");
   return { st:uncovered ? "un" : "na", ways };
 }
 
-function badge(o) {
-  const req = LANGS.flatMap(l => (o.byLang[l] || []).filter(w => w.kind === "setter").map(w => [l, w.required]));
+function badge(row) {
+  if (row.kind === "extra") return `<span class="badge" title="not in the Smithy model">extra in ${esc(LANGS.filter(l => row.byLang[l]).join(", "))}</span>`;
+  const req = LANGS.flatMap(l => (row.byLang[l] || []).filter(w => w.kind === "setter").map(w => [l, w.required]));
   if (!req.length) return "";
   const vals = new Set(req.map(r => r[1]));
   if (vals.size === 1 && vals.has(true)) return `<span class="badge required">required</span>`;
@@ -213,7 +213,7 @@ function badge(o) {
 
 function uncoveredCount(lib, api) {
   let n = 0;
-  for (const o of optionsOf(api)) for (const row of o.rows) for (const lang of LANGS) n += cellOf(lib, o, row, lang).st === "un";
+  for (const row of rowsOf(api)) for (const sub of row.subs) for (const lang of LANGS) n += cellOf(lib, row, sub, lang).st === "un";
   return n;
 }
 
@@ -280,13 +280,13 @@ function snippets(lib, lang, cell) {
   return `<div class="empty">Not offered in ${lang}.</div>`;
 }
 
-function openRow(lib, o, row) {
+function openRow(lib, row, sub) {
   const { lang, compare } = state.open;
   const tabs = LANGS.map(l => `<span class="tab ${!compare && l === lang ? "on" : ""}" data-tab="${l}">${l}</span>`).join("")
     + `<span class="tab cmp" data-compare="1">${compare ? "Show one language" : "Compare all languages"}</span>`;
   const body = compare
-    ? `<div class="side">${LANGS.map(l => `<div class="lang"><h4>${l}</h4>${snippets(lib, l, cellOf(lib, o, row, l))}</div>`).join("")}</div>`
-    : snippets(lib, lang, cellOf(lib, o, row, lang));
+    ? `<div class="side">${LANGS.map(l => `<div class="lang"><h4>${l}</h4>${snippets(lib, l, cellOf(lib, row, sub, l))}</div>`).join("")}</div>`
+    : snippets(lib, lang, cellOf(lib, row, sub, lang));
   return `<tr class="open"><td colspan="${LANGS.length + 1}"><div class="tabs">${tabs}</div>${body}</td></tr>`;
 }
 
@@ -307,17 +307,17 @@ function drawMain() {
     <span><i class="sw nd"></i>no data for that language</span></div>`;
   html += strayProblems(lib, api.id);
   html += `<table class="grid"><thead><tr><th></th>${LANGS.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>`;
-  for (const o of optionsOf(api)) {
-    const names = LANGS.filter(l => o.byLang[l]).map(l => `${l}: ${o.byLang[l].map(w => w.id).join(", ")}`).join(" · ");
-    html += `<tr class="opt"><th colspan="${LANGS.length + 1}">${esc(o.key)}${badge(o)}<small>${esc(names)}</small></th></tr>`;
-    o.rows.forEach((row, i) => {
-      const id = `${o.key}|${i}`;
-      html += `<tr><th>${esc(row.label)}</th>` + LANGS.map(l => {
-        const c = cellOf(lib, o, row, l), on = state.open?.row === id && state.open.lang === l && !state.open.compare;
+  for (const row of rowsOf(api)) {
+    const names = LANGS.filter(l => row.byLang[l]).map(l => `${l}: ${row.byLang[l].map(w => w.id).join(", ")}`).join(" · ");
+    html += `<tr class="opt"><th colspan="${LANGS.length + 1}">${esc(row.label)}${badge(row)}<small>${esc(names || "no language offers this")}</small></th></tr>`;
+    row.subs.forEach((sub, i) => {
+      const id = `${row.key}|${i}`;
+      html += `<tr><th>${esc(sub.label)}</th>` + LANGS.map(l => {
+        const c = cellOf(lib, row, sub, l), on = state.open?.row === id && state.open.lang === l && !state.open.compare;
         const text = { ex:"✓", un:"no snippet", na:"—", nd:"no data" }[c.st];
         return `<td class="cell ${c.st} ${on ? "on" : ""}" data-row="${esc(id)}" data-lang="${l}">${text}</td>`;
       }).join("") + `</tr>`;
-      if (state.open?.row === id) html += openRow(lib, o, row);
+      if (state.open?.row === id) html += openRow(lib, row, sub);
     });
   }
   $("main").innerHTML = html + `</tbody></table>`;

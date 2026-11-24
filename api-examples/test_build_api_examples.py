@@ -9,6 +9,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 import build_api_examples as builder
+import smithy_names
 
 
 def setter(way_id, option):
@@ -31,7 +32,7 @@ def marker(fields, code="let keyring = builder.kms_key_id(arn);"):
 """
 
 
-class BuilderTest(unittest.TestCase):
+class TempDirTest(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -43,9 +44,13 @@ class BuilderTest(unittest.TestCase):
         os.chdir(self.cwd)
         self.dir.cleanup()
 
-    def run_builder(self, surface_doc, tests):
-        """Write surface.json and tests/<name> files, run main, return (exit code, output doc, stdout)."""
+    def run_builder(self, surface_doc, tests, names=None):
+        """Write surface.json, names.json and tests/<name> files, run main.
+
+        names is {api id: entry} for the surface's library. Returns (exit code, output doc, stdout).
+        """
         (self.root / "surface.json").write_text(json.dumps(surface_doc))
+        (self.root / "names.json").write_text(json.dumps({"libraries": {"mpl": names or {}}}))
         for name, text in tests.items():
             path = self.root / "tests" / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,8 +59,11 @@ class BuilderTest(unittest.TestCase):
         out = io.StringIO()
         with redirect_stdout(out):
             code = builder.main(["--surface", "surface.json", "--src", "tests", "--repo", "aws/r",
-                                 "--commit", "abc", "--out", "api-examples.json"])
+                                 "--commit", "abc", "--out", "api-examples.json", "--names", "names.json"])
         return code, json.loads((self.root / "api-examples.json").read_text()), out.getvalue()
+
+
+class BuilderTest(TempDirTest):
 
     def whys(self, doc):
         return {(f["api"], f["way"], f["why"]) for f in doc["uncovered"]}
@@ -146,6 +154,113 @@ class BuilderTest(unittest.TestCase):
             ("tests/c.rs", "kind=pass needs takes="),
             ("tests/d.rs", "kind=fine is not one of missing, omitted, pass, reject"),
         ])
+
+
+def names_entry(members=(), operations=(), aliases=None):
+    return {"shape": "ns#Input", "members": list(members), "operations": list(operations),
+            "aliases": aliases or {}}
+
+
+def covered(*way_ids):
+    """Markers that fully cover setter ways."""
+    return "".join(marker(f"api=aws-kms-keyring way={w} takes=String kind=pass")
+                   + marker(f"api=aws-kms-keyring way={w} kind=missing") for w in way_ids)
+
+
+class RowTest(TempDirTest):
+
+    def rows(self, doc):
+        return [(r["key"], r["kind"]) for r in doc["apis"][0]["rows"]]
+
+    def way_rows(self, doc):
+        return {w["id"]: w["row"] for w in doc["apis"][0]["ways"]}
+
+    def test_rust_setter_pair_lands_on_the_smithy_member_row(self):
+        code, doc, _ = self.run_builder(
+            surface(setter("kms_key_id", "kmsKeyId"), setter("set_kms_key_id", "kmsKeyId")),
+            {"kms.rs": covered("kms_key_id", "set_kms_key_id")},
+            {"aws-kms-keyring": names_entry(["kmsKeyId"])})
+        self.assertEqual(code, 0, doc["uncovered"])
+        self.assertEqual(self.way_rows(doc), {"kms_key_id": "kmsKeyId", "set_kms_key_id": "kmsKeyId"})
+
+    def test_option_matches_member_that_differs_only_in_underscores(self):
+        code, doc, _ = self.run_builder(
+            surface(setter("set_net_v4_0_0_retry_policy", "netV400RetryPolicy")),
+            {"kms.rs": covered("set_net_v4_0_0_retry_policy")},
+            {"aws-kms-keyring": names_entry(["netV4_0_0_RetryPolicy"])})
+        self.assertEqual(self.way_rows(doc), {"set_net_v4_0_0_retry_policy": "netV4_0_0_RetryPolicy"})
+
+    def test_alias_maps_a_renamed_option_to_its_member(self):
+        code, doc, _ = self.run_builder(surface(setter("ttl", "ttl")), {"kms.rs": covered("ttl")},
+                                        {"aws-kms-keyring": names_entry(["ttlSeconds"], aliases={"ttl": "ttlSeconds"})})
+        self.assertEqual(self.way_rows(doc), {"ttl": "ttlSeconds"})
+        self.assertEqual(self.rows(doc), [("construct", "construct"), ("ttlSeconds", "member")])
+
+    def test_every_constructor_way_lands_on_the_construct_row(self):
+        ways = [{"id": i, "option": None, "kind": "constructor"} for i in ("builder", "from_conf", "default")]
+        code, doc, _ = self.run_builder(surface(*ways), {
+            "c.rs": "".join(marker(f"api=aws-kms-keyring way={i} takes=Config kind=pass") for i in
+                            ("builder", "from_conf", "default")),
+        }, {"aws-kms-keyring": names_entry(["kmsKeyId"])})
+        self.assertEqual(set(self.way_rows(doc).values()), {"construct"})
+
+    def test_method_lands_on_its_operation_row_and_api_has_no_construct_row(self):
+        code, doc, _ = self.run_builder(
+            surface({"id": "encrypt", "option": None, "kind": "method"}, setter("plaintext", "plaintext")), {
+                "e.rs": marker("api=aws-kms-keyring way=encrypt takes=Vec<u8> kind=pass") + covered("plaintext"),
+            }, {"aws-kms-keyring": names_entry(["plaintext", "keyring"], ["Encrypt"])})
+        self.assertEqual(code, 0, doc["uncovered"])
+        self.assertEqual(self.way_rows(doc), {"encrypt": "Encrypt", "plaintext": "plaintext"})
+        self.assertEqual(self.rows(doc), [("Encrypt", "operation"), ("plaintext", "member"), ("keyring", "member")])
+
+    def test_rows_follow_model_order_and_keep_members_no_way_offers(self):
+        code, doc, _ = self.run_builder(surface(setter("key_name", "keyName"), setter("key_namespace", "keyNamespace")),
+                                        {"kms.rs": covered("key_name", "key_namespace")},
+                                        {"aws-kms-keyring": names_entry(["keyNamespace", "wrappingKey", "keyName"])})
+        self.assertEqual(self.rows(doc), [("construct", "construct"), ("keyNamespace", "member"),
+                                          ("wrappingKey", "member"), ("keyName", "member")])
+
+    def test_option_not_in_the_model_is_an_extra_row_and_does_not_fail(self):
+        code, doc, _ = self.run_builder(surface(setter("grant_tokens", "grantTokens"), setter("set_grant_tokens", "grantTokens")),
+                                        {"kms.rs": covered("grant_tokens", "set_grant_tokens")},
+                                        {"aws-kms-keyring": names_entry(["kmsKeyId"])})
+        self.assertEqual(code, 0, doc["uncovered"])
+        self.assertEqual(self.way_rows(doc), {"grant_tokens": "extra:grantTokens", "set_grant_tokens": "extra:grantTokens"})
+        self.assertEqual(self.rows(doc), [("construct", "construct"), ("kmsKeyId", "member"),
+                                          ("extra:grantTokens", "extra")])
+
+    def test_api_missing_from_names_file_has_construct_and_extra_rows(self):
+        code, doc, _ = self.run_builder(surface(setter("kms_key_id", "kmsKeyId")), {"kms.rs": covered("kms_key_id")})
+        self.assertEqual(self.rows(doc), [("construct", "construct"), ("extra:kmsKeyId", "extra")])
+
+
+class SmithyNamesTest(unittest.TestCase):
+
+    def test_maps_operations_to_apis_like_the_conformance_config(self):
+        mp = "aws.cryptography.materialProviders"
+        shapes = {
+            f"{mp}#Mpl": {"type": "service", "operations": [{"target": f"{mp}#{o}"} for o in (
+                "CreateAwsKmsHierarchicalKeyring", "CreateAwsKmsKeyring", "GetAlgorithmSuiteInfo", "ValidThing")]},
+            f"{mp}#CreateAwsKmsHierarchicalKeyring": {"type": "operation", "input": {"target": f"{mp}#HInput"}},
+            f"{mp}#CreateAwsKmsKeyring": {"type": "operation", "input": {"target": f"{mp}#KInput"}},
+            f"{mp}#GetAlgorithmSuiteInfo": {"type": "operation", "input": {"target": f"{mp}#GInput"}},
+            f"{mp}#ValidThing": {"type": "operation", "input": {"target": f"{mp}#VInput"}},
+            f"{mp}#HInput": {"type": "structure", "members": {"branchKeyId": {}, "ttlSeconds": {}}},
+            f"{mp}#KInput": {"type": "structure", "members": {"kmsKeyId": {}}},
+            f"{mp}#VInput": {"type": "structure", "members": {"thing": {}}},
+        }
+        config = {"rename": [
+            {"shape": f"{mp}#CreateAwsKmsHierarchicalKeyring", "rust": "HierarchicalKeyring::builder"},
+            {"shape": f"{mp}#HInput$ttlSeconds", "rust": "ttl"},
+            {"shape": f"{mp}#GetAlgorithmSuiteInfo", "rust": "AlgorithmSuiteId::specification"},
+        ]}
+        self.assertEqual(smithy_names.names(shapes, config)["mpl"], {
+            "hierarchical-keyring": {"shape": f"{mp}#HInput", "members": ["branchKeyId", "ttlSeconds"],
+                                     "operations": [], "aliases": {"ttl": "ttlSeconds"}},
+            "aws-kms-keyring": {"shape": f"{mp}#KInput", "members": ["kmsKeyId"], "operations": [], "aliases": {}},
+            "valid-thing": {"shape": f"{mp}#VInput", "members": ["thing"], "operations": ["ValidThing"],
+                            "aliases": {}},
+        })
 
 
 if __name__ == "__main__":
