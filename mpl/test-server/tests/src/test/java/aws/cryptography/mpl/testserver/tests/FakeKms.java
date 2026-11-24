@@ -28,15 +28,32 @@ import java.util.Queue;
  * hand a keyring a reply whose values are wrong, and check exactly what the
  * keyring asked KMS for.
  *
- * <p>It speaks KMS's awsJson1_1 protocol and ignores request signatures.
- * Replies are used in order, per operation. A request with no reply left is
- * answered with a 400 error, so the keyring sees a failed KMS call.
+ * <p>A test scripts the reply for a KMS call right before the keyring call that makes it:
+ * <pre>{@code
+ * fakeKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
+ * keyring.onEncrypt(materials);
+ * fakeKms.nextGenerateDataKeyFailsWith("NotFoundException");
+ * keyring.onEncryptFailsWith(materials, expectedError);
+ * }</pre>
+ * Each {@code next...} method adds one reply after the replies not used yet for that operation.
+ * So when one keyring call makes several KMS calls, the test scripts their replies in order.
+ * A request with no reply left gets a 400 error, so the keyring sees a failed KMS call.
+ *
+ * <p>When a test does not check a reply's data key or ciphertext, FakeKms fills in
+ * {@link #DATA_KEY} and {@link #CIPHERTEXT}.
+ *
+ * <p>FakeKms speaks KMS's awsJson1_1 protocol and ignores request signatures.
  */
 final class FakeKms implements AutoCloseable {
 
-    static final String GENERATE_DATA_KEY = "GenerateDataKey";
-    static final String ENCRYPT = "Encrypt";
-    static final String DECRYPT = "Decrypt";
+    private static final String GENERATE_DATA_KEY = "GenerateDataKey";
+    private static final String ENCRYPT = "Encrypt";
+    private static final String DECRYPT = "Decrypt";
+
+    /** The data key in a reply whose data key the test does not choose. 32 bytes fits an AES-256 suite. */
+    private static final byte[] DATA_KEY = filled(32, 9);
+    /** The ciphertext in a reply whose ciphertext the test does not choose. */
+    private static final byte[] CIPHERTEXT = filled(64, 9);
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String TARGET_PREFIX = "TrentService.";
@@ -73,35 +90,15 @@ final class FakeKms implements AutoCloseable {
     }
 
     /** A scripted reply: a 200 body, or a 400 error of a KMS error type. */
-    record Reply(int status, Map<String, Object> body) {
-        /** A GenerateDataKey reply. */
-        static Reply generateDataKey(String keyId, byte[] plaintext, byte[] ciphertext) {
+    private record Reply(int status, Map<String, Object> body) {
+        static Reply success(String keyId, Map<String, Object> fields) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("KeyId", keyId);
-            body.put("Plaintext", base64(plaintext));
-            body.put("CiphertextBlob", base64(ciphertext));
+            body.putAll(fields);
             return new Reply(200, body);
         }
 
-        /** An Encrypt reply. */
-        static Reply encrypt(String keyId, byte[] ciphertext) {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("KeyId", keyId);
-            body.put("CiphertextBlob", base64(ciphertext));
-            body.put("EncryptionAlgorithm", "SYMMETRIC_DEFAULT");
-            return new Reply(200, body);
-        }
-
-        /** A Decrypt reply. */
-        static Reply decrypt(String keyId, byte[] plaintext) {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("KeyId", keyId);
-            body.put("Plaintext", base64(plaintext));
-            body.put("EncryptionAlgorithm", "SYMMETRIC_DEFAULT");
-            return new Reply(200, body);
-        }
-
-        /** A KMS error such as NotFoundException. Never a 5xx, which SDKs retry. */
+        /** Never a 5xx, which SDKs retry. */
         static Reply error(String type) {
             return new Reply(400, Map.of("__type", type, "message", "FakeKms scripted " + type));
         }
@@ -121,15 +118,75 @@ final class FakeKms implements AutoCloseable {
         server.start();
     }
 
-    /** Add {@code reply} after any replies already scripted for {@code operation}. */
-    synchronized FakeKms reply(String operation, Reply reply) {
-        replies.computeIfAbsent(operation, k -> new ArrayDeque<>()).add(reply);
-        return this;
+    /** The next GenerateDataKey call returns {@link #DATA_KEY} under {@code keyId}. */
+    void nextGenerateDataKeyReturnsDataKeyFor(String keyId) {
+        nextGenerateDataKeyReturns(keyId, DATA_KEY, CIPHERTEXT);
     }
 
-    /** Every request for {@code operation}, in the order received. */
-    synchronized List<Request> requests(String operation) {
-        return requests.stream().filter(r -> r.operation().equals(operation)).toList();
+    /** The next GenerateDataKey call returns {@code plaintext} under {@code keyId}. */
+    void nextGenerateDataKeyReturns(String keyId, byte[] plaintext) {
+        nextGenerateDataKeyReturns(keyId, plaintext, CIPHERTEXT);
+    }
+
+    /** The next GenerateDataKey call returns {@code plaintext} and {@code ciphertext} under {@code keyId}. */
+    void nextGenerateDataKeyReturns(String keyId, byte[] plaintext, byte[] ciphertext) {
+        add(GENERATE_DATA_KEY, Reply.success(keyId, Map.of(
+            "Plaintext", base64(plaintext),
+            "CiphertextBlob", base64(ciphertext))));
+    }
+
+    /** The next GenerateDataKey call fails with the KMS error {@code errorCode}, such as NotFoundException. */
+    void nextGenerateDataKeyFailsWith(String errorCode) {
+        add(GENERATE_DATA_KEY, Reply.error(errorCode));
+    }
+
+    /** The next Encrypt call returns {@link #CIPHERTEXT} under {@code keyId}. */
+    void nextEncryptReturnsCiphertextFor(String keyId) {
+        nextEncryptReturns(keyId, CIPHERTEXT);
+    }
+
+    /** The next Encrypt call returns {@code ciphertext} under {@code keyId}. */
+    void nextEncryptReturns(String keyId, byte[] ciphertext) {
+        add(ENCRYPT, Reply.success(keyId, Map.of(
+            "CiphertextBlob", base64(ciphertext),
+            "EncryptionAlgorithm", "SYMMETRIC_DEFAULT")));
+    }
+
+    /** The next Encrypt call fails with the KMS error {@code errorCode}. */
+    void nextEncryptFailsWith(String errorCode) {
+        add(ENCRYPT, Reply.error(errorCode));
+    }
+
+    /** The next Decrypt call returns {@link #DATA_KEY} under {@code keyId}. */
+    void nextDecryptReturnsDataKeyFor(String keyId) {
+        nextDecryptReturns(keyId, DATA_KEY);
+    }
+
+    /** The next Decrypt call returns {@code plaintext} under {@code keyId}. */
+    void nextDecryptReturns(String keyId, byte[] plaintext) {
+        add(DECRYPT, Reply.success(keyId, Map.of(
+            "Plaintext", base64(plaintext),
+            "EncryptionAlgorithm", "SYMMETRIC_DEFAULT")));
+    }
+
+    /** The next Decrypt call fails with the KMS error {@code errorCode}. */
+    void nextDecryptFailsWith(String errorCode) {
+        add(DECRYPT, Reply.error(errorCode));
+    }
+
+    /** Every GenerateDataKey request so far, in the order received. */
+    List<Request> generateDataKeyCalls() {
+        return calls(GENERATE_DATA_KEY);
+    }
+
+    /** Every Encrypt request so far, in the order received. */
+    List<Request> encryptCalls() {
+        return calls(ENCRYPT);
+    }
+
+    /** Every Decrypt request so far, in the order received. */
+    List<Request> decryptCalls() {
+        return calls(DECRYPT);
     }
 
     String endpoint() {
@@ -145,16 +202,12 @@ final class FakeKms implements AutoCloseable {
     }
 
     /**
-     * Answer one GenerateDataKey and one Decrypt for {@code keyArn}, with the same 32-byte data key.
+     * The next GenerateDataKey and the next Decrypt both return {@link #DATA_KEY} under {@code keyArn}.
      * That is enough for {@link Keyring#assertEncryptsAndDecrypts()} with an AES-256 suite.
      */
-    FakeKms allowOneEncryptAndDecrypt(String keyArn) {
-        byte[] dataKey = new byte[32];
-        Arrays.fill(dataKey, (byte) 9);
-        byte[] ciphertext = new byte[64];
-        Arrays.fill(ciphertext, (byte) 9);
-        return reply(GENERATE_DATA_KEY, Reply.generateDataKey(keyArn, dataKey, ciphertext))
-            .reply(DECRYPT, Reply.decrypt(keyArn, dataKey));
+    void allowOneEncryptAndDecrypt(String keyArn) {
+        nextGenerateDataKeyReturnsDataKeyFor(keyArn);
+        nextDecryptReturnsDataKeyFor(keyArn);
     }
 
     @Override
@@ -184,6 +237,20 @@ final class FakeKms implements AutoCloseable {
         exchange.sendResponseHeaders(reply.status(), response.length);
         exchange.getResponseBody().write(response);
         exchange.close();
+    }
+
+    private synchronized void add(String operation, Reply reply) {
+        replies.computeIfAbsent(operation, k -> new ArrayDeque<>()).add(reply);
+    }
+
+    private synchronized List<Request> calls(String operation) {
+        return requests.stream().filter(r -> r.operation().equals(operation)).toList();
+    }
+
+    private static byte[] filled(int length, int value) {
+        byte[] out = new byte[length];
+        Arrays.fill(out, (byte) value);
+        return out;
     }
 
     private static String base64(byte[] bytes) {
