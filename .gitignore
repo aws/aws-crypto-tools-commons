@@ -1,3 +1,5 @@
 
 # jqwik property-test failure database (local run artifact)
 .jqwik-database
+
+__pycache__/
