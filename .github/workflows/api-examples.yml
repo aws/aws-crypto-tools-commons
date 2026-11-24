@@ -10,6 +10,13 @@
 # api-examples/build_api_examples.py. The job fails when a way has no snippet;
 # api-examples.json is uploaded either way.
 #
+# To show which calls CI built and ran, the caller's job also runs
+# api-examples/combos.py generate and record, from the same commons ref, and
+# puts the combos.json that it writes next to surface.json in the artifact.
+#
+# On a pull request from the same repository, the workflow also keeps one
+# comment on the PR that links to the playground page for that PR.
+#
 #   api-examples-mpl:
 #     needs: discover-mpl   # runs the snippet tests, then uploads mpl-surface
 #     uses: aws/aws-crypto-tools-commons/.github/workflows/api-examples.yml@main
@@ -44,6 +51,14 @@ on:
         description: Space-separated test source directories to scan for snippet markers.
         type: string
         required: true
+      template:
+        description: The language's combos.template, from the repository root. The playground uses it to write a new test.
+        type: string
+        default: ""
+      combos-path:
+        description: The path of combos.json inside the surface artifact. The step skips it when the file is not there.
+        type: string
+        default: combos.json
       artifact-name:
         description: The name of the uploaded artifact. The dashboard reads api-examples-<library>-<language>.
         type: string
@@ -100,11 +115,14 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
+          TEMPLATE: ${{ inputs.template }}
+          COMBOS: ${{ runner.temp }}/surface/${{ inputs.combos-path }}
         run: |
           set -o pipefail
           python3 ../commons/api-examples/build_api_examples.py \
             --surface "$SURFACE" --src $SRC --repo "$REPOSITORY" --commit "$(git rev-parse HEAD)" \
             --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" \
+            --template "$TEMPLATE" --combos "$COMBOS" \
             --out "$RUNNER_TEMP/out/api-examples.json" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload api-examples.json
@@ -114,3 +132,33 @@ jobs:
           name: ${{ steps.name.outputs.name }}
           path: ${{ runner.temp }}/out/api-examples.json
           if-no-files-found: error
+
+  pr-comment:
+    name: Link the playground on the PR
+    needs: api-examples
+    # Forks get a read-only token, so they cannot comment.
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      pull-requests: write
+    # A repository calls this workflow once per library, so the calls take turns to find the comment.
+    concurrency:
+      group: api-examples-comment-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Add or update the comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = "<!-- api-examples-playground -->";
+            const pr = `${context.repo.owner}/${context.repo.repo}#${context.issue.number}`;
+            const url = `https://aws.github.io/aws-crypto-tools-commons/api-examples/index.html?pr=${encodeURIComponent(pr)}`;
+            const body = `${marker}\nTry the calls that this PR's API examples make, compared with the default branch: ${url}`;
+            const comments = await github.paginate(github.rest.issues.listComments,
+              { ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const mine = comments.find(c => c.body?.startsWith(marker));
+            if (!mine) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            } else if (mine.body !== body) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            }

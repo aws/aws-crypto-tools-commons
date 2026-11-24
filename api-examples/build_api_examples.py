@@ -561,8 +561,8 @@ def main(argv=None):
     blocks, errors = scan(args.src, Path.cwd().resolve())
     names = json.loads(args.names.read_text())["libraries"].get(surface.get("library"), {})
     run = {"id": args.run_id, "attempt": args.run_attempt} if args.run_id else None
-    templates = read_template(args.template) if args.template and args.template.exists() else None
-    combos = json.loads(args.combos.read_text()) if args.combos and args.combos.exists() else None
+    templates = read_template(args.template) if args.template and args.template.is_file() else None
+    combos = json.loads(args.combos.read_text()) if args.combos and args.combos.is_file() else None
     doc, failures = build(surface, blocks, errors, args.repo, args.commit, names, run, templates, combos)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(doc, indent=2) + "\n")
