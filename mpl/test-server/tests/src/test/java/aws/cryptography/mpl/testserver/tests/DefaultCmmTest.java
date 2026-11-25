@@ -8,22 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
 import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsOutput;
-import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.TargetPair;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Stream;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * The Default CMM over a Raw AES keyring: GetEncryptionMaterials on the encrypt
@@ -34,9 +25,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * reproduced-encryption-context success and failure sets. Adds one round trip
  * per ESDK algorithm suite and the commitment-policy rules the CMM enforces.
  */
+@KeyringFeature({"raw-aes", "default-cmm"})
 public class DefaultCmmTest {
-
-    private static final Set<String> FEATURES = Set.of("raw-aes", "default-cmm");
 
     /** The AllDefaultCmm.dfy root context: {a: a, b: b}. */
     private static final Map<String, String> ROOT_EC = Map.of("a", "a", "b", "b");
@@ -73,17 +63,8 @@ public class DefaultCmmTest {
             : CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT;
     }
 
-    static List<TargetPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
-    }
-
-    static List<LanguageServerTarget> targets() {
-        return LanguageServerRegistry.shared().targets();
-    }
-
-    static Stream<Arguments> pairsBySuite() {
-        return AlgorithmSuiteId.values().stream()
-            .flatMap(suite -> pairs().stream().map(pair -> Arguments.of(suite, pair)));
+    static List<AlgorithmSuiteId> suites() {
+        return List.copyOf(AlgorithmSuiteId.values());
     }
 
     // -----------------------------------------------------------------------
@@ -91,30 +72,28 @@ public class DefaultCmmTest {
     // -----------------------------------------------------------------------
 
     /** AllDefaultCmm.dfy "Simplest possible happy path": an empty context. */
-    @ParameterizedTest(name = "[default-cmm] happy path, empty context {0}")
-    @MethodSource("pairs")
-    void happyPathEmptyContext(TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
+    @KeyringTest(name = "[default-cmm] happy path, empty context {0}", pairs = true)
+    void happyPathEmptyContext(Mpl encryptingMpl, Mpl decryptingMpl) {
         AlgorithmSuiteId suite = AlgorithmSuiteId.ALG_AES_128_GCM_IV12_TAG16_NO_KDF;
         CommitmentPolicy policy = compatiblePolicy(suite);
 
-        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(Map.of(), policy, suite);
-        DecryptMaterialsOutput decrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.decryptEndpoint())).decryptMaterials(encrypted, policy);
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(Map.of(), policy, suite);
+        DecryptMaterialsOutput decrypted = decryptingMpl.defaultCmm().decryptMaterials(encrypted, policy);
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(Map.of(), decrypted.getEncryptionContext());
     }
 
-    @ParameterizedTest(name = "[default-cmm] round-trip {0} {1}")
-    @MethodSource("pairsBySuite")
-    void roundTripPerSuite(AlgorithmSuiteId suite, TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
+    @KeyringTest(
+        name = "[default-cmm] round-trip {0} {1}",
+        inputs = "suites",
+        pairs = true)
+    void roundTripPerSuite(AlgorithmSuiteId suite, Mpl encryptingMpl, Mpl decryptingMpl) {
         CommitmentPolicy policy = compatiblePolicy(suite);
 
-        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC, policy, suite);
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(ROOT_EC, policy, suite);
 
         assertEquals(suite.getValue(), encrypted.getAlgorithmSuiteId().getValue());
         assertEquals(dataKeyLength(suite), encrypted.getPlaintextDataKey().remaining());
@@ -128,8 +107,7 @@ public class DefaultCmmTest {
             assertEquals(ROOT_EC, encrypted.getEncryptionContext());
         }
 
-        DecryptMaterialsOutput decrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.decryptEndpoint())).decryptMaterials(encrypted, policy);
+        DecryptMaterialsOutput decrypted = decryptingMpl.defaultCmm().decryptMaterials(encrypted, policy);
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(encrypted.getEncryptionContext(), decrypted.getEncryptionContext());
@@ -150,75 +128,70 @@ public class DefaultCmmTest {
      * says ALG_AES_256_GCM_IV12_TAG16_NO_KDF for FORBID_ENCRYPT_ALLOW_DECRYPT;
      * that text is out of date.
      */
-    static Stream<Arguments> defaultSuites() {
-        return targets().stream().flatMap(target -> Stream.of(
+    static List<Arguments> defaultSuites() {
+        return List.of(
             Arguments.of(CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT,
-                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384, target),
+                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384),
             Arguments.of(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_ALLOW_DECRYPT,
-                AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, target),
+                AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384),
             Arguments.of(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT,
-                AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384, target)));
+                AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384));
     }
 
     /** With no suite requested, the CMM picks its policy's default ESDK suite. */
-    @ParameterizedTest(name = "[default-cmm] {0} defaults to {1} {2}")
-    @MethodSource("defaultSuites")
-    void defaultSuitePerPolicy(CommitmentPolicy policy, AlgorithmSuiteId expected,
-            LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(target.endpoint())).getEncryptionMaterials(ROOT_EC, policy, null);
+    @KeyringTest(
+        name = "[default-cmm] {0} defaults to {1} {2}",
+        inputs = "defaultSuites")
+    void defaultSuitePerPolicy(CommitmentPolicy policy, AlgorithmSuiteId expected, Mpl mpl) {
+        GetEncryptionMaterialsOutput encrypted = mpl.defaultCmm().getEncryptionMaterials(ROOT_EC, policy, null);
         assertEquals(expected.getValue(), encrypted.getAlgorithmSuiteId().getValue());
     }
 
-    static Stream<Arguments> encryptRejections() {
-        return targets().stream().flatMap(target -> Stream.of(
+    static List<Arguments> encryptRejections() {
+        return List.of(
             Arguments.of(CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT,
-                AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY, target),
+                AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY),
             Arguments.of(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_ALLOW_DECRYPT,
-                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256, target),
+                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256),
             Arguments.of(CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT,
-                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256, target)));
+                AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256));
     }
 
-    @ParameterizedTest(name = "[default-cmm] {0} rejects encrypt with {1} {2}")
-    @MethodSource("encryptRejections")
-    void encryptRejectsSuiteOutsidePolicy(CommitmentPolicy policy, AlgorithmSuiteId suite,
-            LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        Cmm.defaultCmm(MplTestServerClients.forEndpoint(target.endpoint()))
-            .getEncryptionMaterialsFails(ROOT_EC, policy, suite);
+    @KeyringTest(
+        name = "[default-cmm] {0} rejects encrypt with {1} {2}",
+        inputs = "encryptRejections")
+    void encryptRejectsSuiteOutsidePolicy(CommitmentPolicy policy, AlgorithmSuiteId suite, Mpl mpl) {
+        mpl.defaultCmm().getEncryptionMaterialsFails(ROOT_EC, policy, suite);
     }
 
-    static Stream<Arguments> decryptPolicies() {
+    static List<Arguments> decryptPolicies() {
         AlgorithmSuiteId nonCommitting = AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
         AlgorithmSuiteId committing = AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
-        return pairs().stream().flatMap(pair -> Stream.of(
-            Arguments.of(nonCommitting, CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT, true, pair),
-            Arguments.of(nonCommitting, CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_ALLOW_DECRYPT, true, pair),
-            Arguments.of(nonCommitting, CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT, false, pair),
-            Arguments.of(committing, CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT, true, pair)));
+        return List.of(
+            Arguments.of(nonCommitting, CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT, true),
+            Arguments.of(nonCommitting, CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_ALLOW_DECRYPT, true),
+            Arguments.of(nonCommitting, CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT, false),
+            Arguments.of(committing, CommitmentPolicy.ESDK_FORBID_ENCRYPT_ALLOW_DECRYPT, true));
     }
 
     /**
      * Only REQUIRE_ENCRYPT_REQUIRE_DECRYPT refuses to decrypt a non-committing
      * suite; the two ALLOW_DECRYPT policies accept either kind.
      */
-    @ParameterizedTest(name = "[default-cmm] decrypt {0} under {1}: allowed={2} {3}")
-    @MethodSource("decryptPolicies")
+    @KeyringTest(
+        name = "[default-cmm] decrypt {0} under {1}: allowed={2} {3}",
+        inputs = "decryptPolicies",
+        pairs = true)
     void decryptHonorsPolicy(AlgorithmSuiteId suite, CommitmentPolicy decryptPolicy, boolean allowed,
-            TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
-        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC,
-            compatiblePolicy(suite), suite);
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+            Mpl encryptingMpl, Mpl decryptingMpl) {
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(ROOT_EC, compatiblePolicy(suite), suite);
 
+        Cmm cmm = decryptingMpl.defaultCmm();
         if (allowed) {
-            DecryptMaterialsOutput decrypted = Cmm.defaultCmm(dec).decryptMaterials(encrypted, decryptPolicy);
+            DecryptMaterialsOutput decrypted = cmm.decryptMaterials(encrypted, decryptPolicy);
             assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         } else {
-            Cmm cmm = Cmm.defaultCmm(dec);
             cmm.decryptMaterialsFails(cmm.decryptMaterialsRequest(encrypted, decryptPolicy));
         }
     }
@@ -228,23 +201,19 @@ public class DefaultCmmTest {
     // -----------------------------------------------------------------------
 
     /** Every subset of ROOT_EC, as in AllDefaultCmm.dfy's success set. */
-    static Stream<Arguments> reproducedSubsets() {
-        List<Map<String, String>> subsets = List.of(
-            Map.of(), Map.of("a", "a"), Map.of("b", "b"), ROOT_EC);
-        return pairs().stream()
-            .flatMap(pair -> subsets.stream().map(subset -> Arguments.of(subset, pair)));
+    static List<Map<String, String>> reproducedSubsets() {
+        return List.of(Map.of(), Map.of("a", "a"), Map.of("b", "b"), ROOT_EC);
     }
 
-    @ParameterizedTest(name = "[default-cmm] reproduced context {0} accepted {1}")
-    @MethodSource("reproducedSubsets")
-    void reproducedSubsetAccepted(Map<String, String> reproduced, TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
+    @KeyringTest(
+        name = "[default-cmm] reproduced context {0} accepted {1}",
+        inputs = "reproducedSubsets",
+        pairs = true)
+    void reproducedSubsetAccepted(Map<String, String> reproduced, Mpl encryptingMpl, Mpl decryptingMpl) {
         CommitmentPolicy policy = compatiblePolicy(COMMIT_NO_SIGNING_SUITE);
-        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC, policy,
-            COMMIT_NO_SIGNING_SUITE);
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        Cmm cmm = Cmm.defaultCmm(dec);
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(ROOT_EC, policy, COMMIT_NO_SIGNING_SUITE);
+        Cmm cmm = decryptingMpl.defaultCmm();
 
         DecryptMaterialsOutput decrypted = cmm.decryptMaterials(cmm.decryptMaterialsRequest(encrypted, policy)
             .reproducedEncryptionContext(reproduced));
@@ -259,28 +228,25 @@ public class DefaultCmmTest {
      * fails the CMM's comparison; a key absent from the message is appended
      * to the context the keyring authenticates, so the unwrap fails.
      */
-    static Stream<Arguments> reproducedMismatches() {
-        List<Map<String, String>> mismatches = List.of(
+    static List<Map<String, String>> reproducedMismatches() {
+        return List.of(
             Map.of("a", "c"),
             Map.of("b", "c"),
             Map.of("c", "c"),
             Map.of("a", "a", "b", "c"),
             Map.of("a", "a", "b", "b", "c", "c"),
             Map.of("a", "c", "b", "c", "c", "c"));
-        return pairs().stream()
-            .flatMap(pair -> mismatches.stream().map(mismatch -> Arguments.of(mismatch, pair)));
     }
 
-    @ParameterizedTest(name = "[default-cmm] reproduced context {0} rejected {1}")
-    @MethodSource("reproducedMismatches")
-    void reproducedMismatchRejected(Map<String, String> reproduced, TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
+    @KeyringTest(
+        name = "[default-cmm] reproduced context {0} rejected {1}",
+        inputs = "reproducedMismatches",
+        pairs = true)
+    void reproducedMismatchRejected(Map<String, String> reproduced, Mpl encryptingMpl, Mpl decryptingMpl) {
         CommitmentPolicy policy = compatiblePolicy(COMMIT_NO_SIGNING_SUITE);
-        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC, policy,
-            COMMIT_NO_SIGNING_SUITE);
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        Cmm cmm = Cmm.defaultCmm(dec);
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(ROOT_EC, policy, COMMIT_NO_SIGNING_SUITE);
+        Cmm cmm = decryptingMpl.defaultCmm();
 
         cmm.decryptMaterialsFails(cmm.decryptMaterialsRequest(encrypted, policy)
             .reproducedEncryptionContext(reproduced));

@@ -4,25 +4,16 @@ import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
 import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsOutput;
 import aws.cryptography.testserver.tests.EncryptionContextInputs;
 import aws.cryptography.testserver.tests.Example;
-import aws.cryptography.testserver.tests.ExampleCases;
-import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.TargetPair;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Stream;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Encryption contexts across the UTF-8 encoding widths, through the Default CMM
@@ -36,9 +27,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * AllRawAES.dfy), plus AllDefaultCmm.dfy's surrogate-pair context,
  * plus the shared {@link EncryptionContextInputs#validEncryptionContexts()}, which has the empty context.
  */
+@KeyringFeature({"raw-aes", "default-cmm"})
 public class EncryptionContextTest {
 
-    private static final Set<String> FEATURES = Set.of("raw-aes", "default-cmm");
     private static final AlgorithmSuiteId SUITE = AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
     private static final CommitmentPolicy POLICY = CommitmentPolicy.ESDK_REQUIRE_ENCRYPT_REQUIRE_DECRYPT;
 
@@ -76,41 +67,37 @@ public class EncryptionContextTest {
         return contexts;
     }
 
-    static Stream<Arguments> pairsByContext() {
-        return ExampleCases.withEachPair(contexts());
-    }
-
     /** The non-empty contexts: an empty one has no value to alter. */
-    static Stream<Arguments> pairsByNonEmptyContext() {
-        return ExampleCases.withEachPair(contexts().stream().filter(context -> !context.value().isEmpty()).toList());
+    static List<Example<Map<String, String>>> nonEmptyContexts() {
+        return contexts().stream().filter(context -> !context.value().isEmpty()).toList();
     }
 
-    @ParameterizedTest(name = "[encryption-context] round-trip {0} {1}")
-    @MethodSource("pairsByContext")
-    void roundTrip(Example<Map<String, String>> context, TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
-        Cmm encryptingCmm = Cmm.defaultCmm(MplTestServerClients.forEndpoint(pair.encryptEndpoint()));
-        GetEncryptionMaterialsOutput encrypted = encryptingCmm.getEncryptionMaterials(context.value(), POLICY, SUITE);
+    @KeyringTest(
+        name = "[encryption-context] round-trip {0} {1}",
+        inputs = "contexts",
+        pairs = true)
+    void roundTrip(Example<Map<String, String>> context, Mpl encryptingMpl, Mpl decryptingMpl) {
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(context.value(), POLICY, SUITE);
         assertEquals(context.value(), encrypted.getEncryptionContext());
 
-        DecryptMaterialsOutput decrypted = Cmm.defaultCmm(
-            MplTestServerClients.forEndpoint(pair.decryptEndpoint())).decryptMaterials(encrypted, POLICY);
+        DecryptMaterialsOutput decrypted = decryptingMpl.defaultCmm().decryptMaterials(encrypted, POLICY);
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(context.value(), decrypted.getEncryptionContext());
     }
 
-    @ParameterizedTest(name = "[encryption-context] altered value rejected {0} {1}")
-    @MethodSource("pairsByNonEmptyContext")
-    void alteredContextRejected(Example<Map<String, String>> context, TargetPair pair) {
-        FeatureGate.require(FEATURES, pair);
-        Cmm encryptingCmm = Cmm.defaultCmm(MplTestServerClients.forEndpoint(pair.encryptEndpoint()));
-        GetEncryptionMaterialsOutput encrypted = encryptingCmm.getEncryptionMaterials(context.value(), POLICY, SUITE);
+    @KeyringTest(
+        name = "[encryption-context] altered value rejected {0} {1}",
+        inputs = "nonEmptyContexts",
+        pairs = true)
+    void alteredContextRejected(Example<Map<String, String>> context, Mpl encryptingMpl, Mpl decryptingMpl) {
+        GetEncryptionMaterialsOutput encrypted =
+            encryptingMpl.defaultCmm().getEncryptionMaterials(context.value(), POLICY, SUITE);
 
         Map<String, String> altered = EncryptionContextInputs.withOneValueChanged(encrypted.getEncryptionContext());
 
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        Cmm cmm = Cmm.defaultCmm(dec);
+        Cmm cmm = decryptingMpl.defaultCmm();
         cmm.decryptMaterialsFails(cmm.decryptMaterialsRequest(encrypted, POLICY)
             .encryptionContext(altered));
     }
