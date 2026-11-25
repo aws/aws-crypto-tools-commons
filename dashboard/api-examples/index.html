@@ -61,6 +61,8 @@
   table.matrix td.have { text-align:left; color:var(--text); }
   table.matrix tr.opt th { text-align:left; color:var(--text); background:var(--panel); padding-top:6px; }
   table.matrix td[data-lang] { cursor:pointer; } table.matrix td[data-lang]:hover { background:var(--bg); outline:1px solid var(--sel); }
+  .usage h4 { margin:8px 0 2px; font-size:12px; font-weight:600; } .usage h4 span, .usage .from, .usage .langs { color:var(--dim); font-weight:400; font-size:11px; }
+  .usage ol { margin:0; padding-left:20px; font-size:12px; } .tag.candidate { background:#8957e5; color:#fff; }
 </style>
 </head>
 <body>
@@ -76,6 +78,7 @@
 </main>
 <script src="../test-servers/loader.js"></script>
 <script src="playground.js"></script>
+<script src="usage.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = escHtml;
@@ -285,7 +288,8 @@ function cardHtml(ctx, option, i) {
     <div class="head"><b>${esc(describe(option.label))}</b><code>${esc(option.label)}</code>${requiredBadge(option, lang)}${tag(diff?.option[`${api.id}|${option.key}`])}</div>
     <select data-option="${i}">${choices.join("")}</select>
     <div class="st ${s.kind}"><span>${esc(s.label)}</span>${where}</div>${alts}${copy}
-    <button data-compare="${i}">${open ? "Hide languages" : "Compare languages"}</button>${matrix}</div>`;
+    <button data-compare="${i}">${open ? "Hide languages" : "Compare languages"}</button>${matrix}
+    ${Usage.sectionHtml(usage, LIBRARIES[state.lib], api.id, option, lang)}</div>`;
 }
 
 function removedCard(option) {
@@ -417,6 +421,8 @@ $("branch").addEventListener("change", () => {
   state.api = null;
   loadAll();
 });
+let usage = null;
+Usage.load({ findArtifact, gh, zipEntries, entryText }).then(u => { usage = u; draw(); });
 loadAll();
 </script>
 </body>
