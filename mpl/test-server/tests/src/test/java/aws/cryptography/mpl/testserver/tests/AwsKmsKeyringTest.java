@@ -227,29 +227,30 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
+    static List<Example<String>> validKmsIdentifiers() {
+        return KmsFixtures.validKmsIdentifiers(KMS_KEY_ARN);
+    }
+
     @KeyringTest(
         feature = "aws-kms",
-        name = "the KMS key ID may be any valid identifier {0}")
-    void kmsKeyIdMayBeAnyValidIdentifier(Mpl mpl) {
+        name = "the KMS key ID may be any valid identifier {0} {1}",
+        inputs = "validKmsIdentifiers")
+    void kmsKeyIdMayBeAnyValidIdentifier(Example<String> kmsKeyId, Mpl mpl, MockKms mockKms) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
 
         // a valid identifier: succeeds
-        for (Example<String> kmsKeyId : KmsFixtures.validKmsIdentifiers(KMS_KEY_ARN)) {
-            try (MockKms mockKms = new MockKms()) {
-                mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
-                Keyring keyring = mpl.awsKmsKeyring()
-                    .kmsKeyId(kmsKeyId.value())
-                    .kmsClient(mockKms.client())
-                    .create();
-                // OnDecrypt needs a key ARN, so a keyring for a raw key ID or an alias only runs OnEncrypt.
-                if (kmsKeyId.value().equals(KMS_KEY_ARN)) {
-                    keyring.assertEncryptsAndDecrypts();
-                } else {
-                    keyring.onEncrypt(mpl.newEncryptionMaterials());
-                }
-            }
+        mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
+        Keyring keyring = mpl.awsKmsKeyring()
+            .kmsKeyId(kmsKeyId.value())
+            .kmsClient(mockKms.client())
+            .create();
+        // OnDecrypt needs a key ARN, so a keyring for a raw key ID or an alias only runs OnEncrypt.
+        if (kmsKeyId.value().equals(KMS_KEY_ARN)) {
+            keyring.assertEncryptsAndDecrypts();
+        } else {
+            keyring.onEncrypt(mpl.newEncryptionMaterials());
         }
     }
 
