@@ -195,7 +195,7 @@ final class MockKms implements AutoCloseable {
 
     /**
      * A KMS client for a keyring that sends its KMS calls here.
-     * The SDK needs a Region to sign requests, and FakeKms ignores signatures.
+     * The SDK needs a Region to sign requests, and MockKms ignores signatures.
      */
     KmsClientConfig client() {
         return KmsClientConfig.builder().region("us-west-2").endpoint(endpoint()).build();

@@ -279,7 +279,7 @@ structure KmsClientConfig {
     region: String
 
     /// URL the client sends its requests to, in place of the region's
-    /// endpoint. Tests set it to FakeKms's address.
+    /// endpoint. Tests set it to MockKms's address.
     endpoint: String
 }
 

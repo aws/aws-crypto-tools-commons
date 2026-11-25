@@ -132,7 +132,7 @@ final class Mpl {
             return this;
         }
 
-        /** How the test server builds the keyring's KMS client, such as {@link FakeKms#client()}. */
+        /** How the test server builds the keyring's KMS client, such as {@link MockKms#client()}. */
         AwsKmsKeyringBuilder kmsClient(KmsClientConfig kmsClient) {
             input.kmsClient(kmsClient);
             return this;
