@@ -32,6 +32,9 @@ dependencies {
     // --- MockKms: parses the KMS JSON requests it receives -----------------
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
 
+    // --- MockKmsMatchesRealKmsTest: calls real KMS and MockKms directly ------
+    testImplementation("software.amazon.awssdk:kms:2.59.9")
+
     // --- Test frameworks ----------------------------------------------------
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
