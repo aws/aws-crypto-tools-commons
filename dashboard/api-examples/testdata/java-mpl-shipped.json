@@ -1,0 +1,2791 @@
+{
+  "schema": 4,
+  "language": "java",
+  "library": "mpl",
+  "shipped": {
+    "package": "software.amazon.cryptography:aws-cryptographic-material-providers",
+    "version": "1.11.1"
+  },
+  "repo": "aws/aws-crypto-tools-commons",
+  "commit": "local",
+  "run": null,
+  "templates": null,
+  "apis": [
+    {
+      "id": "aws-kms-discovery-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS discovery keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsDiscoveryKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsDiscoveryKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsDiscoveryKeyring(CreateAwsKmsDiscoveryKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "kmsClient",
+          "option": "kmsClient",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryKeyringInput.builder().kmsClient(KmsClient)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.KmsClient",
+              "signature": "CreateAwsKmsDiscoveryKeyringInput.builder().kmsClient(KmsClient)"
+            }
+          ],
+          "required": null,
+          "row": "kmsClient"
+        },
+        {
+          "id": "discoveryFilter",
+          "option": "discoveryFilter",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+              "signature": "CreateAwsKmsDiscoveryKeyringInput.builder().discoveryFilter(DiscoveryFilter)"
+            }
+          ],
+          "required": null,
+          "row": "discoveryFilter"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsDiscoveryKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "kmsClient",
+          "label": "kmsClient",
+          "kind": "member",
+          "haves": [
+            "KmsClient"
+          ]
+        },
+        {
+          "key": "discoveryFilter",
+          "label": "discoveryFilter",
+          "kind": "member",
+          "haves": [
+            "DiscoveryFilter"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "kmsClient",
+          "way": "kmsClient",
+          "have": "KmsClient",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryKeyringInput.builder().kmsClient(KmsClient)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.KmsClient",
+          "alts": []
+        },
+        {
+          "row": "discoveryFilter",
+          "way": "discoveryFilter",
+          "have": "DiscoveryFilter",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsDiscoveryKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsDiscoveryKeyring(CreateAwsKmsDiscoveryKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-discovery-multi-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS discovery multi keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsDiscoveryMultiKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsDiscoveryMultiKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsDiscoveryMultiKeyring(CreateAwsKmsDiscoveryMultiKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "regions",
+          "option": "regions",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().regions(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().regions(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "regions"
+        },
+        {
+          "id": "discoveryFilter",
+          "option": "discoveryFilter",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+              "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().discoveryFilter(DiscoveryFilter)"
+            }
+          ],
+          "required": null,
+          "row": "discoveryFilter"
+        },
+        {
+          "id": "clientSupplier",
+          "option": "clientSupplier",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IClientSupplier",
+              "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().clientSupplier(IClientSupplier)"
+            }
+          ],
+          "required": null,
+          "row": "clientSupplier"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "regions",
+          "label": "regions",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        },
+        {
+          "key": "discoveryFilter",
+          "label": "discoveryFilter",
+          "kind": "member",
+          "haves": [
+            "DiscoveryFilter"
+          ]
+        },
+        {
+          "key": "clientSupplier",
+          "label": "clientSupplier",
+          "kind": "member",
+          "haves": [
+            "IClientSupplier"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "regions",
+          "way": "regions",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().regions(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        },
+        {
+          "row": "discoveryFilter",
+          "way": "discoveryFilter",
+          "have": "DiscoveryFilter",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+          "alts": []
+        },
+        {
+          "row": "clientSupplier",
+          "way": "clientSupplier",
+          "have": "IClientSupplier",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IClientSupplier",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsDiscoveryMultiKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsDiscoveryMultiKeyring(CreateAwsKmsDiscoveryMultiKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-ecdh-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS ECDH keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsEcdhKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsEcdhKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsEcdhKeyring(CreateAwsKmsEcdhKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "KeyAgreementScheme",
+          "option": "KeyAgreementScheme",
+          "kind": "setter",
+          "signature": "CreateAwsKmsEcdhKeyringInput.builder().KeyAgreementScheme(KmsEcdhStaticConfigurations)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.KmsEcdhStaticConfigurations",
+              "signature": "CreateAwsKmsEcdhKeyringInput.builder().KeyAgreementScheme(KmsEcdhStaticConfigurations)"
+            }
+          ],
+          "required": null,
+          "row": "KeyAgreementScheme"
+        },
+        {
+          "id": "curveSpec",
+          "option": "curveSpec",
+          "kind": "setter",
+          "signature": "CreateAwsKmsEcdhKeyringInput.builder().curveSpec(ECDHCurveSpec)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.primitives.model.ECDHCurveSpec",
+              "signature": "CreateAwsKmsEcdhKeyringInput.builder().curveSpec(ECDHCurveSpec)"
+            }
+          ],
+          "required": null,
+          "row": "curveSpec"
+        },
+        {
+          "id": "kmsClient",
+          "option": "kmsClient",
+          "kind": "setter",
+          "signature": "CreateAwsKmsEcdhKeyringInput.builder().kmsClient(KmsClient)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.KmsClient",
+              "signature": "CreateAwsKmsEcdhKeyringInput.builder().kmsClient(KmsClient)"
+            }
+          ],
+          "required": null,
+          "row": "kmsClient"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsEcdhKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsEcdhKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "KeyAgreementScheme",
+          "label": "KeyAgreementScheme",
+          "kind": "member",
+          "haves": [
+            "KmsEcdhStaticConfigurations"
+          ]
+        },
+        {
+          "key": "curveSpec",
+          "label": "curveSpec",
+          "kind": "member",
+          "haves": [
+            "ECDHCurveSpec"
+          ]
+        },
+        {
+          "key": "kmsClient",
+          "label": "kmsClient",
+          "kind": "member",
+          "haves": [
+            "KmsClient"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "KeyAgreementScheme",
+          "way": "KeyAgreementScheme",
+          "have": "KmsEcdhStaticConfigurations",
+          "setup": [],
+          "setter": "CreateAwsKmsEcdhKeyringInput.builder().KeyAgreementScheme(KmsEcdhStaticConfigurations)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.KmsEcdhStaticConfigurations",
+          "alts": []
+        },
+        {
+          "row": "curveSpec",
+          "way": "curveSpec",
+          "have": "ECDHCurveSpec",
+          "setup": [],
+          "setter": "CreateAwsKmsEcdhKeyringInput.builder().curveSpec(ECDHCurveSpec)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.primitives.model.ECDHCurveSpec",
+          "alts": []
+        },
+        {
+          "row": "kmsClient",
+          "way": "kmsClient",
+          "have": "KmsClient",
+          "setup": [],
+          "setter": "CreateAwsKmsEcdhKeyringInput.builder().kmsClient(KmsClient)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.KmsClient",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsEcdhKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsEcdhKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsEcdhKeyring(CreateAwsKmsEcdhKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsKeyring(CreateAwsKmsKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "kmsKeyId",
+          "option": "kmsKeyId",
+          "kind": "setter",
+          "signature": "CreateAwsKmsKeyringInput.builder().kmsKeyId(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsKeyringInput.builder().kmsKeyId(String)"
+            }
+          ],
+          "required": null,
+          "row": "kmsKeyId"
+        },
+        {
+          "id": "kmsClient",
+          "option": "kmsClient",
+          "kind": "setter",
+          "signature": "CreateAwsKmsKeyringInput.builder().kmsClient(KmsClient)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.KmsClient",
+              "signature": "CreateAwsKmsKeyringInput.builder().kmsClient(KmsClient)"
+            }
+          ],
+          "required": null,
+          "row": "kmsClient"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "kmsKeyId",
+          "label": "kmsKeyId",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "kmsClient",
+          "label": "kmsClient",
+          "kind": "member",
+          "haves": [
+            "KmsClient"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "kmsKeyId",
+          "way": "kmsKeyId",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsKeyringInput.builder().kmsKeyId(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "kmsClient",
+          "way": "kmsClient",
+          "have": "KmsClient",
+          "setup": [],
+          "setter": "CreateAwsKmsKeyringInput.builder().kmsClient(KmsClient)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.KmsClient",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsKeyring(CreateAwsKmsKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-mrk-discovery-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS MRK discovery keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsMrkDiscoveryKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsMrkDiscoveryKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsMrkDiscoveryKeyring(CreateAwsKmsMrkDiscoveryKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "kmsClient",
+          "option": "kmsClient",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().kmsClient(KmsClient)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.KmsClient",
+              "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().kmsClient(KmsClient)"
+            }
+          ],
+          "required": null,
+          "row": "kmsClient"
+        },
+        {
+          "id": "discoveryFilter",
+          "option": "discoveryFilter",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+              "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().discoveryFilter(DiscoveryFilter)"
+            }
+          ],
+          "required": null,
+          "row": "discoveryFilter"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        },
+        {
+          "id": "region",
+          "option": "region",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().region(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().region(String)"
+            }
+          ],
+          "required": null,
+          "row": "region"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "kmsClient",
+          "label": "kmsClient",
+          "kind": "member",
+          "haves": [
+            "KmsClient"
+          ]
+        },
+        {
+          "key": "discoveryFilter",
+          "label": "discoveryFilter",
+          "kind": "member",
+          "haves": [
+            "DiscoveryFilter"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        },
+        {
+          "key": "region",
+          "label": "region",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "kmsClient",
+          "way": "kmsClient",
+          "have": "KmsClient",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().kmsClient(KmsClient)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.KmsClient",
+          "alts": []
+        },
+        {
+          "row": "discoveryFilter",
+          "way": "discoveryFilter",
+          "have": "DiscoveryFilter",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        },
+        {
+          "row": "region",
+          "way": "region",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().region(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsMrkDiscoveryKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsMrkDiscoveryKeyring(CreateAwsKmsMrkDiscoveryKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-mrk-discovery-multi-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS MRK discovery multi keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsMrkDiscoveryMultiKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsMrkDiscoveryMultiKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsMrkDiscoveryMultiKeyring(CreateAwsKmsMrkDiscoveryMultiKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "regions",
+          "option": "regions",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().regions(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().regions(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "regions"
+        },
+        {
+          "id": "discoveryFilter",
+          "option": "discoveryFilter",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+              "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().discoveryFilter(DiscoveryFilter)"
+            }
+          ],
+          "required": null,
+          "row": "discoveryFilter"
+        },
+        {
+          "id": "clientSupplier",
+          "option": "clientSupplier",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IClientSupplier",
+              "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().clientSupplier(IClientSupplier)"
+            }
+          ],
+          "required": null,
+          "row": "clientSupplier"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "regions",
+          "label": "regions",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        },
+        {
+          "key": "discoveryFilter",
+          "label": "discoveryFilter",
+          "kind": "member",
+          "haves": [
+            "DiscoveryFilter"
+          ]
+        },
+        {
+          "key": "clientSupplier",
+          "label": "clientSupplier",
+          "kind": "member",
+          "haves": [
+            "IClientSupplier"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "regions",
+          "way": "regions",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().regions(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        },
+        {
+          "row": "discoveryFilter",
+          "way": "discoveryFilter",
+          "have": "DiscoveryFilter",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().discoveryFilter(DiscoveryFilter)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.DiscoveryFilter",
+          "alts": []
+        },
+        {
+          "row": "clientSupplier",
+          "way": "clientSupplier",
+          "have": "IClientSupplier",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IClientSupplier",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsMrkDiscoveryMultiKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsMrkDiscoveryMultiKeyring(CreateAwsKmsMrkDiscoveryMultiKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-mrk-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS MRK keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsMrkKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsMrkKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsMrkKeyring(CreateAwsKmsMrkKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "kmsKeyId",
+          "option": "kmsKeyId",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkKeyringInput.builder().kmsKeyId(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsMrkKeyringInput.builder().kmsKeyId(String)"
+            }
+          ],
+          "required": null,
+          "row": "kmsKeyId"
+        },
+        {
+          "id": "kmsClient",
+          "option": "kmsClient",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkKeyringInput.builder().kmsClient(KmsClient)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.KmsClient",
+              "signature": "CreateAwsKmsMrkKeyringInput.builder().kmsClient(KmsClient)"
+            }
+          ],
+          "required": null,
+          "row": "kmsClient"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMrkKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "kmsKeyId",
+          "label": "kmsKeyId",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "kmsClient",
+          "label": "kmsClient",
+          "kind": "member",
+          "haves": [
+            "KmsClient"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "kmsKeyId",
+          "way": "kmsKeyId",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkKeyringInput.builder().kmsKeyId(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "kmsClient",
+          "way": "kmsClient",
+          "have": "KmsClient",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkKeyringInput.builder().kmsClient(KmsClient)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.KmsClient",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsMrkKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsMrkKeyring(CreateAwsKmsMrkKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-mrk-multi-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS MRK multi keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsMrkMultiKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsMrkMultiKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsMrkMultiKeyring(CreateAwsKmsMrkMultiKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "generator",
+          "option": "generator",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().generator(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().generator(String)"
+            }
+          ],
+          "required": null,
+          "row": "generator"
+        },
+        {
+          "id": "kmsKeyIds",
+          "option": "kmsKeyIds",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().kmsKeyIds(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().kmsKeyIds(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "kmsKeyIds"
+        },
+        {
+          "id": "clientSupplier",
+          "option": "clientSupplier",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IClientSupplier",
+              "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().clientSupplier(IClientSupplier)"
+            }
+          ],
+          "required": null,
+          "row": "clientSupplier"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMrkMultiKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "generator",
+          "label": "generator",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "kmsKeyIds",
+          "label": "kmsKeyIds",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        },
+        {
+          "key": "clientSupplier",
+          "label": "clientSupplier",
+          "kind": "member",
+          "haves": [
+            "IClientSupplier"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "generator",
+          "way": "generator",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkMultiKeyringInput.builder().generator(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "kmsKeyIds",
+          "way": "kmsKeyIds",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkMultiKeyringInput.builder().kmsKeyIds(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        },
+        {
+          "row": "clientSupplier",
+          "way": "clientSupplier",
+          "have": "IClientSupplier",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IClientSupplier",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMrkMultiKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsMrkMultiKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsMrkMultiKeyring(CreateAwsKmsMrkMultiKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-multi-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS multi keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsMultiKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsMultiKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsMultiKeyring(CreateAwsKmsMultiKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "generator",
+          "option": "generator",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMultiKeyringInput.builder().generator(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsMultiKeyringInput.builder().generator(String)"
+            }
+          ],
+          "required": null,
+          "row": "generator"
+        },
+        {
+          "id": "kmsKeyIds",
+          "option": "kmsKeyIds",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMultiKeyringInput.builder().kmsKeyIds(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMultiKeyringInput.builder().kmsKeyIds(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "kmsKeyIds"
+        },
+        {
+          "id": "clientSupplier",
+          "option": "clientSupplier",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IClientSupplier",
+              "signature": "CreateAwsKmsMultiKeyringInput.builder().clientSupplier(IClientSupplier)"
+            }
+          ],
+          "required": null,
+          "row": "clientSupplier"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsMultiKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsMultiKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "generator",
+          "label": "generator",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "kmsKeyIds",
+          "label": "kmsKeyIds",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        },
+        {
+          "key": "clientSupplier",
+          "label": "clientSupplier",
+          "kind": "member",
+          "haves": [
+            "IClientSupplier"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "generator",
+          "way": "generator",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsMultiKeyringInput.builder().generator(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "kmsKeyIds",
+          "way": "kmsKeyIds",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMultiKeyringInput.builder().kmsKeyIds(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        },
+        {
+          "row": "clientSupplier",
+          "way": "clientSupplier",
+          "have": "IClientSupplier",
+          "setup": [],
+          "setter": "CreateAwsKmsMultiKeyringInput.builder().clientSupplier(IClientSupplier)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IClientSupplier",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsMultiKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsMultiKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsMultiKeyring(CreateAwsKmsMultiKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "aws-kms-rsa-keyring",
+      "group": "Keyrings",
+      "name": "AWS KMS RSA keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsRsaKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsRsaKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsRsaKeyring(CreateAwsKmsRsaKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "publicKey",
+          "option": "publicKey",
+          "kind": "setter",
+          "signature": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer)",
+          "takes": [
+            {
+              "type": "java.nio.ByteBuffer",
+              "signature": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer)"
+            }
+          ],
+          "required": null,
+          "row": "publicKey"
+        },
+        {
+          "id": "kmsKeyId",
+          "option": "kmsKeyId",
+          "kind": "setter",
+          "signature": "CreateAwsKmsRsaKeyringInput.builder().kmsKeyId(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsRsaKeyringInput.builder().kmsKeyId(String)"
+            }
+          ],
+          "required": null,
+          "row": "kmsKeyId"
+        },
+        {
+          "id": "encryptionAlgorithm",
+          "option": "encryptionAlgorithm",
+          "kind": "setter",
+          "signature": "CreateAwsKmsRsaKeyringInput.builder().encryptionAlgorithm(EncryptionAlgorithmSpec)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.model.EncryptionAlgorithmSpec",
+              "signature": "CreateAwsKmsRsaKeyringInput.builder().encryptionAlgorithm(EncryptionAlgorithmSpec)"
+            }
+          ],
+          "required": null,
+          "row": "encryptionAlgorithm"
+        },
+        {
+          "id": "kmsClient",
+          "option": "kmsClient",
+          "kind": "setter",
+          "signature": "CreateAwsKmsRsaKeyringInput.builder().kmsClient(KmsClient)",
+          "takes": [
+            {
+              "type": "software.amazon.awssdk.services.kms.KmsClient",
+              "signature": "CreateAwsKmsRsaKeyringInput.builder().kmsClient(KmsClient)"
+            }
+          ],
+          "required": null,
+          "row": "kmsClient"
+        },
+        {
+          "id": "grantTokens",
+          "option": "grantTokens",
+          "kind": "setter",
+          "signature": "CreateAwsKmsRsaKeyringInput.builder().grantTokens(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateAwsKmsRsaKeyringInput.builder().grantTokens(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "grantTokens"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "publicKey",
+          "label": "publicKey",
+          "kind": "member",
+          "haves": [
+            "a byte buffer"
+          ]
+        },
+        {
+          "key": "kmsKeyId",
+          "label": "kmsKeyId",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "encryptionAlgorithm",
+          "label": "encryptionAlgorithm",
+          "kind": "member",
+          "haves": [
+            "EncryptionAlgorithmSpec"
+          ]
+        },
+        {
+          "key": "kmsClient",
+          "label": "kmsClient",
+          "kind": "member",
+          "haves": [
+            "KmsClient"
+          ]
+        },
+        {
+          "key": "grantTokens",
+          "label": "grantTokens",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "publicKey",
+          "way": "publicKey",
+          "have": "a byte buffer",
+          "setup": [],
+          "setter": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.nio.ByteBuffer",
+          "alts": []
+        },
+        {
+          "row": "kmsKeyId",
+          "way": "kmsKeyId",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsRsaKeyringInput.builder().kmsKeyId(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "encryptionAlgorithm",
+          "way": "encryptionAlgorithm",
+          "have": "EncryptionAlgorithmSpec",
+          "setup": [],
+          "setter": "CreateAwsKmsRsaKeyringInput.builder().encryptionAlgorithm(EncryptionAlgorithmSpec)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.model.EncryptionAlgorithmSpec",
+          "alts": []
+        },
+        {
+          "row": "kmsClient",
+          "way": "kmsClient",
+          "have": "KmsClient",
+          "setup": [],
+          "setter": "CreateAwsKmsRsaKeyringInput.builder().kmsClient(KmsClient)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.awssdk.services.kms.KmsClient",
+          "alts": []
+        },
+        {
+          "row": "grantTokens",
+          "way": "grantTokens",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateAwsKmsRsaKeyringInput.builder().grantTokens(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsRsaKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsRsaKeyring(CreateAwsKmsRsaKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "client",
+      "group": "Client",
+      "name": "Client",
+      "type": "software.amazon.cryptography.materialproviders.model.MaterialProvidersConfig",
+      "ways": [
+        {
+          "id": "builder",
+          "option": null,
+          "kind": "constructor",
+          "signature": "MaterialProviders.builder()",
+          "required": null,
+          "row": "construct"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        }
+      ],
+      "frame": null,
+      "choices": [],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "builder",
+          "row": "construct",
+          "have": "",
+          "code": "MaterialProviders.builder()"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "default-cmm",
+      "group": "CMMs",
+      "name": "Default CMM",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateDefaultCryptographicMaterialsManagerInput",
+      "ways": [
+        {
+          "id": "CreateDefaultCryptographicMaterialsManager",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateDefaultCryptographicMaterialsManager(CreateDefaultCryptographicMaterialsManagerInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "keyring",
+          "option": "keyring",
+          "kind": "setter",
+          "signature": "CreateDefaultCryptographicMaterialsManagerInput.builder().keyring(IKeyring)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IKeyring",
+              "signature": "CreateDefaultCryptographicMaterialsManagerInput.builder().keyring(IKeyring)"
+            }
+          ],
+          "required": null,
+          "row": "keyring"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "keyring",
+          "label": "keyring",
+          "kind": "member",
+          "haves": [
+            "IKeyring"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "keyring",
+          "way": "keyring",
+          "have": "IKeyring",
+          "setup": [],
+          "setter": "CreateDefaultCryptographicMaterialsManagerInput.builder().keyring(IKeyring)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IKeyring",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateDefaultCryptographicMaterialsManager",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateDefaultCryptographicMaterialsManager(CreateDefaultCryptographicMaterialsManagerInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "hierarchical-keyring",
+      "group": "Keyrings",
+      "name": "Hierarchical keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateAwsKmsHierarchicalKeyringInput",
+      "ways": [
+        {
+          "id": "CreateAwsKmsHierarchicalKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateAwsKmsHierarchicalKeyring(CreateAwsKmsHierarchicalKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "branchKeyId",
+          "option": "branchKeyId",
+          "kind": "setter",
+          "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(String)"
+            }
+          ],
+          "required": null,
+          "row": "branchKeyId"
+        },
+        {
+          "id": "branchKeyIdSupplier",
+          "option": "branchKeyIdSupplier",
+          "kind": "setter",
+          "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyIdSupplier(IBranchKeyIdSupplier)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IBranchKeyIdSupplier",
+              "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyIdSupplier(IBranchKeyIdSupplier)"
+            }
+          ],
+          "required": null,
+          "row": "branchKeyIdSupplier"
+        },
+        {
+          "id": "keyStore",
+          "option": "keyStore",
+          "kind": "setter",
+          "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().keyStore(KeyStore)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.keystore.KeyStore",
+              "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().keyStore(KeyStore)"
+            }
+          ],
+          "required": null,
+          "row": "keyStore"
+        },
+        {
+          "id": "ttlSeconds",
+          "option": "ttlSeconds",
+          "kind": "setter",
+          "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(long)",
+          "takes": [
+            {
+              "type": "long",
+              "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(long)"
+            }
+          ],
+          "required": null,
+          "row": "ttlSeconds"
+        },
+        {
+          "id": "cache",
+          "option": "cache",
+          "kind": "setter",
+          "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().cache(CacheType)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.CacheType",
+              "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().cache(CacheType)"
+            }
+          ],
+          "required": null,
+          "row": "cache"
+        },
+        {
+          "id": "partitionId",
+          "option": "partitionId",
+          "kind": "setter",
+          "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().partitionId(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateAwsKmsHierarchicalKeyringInput.builder().partitionId(String)"
+            }
+          ],
+          "required": null,
+          "row": "partitionId"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "branchKeyId",
+          "label": "branchKeyId",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "branchKeyIdSupplier",
+          "label": "branchKeyIdSupplier",
+          "kind": "member",
+          "haves": [
+            "IBranchKeyIdSupplier"
+          ]
+        },
+        {
+          "key": "keyStore",
+          "label": "keyStore",
+          "kind": "member",
+          "haves": [
+            "KeyStore"
+          ]
+        },
+        {
+          "key": "ttlSeconds",
+          "label": "ttlSeconds",
+          "kind": "member",
+          "haves": [
+            "a number"
+          ]
+        },
+        {
+          "key": "cache",
+          "label": "cache",
+          "kind": "member",
+          "haves": [
+            "CacheType"
+          ]
+        },
+        {
+          "key": "partitionId",
+          "label": "partitionId",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "branchKeyId",
+          "way": "branchKeyId",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "branchKeyIdSupplier",
+          "way": "branchKeyIdSupplier",
+          "have": "IBranchKeyIdSupplier",
+          "setup": [],
+          "setter": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyIdSupplier(IBranchKeyIdSupplier)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IBranchKeyIdSupplier",
+          "alts": []
+        },
+        {
+          "row": "keyStore",
+          "way": "keyStore",
+          "have": "KeyStore",
+          "setup": [],
+          "setter": "CreateAwsKmsHierarchicalKeyringInput.builder().keyStore(KeyStore)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.keystore.KeyStore",
+          "alts": []
+        },
+        {
+          "row": "ttlSeconds",
+          "way": "ttlSeconds",
+          "have": "a number",
+          "setup": [],
+          "setter": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(long)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "long",
+          "alts": []
+        },
+        {
+          "row": "cache",
+          "way": "cache",
+          "have": "CacheType",
+          "setup": [],
+          "setter": "CreateAwsKmsHierarchicalKeyringInput.builder().cache(CacheType)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.CacheType",
+          "alts": []
+        },
+        {
+          "row": "partitionId",
+          "way": "partitionId",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateAwsKmsHierarchicalKeyringInput.builder().partitionId(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateAwsKmsHierarchicalKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateAwsKmsHierarchicalKeyring(CreateAwsKmsHierarchicalKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "multi-keyring",
+      "group": "Keyrings",
+      "name": "Multi keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateMultiKeyringInput",
+      "ways": [
+        {
+          "id": "CreateMultiKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateMultiKeyring(CreateMultiKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "generator",
+          "option": "generator",
+          "kind": "setter",
+          "signature": "CreateMultiKeyringInput.builder().generator(IKeyring)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IKeyring",
+              "signature": "CreateMultiKeyringInput.builder().generator(IKeyring)"
+            }
+          ],
+          "required": null,
+          "row": "generator"
+        },
+        {
+          "id": "childKeyrings",
+          "option": "childKeyrings",
+          "kind": "setter",
+          "signature": "CreateMultiKeyringInput.builder().childKeyrings(List<IKeyring>)",
+          "takes": [
+            {
+              "type": "java.util.List<software.amazon.cryptography.materialproviders.IKeyring>",
+              "signature": "CreateMultiKeyringInput.builder().childKeyrings(List<IKeyring>)"
+            }
+          ],
+          "required": null,
+          "row": "childKeyrings"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "generator",
+          "label": "generator",
+          "kind": "member",
+          "haves": [
+            "IKeyring"
+          ]
+        },
+        {
+          "key": "childKeyrings",
+          "label": "childKeyrings",
+          "kind": "member",
+          "haves": [
+            "List<IKeyring>"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "generator",
+          "way": "generator",
+          "have": "IKeyring",
+          "setup": [],
+          "setter": "CreateMultiKeyringInput.builder().generator(IKeyring)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IKeyring",
+          "alts": []
+        },
+        {
+          "row": "childKeyrings",
+          "way": "childKeyrings",
+          "have": "List<IKeyring>",
+          "setup": [],
+          "setter": "CreateMultiKeyringInput.builder().childKeyrings(List<IKeyring>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<software.amazon.cryptography.materialproviders.IKeyring>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateMultiKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateMultiKeyring(CreateMultiKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "raw-aes-keyring",
+      "group": "Keyrings",
+      "name": "Raw AES keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateRawAesKeyringInput",
+      "ways": [
+        {
+          "id": "CreateRawAesKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateRawAesKeyring(CreateRawAesKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "keyNamespace",
+          "option": "keyNamespace",
+          "kind": "setter",
+          "signature": "CreateRawAesKeyringInput.builder().keyNamespace(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateRawAesKeyringInput.builder().keyNamespace(String)"
+            }
+          ],
+          "required": null,
+          "row": "keyNamespace"
+        },
+        {
+          "id": "keyName",
+          "option": "keyName",
+          "kind": "setter",
+          "signature": "CreateRawAesKeyringInput.builder().keyName(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateRawAesKeyringInput.builder().keyName(String)"
+            }
+          ],
+          "required": null,
+          "row": "keyName"
+        },
+        {
+          "id": "wrappingKey",
+          "option": "wrappingKey",
+          "kind": "setter",
+          "signature": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer)",
+          "takes": [
+            {
+              "type": "java.nio.ByteBuffer",
+              "signature": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer)"
+            }
+          ],
+          "required": null,
+          "row": "wrappingKey"
+        },
+        {
+          "id": "wrappingAlg",
+          "option": "wrappingAlg",
+          "kind": "setter",
+          "signature": "CreateRawAesKeyringInput.builder().wrappingAlg(AesWrappingAlg)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.AesWrappingAlg",
+              "signature": "CreateRawAesKeyringInput.builder().wrappingAlg(AesWrappingAlg)"
+            }
+          ],
+          "required": null,
+          "row": "wrappingAlg"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "keyNamespace",
+          "label": "keyNamespace",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "keyName",
+          "label": "keyName",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "wrappingKey",
+          "label": "wrappingKey",
+          "kind": "member",
+          "haves": [
+            "a byte buffer"
+          ]
+        },
+        {
+          "key": "wrappingAlg",
+          "label": "wrappingAlg",
+          "kind": "member",
+          "haves": [
+            "AesWrappingAlg"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "keyNamespace",
+          "way": "keyNamespace",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateRawAesKeyringInput.builder().keyNamespace(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "keyName",
+          "way": "keyName",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateRawAesKeyringInput.builder().keyName(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "wrappingKey",
+          "way": "wrappingKey",
+          "have": "a byte buffer",
+          "setup": [],
+          "setter": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.nio.ByteBuffer",
+          "alts": []
+        },
+        {
+          "row": "wrappingAlg",
+          "way": "wrappingAlg",
+          "have": "AesWrappingAlg",
+          "setup": [],
+          "setter": "CreateRawAesKeyringInput.builder().wrappingAlg(AesWrappingAlg)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.AesWrappingAlg",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateRawAesKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateRawAesKeyring(CreateRawAesKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "raw-ecdh-keyring",
+      "group": "Keyrings",
+      "name": "Raw ECDH keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateRawEcdhKeyringInput",
+      "ways": [
+        {
+          "id": "CreateRawEcdhKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateRawEcdhKeyring(CreateRawEcdhKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "KeyAgreementScheme",
+          "option": "KeyAgreementScheme",
+          "kind": "setter",
+          "signature": "CreateRawEcdhKeyringInput.builder().KeyAgreementScheme(RawEcdhStaticConfigurations)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.RawEcdhStaticConfigurations",
+              "signature": "CreateRawEcdhKeyringInput.builder().KeyAgreementScheme(RawEcdhStaticConfigurations)"
+            }
+          ],
+          "required": null,
+          "row": "KeyAgreementScheme"
+        },
+        {
+          "id": "curveSpec",
+          "option": "curveSpec",
+          "kind": "setter",
+          "signature": "CreateRawEcdhKeyringInput.builder().curveSpec(ECDHCurveSpec)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.primitives.model.ECDHCurveSpec",
+              "signature": "CreateRawEcdhKeyringInput.builder().curveSpec(ECDHCurveSpec)"
+            }
+          ],
+          "required": null,
+          "row": "curveSpec"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "KeyAgreementScheme",
+          "label": "KeyAgreementScheme",
+          "kind": "member",
+          "haves": [
+            "RawEcdhStaticConfigurations"
+          ]
+        },
+        {
+          "key": "curveSpec",
+          "label": "curveSpec",
+          "kind": "member",
+          "haves": [
+            "ECDHCurveSpec"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "KeyAgreementScheme",
+          "way": "KeyAgreementScheme",
+          "have": "RawEcdhStaticConfigurations",
+          "setup": [],
+          "setter": "CreateRawEcdhKeyringInput.builder().KeyAgreementScheme(RawEcdhStaticConfigurations)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.RawEcdhStaticConfigurations",
+          "alts": []
+        },
+        {
+          "row": "curveSpec",
+          "way": "curveSpec",
+          "have": "ECDHCurveSpec",
+          "setup": [],
+          "setter": "CreateRawEcdhKeyringInput.builder().curveSpec(ECDHCurveSpec)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.primitives.model.ECDHCurveSpec",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateRawEcdhKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateRawEcdhKeyring(CreateRawEcdhKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "raw-rsa-keyring",
+      "group": "Keyrings",
+      "name": "Raw RSA keyring",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateRawRsaKeyringInput",
+      "ways": [
+        {
+          "id": "CreateRawRsaKeyring",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateRawRsaKeyring(CreateRawRsaKeyringInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "keyNamespace",
+          "option": "keyNamespace",
+          "kind": "setter",
+          "signature": "CreateRawRsaKeyringInput.builder().keyNamespace(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateRawRsaKeyringInput.builder().keyNamespace(String)"
+            }
+          ],
+          "required": null,
+          "row": "keyNamespace"
+        },
+        {
+          "id": "keyName",
+          "option": "keyName",
+          "kind": "setter",
+          "signature": "CreateRawRsaKeyringInput.builder().keyName(String)",
+          "takes": [
+            {
+              "type": "java.lang.String",
+              "signature": "CreateRawRsaKeyringInput.builder().keyName(String)"
+            }
+          ],
+          "required": null,
+          "row": "keyName"
+        },
+        {
+          "id": "paddingScheme",
+          "option": "paddingScheme",
+          "kind": "setter",
+          "signature": "CreateRawRsaKeyringInput.builder().paddingScheme(PaddingScheme)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.model.PaddingScheme",
+              "signature": "CreateRawRsaKeyringInput.builder().paddingScheme(PaddingScheme)"
+            }
+          ],
+          "required": null,
+          "row": "paddingScheme"
+        },
+        {
+          "id": "publicKey",
+          "option": "publicKey",
+          "kind": "setter",
+          "signature": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer)",
+          "takes": [
+            {
+              "type": "java.nio.ByteBuffer",
+              "signature": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer)"
+            }
+          ],
+          "required": null,
+          "row": "publicKey"
+        },
+        {
+          "id": "privateKey",
+          "option": "privateKey",
+          "kind": "setter",
+          "signature": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer)",
+          "takes": [
+            {
+              "type": "java.nio.ByteBuffer",
+              "signature": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer)"
+            }
+          ],
+          "required": null,
+          "row": "privateKey"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "keyNamespace",
+          "label": "keyNamespace",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "keyName",
+          "label": "keyName",
+          "kind": "member",
+          "haves": [
+            "a string"
+          ]
+        },
+        {
+          "key": "paddingScheme",
+          "label": "paddingScheme",
+          "kind": "member",
+          "haves": [
+            "PaddingScheme"
+          ]
+        },
+        {
+          "key": "publicKey",
+          "label": "publicKey",
+          "kind": "member",
+          "haves": [
+            "a byte buffer"
+          ]
+        },
+        {
+          "key": "privateKey",
+          "label": "privateKey",
+          "kind": "member",
+          "haves": [
+            "a byte buffer"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "keyNamespace",
+          "way": "keyNamespace",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateRawRsaKeyringInput.builder().keyNamespace(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "keyName",
+          "way": "keyName",
+          "have": "a string",
+          "setup": [],
+          "setter": "CreateRawRsaKeyringInput.builder().keyName(String)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.lang.String",
+          "alts": []
+        },
+        {
+          "row": "paddingScheme",
+          "way": "paddingScheme",
+          "have": "PaddingScheme",
+          "setup": [],
+          "setter": "CreateRawRsaKeyringInput.builder().paddingScheme(PaddingScheme)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.model.PaddingScheme",
+          "alts": []
+        },
+        {
+          "row": "publicKey",
+          "way": "publicKey",
+          "have": "a byte buffer",
+          "setup": [],
+          "setter": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.nio.ByteBuffer",
+          "alts": []
+        },
+        {
+          "row": "privateKey",
+          "way": "privateKey",
+          "have": "a byte buffer",
+          "setup": [],
+          "setter": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.nio.ByteBuffer",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateRawRsaKeyring",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateRawRsaKeyring(CreateRawRsaKeyringInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    },
+    {
+      "id": "required-encryption-context-cmm",
+      "group": "CMMs",
+      "name": "Required encryption context CMM",
+      "type": "software.amazon.cryptography.materialproviders.model.CreateRequiredEncryptionContextCMMInput",
+      "ways": [
+        {
+          "id": "CreateRequiredEncryptionContextCMM",
+          "option": null,
+          "kind": "constructor",
+          "signature": "materialProviders.CreateRequiredEncryptionContextCMM(CreateRequiredEncryptionContextCMMInput)",
+          "required": null,
+          "row": "construct"
+        },
+        {
+          "id": "underlyingCMM",
+          "option": "underlyingCMM",
+          "kind": "setter",
+          "signature": "CreateRequiredEncryptionContextCMMInput.builder().underlyingCMM(ICryptographicMaterialsManager)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.ICryptographicMaterialsManager",
+              "signature": "CreateRequiredEncryptionContextCMMInput.builder().underlyingCMM(ICryptographicMaterialsManager)"
+            }
+          ],
+          "required": null,
+          "row": "underlyingCMM"
+        },
+        {
+          "id": "keyring",
+          "option": "keyring",
+          "kind": "setter",
+          "signature": "CreateRequiredEncryptionContextCMMInput.builder().keyring(IKeyring)",
+          "takes": [
+            {
+              "type": "software.amazon.cryptography.materialproviders.IKeyring",
+              "signature": "CreateRequiredEncryptionContextCMMInput.builder().keyring(IKeyring)"
+            }
+          ],
+          "required": null,
+          "row": "keyring"
+        },
+        {
+          "id": "requiredEncryptionContextKeys",
+          "option": "requiredEncryptionContextKeys",
+          "kind": "setter",
+          "signature": "CreateRequiredEncryptionContextCMMInput.builder().requiredEncryptionContextKeys(List<String>)",
+          "takes": [
+            {
+              "type": "java.util.List<java.lang.String>",
+              "signature": "CreateRequiredEncryptionContextCMMInput.builder().requiredEncryptionContextKeys(List<String>)"
+            }
+          ],
+          "required": null,
+          "row": "requiredEncryptionContextKeys"
+        }
+      ],
+      "rows": [
+        {
+          "key": "construct",
+          "label": "Construct",
+          "kind": "construct",
+          "haves": []
+        },
+        {
+          "key": "underlyingCMM",
+          "label": "underlyingCMM",
+          "kind": "member",
+          "haves": [
+            "ICryptographicMaterialsManager"
+          ]
+        },
+        {
+          "key": "keyring",
+          "label": "keyring",
+          "kind": "member",
+          "haves": [
+            "IKeyring"
+          ]
+        },
+        {
+          "key": "requiredEncryptionContextKeys",
+          "label": "requiredEncryptionContextKeys",
+          "kind": "member",
+          "haves": [
+            "a list of strings"
+          ]
+        }
+      ],
+      "frame": null,
+      "choices": [
+        {
+          "row": "underlyingCMM",
+          "way": "underlyingCMM",
+          "have": "ICryptographicMaterialsManager",
+          "setup": [],
+          "setter": "CreateRequiredEncryptionContextCMMInput.builder().underlyingCMM(ICryptographicMaterialsManager)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.ICryptographicMaterialsManager",
+          "alts": []
+        },
+        {
+          "row": "keyring",
+          "way": "keyring",
+          "have": "IKeyring",
+          "setup": [],
+          "setter": "CreateRequiredEncryptionContextCMMInput.builder().keyring(IKeyring)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "software.amazon.cryptography.materialproviders.IKeyring",
+          "alts": []
+        },
+        {
+          "row": "requiredEncryptionContextKeys",
+          "way": "requiredEncryptionContextKeys",
+          "have": "a list of strings",
+          "setup": [],
+          "setter": "CreateRequiredEncryptionContextCMMInput.builder().requiredEncryptionContextKeys(List<String>)",
+          "expect": "shipped",
+          "error": null,
+          "default": false,
+          "takes": "java.util.List<java.lang.String>",
+          "alts": []
+        }
+      ],
+      "left_out": [],
+      "together": [],
+      "examples": [
+        {
+          "way": "CreateRequiredEncryptionContextCMM",
+          "row": "construct",
+          "have": "",
+          "code": "materialProviders.CreateRequiredEncryptionContextCMM(CreateRequiredEncryptionContextCMMInput)"
+        }
+      ],
+      "combos": null,
+      "shipped": true
+    }
+  ],
+  "uncovered": []
+}

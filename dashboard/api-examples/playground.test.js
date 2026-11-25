@@ -171,3 +171,30 @@ test("the branch box takes a branch or owner/repo#number", () => {
   assert.deepStrictEqual(P.parsePr("aws/aws-crypto-tools-rust#206"), { repo: "aws/aws-crypto-tools-rust", number: 206 });
   assert.strictEqual(P.parsePr("lucmcdon/api-examples"), null);
 });
+
+// testdata/java-mpl-shipped.json is real build_api_examples.py --shipped output for the released Java MPL.
+test("a shipped column shows the signature of each type it takes, and does not offer the others", () => {
+  const langs = ["rust", "java-shipped"];
+  const d = { rust: read("rust-mpl.json"), "java-shipped": read("java-mpl-shipped.json") };
+  const a = P.apisOf(d, langs).find(x => x.id === "raw-aes-keyring");
+  const options = P.optionsOf(a, langs);
+  const wrappingKey = option(options, "wrappingKey");
+  assert.ok(wrappingKey.haves.includes("a byte buffer"));
+  assert.deepStrictEqual(P.cellOf(wrappingKey, "a byte buffer", "java-shipped"), {
+    kind: "shipped", symbol: "📦",
+    title: "java-shipped: 📦 shipped, not tested here · CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer)" });
+  assert.strictEqual(P.cellOf(wrappingKey, "bytes in memory", "java-shipped").kind, "absent");
+  assert.strictEqual(P.cellOf(wrappingKey, "a byte buffer", "rust").kind, "absent");
+  assert.strictEqual(P.status(wrappingKey, null, "java-shipped").label, "📦 shipped, not tested here");
+
+  const picks = { keyNamespace: "a string", keyName: "a string", wrappingKey: "a byte buffer", wrappingAlg: "AesWrappingAlg" };
+  assert.strictEqual(P.verdict(a, options, picks, "java-shipped").text, "📦 shipped, not tested here");
+  assert.strictEqual(P.verdict(a, options, { ...picks, wrappingKey: "bytes in memory" }, "java-shipped").text,
+    "— java-shipped has no wrappingKey");
+  assert.deepStrictEqual(P.codeOf(a, options, { wrappingKey: "a byte buffer" }, "java-shipped"), [
+    "materialProviders.CreateRawAesKeyring(CreateRawAesKeyringInput)",
+    "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer)",
+  ]);
+  assert.strictEqual(P.shippedLabel(d["java-shipped"]), "Java (1.x shipped)");
+  assert.strictEqual(P.shippedLabel({ language: "go", shipped: { version: "0.4.0" } }), "Go (0.4 shipped)");
+});

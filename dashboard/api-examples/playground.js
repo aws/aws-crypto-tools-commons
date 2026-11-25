@@ -7,6 +7,10 @@
 // "have", what the customer starts from), left-out results, and the calls
 // that CI built and ran. The page shows one card per option. A pick maps each
 // option row to a have, or to null when the call leaves the option out.
+//
+// A shipped file (build_api_examples.py --shipped) describes a released
+// package with no tests: each choice is a type that the package takes, with
+// its signature as the setter line and expect "shipped".
 (function (exports) {
 "use strict";
 
@@ -42,6 +46,7 @@ function optionsOf(api, langs) {
         haves: r.haves,
         ways: a.ways.filter(w => w.row === r.key && w.kind === "setter"),
         choices: a.choices.filter(c => c.row === r.key),
+        shipped: !!a.shipped,
         leftOut: a.left_out.find(x => x.rows.length === 1 && x.rows[0] === r.key) || null,
       };
     }
@@ -73,6 +78,7 @@ const LABELS = {
   untested: () => "⚠️ not tested",
   absent: () => "— not offered",
   none: () => "— not offered",
+  shipped: () => "📦 shipped, not tested here",
 };
 
 // What one card's pick does in one language.
@@ -80,10 +86,15 @@ const LABELS = {
 //   untested: the language has the option but no test for this pick.
 //   absent: the language does not have the option, and the pick sets it.
 //   none: the language does not have the option, and the pick leaves it out, so it does nothing.
+//   shipped: a released package takes this pick (or lets it be left out), and nothing here tests it.
+//     A shipped package that takes the option but not this type does not offer the pick.
 function status(option, have, lang) {
   let s;
   if (!offers(option, lang)) {
     s = { kind: have === null ? "none" : "absent" };
+  } else if (option.byLang[lang].shipped) {
+    const c = have === null ? null : choiceOf(option, have, lang);
+    s = have === null || c ? { kind: "shipped", signature: c?.setter.trim() || null } : { kind: "absent" };
   } else if (have === null) {
     const lo = option.byLang[lang].leftOut;
     s = !lo ? { kind: "untested" } : { kind: lo.expect, error: lo.error, where: lo };
@@ -122,7 +133,7 @@ function comboFor(api, picks, lang) {
 // The verdict box: what the whole call does in one language, and the tests that show it.
 function verdict(api, options, picks, lang) {
   const a = api.byLang[lang];
-  if (!a?.frame) return { kind: "absent", text: `— ${lang} has no ${api.name}`, links: [], combo: null };
+  if (!a?.frame && !a?.shipped) return { kind: "absent", text: `— ${lang} has no ${api.name}`, links: [], combo: null };
   const parts = options.map(o => ({ option: o, ...status(o, picks[o.key] ?? null, lang) }));
   const group = groupStatus(api, options, picks, lang);
   const named = p => p.option ? p.option.label : p.what;
@@ -130,11 +141,13 @@ function verdict(api, options, picks, lang) {
   const absent = all.filter(p => p.kind === "absent");
   const untested = all.filter(p => p.kind === "untested");
   const failing = all.filter(p => p.kind === "fails");
-  const links = [a.frame, ...all.map(p => p.where).filter(Boolean)].map(w => ({ file: w.file, line: w.line }));
+  const links = [a.frame, ...all.map(p => p.where)].filter(Boolean).map(w => ({ file: w.file, line: w.line }));
   const combo = comboFor(api, picks, lang);
   let kind, text;
   if (absent.length) {
     kind = "absent"; text = `— ${lang} has no ${absent.map(named).join(", ")}`;
+  } else if (a.shipped) {
+    kind = "shipped"; text = LABELS.shipped();
   } else if (untested.length) {
     kind = "untested"; text = `⚠️ not tested: ${untested.map(named).join(", ")}`;
   } else if (failing.length === 0) {
@@ -157,8 +170,20 @@ function setterIndent(a) {
 
 // The call in one language: setup, head, one setter line per chosen option, tail.
 // A pick that the language has no code for becomes a comment line.
+// A shipped package has no frame, so its call is the signatures of its
+// constructors and methods, then the signature of each chosen option.
 function codeOf(api, options, picks, lang) {
   const a = api.byLang[lang];
+  if (a?.shipped) {
+    const lines = a.examples.flatMap(e => e.code.split("\n"));
+    for (const o of options) {
+      const have = picks[o.key] ?? null;
+      if (have === null) continue;
+      const c = choiceOf(o, have, lang);
+      lines.push(c ? c.setter : `// ${o.label} from ${have}: not in ${lang}`);
+    }
+    return lines;
+  }
   if (!a?.frame) return null;
   const setup = [...a.frame.setup], setters = [];
   for (const o of options) {
@@ -252,7 +277,7 @@ function diffApis(base, head, langs) {
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-const SYMBOLS = { ok: "✅", fails: "❌", untested: "⚠️", absent: "--" };
+const SYMBOLS = { ok: "✅", fails: "❌", untested: "⚠️", absent: "--", shipped: "📦" };
 
 // One cell of the compare matrix: what one have (or null, left out) does in one language.
 // A have that the language does not list is not offered, even when the language has the option.
@@ -263,7 +288,8 @@ function cellOf(option, have, lang) {
   }
   const s = status(option, have, lang);
   const setter = have === null ? "left out" : choiceOf(option, have, lang)?.setter.trim();
-  const title = [s.error, s.kind === "untested" ? "not tested" : setter].filter(Boolean).join(" · ");
+  const title = [s.kind === "shipped" ? s.label : null, s.error, s.kind === "untested" ? "not tested" : setter]
+    .filter(Boolean).join(" · ");
   return { kind: s.kind, symbol: SYMBOLS[s.kind], title: `${lang}: ${title}` };
 }
 
@@ -296,8 +322,9 @@ const tagHtml = t => t ? ` <span class="tag ${t}">${t}</span>` : "";
 // index is the option's place in options. With heads, each option gets a row
 // with its name, required label and PR tag, so one table can hold every option.
 // removed lists the options a PR removed. They get only a name row.
-function matrixHtml(api, items, langs, diff, heads, removed = []) {
-  const head = `<tr><th></th>${langs.map(l => `<th>${esc(l)}</th>`).join("")}</tr>`;
+// labels gives a column's header, such as "Java (3.x shipped)", when it is not the language key.
+function matrixHtml(api, items, langs, diff, heads, removed = [], labels = {}) {
+  const head = `<tr><th></th>${langs.map(l => `<th>${esc(labels[l] || l)}</th>`).join("")}</tr>`;
   const body = items.map(({ option, index }) => {
     const req = requiredLabel(option, langs);
     const title = heads ? `<tr class="opt"><th colspan="${langs.length + 1}">${esc(option.label)}`
@@ -319,6 +346,16 @@ function pickCell(options, picks, cell) {
   return { lang: cell.lang, picks: { ...picks, [option.key]: have } };
 }
 
+const LANGUAGE_NAMES = { java: "Java", python: "Python", dotnet: ".NET", go: "Go", javascript: "JavaScript" };
+
+// "Java (3.x shipped)" for a shipped file. A 0.x version keeps its minor
+// version, since each 0.x minor version can break its API.
+function shippedLabel(doc) {
+  const [major, minor] = doc.shipped.version.split(".");
+  const version = major === "0" ? `${major}.${minor}` : `${major}.x`;
+  return `${LANGUAGE_NAMES[doc.language] || doc.language} (${version} shipped)`;
+}
+
 // Nav order: changed, new and removed APIs first, then the rest, each by name.
 function navOrder(apis, diff) {
   const rank = a => (diff && diff.api[a.id] ? 0 : 1);
@@ -334,5 +371,6 @@ function parsePr(text) {
 Object.assign(exports, {
   apisOf, optionsOf, offers, choiceOf, choiceLabel, startPicks, status, groupStatus, comboFor, verdict,
   codeOf, newTest, render, diffApis, navOrder, parsePr, cellOf, matrixRows, requiredLabel, matrixHtml, pickCell,
+  shippedLabel,
 });
 })(typeof module !== "undefined" ? module.exports : (window.Playground = {}));
