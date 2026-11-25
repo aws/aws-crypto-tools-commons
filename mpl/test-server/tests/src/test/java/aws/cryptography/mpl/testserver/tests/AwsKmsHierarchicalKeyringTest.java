@@ -45,6 +45,7 @@ import java.util.UUID;
  * of MRK_ID.
  */
 @KeyringFeature("hierarchical")
+@UsesRealKms
 public class AwsKmsHierarchicalKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     // Shared branch key store fixtures in the CI-resources account 370957321024,

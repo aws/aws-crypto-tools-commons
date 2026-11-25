@@ -16,7 +16,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -42,7 +41,7 @@ import software.amazon.awssdk.services.kms.model.KmsResponse;
  * <p>Real KMS needs AWS credentials that allow GenerateDataKey, Encrypt and Decrypt on both keys in {@link KmsKeys}.
  * The MPL test server CI job has them.
  */
-@Tag("real-kms")
+@UsesRealKms
 class MockKmsMatchesRealKmsTest {
 
     private static final Map<String, String> ENCRYPTION_CONTEXT = Map.of("purpose", "mock-kms-matches-real-kms");
