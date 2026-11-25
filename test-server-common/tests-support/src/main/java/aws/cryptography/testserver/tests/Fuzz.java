@@ -19,7 +19,7 @@ import java.util.Random;
 import java.util.function.Function;
 
 /**
- * Adds random examples to the shared input lists, such as {@link KmsInputs}, when fuzzing is turned on.
+ * Adds random examples to the shared input lists, such as {@link KmsFixtures}, when fuzzing is turned on.
  *
  * <p>A normal run tests only each list's fixed examples.
  * To add random examples, set {@code TESTSERVER_FUZZ} (or {@code -Dtestserver.fuzz}) to how many to add to each list:
