@@ -8,6 +8,7 @@ import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterials
 import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
 import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
+import aws.cryptography.mpl.testserver.client.model.CreateStaticKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.KmsConfiguration;
@@ -194,6 +195,24 @@ final class Mpl {
             .build();
         return new Cmm(this, MplTestServerClients.withRetry(() ->
             testServer().createDefaultCmm(request)).getCmmId());
+    }
+
+    /**
+     * A static keyring, whose OnEncrypt returns {@code encryptionMaterials} and whose OnDecrypt returns
+     * {@code decryptionMaterials}, whatever materials it gets.
+     * A null argument leaves that call without materials to return.
+     */
+    Keyring staticKeyring(EncryptionMaterials encryptionMaterials, DecryptionMaterials decryptionMaterials) {
+        CreateStaticKeyringInput.Builder input = CreateStaticKeyringInput.builder();
+        if (encryptionMaterials != null) {
+            input.encryptionMaterials(encryptionMaterials);
+        }
+        if (decryptionMaterials != null) {
+            input.decryptionMaterials(decryptionMaterials);
+        }
+        CreateStaticKeyringInput request = input.build();
+        return new Keyring(this, MplTestServerClients.withRetry(() ->
+            testServer().createStaticKeyring(request)).getKeyringId());
     }
 
     /** Start building an AWS KMS Hierarchical keyring. */
