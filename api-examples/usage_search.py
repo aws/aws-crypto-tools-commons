@@ -361,7 +361,7 @@ class Rule:
         return bool(self.pattern.search(text)) and not (self.unless and self.unless.search(text))
 
 
-STRING, FILE, BASE64, HEX, CONFIG = "a string", "a file", "base64 text", "hex text", "a string from your config"
+STRING, FILE, BASE64, HEX, CONFIG = "a string", "a file", "base64 text", "hex text", "your config"
 BASE64_JS = r"Buffer\.from\s*\([^)]*['\"]base64['\"]"
 RULES = [
     Rule(".getBytes(...)", r"\.getBytes\s*\(", STRING, ["java"]),

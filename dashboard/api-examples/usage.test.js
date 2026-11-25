@@ -20,7 +20,7 @@ const USAGE = { apis: { "mpl|raw-aes-keyring": {
     { conversion: "passed as is", from: null, count: 1, languages: { python: 1 }, examples: [example(3)] },
   ],
   keyName: [
-    { conversion: "environment variable", from: "a string from your config", count: 2, languages: { java: 2 }, examples: [] },
+    { conversion: "environment variable", from: "your config", count: 2, languages: { java: 2 }, examples: [] },
     { conversion: "string literal", from: "a string", count: 1, languages: { java: 1 }, examples: [] },
   ],
 } } };
