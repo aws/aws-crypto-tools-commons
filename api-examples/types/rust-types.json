@@ -1,0 +1,3008 @@
+{
+ "generated_by": "api-examples/types/rust_types.py build",
+ "lock": {
+  "file": "rust-types.lock.json",
+  "refreshed": "2026-11-25",
+  "crates": 174,
+  "sha256": "12496ec08d93af7bb195045af4200296a1f650e807cde088c8fe93e92b5b4db9"
+ },
+ "rules": [
+  "A type is held when a pub fn returns it, with one Result layer removed, or a pub field has it.",
+  "A type is accepted when it is a pub fn parameter.",
+  "Each type counts once per crate, and types rank by how many crates use them.",
+  "From the rust list, keeps the top 8 held types of each kind, not kept already, that show up in at least 3 crates.",
+  "From the aws list, keeps the top 3 held types of each kind, not kept already, that show up in at least 2 crates.",
+  "From the crypto list, keeps the top 1 held types of each kind, not kept already, that show up in at least 3 crates.",
+  "The Rust list's top 2 types of a kind need only 2 crates.",
+  "A third-party type is bytes, text, a path or a reader when its crate implements AsRef, Deref, Borrow, Read or AsyncRead for it with that target. It is a stream when it is made From bytes but has no such impl.",
+  "Of the fixed-size byte arrays, only the most common length is kept.",
+  "Skips generic types, &mut types, and arrays whose length is a name."
+ ],
+ "parse_errors": 1,
+ "kinds": {
+  "bytes": [
+   {
+    "type": "&[u8]",
+    "rust_crates": 19,
+    "aws_crates": 3,
+    "crypto_crates": 20,
+    "return": 126,
+    "field": 53,
+    "seen_in": [
+     "memchr",
+     "serde",
+     "regex-syntax"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Vec<u8>",
+    "rust_crates": 15,
+    "aws_crates": 6,
+    "crypto_crates": 17,
+    "return": 183,
+    "field": 23,
+    "seen_in": [
+     "syn",
+     "base64",
+     "proc-macro2"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Box<[u8]>",
+    "rust_crates": 3,
+    "aws_crates": 0,
+    "crypto_crates": 6,
+    "return": 16,
+    "field": 2,
+    "seen_in": [
+     "regex-syntax",
+     "digest",
+     "time"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Bytes",
+    "rust_crates": 2,
+    "aws_crates": 4,
+    "crypto_crates": 0,
+    "return": 7,
+    "field": 11,
+    "seen_in": [
+     "bytes",
+     "hyper",
+     "aws-smithy-types"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Cow<[u8]>",
+    "rust_crates": 2,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 6,
+    "field": 0,
+    "seen_in": [
+     "regex",
+     "shlex",
+     "aws-smithy-types"
+    ],
+    "kept": null
+   },
+   {
+    "type": "[u8; 32]",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 6,
+    "return": 15,
+    "field": 60,
+    "seen_in": [
+     "windows-sys",
+     "rand_chacha",
+     "rustls-webpki"
+    ],
+    "kept": "crypto"
+   },
+   {
+    "type": "&CertificateDer",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&HeaderName",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "AeadKey",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 3,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "BorrowedPayload",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "BytesMut",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 7,
+    "field": 0,
+    "seen_in": [
+     "bytes"
+    ],
+    "kept": null
+   },
+   {
+    "type": "HeaderName",
+    "rust_crates": 1,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 5,
+    "field": 0,
+    "seen_in": [
+     "http",
+     "aws-smithy-runtime-api"
+    ],
+    "kept": null
+   },
+   {
+    "type": "InlinedName",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "rustix"
+    ],
+    "kept": null
+   },
+   {
+    "type": "OkmBlock",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "PrefixedPayload",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Blob",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 1,
+    "seen_in": [
+     "aws-smithy-schema",
+     "aws-sdk-dynamodb"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "&Blob",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-dynamodb"
+    ],
+    "kept": null
+   }
+  ],
+  "duration": [
+   {
+    "type": "Duration",
+    "rust_crates": 3,
+    "aws_crates": 7,
+    "crypto_crates": 1,
+    "return": 28,
+    "field": 2,
+    "seen_in": [
+     "socket2",
+     "rustix",
+     "tokio"
+    ],
+    "kept": "rust"
+   }
+  ],
+  "list": [
+   {
+    "type": "&[&str]",
+    "rust_crates": 1,
+    "aws_crates": 6,
+    "crypto_crates": 0,
+    "return": 167,
+    "field": 1,
+    "seen_in": [
+     "serde",
+     "aws-sdk-sts",
+     "aws-sdk-ssooidc"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "&[String]",
+    "rust_crates": 1,
+    "aws_crates": 6,
+    "crypto_crates": 0,
+    "return": 53,
+    "field": 0,
+    "seen_in": [
+     "regex",
+     "aws-sdk-sts",
+     "aws-sdk-ssooidc"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "&[char]",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "regex-syntax"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Vec<String>",
+    "rust_crates": 1,
+    "aws_crates": 4,
+    "crypto_crates": 3,
+    "return": 3,
+    "field": 7,
+    "seen_in": [
+     "rustls",
+     "rustls-webpki",
+     "security-framework"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "&Vec<String>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-dynamodb"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[DryRunModifierType]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[EncapsulationAlgorithmSpec]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[EncryptionAlgorithmSpec]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[EncryptionType]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[GrantOperation]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[InventoryOptionalField]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[KeyAgreementAlgorithmSpec]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[MacAlgorithmSpec]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[ObjectAttributes]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&[OptionalObjectAttributes]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Vec<&str>",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "openssl-sys"
+    ],
+    "kept": null
+   }
+  ],
+  "map": [
+   {
+    "type": "&[(&str, Cow<str>)]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sigv4"
+    ],
+    "kept": null
+   },
+   {
+    "type": "HashMap<String, String>",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-sts",
+     "aws-smithy-schema"
+    ],
+    "kept": "aws"
+   }
+  ],
+  "number": [
+   {
+    "type": "usize",
+    "rust_crates": 50,
+    "aws_crates": 7,
+    "crypto_crates": 22,
+    "return": 756,
+    "field": 926,
+    "seen_in": [
+     "hashbrown",
+     "syn",
+     "rand_core"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "u64",
+    "rust_crates": 25,
+    "aws_crates": 4,
+    "crypto_crates": 7,
+    "return": 168,
+    "field": 2816,
+    "seen_in": [
+     "getrandom",
+     "rand_core",
+     "windows-sys"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "u32",
+    "rust_crates": 24,
+    "aws_crates": 4,
+    "crypto_crates": 6,
+    "return": 227,
+    "field": 22367,
+    "seen_in": [
+     "getrandom",
+     "rand_core",
+     "libc"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "u8",
+    "rust_crates": 18,
+    "aws_crates": 0,
+    "crypto_crates": 7,
+    "return": 85,
+    "field": 2641,
+    "seen_in": [
+     "syn",
+     "base64",
+     "proc-macro2"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "u16",
+    "rust_crates": 14,
+    "aws_crates": 3,
+    "crypto_crates": 2,
+    "return": 28,
+    "field": 3588,
+    "seen_in": [
+     "windows-sys",
+     "serde",
+     "serde_json"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "i32",
+    "rust_crates": 13,
+    "aws_crates": 5,
+    "crypto_crates": 1,
+    "return": 64,
+    "field": 1888,
+    "seen_in": [
+     "windows-sys",
+     "serde",
+     "serde_json"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "i64",
+    "rust_crates": 10,
+    "aws_crates": 7,
+    "crypto_crates": 3,
+    "return": 54,
+    "field": 1078,
+    "seen_in": [
+     "windows-sys",
+     "serde",
+     "log"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "i16",
+    "rust_crates": 7,
+    "aws_crates": 2,
+    "crypto_crates": 1,
+    "return": 16,
+    "field": 314,
+    "seen_in": [
+     "windows-sys",
+     "serde",
+     "bytes"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "i128",
+    "rust_crates": 6,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 19,
+    "field": 1,
+    "seen_in": [
+     "log",
+     "bytes",
+     "winnow"
+    ],
+    "kept": null
+   },
+   {
+    "type": "i8",
+    "rust_crates": 6,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "return": 12,
+    "field": 57,
+    "seen_in": [
+     "windows-sys",
+     "serde",
+     "bytes"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "u128",
+    "rust_crates": 5,
+    "aws_crates": 1,
+    "crypto_crates": 1,
+    "return": 14,
+    "field": 2,
+    "seen_in": [
+     "serde_json",
+     "log",
+     "bytes"
+    ],
+    "kept": null
+   },
+   {
+    "type": "isize",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 470,
+    "seen_in": [
+     "windows-sys",
+     "typenum"
+    ],
+    "kept": null
+   }
+  ],
+  "optional bytes": [
+   {
+    "type": "Option<&[u8]>",
+    "rust_crates": 5,
+    "aws_crates": 3,
+    "crypto_crates": 6,
+    "return": 37,
+    "field": 1,
+    "seen_in": [
+     "regex-syntax",
+     "socket2",
+     "rustix"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Option<Vec<u8>>",
+    "rust_crates": 4,
+    "aws_crates": 0,
+    "crypto_crates": 5,
+    "return": 24,
+    "field": 3,
+    "seen_in": [
+     "regex-syntax",
+     "socket2",
+     "tokio"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Option<Cow<[u8]>>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "regex"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<SubjectPublicKeyInfoDer>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&Blob>",
+    "rust_crates": 0,
+    "aws_crates": 3,
+    "crypto_crates": 0,
+    "return": 46,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3",
+     "aws-sdk-secretsmanager",
+     "aws-sdk-kms"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Option<Blob>",
+    "rust_crates": 0,
+    "aws_crates": 4,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 46,
+    "seen_in": [
+     "aws-smithy-json",
+     "aws-sdk-s3",
+     "aws-sdk-secretsmanager"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Option<Bytes>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 1,
+    "seen_in": [
+     "aws-smithy-types"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<CertificateSigningRequestDer>",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "rustls-pemfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Der>",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "rustls-pki-types"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<[u8; 16]>",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "curve25519-dalek"
+    ],
+    "kept": null
+   }
+  ],
+  "optional list": [
+   {
+    "type": "Option<Vec<String>>",
+    "rust_crates": 1,
+    "aws_crates": 6,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 49,
+    "seen_in": [
+     "shlex",
+     "aws-sdk-sts",
+     "aws-sdk-ssooidc"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Option<Vec<char>>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "idna"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&[String]>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-dynamodb"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<&str>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-runtime"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<Cow<str>>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "aws-sigv4"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<DryRunModifierType>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<EncapsulationAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<EncryptionAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<EncryptionType>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<GrantOperation>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<InventoryOptionalField>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<KeyAgreementAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<MacAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<ObjectAttributes>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Vec<OptionalObjectAttributes>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 3,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   }
+  ],
+  "optional text": [
+   {
+    "type": "Option<&str>",
+    "rust_crates": 13,
+    "aws_crates": 17,
+    "crypto_crates": 4,
+    "return": 1896,
+    "field": 4,
+    "seen_in": [
+     "serde",
+     "serde_derive",
+     "serde_json"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Option<String>",
+    "rust_crates": 5,
+    "aws_crates": 12,
+    "crypto_crates": 2,
+    "return": 17,
+    "field": 1800,
+    "seen_in": [
+     "proc-macro2",
+     "serde_json",
+     "tokio"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Option<Cow<str>>",
+    "rust_crates": 2,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 1,
+    "seen_in": [
+     "log",
+     "regex",
+     "aws-smithy-runtime-api"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Option<&Authority>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&Method>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&Scheme>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&Url>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "url"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Authority>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Box<str>>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "regex-syntax"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<KeyMut>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "toml_edit"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<Scheme>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<char>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "log"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&AccessDeniedExceptionReason>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-ssooidc"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&AlgorithmSpec>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-kms"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&AnnotationDirective>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Option<&AppName>",
+    "rust_crates": 0,
+    "aws_crates": 8,
+    "crypto_crates": 0,
+    "return": 8,
+    "field": 0,
+    "seen_in": [
+     "aws-types",
+     "aws-sdk-sts",
+     "aws-sdk-sso"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Option<&SigningRegionSet>",
+    "rust_crates": 0,
+    "aws_crates": 3,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "aws-types",
+     "aws-sdk-sts",
+     "aws-sdk-s3"
+    ],
+    "kept": "aws"
+   }
+  ],
+  "path": [
+   {
+    "type": "PathBuf",
+    "rust_crates": 4,
+    "aws_crates": 1,
+    "crypto_crates": 1,
+    "return": 10,
+    "field": 2,
+    "seen_in": [
+     "cc",
+     "tokio",
+     "url"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "&Path",
+    "rust_crates": 3,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 9,
+    "field": 0,
+    "seen_in": [
+     "syn",
+     "cc",
+     "tempfile"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Path",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 4,
+    "field": 1,
+    "seen_in": [
+     "syn",
+     "serde_derive"
+    ],
+    "kept": null
+   },
+   {
+    "type": "NamedTempFile",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 8,
+    "field": 0,
+    "seen_in": [
+     "tempfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "TempDir",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 12,
+    "field": 0,
+    "seen_in": [
+     "tempfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "TempPath",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 1,
+    "seen_in": [
+     "tempfile"
+    ],
+    "kept": null
+   }
+  ],
+  "reader": [
+   {
+    "type": "File",
+    "rust_crates": 3,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 24,
+    "field": 1,
+    "seen_in": [
+     "syn",
+     "tokio",
+     "tempfile"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "TcpStream",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 8,
+    "field": 0,
+    "seen_in": [
+     "mio",
+     "tokio",
+     "openssl"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "UnixStream",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 10,
+    "field": 0,
+    "seen_in": [
+     "mio",
+     "tokio"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Chain",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "anyhow"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Cursor",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "syn"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Cursor<Vec<u8>>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "tempfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Empty",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "futures-util"
+    ],
+    "kept": null
+   },
+   {
+    "type": "NamedPipeClient",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "tokio"
+    ],
+    "kept": null
+   },
+   {
+    "type": "NamedPipeServer",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 2,
+    "field": 0,
+    "seen_in": [
+     "tokio"
+    ],
+    "kept": null
+   },
+   {
+    "type": "OwnedReadHalf",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "tokio"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Repeat",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "futures-util"
+    ],
+    "kept": null
+   },
+   {
+    "type": "SimplexStream",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "tokio"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Socket",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "socket2"
+    ],
+    "kept": null
+   },
+   {
+    "type": "SpooledTempFile",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 4,
+    "field": 0,
+    "seen_in": [
+     "tempfile"
+    ],
+    "kept": null
+   }
+  ],
+  "stream": [
+   {
+    "type": "HpkePrivateKey",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "OutboundChunks",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "rustls"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&ByteStream",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 7,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "BodyData",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 1,
+    "seen_in": [
+     "aws-smithy-http-client"
+    ],
+    "kept": null
+   },
+   {
+    "type": "ByteStream",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "return": 9,
+    "field": 7,
+    "seen_in": [
+     "aws-smithy-types",
+     "aws-sdk-s3"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "PrivatePkcs1KeyDer",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "return": 1,
+    "field": 2,
+    "seen_in": [
+     "rustls-pki-types",
+     "rustls-pemfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "PrivatePkcs8KeyDer",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "return": 1,
+    "field": 2,
+    "seen_in": [
+     "rustls-pki-types",
+     "rustls-pemfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "PrivateSec1KeyDer",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "return": 1,
+    "field": 2,
+    "seen_in": [
+     "rustls-pki-types",
+     "rustls-pemfile"
+    ],
+    "kept": null
+   },
+   {
+    "type": "SdkBody",
+    "rust_crates": 0,
+    "aws_crates": 6,
+    "crypto_crates": 0,
+    "return": 81,
+    "field": 0,
+    "seen_in": [
+     "aws-smithy-http",
+     "aws-smithy-types",
+     "aws-sdk-sts"
+    ],
+    "kept": "aws"
+   }
+  ],
+  "text": [
+   {
+    "type": "&str",
+    "rust_crates": 26,
+    "aws_crates": 20,
+    "crypto_crates": 14,
+    "return": 495,
+    "field": 66,
+    "seen_in": [
+     "syn",
+     "bitflags",
+     "base64"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "String",
+    "rust_crates": 21,
+    "aws_crates": 15,
+    "crypto_crates": 13,
+    "return": 95,
+    "field": 179,
+    "seen_in": [
+     "syn",
+     "rand",
+     "base64"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "char",
+    "rust_crates": 9,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 23,
+    "field": 10,
+    "seen_in": [
+     "syn",
+     "base64",
+     "proc-macro2"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "Cow<str>",
+    "rust_crates": 8,
+    "aws_crates": 5,
+    "crypto_crates": 1,
+    "return": 20,
+    "field": 7,
+    "seen_in": [
+     "serde",
+     "rustix",
+     "regex"
+    ],
+    "kept": "rust"
+   },
+   {
+    "type": "&Method",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&String",
+    "rust_crates": 1,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "return": 8,
+    "field": 0,
+    "seen_in": [
+     "serde_json",
+     "aws-sdk-s3",
+     "aws-sdk-dynamodb"
+    ],
+    "kept": "aws"
+   },
+   {
+    "type": "Box<str>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "time"
+    ],
+    "kept": null
+   },
+   {
+    "type": "ByteStr",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "DnsName",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "return": 4,
+    "field": 2,
+    "seen_in": [
+     "rustls",
+     "rustls-pki-types"
+    ],
+    "kept": null
+   },
+   {
+    "type": "KeyMut",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "toml_edit"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Method",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 1,
+    "seen_in": [
+     "http"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Prerelease",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 0,
+    "field": 2,
+    "seen_in": [
+     "semver"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Url",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "url"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&AnalyticsS3ExportFileFormat",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 1,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "&AnnotationConfigurationState",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "return": 3,
+    "field": 0,
+    "seen_in": [
+     "aws-sdk-s3"
+    ],
+    "kept": null
+   },
+   {
+    "type": "Zeroizing<String>",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 4,
+    "return": 5,
+    "field": 0,
+    "seen_in": [
+     "der",
+     "pkcs8",
+     "elliptic-curve"
+    ],
+    "kept": "crypto"
+   }
+  ]
+ },
+ "accepts": {
+  "bytes": [
+   {
+    "type": "&[u8]",
+    "rust_crates": 38,
+    "aws_crates": 11,
+    "crypto_crates": 38,
+    "param": 1557,
+    "seen_in": [
+     "syn",
+     "rand_core",
+     "base64"
+    ]
+   },
+   {
+    "type": "impl AsRef<[u8]>",
+    "rust_crates": 9,
+    "aws_crates": 4,
+    "crypto_crates": 10,
+    "param": 75,
+    "seen_in": [
+     "base64",
+     "memchr",
+     "digest"
+    ]
+   },
+   {
+    "type": "impl Into<Vec<u8>>",
+    "rust_crates": 3,
+    "aws_crates": 2,
+    "crypto_crates": 4,
+    "param": 22,
+    "seen_in": [
+     "regex-syntax",
+     "rustix",
+     "rustls"
+    ]
+   },
+   {
+    "type": "Blob",
+    "rust_crates": 0,
+    "aws_crates": 4,
+    "crypto_crates": 0,
+    "param": 63,
+    "seen_in": [
+     "aws-sdk-s3",
+     "aws-smithy-schema",
+     "aws-sdk-secretsmanager"
+    ]
+   },
+   {
+    "type": "&[u8; 16]",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 3,
+    "param": 9,
+    "seen_in": [
+     "siphasher",
+     "constant_time_eq",
+     "curve25519-dalek"
+    ]
+   },
+   {
+    "type": "&[u8; 32]",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "param": 9,
+    "seen_in": [
+     "rand_chacha",
+     "constant_time_eq",
+     "curve25519-dalek"
+    ]
+   },
+   {
+    "type": "&[u8; 64]",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 3,
+    "param": 8,
+    "seen_in": [
+     "constant_time_eq",
+     "curve25519-dalek",
+     "ed25519-dalek"
+    ]
+   },
+   {
+    "type": "Vec<u8>",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "param": 10,
+    "seen_in": [
+     "serde",
+     "rustls",
+     "rustls-pki-types"
+    ]
+   },
+   {
+    "type": "impl Into<Box<[u8]>>",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 8,
+    "seen_in": [
+     "memchr",
+     "regex-syntax",
+     "der"
+    ]
+   },
+   {
+    "type": "impl Iterator<Item = &[u8]>",
+    "rust_crates": 1,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 10,
+    "seen_in": [
+     "miniz_oxide",
+     "aws-smithy-runtime-api",
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "&Bytes",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "aws-sigv4",
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "&CertificateDer",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "param": 9,
+    "seen_in": [
+     "rustls",
+     "rustls-webpki"
+    ]
+   },
+   {
+    "type": "Bytes",
+    "rust_crates": 1,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 10,
+    "seen_in": [
+     "http",
+     "aws-smithy-checksums"
+    ]
+   },
+   {
+    "type": "HeaderName",
+    "rust_crates": 1,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "http",
+     "aws-smithy-http"
+    ]
+   },
+   {
+    "type": "[u8; 4]",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 4,
+    "seen_in": [
+     "regex-automata",
+     "aho-corasick"
+    ]
+   }
+  ],
+  "duration": [
+   {
+    "type": "Duration",
+    "rust_crates": 6,
+    "aws_crates": 9,
+    "crypto_crates": 2,
+    "param": 94,
+    "seen_in": [
+     "socket2",
+     "rustix",
+     "parking_lot"
+    ]
+   }
+  ],
+  "list": [
+   {
+    "type": "&[&str]",
+    "rust_crates": 3,
+    "aws_crates": 2,
+    "crypto_crates": 2,
+    "param": 13,
+    "seen_in": [
+     "serde",
+     "toml",
+     "tracing-core"
+    ]
+   },
+   {
+    "type": "Vec<String>",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 4,
+    "seen_in": [
+     "aws-config",
+     "aws-sdk-secretsmanager"
+    ]
+   },
+   {
+    "type": "&[String]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-smithy-schema"
+    ]
+   },
+   {
+    "type": "&[char]",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "idna"
+    ]
+   }
+  ],
+  "map": [
+   {
+    "type": "&HashMap<String, String>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-smithy-schema"
+    ]
+   },
+   {
+    "type": "&[(&str, &str)]",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-types"
+    ]
+   },
+   {
+    "type": "&[(char, char)]",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "regex-syntax"
+    ]
+   }
+  ],
+  "number": [
+   {
+    "type": "usize",
+    "rust_crates": 48,
+    "aws_crates": 7,
+    "crypto_crates": 20,
+    "param": 1380,
+    "seen_in": [
+     "hashbrown",
+     "syn",
+     "rand_core"
+    ]
+   },
+   {
+    "type": "u32",
+    "rust_crates": 24,
+    "aws_crates": 9,
+    "crypto_crates": 9,
+    "param": 662,
+    "seen_in": [
+     "rand",
+     "libc",
+     "serde"
+    ]
+   },
+   {
+    "type": "u64",
+    "rust_crates": 22,
+    "aws_crates": 9,
+    "crypto_crates": 7,
+    "param": 241,
+    "seen_in": [
+     "hashbrown",
+     "rand_core",
+     "rand"
+    ]
+   },
+   {
+    "type": "u8",
+    "rust_crates": 21,
+    "aws_crates": 0,
+    "crypto_crates": 9,
+    "param": 423,
+    "seen_in": [
+     "syn",
+     "base64",
+     "proc-macro2"
+    ]
+   },
+   {
+    "type": "i32",
+    "rust_crates": 11,
+    "aws_crates": 8,
+    "crypto_crates": 2,
+    "param": 329,
+    "seen_in": [
+     "rand",
+     "libc",
+     "serde"
+    ]
+   },
+   {
+    "type": "u16",
+    "rust_crates": 11,
+    "aws_crates": 6,
+    "crypto_crates": 3,
+    "param": 435,
+    "seen_in": [
+     "getrandom",
+     "serde",
+     "serde_json"
+    ]
+   },
+   {
+    "type": "i64",
+    "rust_crates": 10,
+    "aws_crates": 8,
+    "crypto_crates": 0,
+    "param": 147,
+    "seen_in": [
+     "serde",
+     "serde_json",
+     "log"
+    ]
+   },
+   {
+    "type": "i128",
+    "rust_crates": 7,
+    "aws_crates": 1,
+    "crypto_crates": 1,
+    "param": 18,
+    "seen_in": [
+     "serde",
+     "serde_json",
+     "log"
+    ]
+   },
+   {
+    "type": "u128",
+    "rust_crates": 8,
+    "aws_crates": 0,
+    "crypto_crates": 2,
+    "param": 18,
+    "seen_in": [
+     "windows-sys",
+     "serde",
+     "serde_json"
+    ]
+   },
+   {
+    "type": "i16",
+    "rust_crates": 5,
+    "aws_crates": 1,
+    "crypto_crates": 2,
+    "param": 14,
+    "seen_in": [
+     "serde",
+     "serde_json",
+     "bytes"
+    ]
+   },
+   {
+    "type": "i8",
+    "rust_crates": 5,
+    "aws_crates": 1,
+    "crypto_crates": 1,
+    "param": 16,
+    "seen_in": [
+     "serde",
+     "serde_json",
+     "bytes"
+    ]
+   },
+   {
+    "type": "isize",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "ryu",
+     "num-traits"
+    ]
+   }
+  ],
+  "optional bytes": [
+   {
+    "type": "Option<&[u8]>",
+    "rust_crates": 3,
+    "aws_crates": 0,
+    "crypto_crates": 6,
+    "param": 38,
+    "seen_in": [
+     "socket2",
+     "tokio",
+     "rustls"
+    ]
+   },
+   {
+    "type": "Option<Blob>",
+    "rust_crates": 0,
+    "aws_crates": 3,
+    "crypto_crates": 0,
+    "param": 62,
+    "seen_in": [
+     "aws-sdk-s3",
+     "aws-sdk-secretsmanager",
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Bytes>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-smithy-types"
+    ]
+   },
+   {
+    "type": "Option<[u8; 8]>",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 2,
+    "seen_in": [
+     "openssl"
+    ]
+   }
+  ],
+  "optional list": [
+   {
+    "type": "Option<Vec<String>>",
+    "rust_crates": 0,
+    "aws_crates": 6,
+    "crypto_crates": 0,
+    "param": 85,
+    "seen_in": [
+     "aws-sdk-sts",
+     "aws-sdk-ssooidc",
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<&[&str]>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-smithy-http-client"
+    ]
+   },
+   {
+    "type": "Option<Vec<DryRunModifierType>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 4,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<EncapsulationAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<EncryptionAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<EncryptionType>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<Vec<GrantOperation>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<InventoryOptionalField>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<Vec<KeyAgreementAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<MacAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<ObjectAttributes>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<Vec<OptionalObjectAttributes>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 6,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<Vec<OutputTypeEnum>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-dynamodb"
+    ]
+   },
+   {
+    "type": "Option<Vec<ResourceOwnerType>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<Vec<SigningAlgorithmSpec>>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   }
+  ],
+  "optional text": [
+   {
+    "type": "Option<String>",
+    "rust_crates": 1,
+    "aws_crates": 11,
+    "crypto_crates": 1,
+    "param": 2857,
+    "seen_in": [
+     "autocfg",
+     "openssl-sys",
+     "aws-types"
+    ]
+   },
+   {
+    "type": "Option<Cow<str>>",
+    "rust_crates": 0,
+    "aws_crates": 11,
+    "crypto_crates": 0,
+    "param": 12,
+    "seen_in": [
+     "aws-sdk-sts",
+     "aws-smithy-runtime-api",
+     "aws-config"
+    ]
+   },
+   {
+    "type": "Option<&str>",
+    "rust_crates": 5,
+    "aws_crates": 3,
+    "crypto_crates": 2,
+    "param": 31,
+    "seen_in": [
+     "log",
+     "toml",
+     "url"
+    ]
+   },
+   {
+    "type": "Option<AppName>",
+    "rust_crates": 0,
+    "aws_crates": 8,
+    "crypto_crates": 0,
+    "param": 8,
+    "seen_in": [
+     "aws-types",
+     "aws-sdk-sts",
+     "aws-sdk-sso"
+    ]
+   },
+   {
+    "type": "Option<SigningRegionSet>",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-sts",
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<&Url>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "url"
+    ]
+   },
+   {
+    "type": "Option<AccessDeniedExceptionReason>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-ssooidc"
+    ]
+   },
+   {
+    "type": "Option<AlgorithmSpec>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-kms"
+    ]
+   },
+   {
+    "type": "Option<AnalyticsS3ExportFileFormat>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<AnnotationConfigurationState>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<AnnotationDirective>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<ApproximateCreationDateTimePrecision>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "aws-sdk-dynamodb"
+    ]
+   },
+   {
+    "type": "Option<Arc<str>>",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "regex-automata"
+    ]
+   },
+   {
+    "type": "Option<ArchiveStatus>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "Option<AttributeAction>",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-dynamodb"
+    ]
+   }
+  ],
+  "path": [
+   {
+    "type": "impl AsRef<Path>",
+    "rust_crates": 6,
+    "aws_crates": 3,
+    "crypto_crates": 7,
+    "param": 124,
+    "seen_in": [
+     "cc",
+     "socket2",
+     "mio"
+    ]
+   },
+   {
+    "type": "impl Into<PathBuf>",
+    "rust_crates": 2,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 6,
+    "seen_in": [
+     "autocfg",
+     "tempfile",
+     "aws-types"
+    ]
+   },
+   {
+    "type": "&Path",
+    "rust_crates": 3,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 25,
+    "seen_in": [
+     "syn",
+     "serde_derive",
+     "tempfile"
+    ]
+   },
+   {
+    "type": "Path",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "syn"
+    ]
+   },
+   {
+    "type": "PathBuf",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "tempfile"
+    ]
+   },
+   {
+    "type": "TempPath",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "tempfile"
+    ]
+   }
+  ],
+  "reader": [
+   {
+    "type": "impl Read",
+    "rust_crates": 4,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 16,
+    "seen_in": [
+     "base64",
+     "serde_json",
+     "aho-corasick"
+    ]
+   },
+   {
+    "type": "impl Read + Write",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 4,
+    "param": 27,
+    "seen_in": [
+     "hyper",
+     "rustls",
+     "openssl"
+    ]
+   },
+   {
+    "type": "File",
+    "rust_crates": 2,
+    "aws_crates": 1,
+    "crypto_crates": 1,
+    "param": 9,
+    "seen_in": [
+     "syn",
+     "tokio",
+     "ring"
+    ]
+   },
+   {
+    "type": "&File",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 5,
+    "seen_in": [
+     "syn",
+     "tempfile"
+    ]
+   },
+   {
+    "type": "TcpStream",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "mio",
+     "tokio"
+    ]
+   },
+   {
+    "type": "UnixStream",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "mio",
+     "tokio"
+    ]
+   },
+   {
+    "type": "impl AsyncRead",
+    "rust_crates": 2,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 7,
+    "seen_in": [
+     "tokio",
+     "futures-util"
+    ]
+   },
+   {
+    "type": "impl AsyncRead + AsyncWrite",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 10,
+    "seen_in": [
+     "tokio",
+     "tokio-rustls"
+    ]
+   },
+   {
+    "type": "ChildStderr",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "tokio"
+    ]
+   },
+   {
+    "type": "ChildStdout",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "tokio"
+    ]
+   },
+   {
+    "type": "Cursor",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 3,
+    "seen_in": [
+     "syn"
+    ]
+   },
+   {
+    "type": "OwnedReadHalf",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 2,
+    "seen_in": [
+     "tokio"
+    ]
+   },
+   {
+    "type": "impl BufRead",
+    "rust_crates": 0,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 1,
+    "seen_in": [
+     "rustls-pki-types"
+    ]
+   }
+  ],
+  "stream": [
+   {
+    "type": "SdkBody",
+    "rust_crates": 0,
+    "aws_crates": 3,
+    "crypto_crates": 0,
+    "param": 4,
+    "seen_in": [
+     "aws-smithy-http",
+     "aws-smithy-types",
+     "aws-smithy-checksums"
+    ]
+   },
+   {
+    "type": "ByteStream",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 16,
+    "seen_in": [
+     "aws-smithy-http",
+     "aws-sdk-s3"
+    ]
+   },
+   {
+    "type": "&HpkePrivateKey",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 2,
+    "seen_in": [
+     "rustls"
+    ]
+   },
+   {
+    "type": "&OutboundChunks",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 1,
+    "seen_in": [
+     "rustls"
+    ]
+   },
+   {
+    "type": "&PrivatePkcs8KeyDer",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 1,
+    "param": 2,
+    "seen_in": [
+     "rustls"
+    ]
+   }
+  ],
+  "text": [
+   {
+    "type": "&str",
+    "rust_crates": 40,
+    "aws_crates": 21,
+    "crypto_crates": 19,
+    "param": 940,
+    "seen_in": [
+     "syn",
+     "bitflags",
+     "base64"
+    ]
+   },
+   {
+    "type": "impl Into<String>",
+    "rust_crates": 3,
+    "aws_crates": 22,
+    "crypto_crates": 1,
+    "param": 3206,
+    "seen_in": [
+     "serde_json",
+     "tokio",
+     "toml_edit"
+    ]
+   },
+   {
+    "type": "impl Into<Cow<str>>",
+    "rust_crates": 0,
+    "aws_crates": 18,
+    "crypto_crates": 0,
+    "param": 54,
+    "seen_in": [
+     "aws-smithy-json",
+     "aws-smithy-types",
+     "aws-sigv4"
+    ]
+   },
+   {
+    "type": "AppName",
+    "rust_crates": 0,
+    "aws_crates": 10,
+    "crypto_crates": 0,
+    "param": 11,
+    "seen_in": [
+     "aws-types",
+     "aws-sdk-sts",
+     "aws-config"
+    ]
+   },
+   {
+    "type": "String",
+    "rust_crates": 5,
+    "aws_crates": 4,
+    "crypto_crates": 1,
+    "param": 18,
+    "seen_in": [
+     "serde",
+     "serde_json",
+     "crossbeam-utils"
+    ]
+   },
+   {
+    "type": "char",
+    "rust_crates": 7,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 25,
+    "seen_in": [
+     "syn",
+     "proc-macro2",
+     "unicode-ident"
+    ]
+   },
+   {
+    "type": "impl AsRef<str>",
+    "rust_crates": 1,
+    "aws_crates": 5,
+    "crypto_crates": 2,
+    "param": 31,
+    "seen_in": [
+     "toml_edit",
+     "security-framework",
+     "pbkdf2"
+    ]
+   },
+   {
+    "type": "impl Into<SigningRegionSet>",
+    "rust_crates": 0,
+    "aws_crates": 4,
+    "crypto_crates": 0,
+    "param": 4,
+    "seen_in": [
+     "aws-types",
+     "aws-sdk-sts",
+     "aws-config"
+    ]
+   },
+   {
+    "type": "Cow<str>",
+    "rust_crates": 1,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 4,
+    "seen_in": [
+     "serde",
+     "aws-smithy-json",
+     "aws-smithy-query"
+    ]
+   },
+   {
+    "type": "ShapeId",
+    "rust_crates": 0,
+    "aws_crates": 2,
+    "crypto_crates": 0,
+    "param": 13,
+    "seen_in": [
+     "aws-smithy-json",
+     "aws-smithy-schema"
+    ]
+   },
+   {
+    "type": "&BigDecimal",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-smithy-schema"
+    ]
+   },
+   {
+    "type": "&BigInteger",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-smithy-schema"
+    ]
+   },
+   {
+    "type": "&ShapeId",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 5,
+    "seen_in": [
+     "aws-smithy-schema"
+    ]
+   },
+   {
+    "type": "&Url",
+    "rust_crates": 1,
+    "aws_crates": 0,
+    "crypto_crates": 0,
+    "param": 13,
+    "seen_in": [
+     "url"
+    ]
+   },
+   {
+    "type": "AccessDeniedExceptionReason",
+    "rust_crates": 0,
+    "aws_crates": 1,
+    "crypto_crates": 0,
+    "param": 1,
+    "seen_in": [
+     "aws-sdk-ssooidc"
+    ]
+   }
+  ]
+ },
+ "paths": {
+  "AppName": [
+   "aws_types::AppName",
+   "aws_types::app_name::AppName"
+  ],
+  "Blob": [
+   "aws_smithy_types::Blob",
+   "aws_smithy_types::blob::Blob"
+  ],
+  "ByteStream": [
+   "aws_smithy_types::ByteStream",
+   "aws_smithy_types::byte_stream::ByteStream"
+  ],
+  "Bytes": [
+   "bytes::Bytes",
+   "uuid::Bytes",
+   "winnow::Bytes",
+   "bytes::bytes::Bytes",
+   "winnow::stream::bytes::Bytes"
+  ],
+  "SdkBody": [
+   "aws_smithy_types::SdkBody",
+   "aws_smithy_types::body::SdkBody"
+  ],
+  "SigningRegionSet": [
+   "aws_types::SigningRegionSet",
+   "aws_types::region::SigningRegionSet"
+  ],
+  "Zeroizing": [
+   "zeroize::Zeroizing"
+  ]
+ }
+}

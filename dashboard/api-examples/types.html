@@ -9,18 +9,20 @@
   .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
   .bar button { border: 1px solid #d0d7de; background: #fff; border-radius: 14px; padding: 3px 10px; cursor: pointer; font-size: 12px; color: #1f2328; }
   .bar button.on { background: #0969da; border-color: #0969da; color: #fff; }
-  .grow { flex: 1; }
+  .bar .gap { width: 12px; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
   th, td { border: 1px solid #e1e4e8; padding: 5px 6px; vertical-align: top; text-align: left; }
   th { background: #f6f8fa; font-size: 12px; }
   td.opt { white-space: nowrap; width: 1%; }
   td.opt b { font-family: ui-monospace, monospace; font-size: 12px; }
   td.opt div { color: #57606a; font-family: ui-monospace, monospace; font-size: 11px; }
+  td.none { color: #8c959f; font-style: italic; }
   .chip { display: inline-block; margin: 2px; padding: 1px 7px; border-radius: 10px; font-family: ui-monospace, monospace; font-size: 11px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
   .b0 { background: #dafbe1; color: #116329; }
   .b1 { background: #f0fbf3; color: #1a7f37; border-color: #aceebb; }
   .b2 { background: #fff8c5; color: #7d4e00; }
   .b4 { background: #ffe8d6; color: #953800; }
+  .bx { background: #f6f8fa; color: #57606a; border-color: #d0d7de; }
   .warn { border-color: #cf222e; color: #a40e26; }
   .sel { outline: 2px solid #0969da; }
   td.ck { text-align: center; }
@@ -33,162 +35,149 @@
 <body>
 <h1>What each option takes</h1>
 <div class="bar" id="apis"></div>
-<div class="bar">
-  <button id="view-rust" class="on">Rust</button><button id="view-compare">Compare languages</button>
-  <span class="grow"></span>
-  <label id="all-wrap"><input type="checkbox" id="all"> every type tried</label>
-</div>
-<div class="bar"><span class="chip b0">as is</span><span class="chip b1">+ &amp; or Some</span><span class="chip b2">one call</span><span class="chip b4">real work</span><span class="chip warn">⚠ compiles, risky</span></div>
+<div class="bar" id="langs"></div>
+<div class="bar"><span class="chip b0">as is</span><span class="chip b1">+ &amp; or Some</span><span class="chip b2">one call</span><span class="chip b4">real work</span><span class="chip bx">no fix found</span><span class="chip warn">⚠ works, risky</span></div>
 <div id="view"></div>
-<pre id="code">Click any type to see the exact line that compiled.</pre>
+<pre id="code">Click any type to see its code.</pre>
 <div class="foot" id="foot"></div>
 <script>
-// types.json comes from one compiler run on aws/aws-crypto-tools-rust#207.
-// For each option, it lists each Rust type tried and the shortest call that compiled.
-// It also lists the types the released libraries take, and what customer code converts first.
-// A Rust row is [type, cost, call that compiled, 1 if the type is common].
-const LANGS = [["Java", "java"], ["Python", "python"], [".NET", "dotnet"], ["Go", "go"], ["JS", "javascript"]];
-const KINDS = ["bytes", "text", "base64 text", "file / stream", "map", "pairs", "list", "number", "Duration", "KMS client", "SDK config"];
-const LEVEL = { 0: "as is", 1: "+ & or Some", 2: "one call", 4: "real work" };
-let data = null, api = 0, view = "rust", all = false, picked = "";
+// types.json holds, for each option, each type a customer may hold and the shortest call that takes it.
+// Rust rows come from a compiler run: rust_types.py picks the types from real crates, compile_rust_types.py tries them.
+// Other languages' rows come from other_languages.py, written from each release's signatures and not compiled.
+// A row is [type, cost, code, kind]. The cost is null when no fix works.
+const LANGS = [["Rust", "rust"], ["Java", "java"], ["Python", "python"], [".NET", "dotnet"], ["Go", "go"], ["JS", "javascript"]];
+const KINDS = ["bytes", "text", "pairs", "base64 text", "file / stream", "map", "list", "number", "Duration", "the type itself", "what builds it"];
+// Rust kinds under the comparison's rows. Optional values have no row, because the other languages take null instead.
+const RUST_KIND = { bytes: "bytes", text: "text", pair: "pairs", path: "file / stream", reader: "file / stream",
+  stream: "file / stream", number: "number", duration: "Duration", list: "list", map: "map",
+  named: "the type itself", ctor: "what builds it" };
+const LEVEL = { 0: "as is", 1: "+ & or Some", 2: "one call", 4: "real work", x: "no fix found" };
+let data = null, api = 0, lang = "rust", picked = "";
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // Cost 0 passes the value as is, 1 adds & or Some, 2 or 3 adds one call, 4 or more is real work.
-const level = cost => cost === 0 ? 0 : cost === 1 ? 1 : cost <= 3 ? 2 : 4;
+const level = cost => cost === null ? "x" : cost === 0 ? 0 : cost === 1 ? 1 : cost <= 3 ? 2 : 4;
 
-// Calls that compile but are likely mistakes.
-function risk(key, type, cost) {
-  if (key === "mpl/RawAesKeyring.wrapping_key" && !/u8|Blob|Path|File|Read|Stream/.test(type)) return "Text becomes the key bytes.";
-  if (type === "char" && cost === 0) return "A single char compiles.";
+const rowsOf = (key, l) => (l === "rust" ? data.rust[key] : ((data.others || {})[key] || {})[l]) || [];
+const kindOf = (row, l) => l === "rust" ? RUST_KIND[row[3]] : row[3];
+const takesOf = (key, l) => l === "rust" ? data.takes[key] : ((data.shipped[key] || {})[l] || []).join(", ");
+
+// Calls that work but are likely mistakes.
+function risk(key, row) {
+  if (row[1] === null) return "";
+  if (key === "mpl/RawAesKeyring.wrapping_key" && (row[3] === "text" || row[3] === "optional text")) return "Text becomes the key bytes.";
+  if (row[0] === "char" && row[1] === 0) return "A single char compiles.";
   return "";
 }
 
-// Kinds line up rows across languages. Each cell still shows that language's own types.
-function rustKind(type) {
-  if (/^Option|^env::var|^char$/.test(type)) return null;
-  if (/^\((&str|String), /.test(type)) return "pairs";
-  if (/HashMap|BTreeMap|^Vec<\(|^\[\(/.test(type)) return "map";
-  if (/^(Vec<String>|Vec<&str>|&\[String\]|\[&str; 2\])$/.test(type)) return "list";
-  if (/Path|File|Read|ByteStream/.test(type)) return "file / stream";
-  if (/u8|Blob/.test(type)) return "bytes";
-  if (/kms::Client/.test(type)) return "KMS client";
-  if (/SdkConfig|kms::Config/.test(type)) return "SDK config";
-  if (/str|String/.test(type)) return "text";
-  if (/^[ui](16|32|64|size)$/.test(type)) return "number";
-  if (type === "Duration") return "Duration";
-  return null;
+function chip(key, l, row, text) {
+  const warn = risk(key, row);
+  const id = [key, l, row[0]].join("|");
+  return `<span class="chip b${level(row[1])}${warn ? " warn" : ""}${picked === id ? " sel" : ""}" data-key="${esc(key)}" data-lang="${l}" data-type="${esc(row[0])}">${esc(text)}${warn ? " ⚠" : ""}</span>`;
 }
 
-// 2 means the language takes it as is. 1 means it takes a wrapper such as ByteBuffer.
-function otherKind(type) {
-  if (/^(byte\[\]|\[\]byte|bytes|bytearray|Uint8Array|Buffer)$/.test(type)) return ["bytes", 2];
-  if (/^(ByteBuffer|MemoryStream)$/.test(type)) return ["bytes", 1];
-  if (/^(String|string|str|\*string)$/.test(type)) return ["text", 2];
-  if (/^(InputStream|IOBase|file|Readable|ReadableStream)$/.test(type)) return ["file / stream", 2];
-  if (/^Map<|^dict$|^Dictionary<|^map\[|^EncryptionContext$/.test(type)) return ["map", 2];
-  if (/^List<|^\[\]string$|^string\[\]$|^list\[/.test(type)) return ["list", 2];
-  if (/^(Int64|int64|\*int64|long|int|number|positive int)$/.test(type)) return ["number", 2];
-  if (/^KmsClientSupplier/.test(type)) return ["KMS client", 1];
-  if (/^(IAmazonKeyManagementService|Client|KmsClient|BaseClient)$/.test(type)) return ["KMS client", 2];
-  return null;
-}
-
-function chip(key, row, text) {
-  const warn = risk(key, row[0], row[1]);
-  const id = key + "|" + row[0];
-  return `<span class="chip b${level(row[1])}${warn ? " warn" : ""}${picked === id ? " sel" : ""}" data-key="${esc(key)}" data-type="${esc(row[0])}">${esc(text)}${warn ? " ⚠" : ""}</span>`;
-}
-
-function optionCell(key) {
-  return `<td class="opt"><b>${esc(key.split(".")[1])}</b><div>${esc(data.takes[key])}</div></td>`;
-}
-
-function rustView() {
-  let html = "<table><tr><th>Option · takes</th><th>As is</th><th>+ &amp; or Some</th><th>One call</th><th>Real work</th></tr>";
+function mapView() {
+  const levels = [0, 1, 2, 4, "x"];
+  let html = "<table><tr><th>Option · takes</th>" + levels.map(l => `<th>${esc(LEVEL[l][0].toUpperCase() + LEVEL[l].slice(1))}</th>`).join("") + "</tr>";
   for (const key of data.apis[api].options) {
-    const cells = { 0: "", 1: "", 2: "", 4: "" };
-    for (const row of data.rust[key]) {
-      if (all || row[3]) cells[level(row[1])] += chip(key, row, row[0]);
+    const takes = takesOf(key, lang);
+    html += `<tr><td class="opt"><b>${esc(key.split(".")[1])}</b><div>${esc(takes || "not offered")}</div></td>`;
+    if (!takes) {
+      html += `<td class="none" colspan="${levels.length}">Not offered</td></tr>`;
+      continue;
     }
-    html += "<tr>" + optionCell(key) + [0, 1, 2, 4].map(l => `<td>${cells[l]}</td>`).join("") + "</tr>";
+    const cells = { 0: "", 1: "", 2: "", 4: "", x: "" };
+    for (const row of rowsOf(key, lang)) cells[level(row[1])] += chip(key, lang, row, row[0]);
+    html += levels.map(l => `<td>${cells[l]}</td>`).join("") + "</tr>";
   }
   return html + "</table>";
 }
 
+// The cheaper of two rows. A row with no fix found loses.
+const cheaper = (a, b) => !b || (a[1] !== null && (b[1] === null || a[1] < b[1]));
+
 function compareView() {
   let html = "";
   for (const key of data.apis[api].options) {
-    const rust = {};
-    for (const row of data.rust[key]) {
-      const kind = rustKind(row[0]);
-      if (kind && (!rust[kind] || row[1] < rust[kind][1])) rust[kind] = row;
-    }
-    const other = {};
-    for (const [lang, types] of Object.entries(data.shipped[key] || {})) {
-      for (const type of types) {
-        const match = otherKind(type);
-        if (!match) continue;
-        const [kind, strength] = match;
-        other[kind] = other[kind] || {};
-        const cell = other[kind][lang] = other[kind][lang] || [0, []];
-        if (strength > cell[0]) { cell[0] = strength; cell[1] = [type]; }
-        else if (strength === cell[0]) cell[1].push(type);
+    const best = {};
+    for (const [, l] of LANGS) {
+      for (const row of rowsOf(key, l)) {
+        const kind = kindOf(row, l);
+        if (!kind) continue;
+        best[kind] = best[kind] || {};
+        if (cheaper(row, best[kind][l])) best[kind][l] = row;
       }
     }
     const customers = data.customers[key] || {};
-    html += `<table><tr><th>${esc(key.split(".")[1])}</th><th>Rust</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("") + "<th>Customers convert</th></tr>";
-    for (const kind of KINDS.filter(k => rust[k] || other[k] || customers[k])) {
-      const row = rust[kind];
-      html += `<tr><td>${esc(kind)}</td><td class="ck">${row ? chip(key, row, LEVEL[level(row[1])]) : ""}</td>`;
-      for (const [, id] of LANGS) {
-        const cell = (other[kind] || {})[id];
-        html += `<td class="ck">${cell ? (cell[0] === 2 ? "✓" : "◐") + "<small>" + esc(cell[1].join(", ")) + "</small>" : ""}</td>`;
+    html += `<table><tr><th>${esc(key.split(".")[1])}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("") + "<th>Customers convert</th></tr>";
+    for (const kind of KINDS.filter(k => best[k] || customers[k])) {
+      html += `<tr><td>${esc(kind)}</td>`;
+      for (const [, l] of LANGS) {
+        const row = (best[kind] || {})[l];
+        const none = takesOf(key, l) ? "" : "not offered";
+        html += `<td class="ck">${row ? chip(key, l, row, LEVEL[level(row[1])]) + `<small>${esc(row[0])}</small>` : `<small>${none}</small>`}</td>`;
       }
       html += `<td class="ev">${esc(customers[kind] || "")}</td></tr>`;
     }
     html += "</table>";
   }
-  return html + `<div class="ev">✓ takes it as is · ◐ takes a wrapper (ByteBuffer, MemoryStream, a client supplier)</div>`;
+  return html;
 }
 
-function show(key, type) {
-  const row = data.rust[key].find(r => r[0] === type);
-  const warn = risk(key, row[0], row[1]);
-  const held = type === "env::var(..)" ? "Result<String, VarError> from std::env::var(..)" : type;
-  $("code").textContent = `// x: ${held}\n${data.apis[api].call}${row[2]}\n// ✅ compiled` + (warn ? `\n// ⚠ ${warn}` : "");
+function show(key, l, type) {
+  const row = rowsOf(key, l).find(r => r[0] === type);
+  const name = LANGS.find(x => x[1] === l)[0];
+  // A pair row stands for two values: x and y in Rust, k and v in the other languages.
+  const pair = row[3] === "pair" || row[3] === "pairs";
+  const held = pair ? `${l === "rust" ? "x, y" : "k, v"}: ${type.slice(1, -1).split(", ")[0]}` : `x: ${type}`;
+  if (row[1] === null) {
+    $("code").textContent = `// ${name}, ${held}\n// No fix in the list works.`;
+    return;
+  }
+  const warn = risk(key, row);
+  const code = l === "rust" ? data.apis[api].call + row[2] : row[2];
+  const proof = l === "rust" ? "// ✅ compiled" : "// ⚙ written from the release's signature, not compiled";
+  $("code").textContent = `// ${name}, ${held}\n${code}\n${proof}` + (warn ? `\n// ⚠ ${warn}` : "");
 }
 
 function draw() {
   $("apis").innerHTML = data.apis.map((a, i) => `<button data-api="${i}" class="${i === api ? "on" : ""}">${esc(a.name)}</button>`).join("");
-  $("view-rust").className = view === "rust" ? "on" : "";
-  $("view-compare").className = view === "compare" ? "on" : "";
-  $("all-wrap").style.display = view === "rust" ? "" : "none";
-  $("view").innerHTML = view === "rust" ? rustView() : compareView();
+  $("langs").innerHTML = LANGS.map(([n, l]) => `<button data-lang="${l}" class="${l === lang ? "on" : ""}">${n}</button>`).join("")
+    + `<span class="gap"></span><button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`;
+  $("view").innerHTML = lang === "compare" ? compareView() : mapView();
+}
+
+function reset() {
+  picked = "";
+  $("code").textContent = "Click any type to see its code.";
 }
 
 $("apis").addEventListener("click", e => {
   const button = e.target.closest("button");
   if (!button) return;
   api = Number(button.dataset.api);
-  picked = "";
-  $("code").textContent = "Click any type to see the exact line that compiled.";
+  reset();
   draw();
 });
-$("view-rust").onclick = () => { view = "rust"; draw(); };
-$("view-compare").onclick = () => { view = "compare"; draw(); };
-$("all").onchange = e => { all = e.target.checked; draw(); };
+$("langs").addEventListener("click", e => {
+  const button = e.target.closest("button");
+  if (!button) return;
+  lang = button.dataset.lang;
+  reset();
+  draw();
+});
 $("view").addEventListener("click", e => {
   const c = e.target.closest(".chip");
   if (!c || !c.dataset.key) return;
-  picked = c.dataset.key + "|" + c.dataset.type;
+  picked = [c.dataset.key, c.dataset.lang, c.dataset.type].join("|");
   draw();
-  show(c.dataset.key, c.dataset.type);
+  show(c.dataset.key, c.dataset.lang, c.dataset.type);
 });
 
 fetch("types.json")
   .then(r => r.json())
-  .then(d => { data = d; $("foot").textContent = d.note; draw(); })
+  .then(d => { data = d; $("foot").textContent = [d.note, d.others_note].filter(Boolean).join(" "); draw(); })
   .catch(e => { $("view").textContent = "Could not load types.json: " + e; });
 </script>
 </body>
