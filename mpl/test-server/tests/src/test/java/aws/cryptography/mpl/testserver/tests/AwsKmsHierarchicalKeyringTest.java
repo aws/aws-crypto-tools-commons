@@ -170,7 +170,10 @@ public class AwsKmsHierarchicalKeyringTest implements KeyringTestDefaults, Keyri
     // -----------------------------------------------------------------------
 
     /** The supplier picks the branch key from the encryption context, on both sides. */
-    @KeyringTest(name = "[hierarchical] supplier {0} {1}", inputs = "supplierCases", pairs = true)
+    @KeyringTest(
+        name = "[hierarchical] supplier {0} {1}",
+        inputs = "supplierCases",
+        pairs = true)
     void supplierSelectsBranchKeyFromContext(String supplierCase, Mpl encryptingMpl, Mpl decryptingMpl) {
         Map<String, String> ec = withSupplierCase(supplierCase);
 
@@ -357,7 +360,10 @@ public class AwsKmsHierarchicalKeyringTest implements KeyringTestDefaults, Keyri
                 "ap-south-2", WEST_BRANCH_KEY));
     }
 
-    @KeyringTest(name = "[hierarchical] key store {0} round trip {1}", inputs = "servingCases", pairs = true)
+    @KeyringTest(
+        name = "[hierarchical] key store {0} round trip {1}",
+        inputs = "servingCases",
+        pairs = true)
     void keyStoreConfigurationServesBranchKey(KeyStoreCase keyStoreCase, Mpl encryptingMpl, Mpl decryptingMpl) {
         EncryptionMaterials encrypted = keyStoreCaseKeyring(encryptingMpl, keyStoreCase)
             .onEncrypt(encryptingMpl.newEncryptionMaterials());
@@ -376,7 +382,9 @@ public class AwsKmsHierarchicalKeyringTest implements KeyringTestDefaults, Keyri
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @KeyringTest(name = "[hierarchical] key store {0} rejects the branch key {1}", inputs = "rejectingCases")
+    @KeyringTest(
+        name = "[hierarchical] key store {0} rejects the branch key {1}",
+        inputs = "rejectingCases")
     void keyStoreConfigurationRejectsBranchKey(KeyStoreCase keyStoreCase, Mpl mpl) {
         keyStoreCaseKeyring(mpl, keyStoreCase).onEncryptFails(mpl.newEncryptionMaterials());
     }

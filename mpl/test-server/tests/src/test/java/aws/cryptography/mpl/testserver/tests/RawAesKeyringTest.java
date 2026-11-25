@@ -254,7 +254,9 @@ public class RawAesKeyringTest implements KeyringTestDefaults, KeyringContract {
         keyring.onEncryptFails(newEncryptionMaterials(mpl, UNSERIALIZABLE_EC));
     }
 
-    @KeyringTest(name = "[raw-aes] unserializable encryption context rejected on decrypt {0}", pairs = true)
+    @KeyringTest(
+        name = "[raw-aes] unserializable encryption context rejected on decrypt {0}",
+        pairs = true)
     void onDecryptUnserializableEcFails(Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
         byte[] wrappingKey = wrappingKey(alg, 0);
