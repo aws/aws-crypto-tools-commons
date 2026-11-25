@@ -63,6 +63,7 @@ class FeatureGateLogTest {
         expected.add("pairGatesEachSide() [rust-v1] [raw-aes] run");
         expected.add("pairGatesEachSide() [java-v1] [caching, raw-aes] run");
         expected.add("unsupportedIsSkipped() [rust-v1] [caching] skipped");
+        expected.add("skipIsLogged() [rust-v1] [raw-aes] skipped");
         IntStream.range(0, 20).forEach(i -> {
             expected.add("param " + i + " [java-v1, rust-v1] [raw-aes] run");
             expected.add("dynamic " + i + " [rust-v1] [raw-aes] run");
@@ -83,6 +84,11 @@ class FeatureGateLogTest {
         @Test
         void unsupportedIsSkipped() {
             FeatureGate.require(Set.of("caching"), RUST, DECLARATIONS);
+        }
+
+        @Test
+        void skipIsLogged() {
+            FeatureGate.skip("skipped for a reason", Set.of("raw-aes"), RUST);
         }
 
         @ParameterizedTest(name = "param {0}")

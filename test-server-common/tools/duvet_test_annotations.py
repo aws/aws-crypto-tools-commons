@@ -17,8 +17,15 @@ An annotation is dropped when:
     (duvet fails the whole report on such a quote).
 
 An annotation in a helper method counts for the tests in the same file that
-call that helper. An annotation outside any method, or one that is not
-`type=test`, is an error.
+call that helper. An annotation in a default test method of an interface, such
+as KeyringContract, counts for each test class that implements the interface
+and does not override that method. When the class overrides it, only the
+override's annotations count.
+
+A `type=exception` annotation is always kept, with only the --spec-root check:
+it marks a rule that the code does not follow, so its test never runs.
+An annotation outside any method, or one that is neither `type=test` nor
+`type=exception`, is an error.
 
 Usage:
   duvet_test_annotations.py --gate-log build/test-results/feature-gate-log.jsonl \
@@ -44,6 +51,8 @@ GATE_DECLARED = re.compile(r'(?:gateDeclared|knownBug|unlessKnownBug)\(\s*"([^"]
 CALL = re.compile(r"\b(\w+)\s*\(")
 GATE_ID_SEGMENT = re.compile(r"\[(\w[\w-]*):([^\]]*)\]")
 TEST_SEGMENTS = {"method", "test-template", "test-factory", "property", "example"}
+CLASS = re.compile(r"\bclass\s+(\w+)\b([^{]*)\{")
+IMPLEMENTS = re.compile(r"\bimplements\s+(.*)$", re.S)
 
 
 class Block:
@@ -149,6 +158,32 @@ def parse_java(path):
                 while stack and not stack[-1][2] and depth + 1 == stack[-1][1]:
                     methods.remove(stack.pop()[0])
     return methods, blocks
+
+
+def interfaces(path):
+    """The simple names of the interfaces that the file's top-level class implements."""
+    for match in CLASS.finditer(path.read_text(encoding="utf-8")):
+        if match.group(1) != path.stem:
+            continue
+        listed = IMPLEMENTS.search(match.group(2))
+        if not listed:
+            return set()
+        names = re.sub(r"<[^<>]*>", "", listed.group(1))
+        return {name.strip().rsplit(".", 1)[-1] for name in names.split(",") if name.strip()}
+    return set()
+
+
+def with_inherited(running, files):
+    """Add (interface, method) for each run of a default test method that the class does not override."""
+    tests = {stem: {m.name for m in methods if m.is_test} for stem, (methods, _, _) in files.items()}
+    inherited = set()
+    for cls, method in running:
+        if cls not in files or method in tests[cls]:
+            continue
+        for interface in files[cls][2]:
+            if method in tests.get(interface, set()):
+                inherited.add((interface, method))
+    return running | inherited
 
 
 def enclosing(methods, line):
@@ -273,17 +308,26 @@ def main(argv=None):
     if args.bug_config and args.bug_config.is_file():
         bugs = set(json.loads(args.bug_config.read_text(encoding="utf-8")))
 
+    parsed = [(path, *parse_java(path)) for path in sorted(args.tests_dir.rglob("*.java"))]
+    files = {path.stem: (methods, blocks, interfaces(path)) for path, methods, blocks in parsed}
+    running = with_inherited(running, files)
+
     kept, dropped, errors, cache = [], [], [], {}
-    for path in sorted(args.tests_dir.rglob("*.java")):
-        methods, blocks = parse_java(path)
+    for path, methods, blocks in parsed:
         for block in blocks:
             where = f"{path}:{block.line}"
-            if block.kind() != "test":
-                errors.append(f"{where}: shared Tests may only hold type=test annotations")
+            if block.kind() not in ("test", "exception"):
+                errors.append(f"{where}: shared Tests may only hold type=test or type=exception annotations")
                 continue
             method = enclosing(methods, block.line)
             if method is None:
                 errors.append(f"{where}: annotation is not inside a method")
+                continue
+            if block.kind() == "exception":
+                if args.spec_root and (problem := quote_problem(block, args.spec_root, prefixes, cache)):
+                    dropped.append((where, problem))
+                else:
+                    kept.append((block, path.stem, method.name))
                 continue
             tests = tests_reaching(method, methods)
             if not tests:

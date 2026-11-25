@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -28,9 +29,10 @@ import org.junit.platform.commons.support.ReflectionSupport;
  * <p>JUnit asks this provider for the runs of a test when it plans the test class.
  * Each run is one {@link Run}, which JUnit also uses as an extension for that run alone:
  * <ol>
- *   <li>Before the test body, {@link Run#beforeEach} calls {@link FeatureGate#require}.
- *       That call skips the run when a language does not support the feature,
- *       and it records the decision in feature-gate-log.jsonl.
+ *   <li>Before the test body, {@link Run#beforeEach} skips a test marked {@link ContractException}.
+ *       Otherwise it calls {@link FeatureGate#require}.
+ *       That call skips the run when a language does not support the feature.
+ *       Both skips are recorded in feature-gate-log.jsonl, and so is a run that goes on.
  *       Then it builds the test server client.
  *       In a dry run, building the client stops the run and logs it as one that would run.</li>
  *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.
@@ -50,7 +52,7 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
     public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(ExtensionContext context) {
         Method testMethod = context.getRequiredTestMethod();
         KeyringTest settings = AnnotationSupport.findAnnotation(testMethod, KeyringTest.class).orElseThrow();
-        Set<String> features = Set.copyOf(Arrays.asList(settings.feature()));
+        Set<String> features = features(settings, testMethod, context.getRequiredTestClass());
         List<?> languageServers = settings.pairs()
             ? LanguageServerRegistry.shared().pairs()
             : LanguageServerRegistry.shared().targets();
@@ -67,6 +69,22 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
             }
         }
         return runs.stream();
+    }
+
+    /**
+     * {@link KeyringTest#feature()}, or else the {@link KeyringFeature} of the test class.
+     * The test class is the class that JUnit runs, so a {@link KeyringContract} test gets the features of each keyring.
+     */
+    private static Set<String> features(KeyringTest settings, Method testMethod, Class<?> testClass) {
+        if (settings.feature().length > 0) {
+            return Set.copyOf(Arrays.asList(settings.feature()));
+        }
+        KeyringFeature classFeature = testClass.getAnnotation(KeyringFeature.class);
+        if (classFeature == null) {
+            throw new IllegalStateException("@KeyringTest " + testClass.getName() + "." + testMethod.getName()
+                + " has no feature: set feature, or put @KeyringFeature on the class");
+        }
+        return Set.copyOf(Arrays.asList(classFeature.value()));
     }
 
     /** Call the static method named by {@link KeyringTest#inputs()}. */
@@ -114,7 +132,7 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
             List<Object> arguments = input == NO_INPUT ? List.of(languageServer) : List.of(input, languageServer);
             String pattern = settings.name();
             if (pattern.isEmpty()) {
-                pattern = "[" + String.join(", ", settings.feature()) + "] " + testMethod.getName()
+                pattern = "[" + String.join(", ", new TreeSet<>(features)) + "] " + testMethod.getName()
                     + (input == NO_INPUT ? " {0}" : " {0} {1}");
             }
             for (int i = 0; i < arguments.size(); i++) {
@@ -130,6 +148,15 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
 
         @Override
         public void beforeEach(ExtensionContext context) {
+            ContractException exception = testMethod.getAnnotation(ContractException.class);
+            if (exception != null) {
+                String message = "keyring contract exception: " + exception.reason();
+                if (languageServer instanceof TargetPair pair) {
+                    FeatureGate.skip(message, features, pair);
+                } else {
+                    FeatureGate.skip(message, features, (LanguageServerTarget) languageServer);
+                }
+            }
             KeyringTestDefaults defaults = context.getRequiredTestInstance() instanceof KeyringTestDefaults d ? d : null;
             if (languageServer instanceof TargetPair pair) {
                 FeatureGate.require(features, pair);
