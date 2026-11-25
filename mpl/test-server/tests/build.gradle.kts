@@ -29,7 +29,7 @@ dependencies {
     testImplementation("software.amazon.smithy.java:client-rpcv2-cbor:$smithyJavaVersion")
     testImplementation("software.amazon.smithy.java:client-http:$smithyJavaVersion")
 
-    // --- FakeKms: parses the KMS JSON requests it receives -----------------
+    // --- MockKms: parses the KMS JSON requests it receives -----------------
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
 
     // --- Test frameworks ----------------------------------------------------
