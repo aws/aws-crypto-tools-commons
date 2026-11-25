@@ -68,6 +68,13 @@ Usage:
       [--run-id <id> --run-attempt <n>] [--names smithy-names.json] \\
       [--template combos.template] [--combos combos.json]
 
+  build_api_examples.py --shipped --surface surface.json --repo aws/aws-crypto-tools-commons \\
+      --commit <sha> --out api-examples.json [--run-id <id> --run-attempt <n>]
+
+--shipped reads a released package's surface.json from read_shipped.py, which
+has no tests: each type that a setter takes becomes a choice with expect
+"shipped", named by type-phrases.json.
+
 --run-id and --run-attempt name the CI run whose tests ran the examples.
 --template is the language's combos.template; the dashboard uses its new-test
 section to write a new example test. --combos is combos.py's results for the
@@ -99,6 +106,57 @@ def option_key(name):
     s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s).lower()
     head, *rest = [p for p in s.split("_") if p]
     return head + "".join(p.capitalize() for p in rest)
+
+
+def short_type(text):
+    """A type without package names or pointer and nullable marks.
+
+    java.util.List<java.lang.String> gives List<String>, *kms.Client gives
+    Client, and Int64? gives Int64.
+    """
+    text = re.sub(r"\b(?:[A-Za-z_]\w*\.)+(?=[A-Za-z_])", "", text.strip())
+    return text.lstrip("*").rstrip("?")
+
+
+def have_of(type_text, phrases):
+    """What a customer has, for one parameter type, from type-phrases.json. A type it does not list is its own name."""
+    t = short_type(type_text)
+    return next((p for p, types in phrases.items() if t in types), t)
+
+
+def build_shipped(surface, names, phrases, repo, commit, run=None):
+    """The api-examples document for a library as it ships, from read_shipped.py's surface.json.
+
+    It has no tests to match, so each type that a setter way takes becomes a
+    choice with expect "shipped", and each constructor or method way becomes a
+    whole example that shows its signature.
+    """
+    apis = []
+    for api in surface.get("apis", []):
+        api_names = names.get(api["id"], NO_NAMES)
+        ways = [dict(w, required=None) for w in api.get("ways", [])]
+        choices, examples = [], []
+        for w in ways:
+            w["row"] = row_of(w, api_names)
+            if w["kind"] != "setter":
+                examples.append({"way": w["id"], "row": w["row"], "have": "", "code": w["signature"]})
+                continue
+            for take in w.get("takes", []):
+                have = have_of(take["type"], phrases)
+                same = next((c for c in choices if c["row"] == w["row"] and c["have"] == have), None)
+                if same:
+                    if take["type"] not in same["takes"].split(" | "):
+                        same["takes"] += " | " + take["type"]
+                    continue
+                choices.append({"row": w["row"], "way": w["id"], "have": have, "setup": [], "setter": take["signature"],
+                                "expect": "shipped", "error": None, "default": False, "takes": take["type"], "alts": []})
+        out_api = {k: v for k, v in api.items() if k != "ways"}
+        out_api.update({"ways": ways, "rows": rows_of(ways, choices, api_names), "frame": None, "choices": choices,
+                        "left_out": [], "together": [], "examples": examples, "combos": None, "shipped": True})
+        apis.append(out_api)
+    return {"schema": 4, "language": surface.get("language"), "library": surface.get("library"),
+            "shipped": surface.get("shipped"), "repo": repo, "commit": commit, "run": run,
+            "templates": None, "apis": apis, "uncovered": []}
 
 
 def row_of(way, names):
@@ -543,8 +601,11 @@ def describe(f):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--surface", required=True, type=Path)
-    p.add_argument("--src", required=True, nargs="+", type=Path,
+    p.add_argument("--src", nargs="+", type=Path, default=[],
                    help="test source directories to scan for markers")
+    p.add_argument("--shipped", action="store_true",
+                   help="the surface is a released package's, from read_shipped.py: no tests to match")
+    p.add_argument("--phrases", type=Path, default=Path(__file__).with_name("type-phrases.json"))
     p.add_argument("--repo", required=True, help="owner/name of the language repo")
     p.add_argument("--commit", required=True)
     p.add_argument("--out", required=True, type=Path)
@@ -558,9 +619,19 @@ def main(argv=None):
     surface = json.loads(args.surface.read_text())
     if surface.get("schema") != 1:
         sys.exit(f"{args.surface}: schema must be 1, got {surface.get('schema')!r}")
-    blocks, errors = scan(args.src, Path.cwd().resolve())
     names = json.loads(args.names.read_text())["libraries"].get(surface.get("library"), {})
     run = {"id": args.run_id, "attempt": args.run_attempt} if args.run_id else None
+    if args.shipped:
+        phrases = json.loads(args.phrases.read_text())["phrases"]
+        doc = build_shipped(surface, names, phrases, args.repo, args.commit, run)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(doc, indent=2) + "\n")
+        print(f"{doc['library']} {doc['language']} shipped {doc['shipped']['package']} {doc['shipped']['version']}: "
+              f"{len(doc['apis'])} apis, {sum(len(a['choices']) for a in doc['apis'])} choices")
+        return 0
+    if not args.src:
+        p.error("--src is required without --shipped")
+    blocks, errors = scan(args.src, Path.cwd().resolve())
     templates = read_template(args.template) if args.template and args.template.is_file() else None
     combos = json.loads(args.combos.read_text()) if args.combos and args.combos.is_file() else None
     doc, failures = build(surface, blocks, errors, args.repo, args.commit, names, run, templates, combos)

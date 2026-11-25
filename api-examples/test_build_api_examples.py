@@ -373,3 +373,57 @@ class SmithyNamesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+PHRASES = json.loads(builder.Path(builder.__file__).with_name("type-phrases.json").read_text())["phrases"]
+
+
+def take(t, sig):
+    return {"type": t, "signature": sig}
+
+
+class ShippedTest(unittest.TestCase):
+    NAMES = {API: {"members": ["keyNamespace", "keyName", "wrappingKey", "wrappingAlg"], "operations": [], "aliases": {}}}
+
+    def doc(self, *ways):
+        s = {"schema": 1, "language": "java", "library": "mpl", "shipped": {"package": "p", "version": "1.11.1"},
+             "apis": [{"id": API, "group": "Keyrings", "name": "Raw AES keyring", "type": "T",
+                       "ways": [{"id": "CreateRawAesKeyring", "option": None, "kind": "constructor",
+                                 "signature": "materialProviders.CreateRawAesKeyring(CreateRawAesKeyringInput)"}, *ways]}]}
+        return builder.build_shipped(s, self.NAMES, PHRASES, "aws/aws-crypto-tools-commons", "abc", {"id": 1, "attempt": 1})
+
+    def test_each_type_becomes_a_shipped_choice_named_by_the_phrase_table(self):
+        doc = self.doc({"id": "wrappingKey", "option": "wrappingKey", "kind": "setter", "signature": "...",
+                        "takes": [take("java.nio.ByteBuffer", "wrappingKey(ByteBuffer)"), take("byte[]", "wrappingKey(byte[])")]},
+                       {"id": "keyName", "option": "keyName", "kind": "setter", "signature": "...",
+                        "takes": [take("java.lang.String", "keyName(String)"), take("*string", "KeyName: string")]})
+        api = doc["apis"][0]
+        self.assertEqual([(c["row"], c["have"], c["takes"], c["expect"]) for c in api["choices"]], [
+            ("wrappingKey", "a byte buffer", "java.nio.ByteBuffer", "shipped"),
+            ("wrappingKey", "bytes in memory", "byte[]", "shipped"),
+            ("keyName", "a string", "java.lang.String | *string", "shipped"),
+        ])
+        self.assertEqual(api["choices"][0]["setter"], "wrappingKey(ByteBuffer)")
+        self.assertTrue(api["shipped"])
+        self.assertEqual(doc["shipped"]["version"], "1.11.1")
+        self.assertEqual(doc["uncovered"], [])
+        self.assertEqual(api["examples"][0]["code"], "materialProviders.CreateRawAesKeyring(CreateRawAesKeyringInput)")
+
+    def test_a_type_that_the_table_does_not_list_shows_its_own_name(self):
+        doc = self.doc({"id": "wrappingAlg", "option": "wrappingAlg", "kind": "setter", "signature": "...",
+                        "takes": [take("software.amazon.cryptography.materialproviders.model.AesWrappingAlg", "wrappingAlg(AesWrappingAlg)")]})
+        self.assertEqual(doc["apis"][0]["choices"][0]["have"], "AesWrappingAlg")
+
+    def test_the_phrase_table_names_the_usual_types(self):
+        self.assertEqual({t: builder.have_of(t, PHRASES) for t in
+                          ["byte[]", "bytes", "[]byte", "Uint8Array", "java.nio.ByteBuffer", "System.IO.MemoryStream",
+                           "java.io.InputStream", "NodeJS.ReadableStream", "str", "String", "java.util.Map<java.lang.String, java.lang.String>",
+                           "dict", "Int64?", "*int64"]}, {
+            "byte[]": "bytes in memory", "bytes": "bytes in memory", "[]byte": "bytes in memory", "Uint8Array": "bytes in memory",
+            "java.nio.ByteBuffer": "a byte buffer", "System.IO.MemoryStream": "a memory stream",
+            "java.io.InputStream": "a stream", "NodeJS.ReadableStream": "a stream", "str": "a string", "String": "a string",
+            "java.util.Map<java.lang.String, java.lang.String>": "a map", "dict": "a map", "Int64?": "a number", "*int64": "a number"})
+
+    def test_no_type_is_in_the_phrase_table_twice(self):
+        types = [t for ts in PHRASES.values() for t in ts]
+        self.assertEqual(sorted({t for t in types if types.count(t) > 1}), [])
