@@ -650,6 +650,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
     // Through a us-east-2 client it fails, which happens only if the keyring uses the client it was given.
     // -----------------------------------------------------------------------
 
+    @UsesRealKms
     @KeyringTest(
         feature = "aws-kms",
         name = "GenerateDataKey uses the configured client {0}")
@@ -674,6 +675,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         usEast2Keyring.onEncryptFailsWith(mpl.newEncryptionMaterials(), WRONG_REGION_KMS_ERROR);
     }
 
+    @UsesRealKms
     @KeyringTest(feature = "aws-kms", name = "Encrypt uses the configured client {0}")
     void encryptUsesConfiguredClient(Mpl mpl) {
         Keyring usWest2Keyring = mpl.awsKmsKeyring()
@@ -699,6 +701,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
             WRONG_REGION_KMS_ERROR);
     }
 
+    @UsesRealKms
     @KeyringTest(feature = "aws-kms", name = "Decrypt uses the configured client {0}")
     void decryptUsesConfiguredClient(Mpl mpl) {
         Keyring usWest2Keyring = mpl.awsKmsKeyring()
@@ -724,6 +727,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         usEast2Keyring.onDecryptFailsWith(mpl.newDecryptionMaterials(), edks, WRONG_REGION_KMS_ERROR);
     }
 
+    @UsesRealKms
     @KeyringTest(feature = "aws-kms", name = "one language encrypts and another decrypts with real KMS {0}", pairs = true)
     void roundTripWithRealKms(Mpl encryptingMpl, Mpl decryptingMpl) {
         // one language encrypts, another language decrypts: succeeds
