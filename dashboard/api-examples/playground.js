@@ -39,6 +39,7 @@ function optionsOf(api, langs) {
       const o = options.get(r.key) || options.set(r.key, { key: r.key, label: r.label, kind: r.kind, haves: [], byLang: {} }).get(r.key);
       for (const h of r.haves) if (!o.haves.includes(h)) o.haves.push(h);
       o.byLang[lang] = {
+        haves: r.haves,
         ways: a.ways.filter(w => w.row === r.key && w.kind === "setter"),
         choices: a.choices.filter(c => c.row === r.key),
         leftOut: a.left_out.find(x => x.rows.length === 1 && x.rows[0] === r.key) || null,
@@ -249,6 +250,75 @@ function diffApis(base, head, langs) {
   return out;
 }
 
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+const SYMBOLS = { ok: "✅", fails: "❌", untested: "⚠️", absent: "--" };
+
+// One cell of the compare matrix: what one have (or null, left out) does in one language.
+// A have that the language does not list is not offered, even when the language has the option.
+function cellOf(option, have, lang) {
+  const b = option.byLang[lang];
+  if (!b?.ways.length || (have !== null && !b.haves.includes(have))) {
+    return { kind: "absent", symbol: SYMBOLS.absent, title: `${lang}: not offered` };
+  }
+  const s = status(option, have, lang);
+  const setter = have === null ? "left out" : choiceOf(option, have, lang)?.setter.trim();
+  const title = [s.error, s.kind === "untested" ? "not tested" : setter].filter(Boolean).join(" · ");
+  return { kind: s.kind, symbol: SYMBOLS[s.kind], title: `${lang}: ${title}` };
+}
+
+// The compare matrix rows of one option: every have any language lists, then
+// leave it out, then the haves a PR removed. tag is "new" or "removed" in PR mode.
+function matrixRows(api, option, langs, diff) {
+  const tagOf = h => diff?.have[`${api.id}|${option.key}|${h}`] || "";
+  const rows = [...option.haves, null].map((have, j) => ({
+    have, index: have === null ? "" : String(j), tag: have === null ? "" : tagOf(have),
+    cells: Object.fromEntries(langs.map(l => [l, cellOf(option, have, l)])),
+  }));
+  for (const have of diff?.removedHaves[`${api.id}|${option.key}`] || []) {
+    rows.push({ have, index: null, tag: "removed",
+      cells: Object.fromEntries(langs.map(l => [l, { kind: "absent", symbol: SYMBOLS.absent, title: `${l}: removed` }])) });
+  }
+  return rows;
+}
+
+// "required", "required in rust", or "" when no language requires the option.
+function requiredLabel(option, langs) {
+  const offering = langs.filter(l => offers(option, l));
+  const req = offering.filter(l => option.byLang[l].ways.some(w => w.required));
+  if (!req.length) return "";
+  return req.length === offering.length ? "required" : `required in ${req.join(", ")}`;
+}
+
+const tagHtml = t => t ? ` <span class="tag ${t}">${t}</span>` : "";
+
+// One table with a column per language. Each item is { option, index } where
+// index is the option's place in options. With heads, each option gets a row
+// with its name, required label and PR tag, so one table can hold every option.
+// removed lists the options a PR removed. They get only a name row.
+function matrixHtml(api, items, langs, diff, heads, removed = []) {
+  const head = `<tr><th></th>${langs.map(l => `<th>${esc(l)}</th>`).join("")}</tr>`;
+  const body = items.map(({ option, index }) => {
+    const req = requiredLabel(option, langs);
+    const title = heads ? `<tr class="opt"><th colspan="${langs.length + 1}">${esc(option.label)}`
+      + `${req ? ` <span class="badge required">${esc(req)}</span>` : ""}${tagHtml(diff?.option[`${api.id}|${option.key}`])}</th></tr>` : "";
+    return title + matrixRows(api, option, langs, diff).map(r => `<tr><td class="have">${esc(r.have ?? "leave it out")}${tagHtml(r.tag)}</td>`
+      + langs.map(l => {
+        const c = r.cells[l];
+        const click = r.index === null ? "" : ` data-lang="${esc(l)}" data-option="${index}" data-have="${r.index}"`;
+        return `<td class="cell ${c.kind}" title="${esc(c.title)}"${click}>${c.symbol}</td>`;
+      }).join("") + `</tr>`).join("");
+  }).join("") + removed.map(o => `<tr class="opt"><th colspan="${langs.length + 1}">${esc(o.label)}${tagHtml("removed")}</th></tr>`).join("");
+  return `<table class="matrix">${head}${body}</table>`;
+}
+
+// A click on a matrix cell: that cell's language, and the picks with that cell's have.
+function pickCell(options, picks, cell) {
+  const option = options[Number(cell.option)];
+  const have = cell.have === "" ? null : option.haves[Number(cell.have)];
+  return { lang: cell.lang, picks: { ...picks, [option.key]: have } };
+}
+
 // Nav order: changed, new and removed APIs first, then the rest, each by name.
 function navOrder(apis, diff) {
   const rank = a => (diff && diff.api[a.id] ? 0 : 1);
@@ -263,6 +333,6 @@ function parsePr(text) {
 
 Object.assign(exports, {
   apisOf, optionsOf, offers, choiceOf, choiceLabel, startPicks, status, groupStatus, comboFor, verdict,
-  codeOf, newTest, render, diffApis, navOrder, parsePr,
+  codeOf, newTest, render, diffApis, navOrder, parsePr, cellOf, matrixRows, requiredLabel, matrixHtml, pickCell,
 });
 })(typeof module !== "undefined" ? module.exports : (window.Playground = {}));

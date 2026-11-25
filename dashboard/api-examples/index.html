@@ -53,6 +53,14 @@
   .empty { color:var(--dim); padding:20px 0; }
   details.problems { font-size:12px; margin:0 0 12px; } details.problems summary { cursor:pointer; color:#ffa198; }
   details.problems li { color:var(--dim); }
+  #all { background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:4px 12px; cursor:pointer; font:inherit; }
+  #all.on { color:var(--text); border-color:var(--sel); }
+  table.matrix { border-collapse:collapse; font-size:12px; margin-top:6px; }
+  table.matrix th, table.matrix td { border:1px solid var(--line); padding:2px 8px; text-align:center; }
+  table.matrix th { color:var(--dim); font-weight:600; }
+  table.matrix td.have { text-align:left; color:var(--text); }
+  table.matrix tr.opt th { text-align:left; color:var(--text); background:var(--panel); padding-top:6px; }
+  table.matrix td[data-lang] { cursor:pointer; } table.matrix td[data-lang]:hover { background:var(--bg); outline:1px solid var(--sel); }
 </style>
 </head>
 <body>
@@ -60,6 +68,7 @@
   <h1>API Examples</h1>
   <label title="A branch name reads every repo's api-examples artifacts from that branch. owner/repo#number reads that pull request's artifacts. Either one is compared with the default branch.">Branch or PR <input type="text" id="branch" size="32" placeholder="each repo's default branch"></label>
   <div class="tabs" id="tabs"></div>
+  <button id="all" title="Every option of this API in every language">All options</button>
 </header>
 <main>
   <nav id="nav"></nav>
@@ -86,7 +95,9 @@ const LANGS = SOURCES.map(s => s.language);
 // base is the default branch's file, when the page compares a branch or PR with it.
 const docs = {};
 // picks["MPL|raw-aes-keyring"] = { option row: have, or null to leave it out }
-const state = { lib:"MPL", api:null, lang:LANGS[0], picks:{} };
+// compare holds "MPL|raw-aes-keyring|keyName" for each card whose language matrix is open.
+// all shows every option's matrix in one table instead of the cards.
+const state = { lib:"MPL", api:null, lang:LANGS[0], picks:{}, compare:new Set(), all:false };
 
 // ---------- loading ----------
 async function entryText(zip, e) {
@@ -268,10 +279,13 @@ function cardHtml(ctx, option, i) {
   const where = s.where && doc ? link(doc, s.where.file, s.where.line, "test ↗") : "";
   const copy = (s.kind === "untested" || s.kind === "absent") && doc?.templates?.["new-test"]
     ? `<button data-copy="${i}">Copy as a new test</button>` : "";
+  const open = state.compare.has(`${ctx.pickKey}|${option.key}`);
+  const matrix = open ? P.matrixHtml(api, [{ option, index:i }], ctx.langs, diff, false) : "";
   return `<div class="card">
     <div class="head"><b>${esc(describe(option.label))}</b><code>${esc(option.label)}</code>${requiredBadge(option, lang)}${tag(diff?.option[`${api.id}|${option.key}`])}</div>
     <select data-option="${i}">${choices.join("")}</select>
-    <div class="st ${s.kind}"><span>${esc(s.label)}</span>${where}</div>${alts}${copy}</div>`;
+    <div class="st ${s.kind}"><span>${esc(s.label)}</span>${where}</div>${alts}${copy}
+    <button data-compare="${i}">${open ? "Hide languages" : "Compare languages"}</button>${matrix}</div>`;
 }
 
 function removedCard(option) {
@@ -320,10 +334,16 @@ function drawMain() {
   const pickKey = `${state.lib}|${api.id}`;
   const picks = state.picks[pickKey] ??= P.startPicks(options, lang, LANGS);
   const doc = loaded(lib, lang) ? docs[`${lib}|${lang}`].doc : null;
-  ctx = { api, options, picks, lang, diff, doc };
+  const langs = LANGS.filter(l => loaded(lib, l));
+  ctx = { api, options, picks, pickKey, lang, langs, diff, doc };
   const type = api.byLang[lang]?.type;
   html += `<h2 class="api">${esc(api.name)} ${tag(diff?.api[api.id])}</h2><div class="sub">${esc(state.lib)} · ${esc(api.group)}${type ? ` · <code>${esc(type)}</code>` : ""}</div>`;
   html += problemList(lib, api.id);
+  if (state.all) {
+    const items = options.map((option, index) => ({ option, index }));
+    $("main").innerHTML = html + P.matrixHtml(api, items, langs, diff, true, diff?.removedOptions[api.id] || []);
+    return;
+  }
   const code = P.codeOf(api, options, picks, lang);
   const removed = (diff?.removedOptions[api.id] || []).map(removedCard).join("");
   html += `<div class="play"><div class="cards">${options.map((o, i) => cardHtml(ctx, o, i)).join("")}${removed}</div>
@@ -334,6 +354,7 @@ function drawMain() {
 function draw() {
   if (!state.api) state.api = P.navOrder(P.apisOf(docsOf(LIBRARIES[state.lib]), LANGS), diffOf(LIBRARIES[state.lib]))[0]?.id || null;
   drawTabs(); drawNav(); drawMain();
+  $("all").className = state.all ? "on" : "";
 }
 
 // ---------- events ----------
@@ -355,6 +376,27 @@ $("main").addEventListener("change", e => {
   const option = ctx.options[Number(sel.dataset.option)];
   ctx.picks[option.key] = sel.value === "" ? null : option.haves[Number(sel.value)];
   drawMain();
+});
+$("all").addEventListener("click", () => {
+  state.all = !state.all;
+  draw();
+});
+$("main").addEventListener("click", e => {
+  const toggle = e.target.closest("button[data-compare]");
+  if (toggle && ctx) {
+    const key = `${ctx.pickKey}|${ctx.options[Number(toggle.dataset.compare)].key}`;
+    if (!state.compare.delete(key)) state.compare.add(key);
+    drawMain();
+    return;
+  }
+  // A cell shows that language's tab with that choice picked, in the cards.
+  const cell = e.target.closest("td[data-lang]");
+  if (!cell || !ctx) return;
+  const next = P.pickCell(ctx.options, ctx.picks, cell.dataset);
+  state.picks[ctx.pickKey] = next.picks;
+  state.lang = next.lang;
+  state.all = false;
+  draw();
 });
 $("main").addEventListener("click", async e => {
   const b = e.target.closest("button[data-copy]");

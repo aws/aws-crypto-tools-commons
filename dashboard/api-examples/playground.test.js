@@ -134,6 +134,39 @@ test("PR mode tags new and removed APIs, options and haves, and puts changed API
   assert.deepStrictEqual(order, ["raw-aes-keyring", "hierarchical-keyring"]);
 });
 
+// The compare matrix cell symbols, by option and have (null is leave it out), per language.
+function symbols(options, key, a) {
+  const rows = P.matrixRows(a, option(options, key), LANGS, null);
+  return Object.fromEntries(rows.map(r => [r.have, Object.fromEntries(LANGS.map(l => [l, r.cells[l].symbol]))]));
+}
+
+test("compare matrix: a shared choice works in both, a Java-only choice is not offered in Rust", () => {
+  const { a, options } = api("raw-aes-keyring");
+  assert.deepStrictEqual(symbols(options, "keyName", a)["a string"], { rust: "✅", java: "✅" });
+  assert.deepStrictEqual(symbols(options, "wrappingKey", a)["a SecretKey"], { rust: "--", java: "✅" });
+  assert.strictEqual(P.cellOf(option(options, "keyName"), "a string", "java").title, 'java: .keyName("my-key-name")');
+});
+
+test("compare matrix: a rejected choice and a rejected leave-it-out show the error", () => {
+  const { a, options } = api("raw-aes-keyring");
+  assert.strictEqual(symbols(options, "wrappingKey", a)["a key of the wrong length"].rust, "❌");
+  assert.deepStrictEqual(symbols(options, "keyName", a)[null], { rust: "❌", java: "❌" });
+  assert.strictEqual(P.cellOf(option(options, "keyName"), null, "java").title, "java: IllegalArgumentException · left out");
+});
+
+test("clicking a compare cell picks that language and that choice", () => {
+  const { a, options } = api("raw-aes-keyring");
+  const index = options.findIndex(o => o.key === "keyName");
+  const html = P.matrixHtml(a, [{ option: options[index], index }], LANGS, null, false);
+  const have = option(options, "keyName").haves.indexOf("a string from your config");
+  const cell = html.match(new RegExp(`data-lang="rust" data-option="${index}" data-have="${have}"`));
+  assert.ok(cell, "the cell carries its language, option and have");
+  const start = P.startPicks(options, "java", LANGS);
+  const next = P.pickCell(options, start, { lang: "rust", option: String(index), have: String(have) });
+  assert.strictEqual(next.lang, "rust");
+  assert.deepStrictEqual(next.picks, { ...start, keyName: "a string from your config" });
+});
+
 test("the branch box takes a branch or owner/repo#number", () => {
   assert.deepStrictEqual(P.parsePr("aws/aws-crypto-tools-rust#206"), { repo: "aws/aws-crypto-tools-rust", number: 206 });
   assert.strictEqual(P.parsePr("lucmcdon/api-examples"), null);
