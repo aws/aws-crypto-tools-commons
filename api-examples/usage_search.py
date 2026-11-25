@@ -455,7 +455,7 @@ def get(url, auth):
             later = re.search(r"try again in ([\d.]+)s", body)
             reset = int(e.headers.get("x-ratelimit-reset", time.time() + 60))
             wait = int(e.headers.get("retry-after") or (later and float(later.group(1))) or max(reset - time.time(), 1)) + 1
-            print(f"rate limited; waiting {wait}s", file=sys.stderr)
+            print(f"rate limited ({e.code} {body.strip()[:120]}); waiting {wait}s", file=sys.stderr)
             time.sleep(wait)
     raise SystemExit(f"still rate limited after 10 waits: {url}")
 
