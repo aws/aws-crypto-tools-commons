@@ -57,6 +57,13 @@ final class Materials {
             .build();
     }
 
+    /** {@code materials} with {@code dataKey} as their plaintext data key. */
+    static DecryptionMaterials materialsWithDataKey(DecryptionMaterials materials, byte[] dataKey) {
+        return materials.toBuilder()
+            .plaintextDataKey(ByteBuffer.wrap(dataKey))
+            .build();
+    }
+
     /**
      * An EDK for {@code providerId} and {@code providerInfo}.
      * Each {@code seed} gives a different ciphertext, so a test can tell EDKs apart.
