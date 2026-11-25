@@ -376,7 +376,7 @@ RULES = [
     Rule("Encoding.UTF8.GetBytes", r"Encoding\.(UTF8|ASCII|Unicode)\.GetBytes\s*\(", STRING, ["dotnet"]),
     Rule("string literal", r"^\s*(@|f|r)?(\"[^\"]*\"|'[^']*'|`[^`$]*`)\s*$", STRING),
     Rule("Files.readAllBytes", r"Files\.readAllBytes\s*\(", FILE, ["java"]),
-    Rule("open(...).read()", r"\.read\s*\(\s*\)", FILE, ["python"]),
+    Rule(".read()", r"\.read\s*\(\s*\)", "a file or stream", ["python"]),
     Rule("fs.readFileSync", r"\breadFile(Sync)?\s*\(", FILE, ["javascript"]),
     Rule("fs::read", r"\bfs::read(_to_string)?\s*\(", FILE, ["rust"]),
     Rule("File.ReadAllBytes", r"File\.ReadAll(Bytes|Text)\s*\(", FILE, ["dotnet"]),
@@ -392,6 +392,7 @@ RULES = [
     Rule(".to_string()", r"\.to_(string|owned)\s*\(\s*\)|String::from\s*\(", "a &str", ["rust"]),
     Rule("str(...)", r"(?<![\w.])str\s*\(", "a value that is not a string", ["python"]),
     Rule(".toString()", r"\.toString\s*\(\s*\)|String\.valueOf\s*\(", "a value that is not a string", ["java", "javascript"]),
+    Rule("list literal", r"^\s*\[", "separate values", ["python", "javascript"]),
     Rule("list of one", r"Collections\.singletonList|List\.of\s*\(|Arrays\.asList", "separate values", ["java"]),
     Rule("map literal", r"Collections\.singletonMap|Map\.of\s*\(|ImmutableMap\.of", "key/value pairs", ["java"]),
 ]

@@ -106,7 +106,7 @@ SAMPLES = {
     "Encoding.UTF8.GetBytes": ("dotnet", "Encoding.UTF8.GetBytes(s)"),
     "string literal": ("java", '"arn:aws:kms:us-west-2:111122223333:key/k"'),
     "Files.readAllBytes": ("java", "Files.readAllBytes(path)"),
-    "open(...).read()": ("python", "f.read()"),
+    ".read()": ("python", "f.read()"),
     "fs.readFileSync": ("javascript", "fs.readFileSync(path)"),
     "fs::read": ("rust", "std::fs::read(path)"),
     "File.ReadAllBytes": ("dotnet", "File.ReadAllBytes(path)"),
@@ -121,6 +121,7 @@ SAMPLES = {
     ".to_string()": ("rust", "arn.to_string()"),
     "str(...)": ("python", "str(key_id)"),
     ".toString()": ("java", "id.toString()"),
+    "list literal": ("python", "[arn]"),
     "list of one": ("java", "List.of(arn)"),
     "map literal": ("java", 'Map.of("k", "v")'),
 }
