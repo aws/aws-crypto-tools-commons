@@ -1,44 +1,27 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
+import static aws.cryptography.mpl.testserver.tests.Materials.edk;
+import static aws.cryptography.mpl.testserver.tests.Materials.materialsWithDataKey;
+import static aws.cryptography.mpl.testserver.tests.MplErrors.INVALID_CONFIGURATION_ERROR;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
-import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyringInput;
-import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterialsCacheInput;
-import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.Discovery;
 import aws.cryptography.mpl.testserver.client.model.EncryptedDataKey;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
-import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
-import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterialsInput;
 import aws.cryptography.mpl.testserver.client.model.KmsConfiguration;
-import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.mpl.testserver.client.model.MRDiscovery;
-import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
-import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
 import aws.cryptography.mpl.testserver.client.model.StaticBranchKeyIdSupplier;
-import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
-import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * The AWS KMS Hierarchical keyring, ported from the Dafny MPL's
@@ -61,7 +44,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * DISCOVERY_BRANCH_KEY_ID's KMS key, and the us-east-1 and us-west-2 replicas
  * of MRK_ID.
  */
-public class AwsKmsHierarchicalKeyringTest {
+@KeyringFeature("hierarchical")
+public class AwsKmsHierarchicalKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     // Shared branch key store fixtures in the CI-resources account 370957321024,
     // the same ones the Dafny MPL tests use (AwsCryptographyKeyStore/test/Fixtures.dfy).
@@ -123,31 +107,28 @@ public class AwsKmsHierarchicalKeyringTest {
     private static final int VERSION_LENGTH = 16;
     private static final int TAG_LENGTH = 16;
 
-    static List<TargetPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    @Override
+    public AlgorithmSuiteId algorithmSuite() {
+        return SUITE;
     }
 
-    static List<LanguageServerTarget> targets() {
-        return LanguageServerRegistry.shared().targets();
+    @Override
+    public Map<String, String> encryptionContext() {
+        return EC;
     }
 
-    static Stream<Arguments> pairsBySupplierCase() {
-        return Stream.of(CASE_A, CASE_B)
-            .flatMap(c -> pairs().stream().map(pair -> Arguments.of(c, pair)));
+    static List<String> supplierCases() {
+        return List.of(CASE_A, CASE_B);
     }
 
     // -----------------------------------------------------------------------
     // TestHierarchyClientESDKSuite
     // -----------------------------------------------------------------------
 
-    @ParameterizedTest(name = "[hierarchical] OnEncrypt/OnDecrypt {0}")
-    @MethodSource("pairs")
-    void onEncryptOnDecryptRoundTrip(TargetPair pair) {
-        FeatureGate.require(Set.of("hierarchical"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-
-        EncryptionMaterials encrypted = onEncrypt(enc, hierarchyKeyring(enc), initializeEncryption(enc, EC));
+    @KeyringTest(name = "[hierarchical] OnEncrypt/OnDecrypt {0}", pairs = true)
+    void onEncryptOnDecryptRoundTrip(Mpl encryptingMpl, Mpl decryptingMpl) {
+        EncryptionMaterials encrypted =
+            hierarchyKeyring(encryptingMpl).onEncrypt(encryptingMpl.newEncryptionMaterials());
 
         assertEquals(DATA_KEY_LENGTH, bytes(encrypted.getPlaintextDataKey()).length);
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
@@ -156,8 +137,8 @@ public class AwsKmsHierarchicalKeyringTest {
         assertArrayEquals(uuidBytes(BRANCH_KEY_ACTIVE_VERSION), versionBytes(edk),
             "the EDK carries the branch key's active version");
 
-        DecryptionMaterials decrypted = onDecrypt(dec, hierarchyKeyring(dec),
-            initializeDecryption(dec, EC), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted = hierarchyKeyring(decryptingMpl)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
@@ -166,26 +147,20 @@ public class AwsKmsHierarchicalKeyringTest {
      * Materials that already hold a data key: OnEncrypt must wrap that key, not
      * generate a new one. The Dafny test uses an all-zero key.
      */
-    @ParameterizedTest(name = "[hierarchical] wrap existing data key {0}")
-    @MethodSource("pairs")
-    void onEncryptWrapsExistingDataKey(TargetPair pair) {
-        FeatureGate.require(Set.of("hierarchical"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[hierarchical] wrap existing data key {0}", pairs = true)
+    void onEncryptWrapsExistingDataKey(Mpl encryptingMpl, Mpl decryptingMpl) {
         byte[] zeroedKey = new byte[DATA_KEY_LENGTH];
 
-        EncryptionMaterials withKey = initializeEncryption(enc, EC).toBuilder()
-            .plaintextDataKey(ByteBuffer.wrap(zeroedKey))
-            .build();
-        EncryptionMaterials encrypted = onEncrypt(enc, hierarchyKeyring(enc), withKey);
+        EncryptionMaterials withKey = materialsWithDataKey(encryptingMpl.newEncryptionMaterials(), zeroedKey);
+        EncryptionMaterials encrypted = hierarchyKeyring(encryptingMpl).onEncrypt(withKey);
 
         assertArrayEquals(zeroedKey, bytes(encrypted.getPlaintextDataKey()),
             "wrapping an existing data key must not replace it");
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
         assertHierarchyEdk(encrypted.getEncryptedDataKeys().get(0), BRANCH_KEY_ID);
 
-        DecryptionMaterials decrypted = onDecrypt(dec, hierarchyKeyring(dec),
-            initializeDecryption(dec, EC), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted = hierarchyKeyring(decryptingMpl)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(zeroedKey, bytes(decrypted.getPlaintextDataKey()));
     }
@@ -195,21 +170,18 @@ public class AwsKmsHierarchicalKeyringTest {
     // -----------------------------------------------------------------------
 
     /** The supplier picks the branch key from the encryption context, on both sides. */
-    @ParameterizedTest(name = "[hierarchical] supplier {0} {1}")
-    @MethodSource("pairsBySupplierCase")
-    void supplierSelectsBranchKeyFromContext(String supplierCase, TargetPair pair) {
-        FeatureGate.require(Set.of("hierarchical"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[hierarchical] supplier {0} {1}", inputs = "supplierCases", pairs = true)
+    void supplierSelectsBranchKeyFromContext(String supplierCase, Mpl encryptingMpl, Mpl decryptingMpl) {
         Map<String, String> ec = withSupplierCase(supplierCase);
 
-        EncryptionMaterials encrypted = onEncrypt(enc, supplierKeyring(enc), initializeEncryption(enc, ec));
+        EncryptionMaterials encrypted =
+            supplierKeyring(encryptingMpl).onEncrypt(encryptingMpl.newEncryptionMaterials(ec));
 
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
         assertHierarchyEdk(encrypted.getEncryptedDataKeys().get(0), SUPPLIER_MAPPING.get(supplierCase));
 
-        DecryptionMaterials decrypted = onDecrypt(dec, supplierKeyring(dec),
-            initializeDecryption(dec, ec), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted = supplierKeyring(decryptingMpl)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(ec), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
@@ -218,84 +190,58 @@ public class AwsKmsHierarchicalKeyringTest {
      * Encrypt under case A, decrypt with a case B context: the supplier picks the
      * other branch key, whose id does not match the EDK's, so no EDK decrypts.
      */
-    @ParameterizedTest(name = "[hierarchical] supplier picks a non-matching branch key {0}")
-    @MethodSource("pairs")
-    void onDecryptWithNonMatchingSuppliedBranchKeyFails(TargetPair pair) {
-        FeatureGate.require(Set.of("hierarchical"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[hierarchical] supplier picks a non-matching branch key {0}", pairs = true)
+    void onDecryptWithNonMatchingSuppliedBranchKeyFails(Mpl encryptingMpl, Mpl decryptingMpl) {
+        EncryptionMaterials encrypted = supplierKeyring(encryptingMpl)
+            .onEncrypt(encryptingMpl.newEncryptionMaterials(withSupplierCase(CASE_A)));
 
-        EncryptionMaterials encrypted = onEncrypt(enc, supplierKeyring(enc),
-            initializeEncryption(enc, withSupplierCase(CASE_A)));
-
-        String keyringId = supplierKeyring(dec);
-        DecryptionMaterials caseB = initializeDecryption(dec, withSupplierCase(CASE_B));
-        assertThrows(MPLClientError.class, () -> dec.onDecrypt(OnDecryptInput.builder()
-            .keyringId(keyringId)
-            .materials(caseB)
-            .encryptedDataKeys(encrypted.getEncryptedDataKeys())
-            .build()));
+        Keyring keyring = supplierKeyring(decryptingMpl);
+        DecryptionMaterials caseB = decryptingMpl.newDecryptionMaterials(withSupplierCase(CASE_B));
+        keyring.onDecryptFails(caseB, encrypted.getEncryptedDataKeys());
     }
 
     /** DummyBranchKeyIdSupplier fails for a context it has no mapping for. */
-    @ParameterizedTest(name = "[hierarchical] supplier with no mapping for the context fails {0}")
-    @MethodSource("targets")
-    void supplierWithNoMappingFails(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-
-        String keyringId = supplierKeyring(client);
-        EncryptionMaterials materials = initializeEncryption(client, EC);
-        assertThrows(MPLClientError.class, () -> client.onEncrypt(OnEncryptInput.builder()
-            .keyringId(keyringId)
-            .materials(materials)
-            .build()));
+    @KeyringTest(name = "[hierarchical] supplier with no mapping for the context fails {0}")
+    void supplierWithNoMappingFails(Mpl mpl) {
+        Keyring keyring = supplierKeyring(mpl);
+        keyring.onEncryptFails(mpl.newEncryptionMaterials());
     }
 
     // -----------------------------------------------------------------------
     // Construction (AwsCryptographyMaterialProvidersOperations.dfy)
     // -----------------------------------------------------------------------
 
-    @ParameterizedTest(name = "[hierarchical] both branch key id and supplier rejected {0}")
-    @MethodSource("targets")
-    void bothBranchKeyIdAndSupplierRejected(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
+    @KeyringTest(name = "[hierarchical] both branch key id and supplier rejected {0}")
+    void bothBranchKeyIdAndSupplierRejected(Mpl mpl) {
+        String keyStoreId = keyStore(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
 
         // Accepts a branch key id alone: the keyring encrypts a data key and decrypts it again
-        String keyringId = createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+        Keyring keyring = mpl.hierarchicalKeyring()
             .keyStoreId(keyStoreId)
             .branchKeyId(BRANCH_KEY_ID)
-            .ttlSeconds(TTL_SECONDS));
-        EncryptionMaterials encrypted = onEncrypt(client, keyringId, initializeEncryption(client, EC));
-        DecryptionMaterials decrypted = onDecrypt(client, keyringId, initializeDecryption(client, EC),
-            encrypted.getEncryptedDataKeys());
+            .ttlSeconds(TTL_SECONDS)
+            .create();
+        EncryptionMaterials encrypted = keyring.onEncrypt(mpl.newEncryptionMaterials());
+        DecryptionMaterials decrypted =
+            keyring.onDecrypt(mpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
         assertEquals(encrypted.getPlaintextDataKey(), decrypted.getPlaintextDataKey());
         // Rejects a branch key id and a supplier together
-        MPLClientError error = assertThrows(MPLClientError.class,
-            () -> client.createAwsKmsHierarchicalKeyring(
-                CreateAwsKmsHierarchicalKeyringInput.builder()
-                    .keyStoreId(keyStoreId)
-                    .branchKeyId(BRANCH_KEY_ID)
-                    .branchKeyIdSupplier(supplier())
-                    .ttlSeconds(TTL_SECONDS)
-                    .build()));
-        MplErrors.expectError(target, error).kind("Validation").retryable(false);
+        mpl.hierarchicalKeyring()
+            .keyStoreId(keyStoreId)
+            .branchKeyId(BRANCH_KEY_ID)
+            .branchKeyIdSupplier(supplier())
+            .ttlSeconds(TTL_SECONDS)
+            .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
-    @ParameterizedTest(name = "[hierarchical] neither branch key id nor supplier rejected {0}")
-    @MethodSource("targets")
-    void neitherBranchKeyIdNorSupplierRejected(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
+    @KeyringTest(name = "[hierarchical] neither branch key id nor supplier rejected {0}")
+    void neitherBranchKeyIdNorSupplierRejected(Mpl mpl) {
+        String keyStoreId = keyStore(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
 
-        assertThrows(MPLClientError.class, () -> client.createAwsKmsHierarchicalKeyring(
-            CreateAwsKmsHierarchicalKeyringInput.builder()
-                .keyStoreId(keyStoreId)
-                .ttlSeconds(TTL_SECONDS)
-                .build()));
+        mpl.hierarchicalKeyring()
+            .keyStoreId(keyStoreId)
+            .ttlSeconds(TTL_SECONDS)
+            .createFails();
     }
 
     // -----------------------------------------------------------------------
@@ -307,55 +253,43 @@ public class AwsKmsHierarchicalKeyringTest {
     // cache hit; HK2 still failing proves a miss.
     // -----------------------------------------------------------------------
 
-    @ParameterizedTest(name = "[hierarchical] shared cache, same partition, same logical name: hit {0}")
-    @MethodSource("targets")
-    void sharedCacheSamePartitionSameLogicalNameHits(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cacheId = sharedCache(client);
-        String hk1 = sharedCacheKeyring(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionId");
-        String hk2 = sharedCacheKeyring(client, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionId");
+    @KeyringTest(name = "[hierarchical] shared cache, same partition, same logical name: hit {0}")
+    void sharedCacheSamePartitionSameLogicalNameHits(Mpl mpl) {
+        String cacheId = mpl.sharedCache(100);
+        Keyring hk1 = sharedCacheKeyring(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionId");
+        Keyring hk2 = sharedCacheKeyring(mpl, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionId");
 
-        assertOnEncryptFails(client, hk2);
-        roundTripOnOneTarget(client, hk1);
-        roundTripOnOneTarget(client, hk2);
+        hk2.onEncryptFails(mpl.newEncryptionMaterials());
+        roundTripOnOneTarget(mpl, hk1);
+        roundTripOnOneTarget(mpl, hk2);
     }
 
-    @ParameterizedTest(name = "[hierarchical] shared cache, unspecified partitions: miss {0}")
-    @MethodSource("targets")
-    void sharedCacheUnspecifiedPartitionsMiss(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cacheId = sharedCache(client);
-        String hk1 = sharedCacheKeyring(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, null);
-        String hk2 = sharedCacheKeyring(client, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME, cacheId, null);
+    @KeyringTest(name = "[hierarchical] shared cache, unspecified partitions: miss {0}")
+    void sharedCacheUnspecifiedPartitionsMiss(Mpl mpl) {
+        String cacheId = mpl.sharedCache(100);
+        Keyring hk1 = sharedCacheKeyring(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, null);
+        Keyring hk2 = sharedCacheKeyring(mpl, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME, cacheId, null);
 
-        assertSharedCacheMiss(client, hk1, hk2);
+        assertSharedCacheMiss(mpl, hk1, hk2);
     }
 
-    @ParameterizedTest(name = "[hierarchical] shared cache, different partitions: miss {0}")
-    @MethodSource("targets")
-    void sharedCacheDifferentPartitionsMiss(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cacheId = sharedCache(client);
-        String hk1 = sharedCacheKeyring(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionIdHK1");
-        String hk2 = sharedCacheKeyring(client, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionIdHK2");
+    @KeyringTest(name = "[hierarchical] shared cache, different partitions: miss {0}")
+    void sharedCacheDifferentPartitionsMiss(Mpl mpl) {
+        String cacheId = mpl.sharedCache(100);
+        Keyring hk1 = sharedCacheKeyring(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionIdHK1");
+        Keyring hk2 = sharedCacheKeyring(mpl, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionIdHK2");
 
-        assertSharedCacheMiss(client, hk1, hk2);
+        assertSharedCacheMiss(mpl, hk1, hk2);
     }
 
-    @ParameterizedTest(name = "[hierarchical] shared cache, same partition, different logical name: miss {0}")
-    @MethodSource("targets")
-    void sharedCacheDifferentLogicalNameMiss(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cacheId = sharedCache(client);
-        String hk1 = sharedCacheKeyring(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionId");
-        String hk2 = sharedCacheKeyring(client, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME + "New",
+    @KeyringTest(name = "[hierarchical] shared cache, same partition, different logical name: miss {0}")
+    void sharedCacheDifferentLogicalNameMiss(Mpl mpl) {
+        String cacheId = mpl.sharedCache(100);
+        Keyring hk1 = sharedCacheKeyring(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME, cacheId, "partitionId");
+        Keyring hk2 = sharedCacheKeyring(mpl, MISMATCHED_KMS_REGION, LOGICAL_KEY_STORE_NAME + "New",
             cacheId, "partitionId");
 
-        assertSharedCacheMiss(client, hk1, hk2);
+        assertSharedCacheMiss(mpl, hk1, hk2);
     }
 
     // -----------------------------------------------------------------------
@@ -423,25 +357,10 @@ public class AwsKmsHierarchicalKeyringTest {
                 "ap-south-2", WEST_BRANCH_KEY));
     }
 
-    static Stream<Arguments> servingCasesByPair() {
-        return servingCases().stream()
-            .flatMap(c -> pairs().stream().map(pair -> Arguments.of(c, pair)));
-    }
-
-    static Stream<Arguments> rejectingCasesByTarget() {
-        return rejectingCases().stream()
-            .flatMap(c -> targets().stream().map(target -> Arguments.of(c, target)));
-    }
-
-    @ParameterizedTest(name = "[hierarchical] key store {0} round trip {1}")
-    @MethodSource("servingCasesByPair")
-    void keyStoreConfigurationServesBranchKey(KeyStoreCase keyStoreCase, TargetPair pair) {
-        FeatureGate.require(Set.of("hierarchical"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-
-        EncryptionMaterials encrypted = onEncrypt(enc, keyStoreCaseKeyring(enc, keyStoreCase),
-            initializeEncryption(enc, EC));
+    @KeyringTest(name = "[hierarchical] key store {0} round trip {1}", inputs = "servingCases", pairs = true)
+    void keyStoreConfigurationServesBranchKey(KeyStoreCase keyStoreCase, Mpl encryptingMpl, Mpl decryptingMpl) {
+        EncryptionMaterials encrypted = keyStoreCaseKeyring(encryptingMpl, keyStoreCase)
+            .onEncrypt(encryptingMpl.newEncryptionMaterials());
 
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
         EncryptedDataKey edk = encrypted.getEncryptedDataKeys().get(0);
@@ -451,46 +370,51 @@ public class AwsKmsHierarchicalKeyringTest {
                 "the EDK carries the branch key's active version");
         }
 
-        DecryptionMaterials decrypted = onDecrypt(dec, keyStoreCaseKeyring(dec, keyStoreCase),
-            initializeDecryption(dec, EC), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted = keyStoreCaseKeyring(decryptingMpl, keyStoreCase)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[hierarchical] key store {0} rejects the branch key {1}")
-    @MethodSource("rejectingCasesByTarget")
-    void keyStoreConfigurationRejectsBranchKey(KeyStoreCase keyStoreCase, LanguageServerTarget target) {
-        FeatureGate.require(Set.of("hierarchical"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+    @KeyringTest(name = "[hierarchical] key store {0} rejects the branch key {1}", inputs = "rejectingCases")
+    void keyStoreConfigurationRejectsBranchKey(KeyStoreCase keyStoreCase, Mpl mpl) {
+        keyStoreCaseKeyring(mpl, keyStoreCase).onEncryptFails(mpl.newEncryptionMaterials());
+    }
 
-        assertOnEncryptFails(client, keyStoreCaseKeyring(client, keyStoreCase));
+    // -----------------------------------------------------------------------
+    // Checks every keyring must pass
+    // -----------------------------------------------------------------------
+
+    @Override
+    public Keyring workingKeyring(Mpl mpl) {
+        return hierarchyKeyring(mpl);
+    }
+
+    /** One EDK for another provider and one for another branch key. */
+    @Override
+    public List<EncryptedDataKey> edksThatDontMatch() {
+        return List.of(
+            edk("raw-aes", BRANCH_KEY_ID, 1),
+            edk(PROVIDER_ID, BRANCH_KEY_ID_WITH_EC, 2));
     }
 
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
-    private static void assertSharedCacheMiss(MPLTestServerClient client, String hk1, String hk2) {
-        assertOnEncryptFails(client, hk2);
-        roundTripOnOneTarget(client, hk1);
-        assertOnEncryptFails(client, hk2);
-    }
-
-    private static void assertOnEncryptFails(MPLTestServerClient client, String keyringId) {
-        EncryptionMaterials materials = initializeEncryption(client, EC);
-        assertThrows(MPLClientError.class, () -> client.onEncrypt(OnEncryptInput.builder()
-            .keyringId(keyringId)
-            .materials(materials)
-            .build()));
+    private static void assertSharedCacheMiss(Mpl mpl, Keyring hk1, Keyring hk2) {
+        hk2.onEncryptFails(mpl.newEncryptionMaterials());
+        roundTripOnOneTarget(mpl, hk1);
+        hk2.onEncryptFails(mpl.newEncryptionMaterials());
     }
 
     /** The Dafny TestRoundtrip: OnEncrypt then OnDecrypt with one keyring. */
-    private static void roundTripOnOneTarget(MPLTestServerClient client, String keyringId) {
-        EncryptionMaterials encrypted = onEncrypt(client, keyringId, initializeEncryption(client, EC));
+    private static void roundTripOnOneTarget(Mpl mpl, Keyring keyring) {
+        EncryptionMaterials encrypted = keyring.onEncrypt(mpl.newEncryptionMaterials());
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
         assertHierarchyEdk(encrypted.getEncryptedDataKeys().get(0), BRANCH_KEY_ID);
-        DecryptionMaterials decrypted = onDecrypt(client, keyringId,
-            initializeDecryption(client, EC), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted =
+            keyring.onDecrypt(mpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
@@ -530,27 +454,19 @@ public class AwsKmsHierarchicalKeyringTest {
             .build();
     }
 
-    private static String keyStore(MPLTestServerClient client, String kmsRegion, String logicalName) {
-        return keyStore(client, kmsKeyArn(KMS_KEY_ARN), kmsRegion, logicalName);
+    private static String keyStore(Mpl mpl, String kmsRegion, String logicalName) {
+        return keyStore(mpl, kmsKeyArn(KMS_KEY_ARN), kmsRegion, logicalName);
     }
 
-    private static String keyStore(MPLTestServerClient client, KmsConfiguration kmsConfiguration,
-            String kmsRegion, String logicalName) {
-        return MplTestServerClients.withRetry(() -> client.createKeyStoreClient(
-            CreateKeyStoreClientInput.builder()
-                .ddbTableName(KEY_STORE_TABLE_NAME)
-                .logicalKeyStoreName(logicalName)
-                .kmsConfiguration(kmsConfiguration)
-                .kmsClientRegion(kmsRegion)
-                .ddbClientRegion(KEY_STORE_REGION)
-                .build())).getKeyStoreId();
-    }
-
-    private static String sharedCache(MPLTestServerClient client) {
-        return MplTestServerClients.withRetry(() -> client.createCryptographicMaterialsCache(
-            CreateCryptographicMaterialsCacheInput.builder()
-                .entryCapacity(100)
-                .build())).getCacheId();
+    private static String keyStore(Mpl mpl, KmsConfiguration kmsConfiguration, String kmsRegion,
+            String logicalName) {
+        return mpl.keyStore()
+            .ddbTableName(KEY_STORE_TABLE_NAME)
+            .logicalKeyStoreName(logicalName)
+            .kmsConfiguration(kmsConfiguration)
+            .kmsClientRegion(kmsRegion)
+            .ddbClientRegion(KEY_STORE_REGION)
+            .create();
     }
 
     private static KmsConfiguration kmsKeyArn(String arn) {
@@ -571,101 +487,43 @@ public class AwsKmsHierarchicalKeyringTest {
             .build();
     }
 
-    private static String keyStoreCaseKeyring(MPLTestServerClient client, KeyStoreCase keyStoreCase) {
-        String keyStoreId = keyStore(client, keyStoreCase.kmsConfiguration(), keyStoreCase.kmsRegion(),
+    private static Keyring keyStoreCaseKeyring(Mpl mpl, KeyStoreCase keyStoreCase) {
+        String keyStoreId = keyStore(mpl, keyStoreCase.kmsConfiguration(), keyStoreCase.kmsRegion(),
             LOGICAL_KEY_STORE_NAME);
-        return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+        return mpl.hierarchicalKeyring()
             .keyStoreId(keyStoreId)
             .branchKeyId(keyStoreCase.branchKeyId())
-            .ttlSeconds(TTL_SECONDS));
+            .ttlSeconds(TTL_SECONDS)
+            .create();
     }
 
-    private static String hierarchyKeyring(MPLTestServerClient client) {
-        String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
-        return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+    private static Keyring hierarchyKeyring(Mpl mpl) {
+        String keyStoreId = keyStore(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
+        return mpl.hierarchicalKeyring()
             .keyStoreId(keyStoreId)
             .branchKeyId(BRANCH_KEY_ID)
-            .ttlSeconds(TTL_SECONDS));
+            .ttlSeconds(TTL_SECONDS)
+            .create();
     }
 
-    private static String supplierKeyring(MPLTestServerClient client) {
-        String keyStoreId = keyStore(client, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
-        return createKeyring(client, CreateAwsKmsHierarchicalKeyringInput.builder()
+    private static Keyring supplierKeyring(Mpl mpl) {
+        String keyStoreId = keyStore(mpl, KEY_STORE_REGION, LOGICAL_KEY_STORE_NAME);
+        return mpl.hierarchicalKeyring()
             .keyStoreId(keyStoreId)
             .branchKeyIdSupplier(supplier())
-            .ttlSeconds(TTL_SECONDS));
+            .ttlSeconds(TTL_SECONDS)
+            .create();
     }
 
     /** @param partitionId the partition, or null to let the MPL generate one. */
-    private static String sharedCacheKeyring(MPLTestServerClient client, String kmsRegion,
-            String logicalName, String cacheId, String partitionId) {
-        String keyStoreId = keyStore(client, kmsRegion, logicalName);
-        CreateAwsKmsHierarchicalKeyringInput.Builder builder = CreateAwsKmsHierarchicalKeyringInput.builder()
+    private static Keyring sharedCacheKeyring(Mpl mpl, String kmsRegion, String logicalName, String cacheId,
+            String partitionId) {
+        String keyStoreId = keyStore(mpl, kmsRegion, logicalName);
+        Mpl.HierarchicalKeyringBuilder builder = mpl.hierarchicalKeyring()
             .keyStoreId(keyStoreId)
             .branchKeyId(BRANCH_KEY_ID)
             .ttlSeconds(TTL_SECONDS)
             .cacheId(cacheId);
-        return createKeyring(client, partitionId == null ? builder : builder.partitionId(partitionId));
-    }
-
-    private static String createKeyring(MPLTestServerClient client,
-            CreateAwsKmsHierarchicalKeyringInput.Builder builder) {
-        return MplTestServerClients.withRetry(() ->
-            client.createAwsKmsHierarchicalKeyring(builder.build())).getKeyringId();
-    }
-
-    private static EncryptionMaterials initializeEncryption(MPLTestServerClient client, Map<String, String> ec) {
-        EncryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            client.initializeEncryptionMaterials(InitializeEncryptionMaterialsInput.builder()
-                .algorithmSuiteId(SUITE)
-                .encryptionContext(ec)
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "initialized materials carry no data key");
-        return materials;
-    }
-
-    private static DecryptionMaterials initializeDecryption(MPLTestServerClient client, Map<String, String> ec) {
-        DecryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            client.initializeDecryptionMaterials(InitializeDecryptionMaterialsInput.builder()
-                .algorithmSuiteId(SUITE)
-                .encryptionContext(ec)
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "initialized materials carry no data key");
-        return materials;
-    }
-
-    private static EncryptionMaterials onEncrypt(
-        MPLTestServerClient client, String keyringId, EncryptionMaterials materials) {
-        EncryptionMaterials out = MplTestServerClients.withRetry(() ->
-            client.onEncrypt(OnEncryptInput.builder()
-                .keyringId(keyringId)
-                .materials(materials)
-                .build())).getMaterials();
-        assertNotNull(out.getPlaintextDataKey());
-        assertEquals(SUITE.getValue(), out.getAlgorithmSuiteId().getValue());
-        return out;
-    }
-
-    private static DecryptionMaterials onDecrypt(
-        MPLTestServerClient client, String keyringId, DecryptionMaterials materials,
-        List<EncryptedDataKey> edks) {
-        DecryptionMaterials out = MplTestServerClients.withRetry(() ->
-            client.onDecrypt(OnDecryptInput.builder()
-                .keyringId(keyringId)
-                .materials(materials)
-                .encryptedDataKeys(edks)
-                .build())).getMaterials();
-        assertNotNull(out.getPlaintextDataKey());
-        return out;
-    }
-
-    /** Copy a ByteBuffer's remaining bytes without moving its position. */
-    private static byte[] bytes(ByteBuffer buffer) {
-        ByteBuffer view = buffer.duplicate();
-        byte[] out = new byte[view.remaining()];
-        view.get(out);
-        return out;
+        return (partitionId == null ? builder : builder.partitionId(partitionId)).create();
     }
 }

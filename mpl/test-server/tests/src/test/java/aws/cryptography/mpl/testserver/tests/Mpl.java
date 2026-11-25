@@ -3,9 +3,14 @@ package aws.cryptography.mpl.testserver.tests;
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
+import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyringInput;
+import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterialsCacheInput;
+import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
+import aws.cryptography.mpl.testserver.client.model.KmsConfiguration;
+import aws.cryptography.mpl.testserver.client.model.StaticBranchKeyIdSupplier;
 import aws.cryptography.testserver.tests.ExpectedError;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.nio.ByteBuffer;
@@ -164,6 +169,135 @@ final class Mpl {
             CreateRawAesKeyringInput request = input.build();
             return FailureCheck.run(Mpl.this, () -> MplTestServerClients.withRetry(() ->
                 testServer.createRawAesKeyring(request)), expected);
+        }
+    }
+
+    /** Start building an AWS KMS Hierarchical keyring. */
+    HierarchicalKeyringBuilder hierarchicalKeyring() {
+        throwUnresolvedFailure();
+        return new HierarchicalKeyringBuilder();
+    }
+
+    /** Start building a key store client, which a Hierarchical keyring reads branch keys from. */
+    KeyStoreBuilder keyStore() {
+        throwUnresolvedFailure();
+        return new KeyStoreBuilder();
+    }
+
+    /**
+     * Create a materials cache that Hierarchical keyrings in this language's test server can share.
+     *
+     * @return the ID that the test server gave the cache, for {@link HierarchicalKeyringBuilder#cacheId}
+     */
+    String sharedCache(int entryCapacity) {
+        CreateCryptographicMaterialsCacheInput request = CreateCryptographicMaterialsCacheInput.builder()
+            .entryCapacity(entryCapacity)
+            .build();
+        return MplTestServerClients.withRetry(() ->
+            testServer().createCryptographicMaterialsCache(request)).getCacheId();
+    }
+
+    /** The settings of an AWS KMS Hierarchical keyring. {@link #create()} sends them to the MPL. */
+    final class HierarchicalKeyringBuilder {
+        private final CreateAwsKmsHierarchicalKeyringInput.Builder input =
+            CreateAwsKmsHierarchicalKeyringInput.builder();
+
+        private HierarchicalKeyringBuilder() {
+        }
+
+        /** The ID that {@link KeyStoreBuilder#create()} returned. */
+        HierarchicalKeyringBuilder keyStoreId(String keyStoreId) {
+            input.keyStoreId(keyStoreId);
+            return this;
+        }
+
+        HierarchicalKeyringBuilder branchKeyId(String branchKeyId) {
+            input.branchKeyId(branchKeyId);
+            return this;
+        }
+
+        HierarchicalKeyringBuilder branchKeyIdSupplier(StaticBranchKeyIdSupplier branchKeyIdSupplier) {
+            input.branchKeyIdSupplier(branchKeyIdSupplier);
+            return this;
+        }
+
+        HierarchicalKeyringBuilder ttlSeconds(int ttlSeconds) {
+            input.ttlSeconds(ttlSeconds);
+            return this;
+        }
+
+        /** The ID that {@link Mpl#sharedCache} returned. */
+        HierarchicalKeyringBuilder cacheId(String cacheId) {
+            input.cacheId(cacheId);
+            return this;
+        }
+
+        HierarchicalKeyringBuilder partitionId(String partitionId) {
+            input.partitionId(partitionId);
+            return this;
+        }
+
+        /** Create the keyring, which must succeed. */
+        Keyring create() {
+            CreateAwsKmsHierarchicalKeyringInput request = input.build();
+            return new Keyring(Mpl.this, MplTestServerClients.withRetry(() ->
+                testServer().createAwsKmsHierarchicalKeyring(request)).getKeyringId());
+        }
+
+        /** Create the keyring, which must fail with any error. */
+        FailureCheck createFails() {
+            return createFailsWith(null);
+        }
+
+        /** Create the keyring, which must fail with {@code expected}. */
+        FailureCheck createFailsWith(ExpectedError expected) {
+            CreateAwsKmsHierarchicalKeyringInput request = input.build();
+            return FailureCheck.run(Mpl.this, () -> MplTestServerClients.withRetry(() ->
+                testServer.createAwsKmsHierarchicalKeyring(request)), expected);
+        }
+    }
+
+    /** The settings of a key store client. {@link #create()} sends them to the MPL. */
+    final class KeyStoreBuilder {
+        private final CreateKeyStoreClientInput.Builder input = CreateKeyStoreClientInput.builder();
+
+        private KeyStoreBuilder() {
+        }
+
+        KeyStoreBuilder ddbTableName(String ddbTableName) {
+            input.ddbTableName(ddbTableName);
+            return this;
+        }
+
+        KeyStoreBuilder logicalKeyStoreName(String logicalKeyStoreName) {
+            input.logicalKeyStoreName(logicalKeyStoreName);
+            return this;
+        }
+
+        KeyStoreBuilder kmsConfiguration(KmsConfiguration kmsConfiguration) {
+            input.kmsConfiguration(kmsConfiguration);
+            return this;
+        }
+
+        KeyStoreBuilder kmsClientRegion(String kmsClientRegion) {
+            input.kmsClientRegion(kmsClientRegion);
+            return this;
+        }
+
+        KeyStoreBuilder ddbClientRegion(String ddbClientRegion) {
+            input.ddbClientRegion(ddbClientRegion);
+            return this;
+        }
+
+        /**
+         * Create the key store client, which must succeed.
+         *
+         * @return the ID that the test server gave it, for {@link HierarchicalKeyringBuilder#keyStoreId}
+         */
+        String create() {
+            CreateKeyStoreClientInput request = input.build();
+            return MplTestServerClients.withRetry(() ->
+                testServer().createKeyStoreClient(request)).getKeyStoreId();
         }
     }
 }
