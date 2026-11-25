@@ -1,7 +1,7 @@
 package aws.cryptography.mpl.testserver.tests;
 
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.PUBLIC_KEY_EC_KEY;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.bytes;
+import static aws.cryptography.mpl.testserver.tests.Cmm.PUBLIC_KEY_EC_KEY;
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

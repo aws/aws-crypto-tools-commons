@@ -1,5 +1,6 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,7 +11,6 @@ import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
 import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
 import aws.cryptography.testserver.tests.ExpectedError;
-import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
@@ -93,13 +93,5 @@ final class Keyring {
             .materials(materials)
             .encryptedDataKeys(encryptedDataKeys)
             .build();
-    }
-
-    /** Copy a ByteBuffer's remaining bytes without moving its position. */
-    private static byte[] bytes(ByteBuffer buffer) {
-        ByteBuffer view = buffer.duplicate();
-        byte[] out = new byte[view.remaining()];
-        view.get(out);
-        return out;
     }
 }

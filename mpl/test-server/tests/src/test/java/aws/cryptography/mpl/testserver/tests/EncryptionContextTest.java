@@ -1,20 +1,14 @@
 package aws.cryptography.mpl.testserver.tests;
 
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.bytes;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.createCmm;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.decrypt;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.decryptMaterials;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.encrypt;
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
 import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsOutput;
-import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.testserver.tests.EncryptionContextInputs;
 import aws.cryptography.testserver.tests.Example;
 import aws.cryptography.testserver.tests.ExampleCases;
@@ -95,12 +89,12 @@ public class EncryptionContextTest {
     @MethodSource("pairsByContext")
     void roundTrip(Example<Map<String, String>> context, TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), context.value(), POLICY, SUITE);
+        Cmm encryptingCmm = Cmm.defaultCmm(MplTestServerClients.forEndpoint(pair.encryptEndpoint()));
+        GetEncryptionMaterialsOutput encrypted = encryptingCmm.getEncryptionMaterials(context.value(), POLICY, SUITE);
         assertEquals(context.value(), encrypted.getEncryptionContext());
 
-        DecryptMaterialsOutput decrypted = decrypt(
-            MplTestServerClients.forEndpoint(pair.decryptEndpoint()), encrypted, POLICY);
+        DecryptMaterialsOutput decrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.decryptEndpoint())).decryptMaterials(encrypted, POLICY);
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(context.value(), decrypted.getEncryptionContext());
@@ -110,16 +104,14 @@ public class EncryptionContextTest {
     @MethodSource("pairsByNonEmptyContext")
     void alteredContextRejected(Example<Map<String, String>> context, TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), context.value(), POLICY, SUITE);
+        Cmm encryptingCmm = Cmm.defaultCmm(MplTestServerClients.forEndpoint(pair.encryptEndpoint()));
+        GetEncryptionMaterialsOutput encrypted = encryptingCmm.getEncryptionMaterials(context.value(), POLICY, SUITE);
 
         Map<String, String> altered = EncryptionContextInputs.withOneValueChanged(encrypted.getEncryptionContext());
 
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        String cmmId = createCmm(dec);
-        assertThrows(MPLClientError.class, () -> dec.decryptMaterials(
-            decryptMaterials(cmmId, encrypted, POLICY)
-                .encryptionContext(altered)
-                .build()));
+        Cmm cmm = Cmm.defaultCmm(dec);
+        cmm.decryptMaterialsFails(cmm.decryptMaterialsRequest(encrypted, POLICY)
+            .encryptionContext(altered));
     }
 }

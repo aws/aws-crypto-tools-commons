@@ -1,7 +1,5 @@
 package aws.cryptography.mpl.testserver.tests;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
@@ -9,8 +7,6 @@ import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
-import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
-import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterialsInput;
 import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import aws.cryptography.testserver.tests.ExpectedError;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
@@ -98,14 +94,7 @@ final class Mpl {
     /** New encryption materials with {@code suite}, the test class's encryption context, and no data key yet. */
     EncryptionMaterials newEncryptionMaterials(AlgorithmSuiteId suite) {
         throwUnresolvedFailure();
-        EncryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            testServer.initializeEncryptionMaterials(InitializeEncryptionMaterialsInput.builder()
-                .algorithmSuiteId(suite)
-                .encryptionContext(requireDefaults().encryptionContext())
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "new encryption materials hold no data key");
-        return materials;
+        return Materials.newEncryptionMaterials(testServer, suite, requireDefaults().encryptionContext());
     }
 
     /** New decryption materials with the test class's suite and encryption context, and no data key yet. */
@@ -116,14 +105,7 @@ final class Mpl {
     /** New decryption materials with {@code suite}, the test class's encryption context, and no data key yet. */
     DecryptionMaterials newDecryptionMaterials(AlgorithmSuiteId suite) {
         throwUnresolvedFailure();
-        DecryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            testServer.initializeDecryptionMaterials(InitializeDecryptionMaterialsInput.builder()
-                .algorithmSuiteId(suite)
-                .encryptionContext(requireDefaults().encryptionContext())
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "new decryption materials hold no data key");
-        return materials;
+        return Materials.newDecryptionMaterials(testServer, suite, requireDefaults().encryptionContext());
     }
 
     private KeyringTestDefaults requireDefaults() {
