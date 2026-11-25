@@ -177,6 +177,13 @@ class PickerTest(unittest.TestCase):
         self.assertIn("//# The thing MUST be blue.", out)
         self.assertNotIn("The lid MUST be green.", out)
 
+    def test_reads_a_keyring_test_whose_arguments_span_lines(self):
+        tests = TESTS.replace('@ParameterizedTest(name = "runs {0}")\n    @MethodSource("targets")',
+                              '@KeyringTest(\n        feature = "raw-aes",\n        name = "runs {0}")', 1)
+        code, out = self.run_picker(tests)
+        self.assertEqual(0, code)
+        self.assertIn("//# The thing MUST be blue.", out)
+
     def test_reads_a_known_bug_named_after_the_check(self):
         tests = TESTS.replace('KnownBugGate.gateDeclared(\n            "lid-is-grey", target, () -> {});',
                               'keyring.onDecryptFailsWith(materials, edks, ERROR)\n'
@@ -187,13 +194,20 @@ class PickerTest(unittest.TestCase):
         self.assertIn("//# The thing MUST be blue.", out)
         self.assertNotIn("The lid MUST be green.", out)
 
-    def test_credits_a_default_method_only_when_the_class_does_not_override_it(self):
+    def test_credits_a_default_method_unless_an_override_replaces_it(self):
+        gate_lines = [gate_line("inherited", cls="KeyringTests"), gate_line("overridden", cls="KeyringTests")]
         code, out = self.run_picker(
-            files={"Contract.java": CONTRACT, "KeyringTests.java": KEYRING_TESTS},
-            gate_lines=[gate_line("inherited", cls="KeyringTests"), gate_line("overridden", cls="KeyringTests")])
+            files={"Contract.java": CONTRACT, "KeyringTests.java": KEYRING_TESTS}, gate_lines=gate_lines)
         self.assertEqual(0, code)
         self.assertIn("// Contract#inherited\n//= spec/doc.md#sec\n//= type=test\n//# Every keyring MUST pass.", out)
         self.assertIn("// KeyringTests#overridden\n//= spec/doc.md#sec\n//= type=test\n//# The thing MUST be blue.", out)
+        self.assertIn("// Contract#overridden\n//= spec/doc.md#sec\n//= type=test\n//# Every keyring MUST also pass this.", out)
+
+        replaced = KEYRING_TESTS.replace("Contract.super.overridden(mpl);", "mpl.check();", 1)
+        code, out = self.run_picker(
+            files={"Contract.java": CONTRACT, "KeyringTests.java": replaced}, gate_lines=gate_lines)
+        self.assertEqual(0, code)
+        self.assertIn("//# The thing MUST be blue.", out)
         self.assertNotIn("Every keyring MUST also pass this.", out)
 
     def test_keeps_an_exception_annotation_whose_test_is_skipped(self):

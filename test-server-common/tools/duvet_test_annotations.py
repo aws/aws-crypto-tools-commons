@@ -19,8 +19,8 @@ An annotation is dropped when:
 An annotation in a helper method counts for the tests in the same file that
 call that helper. An annotation in a default test method of an interface, such
 as KeyringContract, counts for each test class that implements the interface
-and does not override that method. When the class overrides it, only the
-override's annotations count.
+and does not override that method. When the class overrides it, the override's
+annotations count, and the default method's count only if the override calls it.
 
 A `type=exception` annotation is always kept, with only the --spec-root check:
 it marks a rule that the code does not follow, so its test never runs.
@@ -98,6 +98,8 @@ def parse_java(path):
     text = path.read_text(encoding="utf-8").splitlines()
     methods, blocks, stack = [], [], []
     depth, pending, block = 0, [], None
+    # Open parentheses of an annotation whose arguments continue on the next lines.
+    annotation_parens = 0
     in_block_comment = False
     for number, raw in enumerate(text, 1):
         stripped = raw.strip()
@@ -128,8 +130,14 @@ def parse_java(path):
         code = strip_code(code)
         if not code.strip():
             continue
+        if annotation_parens > 0:
+            annotation_parens += code.count("(") - code.count(")")
+            continue
         if code.strip().startswith("@"):
             pending.append(code.strip().split("(")[0])
+            annotation_parens = code.count("(") - code.count(")")
+            if annotation_parens > 0:
+                continue
         match = METHOD.match(code)
         if match and not NOT_METHOD.match(code) and "=" not in code.split("(")[0] \
                 and not code.rstrip().endswith(";"):
@@ -174,14 +182,21 @@ def interfaces(path):
 
 
 def with_inherited(running, files):
-    """Add (interface, method) for each run of a default test method that the class does not override."""
-    tests = {stem: {m.name for m in methods if m.is_test} for stem, (methods, _, _) in files.items()}
+    """Add (interface, method) for each run of an interface's default test method.
+
+    The run counts for the default method when the class does not override it,
+    or when the override calls it, as in `Contract.super.method(mpl)`.
+    """
+    tests = {stem: {m.name: m for m in methods if m.is_test} for stem, (methods, _, _) in files.items()}
     inherited = set()
     for cls, method in running:
-        if cls not in files or method in tests[cls]:
+        if cls not in files:
             continue
+        override = tests[cls].get(method)
         for interface in files[cls][2]:
-            if method in tests.get(interface, set()):
+            if method not in tests.get(interface, {}):
+                continue
+            if override is None or f"{interface}.super.{method}(" in "".join(override.body):
                 inherited.add((interface, method))
     return running | inherited
 
