@@ -9,6 +9,7 @@ import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
 import aws.cryptography.testserver.tests.ExpectedError;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 /**
  * One language's MPL, as a {@link KeyringTest} sees it.
@@ -88,6 +89,12 @@ final class Mpl {
         return Materials.newEncryptionMaterials(testServer, suite, requireDefaults().encryptionContext());
     }
 
+    /** New encryption materials with the test class's suite, {@code encryptionContext}, and no data key yet. */
+    EncryptionMaterials newEncryptionMaterials(Map<String, String> encryptionContext) {
+        throwUnresolvedFailure();
+        return Materials.newEncryptionMaterials(testServer, requireDefaults().algorithmSuite(), encryptionContext);
+    }
+
     /** New decryption materials with the test class's suite and encryption context, and no data key yet. */
     DecryptionMaterials newDecryptionMaterials() {
         return newDecryptionMaterials(requireDefaults().algorithmSuite());
@@ -97,6 +104,12 @@ final class Mpl {
     DecryptionMaterials newDecryptionMaterials(AlgorithmSuiteId suite) {
         throwUnresolvedFailure();
         return Materials.newDecryptionMaterials(testServer, suite, requireDefaults().encryptionContext());
+    }
+
+    /** New decryption materials with the test class's suite, {@code encryptionContext}, and no data key yet. */
+    DecryptionMaterials newDecryptionMaterials(Map<String, String> encryptionContext) {
+        throwUnresolvedFailure();
+        return Materials.newDecryptionMaterials(testServer, requireDefaults().algorithmSuite(), encryptionContext);
     }
 
     private KeyringTestDefaults requireDefaults() {
@@ -139,6 +152,11 @@ final class Mpl {
             CreateRawAesKeyringInput request = input.build();
             return new Keyring(Mpl.this, MplTestServerClients.withRetry(() ->
                 testServer().createRawAesKeyring(request)).getKeyringId());
+        }
+
+        /** Create the keyring, which must fail with any error. */
+        FailureCheck createFails() {
+            return createFailsWith(null);
         }
 
         /** Create the keyring, which must fail with {@code expected}. */

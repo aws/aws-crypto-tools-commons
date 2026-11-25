@@ -35,7 +35,15 @@ final class FailureCheck {
         this.failure = failure;
     }
 
-    /** Run {@code call} on {@code mpl}, and check that the MPL rejects it with {@code expected}. */
+    /** Run {@code call} on {@code mpl}, and check that the MPL rejects it with any error. */
+    static FailureCheck run(Mpl mpl, Executable call) {
+        return run(mpl, call, null);
+    }
+
+    /**
+     * Run {@code call} on {@code mpl}, and check that the MPL rejects it with {@code expected}.
+     * When {@code expected} is null, any MPL error passes.
+     */
     static FailureCheck run(Mpl mpl, Executable call, ExpectedError expected) {
         // A failure kept from an earlier check is thrown here, so this check cannot catch it.
         mpl.throwUnresolvedFailure();
@@ -43,7 +51,9 @@ final class FailureCheck {
         AssertionError failure = null;
         try {
             error = assertThrows(MPLClientError.class, call);
-            MplErrors.expectError(mpl.languageServer(), error).matches(expected);
+            if (expected != null) {
+                MplErrors.expectError(mpl.languageServer(), error).matches(expected);
+            }
         } catch (AssertionError e) {
             failure = e;
         }

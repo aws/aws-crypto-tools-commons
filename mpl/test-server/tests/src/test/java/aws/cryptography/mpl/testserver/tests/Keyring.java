@@ -51,6 +51,16 @@ final class Keyring {
         return out;
     }
 
+    /** OnEncrypt, which must fail with any error. */
+    FailureCheck onEncryptFails(EncryptionMaterials materials) {
+        return onEncryptFailsWith(materials, null);
+    }
+
+    /** OnDecrypt, which must fail with any error. */
+    FailureCheck onDecryptFails(DecryptionMaterials materials, List<EncryptedDataKey> encryptedDataKeys) {
+        return onDecryptFailsWith(materials, encryptedDataKeys, null);
+    }
+
     /** OnEncrypt, which must fail with {@code expected}. */
     FailureCheck onEncryptFailsWith(EncryptionMaterials materials, ExpectedError expected) {
         OnEncryptInput input = onEncryptInput(materials);

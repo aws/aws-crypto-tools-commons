@@ -1,43 +1,25 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
+import static aws.cryptography.mpl.testserver.tests.Materials.edk;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
-import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptedDataKey;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
-import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
-import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterialsInput;
-import aws.cryptography.mpl.testserver.client.model.MPLClientError;
-import aws.cryptography.mpl.testserver.client.model.OnDecryptInput;
-import aws.cryptography.mpl.testserver.client.model.OnEncryptInput;
 import aws.cryptography.testserver.tests.Example;
-import aws.cryptography.testserver.tests.ExampleCases;
-import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.RawAesWrappingKeys;
 import aws.cryptography.testserver.tests.RawAesWrappingKeys.WrappingKey;
 import aws.cryptography.testserver.tests.RawKeyringNames;
 import aws.cryptography.testserver.tests.RawKeyringNames.KeyNames;
-import aws.cryptography.testserver.tests.TargetPair;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Stream;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * The Raw AES keyring driven directly through the keyring interface, across the
@@ -50,7 +32,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * wrapped key || 16-byte tag), so two implementations that agree only with
  * themselves still fail here.
  */
-public class RawAesKeyringTest {
+@KeyringFeature("raw-aes")
+public class RawAesKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     private static final String NAMESPACE = "mpl-test-server";
     private static final String KEY_NAME = "raw-aes-keyring-key";
@@ -68,105 +51,103 @@ public class RawAesKeyringTest {
     private static final int IV_LENGTH = 12;
     private static final int TAG_LENGTH = 16;
 
-    static Stream<Arguments> validWrappingKeys() {
-        return ExampleCases.withEachPair(RawAesWrappingKeys.validWrappingKeys());
+    @Override
+    public AlgorithmSuiteId algorithmSuite() {
+        return SUITE;
     }
 
-    static Stream<Arguments> invalidWrappingKeys() {
-        return ExampleCases.withEachLanguageServer(RawAesWrappingKeys.invalidWrappingKeys());
+    @Override
+    public Map<String, String> encryptionContext() {
+        return EC;
     }
 
-    static Stream<Arguments> validKeyNames() {
-        return ExampleCases.withEachPair(RawKeyringNames.validKeyNames());
+    static List<Example<WrappingKey>> validWrappingKeys() {
+        return RawAesWrappingKeys.validWrappingKeys();
     }
 
-    static Stream<Arguments> invalidKeyNames() {
-        return ExampleCases.withEachLanguageServer(RawKeyringNames.invalidKeyNames());
+    static List<Example<WrappingKey>> invalidWrappingKeys() {
+        return RawAesWrappingKeys.invalidWrappingKeys();
     }
 
-    static List<TargetPair> pairs() {
-        return LanguageServerRegistry.shared().pairs();
+    static List<Example<KeyNames>> validKeyNames() {
+        return RawKeyringNames.validKeyNames();
     }
 
-    static List<LanguageServerTarget> targets() {
-        return LanguageServerRegistry.shared().targets();
+    static List<Example<KeyNames>> invalidKeyNames() {
+        return RawKeyringNames.invalidKeyNames();
     }
 
-    @ParameterizedTest(name = "[raw-aes] {0} OnEncrypt/OnDecrypt {1}")
-    @MethodSource("validWrappingKeys")
-    void onEncryptOnDecryptRoundTrip(Example<WrappingKey> example, TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(
+        name = "[raw-aes] {0} OnEncrypt/OnDecrypt {1}",
+        inputs = "validWrappingKeys",
+        pairs = true)
+    void onEncryptOnDecryptRoundTrip(Example<WrappingKey> example, Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = wrappingAlg(example.value().algorithmKeyLength());
         byte[] wrappingKey = example.value().key();
 
-        EncryptionMaterials encrypted = onEncrypt(enc,
-            createKeyring(enc, KEY_NAME, wrappingKey, alg), initializeEncryption(enc));
+        EncryptionMaterials encrypted = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg),
+            newEncryptionMaterials(encryptingMpl, EC));
 
         byte[] plaintextDataKey = bytes(encrypted.getPlaintextDataKey());
         assertEquals(SUITE_DATA_KEY_LENGTH, plaintextDataKey.length);
         assertEquals(1, encrypted.getEncryptedDataKeys().size());
-        assertRawAesEdk(encrypted.getEncryptedDataKeys().get(0), KEY_NAME);
+        assertRawAesEdk(encrypted.getEncryptedDataKeys().get(0), NAMESPACE, KEY_NAME);
 
-        DecryptionMaterials decrypted = onDecrypt(dec,
-            createKeyring(dec, KEY_NAME, wrappingKey, alg),
-            initializeDecryption(dec), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted = rawAesKeyring(decryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(plaintextDataKey, bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[raw-aes] wrong wrapping key length rejected {0} {1}")
-    @MethodSource("invalidWrappingKeys")
-    void createRejectsWrongWrappingKeyLength(Example<WrappingKey> example, LanguageServerTarget languageServer) {
-        FeatureGate.require(Set.of("raw-aes"), languageServer);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(languageServer.endpoint());
-        assertThrows(MPLClientError.class, () -> client.createRawAesKeyring(CreateRawAesKeyringInput.builder()
+    @KeyringTest(
+        name = "[raw-aes] wrong wrapping key length rejected {0} {1}",
+        inputs = "invalidWrappingKeys")
+    void createRejectsWrongWrappingKeyLength(Example<WrappingKey> example, Mpl mpl) {
+        mpl.rawAesKeyring()
             .keyNamespace(NAMESPACE)
             .keyName(KEY_NAME)
-            .wrappingKey(ByteBuffer.wrap(example.value().key()))
+            .wrappingKey(example.value().key())
             .wrappingAlg(wrappingAlg(example.value().algorithmKeyLength()))
-            .build()));
+            .createFails();
     }
 
     /**
      * The encrypt target writes the key namespace and key name into the EDK as UTF-8,
      * and the decrypt target must match those exact bytes to find its key.
      */
-    @ParameterizedTest(name = "[raw-aes] key namespace and name round-trip {0} {1}")
-    @MethodSource("validKeyNames")
-    void keyNamespaceAndNameRoundTrip(Example<KeyNames> example, TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(
+        name = "[raw-aes] key namespace and name round-trip {0} {1}",
+        inputs = "validKeyNames",
+        pairs = true)
+    void keyNamespaceAndNameRoundTrip(Example<KeyNames> example, Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
         byte[] wrappingKey = wrappingKey(alg, 0);
         KeyNames names = example.value();
 
-        EncryptionMaterials encrypted = onEncrypt(enc,
-            createKeyring(enc, names.keyNamespace(), names.keyName(), wrappingKey, alg),
-            initializeEncryption(enc));
+        EncryptionMaterials encrypted = onEncrypt(
+            rawAesKeyring(encryptingMpl, names.keyNamespace(), names.keyName(), wrappingKey, alg),
+            newEncryptionMaterials(encryptingMpl, EC));
         assertRawAesEdk(encrypted.getEncryptedDataKeys().get(0), names.keyNamespace(), names.keyName());
 
-        DecryptionMaterials decrypted = onDecrypt(dec,
-            createKeyring(dec, names.keyNamespace(), names.keyName(), wrappingKey, alg),
-            initializeDecryption(dec), encrypted.getEncryptedDataKeys());
+        DecryptionMaterials decrypted =
+            rawAesKeyring(decryptingMpl, names.keyNamespace(), names.keyName(), wrappingKey, alg)
+                .onDecrypt(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[raw-aes] reserved key namespace rejected {0} {1}")
-    @MethodSource("invalidKeyNames")
-    void createRejectsReservedKeyNamespace(Example<KeyNames> example, LanguageServerTarget languageServer) {
-        FeatureGate.require(Set.of("raw-aes"), languageServer);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(languageServer.endpoint());
+    @KeyringTest(
+        name = "[raw-aes] reserved key namespace rejected {0} {1}",
+        inputs = "invalidKeyNames")
+    void createRejectsReservedKeyNamespace(Example<KeyNames> example, Mpl mpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
-        assertThrows(MPLClientError.class, () -> client.createRawAesKeyring(CreateRawAesKeyringInput.builder()
+        mpl.rawAesKeyring()
             .keyNamespace(example.value().keyNamespace())
             .keyName(example.value().keyName())
-            .wrappingKey(ByteBuffer.wrap(wrappingKey(alg, 0)))
+            .wrappingKey(wrappingKey(alg, 0))
             .wrappingAlg(alg)
-            .build()));
+            .createFails();
     }
 
     /**
@@ -174,75 +155,56 @@ public class RawAesKeyringTest {
      * that same key and append its EDK, not generate a new key. The decrypt
      * target then unwraps with only the second keyring, from the full EDK list.
      */
-    @ParameterizedTest(name = "[raw-aes] wrap existing data key {0}")
-    @MethodSource("pairs")
-    void onEncryptWrapsExistingDataKey(TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[raw-aes] wrap existing data key {0}", pairs = true)
+    void onEncryptWrapsExistingDataKey(Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
         byte[] firstKey = wrappingKey(alg, 0);
         byte[] secondKey = wrappingKey(alg, 1);
 
-        EncryptionMaterials first = onEncrypt(enc,
-            createKeyring(enc, "first-key", firstKey, alg), initializeEncryption(enc));
-        EncryptionMaterials second = onEncrypt(enc,
-            createKeyring(enc, "second-key", secondKey, alg), first);
+        EncryptionMaterials first = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, "first-key", firstKey, alg),
+            newEncryptionMaterials(encryptingMpl, EC));
+        EncryptionMaterials second = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, "second-key", secondKey, alg),
+            first);
 
         assertArrayEquals(bytes(first.getPlaintextDataKey()), bytes(second.getPlaintextDataKey()),
             "wrapping an existing data key must not replace it");
         assertEquals(2, second.getEncryptedDataKeys().size());
-        assertRawAesEdk(second.getEncryptedDataKeys().get(0), "first-key");
-        assertRawAesEdk(second.getEncryptedDataKeys().get(1), "second-key");
+        assertRawAesEdk(second.getEncryptedDataKeys().get(0), NAMESPACE, "first-key");
+        assertRawAesEdk(second.getEncryptedDataKeys().get(1), NAMESPACE, "second-key");
 
-        DecryptionMaterials decrypted = onDecrypt(dec,
-            createKeyring(dec, "second-key", secondKey, alg),
-            initializeDecryption(dec), second.getEncryptedDataKeys());
+        DecryptionMaterials decrypted = rawAesKeyring(decryptingMpl, NAMESPACE, "second-key", secondKey, alg)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(), second.getEncryptedDataKeys());
 
         assertArrayEquals(bytes(first.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[raw-aes] wrong wrapping key rejected {0}")
-    @MethodSource("pairs")
-    void onDecryptWithWrongWrappingKeyFails(TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[raw-aes] wrong wrapping key rejected {0}", pairs = true)
+    void onDecryptWithWrongWrappingKeyFails(Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
 
-        EncryptionMaterials encrypted = onEncrypt(enc,
-            createKeyring(enc, KEY_NAME, wrappingKey(alg, 0), alg), initializeEncryption(enc));
+        EncryptionMaterials encrypted = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, KEY_NAME, wrappingKey(alg, 0), alg),
+            newEncryptionMaterials(encryptingMpl, EC));
 
         // Same namespace and name, so the EDK is a candidate; the unwrap itself must fail.
-        String wrongKeyring = createKeyring(dec, KEY_NAME, wrappingKey(alg, 1), alg);
-        DecryptionMaterials initial = initializeDecryption(dec);
-        assertThrows(MPLClientError.class, () -> dec.onDecrypt(OnDecryptInput.builder()
-            .keyringId(wrongKeyring)
-            .materials(initial)
-            .encryptedDataKeys(encrypted.getEncryptedDataKeys())
-            .build()));
+        Keyring wrongKeyring = rawAesKeyring(decryptingMpl, NAMESPACE, KEY_NAME, wrappingKey(alg, 1), alg);
+        wrongKeyring.onDecryptFails(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
     }
 
-    @ParameterizedTest(name = "[raw-aes] non-matching key name rejected {0}")
-    @MethodSource("pairs")
-    void onDecryptWithNonMatchingKeyNameFails(TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[raw-aes] non-matching key name rejected {0}", pairs = true)
+    void onDecryptWithNonMatchingKeyNameFails(Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
         byte[] wrappingKey = wrappingKey(alg, 0);
 
-        EncryptionMaterials encrypted = onEncrypt(enc,
-            createKeyring(enc, KEY_NAME, wrappingKey, alg), initializeEncryption(enc));
+        EncryptionMaterials encrypted = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg),
+            newEncryptionMaterials(encryptingMpl, EC));
 
         // Same wrapping key under another name: the keyring must not attempt the EDK.
-        String otherName = createKeyring(dec, "some-other-key-name", wrappingKey, alg);
-        DecryptionMaterials initial = initializeDecryption(dec);
-        assertThrows(MPLClientError.class, () -> dec.onDecrypt(OnDecryptInput.builder()
-            .keyringId(otherName)
-            .materials(initial)
-            .encryptedDataKeys(encrypted.getEncryptedDataKeys())
-            .build()));
+        Keyring otherName = rawAesKeyring(decryptingMpl, NAMESPACE, "some-other-key-name", wrappingKey, alg);
+        otherName.onDecryptFails(decryptingMpl.newDecryptionMaterials(), encrypted.getEncryptedDataKeys());
     }
 
     /**
@@ -251,45 +213,31 @@ public class RawAesKeyringTest {
      * The bad EDK keeps the good one's provider id and info, so it is a
      * candidate, but its ciphertext is zeroed.
      */
-    @ParameterizedTest(name = "[raw-aes] bad then good EDK succeeds {0}")
-    @MethodSource("pairs")
-    void onDecryptBadAndGoodEdkSucceeds(TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[raw-aes] bad then good EDK succeeds {0}", pairs = true)
+    void onDecryptBadAndGoodEdkSucceeds(Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
         byte[] wrappingKey = wrappingKey(alg, 0);
 
-        EncryptionMaterials encrypted = onEncrypt(enc,
-            createKeyring(enc, KEY_NAME, wrappingKey, alg), initializeEncryption(enc));
+        EncryptionMaterials encrypted = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg),
+            newEncryptionMaterials(encryptingMpl, EC));
         EncryptedDataKey good = encrypted.getEncryptedDataKeys().get(0);
-        EncryptedDataKey bad = EncryptedDataKey.builder()
-            .keyProviderId(good.getKeyProviderId())
-            .keyProviderInfo(good.getKeyProviderInfo())
+        EncryptedDataKey bad = good.toBuilder()
             .ciphertext(ByteBuffer.wrap(new byte[bytes(good.getCiphertext()).length]))
             .build();
 
-        DecryptionMaterials decrypted = onDecrypt(dec,
-            createKeyring(dec, KEY_NAME, wrappingKey, alg),
-            initializeDecryption(dec), List.of(bad, good));
+        DecryptionMaterials decrypted = rawAesKeyring(decryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg)
+            .onDecrypt(decryptingMpl.newDecryptionMaterials(), List.of(bad, good));
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[raw-aes] no EDKs supplied, fails {0}")
-    @MethodSource("targets")
-    void onDecryptWithNoEdksFails(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+    @KeyringTest(name = "[raw-aes] no EDKs supplied, fails {0}")
+    void onDecryptWithNoEdksFails(Mpl mpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
 
-        String keyring = createKeyring(client, KEY_NAME, wrappingKey(alg, 0), alg);
-        DecryptionMaterials initial = initializeDecryption(client);
-        assertThrows(MPLClientError.class, () -> client.onDecrypt(OnDecryptInput.builder()
-            .keyringId(keyring)
-            .materials(initial)
-            .encryptedDataKeys(List.of())
-            .build()));
+        Keyring keyring = rawAesKeyring(mpl, NAMESPACE, KEY_NAME, wrappingKey(alg, 0), alg);
+        keyring.onDecryptFails(mpl.newDecryptionMaterials(), List.of());
     }
 
     /**
@@ -298,49 +246,50 @@ public class RawAesKeyringTest {
      * length is a u16). The Dafny TestRawAESKeyring.dfy uses 2^16 zero bytes;
      * this uses 2^16 ASCII 'a' characters, the same length in UTF-8.
      */
-    @ParameterizedTest(name = "[raw-aes] unserializable encryption context rejected on encrypt {0}")
-    @MethodSource("targets")
-    void onEncryptUnserializableEcFails(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-aes"), target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
+    @KeyringTest(name = "[raw-aes] unserializable encryption context rejected on encrypt {0}")
+    void onEncryptUnserializableEcFails(Mpl mpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
 
-        String keyring = createKeyring(client, KEY_NAME, wrappingKey(alg, 0), alg);
-        EncryptionMaterials initial = initializeEncryption(client, UNSERIALIZABLE_EC);
-        assertThrows(MPLClientError.class, () -> client.onEncrypt(OnEncryptInput.builder()
-            .keyringId(keyring)
-            .materials(initial)
-            .build()));
+        Keyring keyring = rawAesKeyring(mpl, NAMESPACE, KEY_NAME, wrappingKey(alg, 0), alg);
+        keyring.onEncryptFails(newEncryptionMaterials(mpl, UNSERIALIZABLE_EC));
     }
 
-    @ParameterizedTest(name = "[raw-aes] unserializable encryption context rejected on decrypt {0}")
-    @MethodSource("pairs")
-    void onDecryptUnserializableEcFails(TargetPair pair) {
-        FeatureGate.require(Set.of("raw-aes"), pair);
-        MPLTestServerClient enc = MplTestServerClients.forEndpoint(pair.encryptEndpoint());
-        MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
+    @KeyringTest(name = "[raw-aes] unserializable encryption context rejected on decrypt {0}", pairs = true)
+    void onDecryptUnserializableEcFails(Mpl encryptingMpl, Mpl decryptingMpl) {
         AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
         byte[] wrappingKey = wrappingKey(alg, 0);
 
-        EncryptionMaterials encrypted = onEncrypt(enc,
-            createKeyring(enc, KEY_NAME, wrappingKey, alg), initializeEncryption(enc));
+        EncryptionMaterials encrypted = onEncrypt(
+            rawAesKeyring(encryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg),
+            newEncryptionMaterials(encryptingMpl, EC));
 
-        String keyring = createKeyring(dec, KEY_NAME, wrappingKey, alg);
-        DecryptionMaterials initial = initializeDecryption(dec, UNSERIALIZABLE_EC);
-        assertThrows(MPLClientError.class, () -> dec.onDecrypt(OnDecryptInput.builder()
-            .keyringId(keyring)
-            .materials(initial)
-            .encryptedDataKeys(encrypted.getEncryptedDataKeys())
-            .build()));
+        Keyring keyring = rawAesKeyring(decryptingMpl, NAMESPACE, KEY_NAME, wrappingKey, alg);
+        keyring.onDecryptFails(
+            decryptingMpl.newDecryptionMaterials(UNSERIALIZABLE_EC),
+            encrypted.getEncryptedDataKeys());
+    }
+
+    // -----------------------------------------------------------------------
+    // Checks every keyring must pass
+    // -----------------------------------------------------------------------
+
+    @Override
+    public Keyring workingKeyring(Mpl mpl) {
+        AesWrappingAlg alg = AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16;
+        return rawAesKeyring(mpl, NAMESPACE, KEY_NAME, wrappingKey(alg, 0), alg);
+    }
+
+    /** One EDK for another key namespace and one for another key name. */
+    @Override
+    public List<EncryptedDataKey> edksThatDontMatch() {
+        return List.of(
+            edk("other-namespace", KEY_NAME, 1),
+            edk(NAMESPACE, "other-key-name", 2));
     }
 
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
-
-    private static void assertRawAesEdk(EncryptedDataKey edk, String keyName) {
-        assertRawAesEdk(edk, NAMESPACE, keyName);
-    }
 
     private static void assertRawAesEdk(EncryptedDataKey edk, String keyNamespace, String keyName) {
         assertEquals(keyNamespace, edk.getKeyProviderId(), "key provider id is the key namespace");
@@ -357,79 +306,28 @@ public class RawAesKeyringTest {
             "ciphertext is the wrapped data key followed by the GCM tag");
     }
 
-    private static String createKeyring(
-        MPLTestServerClient client, String keyName, byte[] wrappingKey, AesWrappingAlg alg) {
-        return createKeyring(client, NAMESPACE, keyName, wrappingKey, alg);
+    private static Keyring rawAesKeyring(Mpl mpl, String keyNamespace, String keyName, byte[] wrappingKey,
+            AesWrappingAlg alg) {
+        return mpl.rawAesKeyring()
+            .keyNamespace(keyNamespace)
+            .keyName(keyName)
+            .wrappingKey(wrappingKey)
+            .wrappingAlg(alg)
+            .create();
     }
 
-    private static String createKeyring(MPLTestServerClient client, String keyNamespace, String keyName,
-        byte[] wrappingKey, AesWrappingAlg alg) {
-        return MplTestServerClients.withRetry(() -> client.createRawAesKeyring(
-            CreateRawAesKeyringInput.builder()
-                .keyNamespace(keyNamespace)
-                .keyName(keyName)
-                .wrappingKey(ByteBuffer.wrap(wrappingKey))
-                .wrappingAlg(alg)
-                .build())).getKeyringId();
-    }
-
-    private static EncryptionMaterials initializeEncryption(MPLTestServerClient client) {
-        return initializeEncryption(client, EC);
-    }
-
-    private static EncryptionMaterials initializeEncryption(
-        MPLTestServerClient client, Map<String, String> ec) {
-        EncryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            client.initializeEncryptionMaterials(InitializeEncryptionMaterialsInput.builder()
-                .algorithmSuiteId(SUITE)
-                .encryptionContext(ec)
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
+    /** New encryption materials with {@code ec}, which must have the class's suite and no EDKs. */
+    private static EncryptionMaterials newEncryptionMaterials(Mpl mpl, Map<String, String> ec) {
+        EncryptionMaterials materials = mpl.newEncryptionMaterials(ec);
         assertEquals(SUITE.getValue(), materials.getAlgorithmSuiteId().getValue());
-        assertNull(materials.getPlaintextDataKey(), "initialized materials carry no data key");
         assertEquals(0, materials.getEncryptedDataKeys().size());
         return materials;
     }
 
-    private static DecryptionMaterials initializeDecryption(MPLTestServerClient client) {
-        return initializeDecryption(client, EC);
-    }
-
-    private static DecryptionMaterials initializeDecryption(
-        MPLTestServerClient client, Map<String, String> ec) {
-        DecryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            client.initializeDecryptionMaterials(InitializeDecryptionMaterialsInput.builder()
-                .algorithmSuiteId(SUITE)
-                .encryptionContext(ec)
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "initialized materials carry no data key");
-        return materials;
-    }
-
-    private static EncryptionMaterials onEncrypt(
-        MPLTestServerClient client, String keyringId, EncryptionMaterials materials) {
-        EncryptionMaterials out = MplTestServerClients.withRetry(() ->
-            client.onEncrypt(OnEncryptInput.builder()
-                .keyringId(keyringId)
-                .materials(materials)
-                .build())).getMaterials();
-        assertNotNull(out.getPlaintextDataKey());
-        assertEquals(SUITE.getValue(), out.getAlgorithmSuiteId().getValue());
+    /** OnEncrypt, whose materials must keep the class's encryption context. */
+    private static EncryptionMaterials onEncrypt(Keyring keyring, EncryptionMaterials materials) {
+        EncryptionMaterials out = keyring.onEncrypt(materials);
         assertEquals(EC, out.getEncryptionContext());
-        return out;
-    }
-
-    private static DecryptionMaterials onDecrypt(
-        MPLTestServerClient client, String keyringId, DecryptionMaterials materials,
-        List<EncryptedDataKey> edks) {
-        DecryptionMaterials out = MplTestServerClients.withRetry(() ->
-            client.onDecrypt(OnDecryptInput.builder()
-                .keyringId(keyringId)
-                .materials(materials)
-                .encryptedDataKeys(edks)
-                .build())).getMaterials();
-        assertNotNull(out.getPlaintextDataKey());
         return out;
     }
 
@@ -460,13 +358,5 @@ public class RawAesKeyringTest {
             key[i] = (byte) (i + seed * 101);
         }
         return key;
-    }
-
-    /** Copy a ByteBuffer's remaining bytes without moving its position. */
-    private static byte[] bytes(ByteBuffer buffer) {
-        ByteBuffer view = buffer.duplicate();
-        byte[] out = new byte[view.remaining()];
-        view.get(out);
-        return out;
     }
 }
