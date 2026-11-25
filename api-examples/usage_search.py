@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Write usage.json: how public customer code calls the shipped ESDK and MPL today.
 
-The API examples page shows it under each option, so a reviewer sees what
-customers convert before they call us. Each conversion is a candidate input type.
+The types page lists it under each option, so a reviewer sees what customers
+convert before they call us.
 
 The script runs GitHub code search for calls in each language, drops code that
 is not customer code (AWS orgs, forks, private repos, copies of the libraries),

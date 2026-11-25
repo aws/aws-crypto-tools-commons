@@ -1,8 +1,9 @@
 # Read each released ESDK and MPL package, and upload what its API takes as
-# api-examples-<library>-<language>-shipped for the API playground's shipped
-# columns. api-examples/read_shipped.py downloads the newest release and writes
-# surface.json, and api-examples/build_api_examples.py --shipped turns that
-# into api-examples.json. Nothing is built or tested.
+# api-examples-<library>-<language>-shipped. The types page's rows for these
+# languages come from these artifacts, through api-examples/types/other_languages.py.
+# api-examples/read_shipped.py downloads the newest release and writes
+# surface.json, and api-examples/build_api_examples.py turns that into
+# api-examples.json. Nothing is built or tested.
 
 name: API examples (shipped)
 
@@ -75,7 +76,7 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -o pipefail
-          python3 api-examples/build_api_examples.py --shipped --surface "$RUNNER_TEMP/surface.json" \
+          python3 api-examples/build_api_examples.py --surface "$RUNNER_TEMP/surface.json" \
             --repo "$REPOSITORY" --commit "$GITHUB_SHA" --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" \
             --out "$RUNNER_TEMP/out/api-examples.json" | tee -a "$GITHUB_STEP_SUMMARY"
 

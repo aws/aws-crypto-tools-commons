@@ -1,5 +1,6 @@
 # Search public GitHub code for customer calls to the ESDK and MPL, and upload
-# usage.json for the API examples page, which reads the newest artifact from main.
+# usage.json. The types page reads the copy in dashboard/api-examples/usage.json,
+# so commit a new one from this artifact to update the page.
 # A pull request that changes the search runs it with one page per search.
 
 name: API examples usage

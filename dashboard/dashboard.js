@@ -252,16 +252,6 @@ class GitHubDashboard {
             // The frame gets the dashboard's query string, so ?ref=<branch> reaches the types page's links.
             const frame = document.getElementById('apiExamplesFrame');
             if (!frame.getAttribute('src')) frame.src = 'api-examples/types.html' + window.location.search;
-            const tabs = document.getElementById('apiExamplesTabs');
-            if (!tabs.dataset.bound) {
-                tabs.dataset.bound = 'true';
-                tabs.addEventListener('click', (e) => {
-                    const button = e.target.closest('button[data-page]');
-                    if (!button) return;
-                    tabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === button));
-                    frame.src = 'api-examples/' + button.dataset.page + window.location.search;
-                });
-            }
             return;
         }
 

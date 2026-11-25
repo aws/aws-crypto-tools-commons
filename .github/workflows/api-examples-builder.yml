@@ -1,5 +1,4 @@
-# Unit tests for the scripts that api-examples.yml runs for each language repository,
-# for the types page's tools, and for the playground and types pages' logic.
+# Unit tests for the scripts that make the types page's data, and for the types page's logic.
 
 name: API examples builder
 
@@ -37,7 +36,5 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Playground and types page tests
-        run: >-
-          node --test dashboard/api-examples/playground.test.js dashboard/api-examples/usage.test.js
-          dashboard/api-examples/types.test.js
+      - name: Types page tests
+        run: node --test dashboard/api-examples/types.test.js

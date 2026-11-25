@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Write surface.json for an ESDK or MPL that already ships in some language.
 
-The playground's shipped columns show what each released library takes today.
-This script downloads one released package, reads its public API without
-building anything, and writes surface.json for the same API ids that the live
-surfaces use. build_api_examples.py --shipped then puts each parameter on its
+The types page's rows for Java, Python, .NET, Go and JS show what each released
+library takes today. This script downloads one released package, reads its
+public API without building anything, and writes surface.json with one id for
+each API. build_api_examples.py then puts each parameter on its
 Smithy row and says what the customer has for each parameter type.
 
   java        jars from Maven Central, read with javap. javap -l gives the
