@@ -1,0 +1,43 @@
+# Search public GitHub code for customer calls to the ESDK and MPL, and upload
+# usage.json for the API examples page, which reads the newest artifact from main.
+# A pull request that changes the search runs it with one page per search.
+
+name: API examples usage
+
+on:
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "api-examples/usage_search.py"
+      - ".github/workflows/api-examples-usage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    name: Search customer code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Search every page
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 api-examples/usage_search.py --out "$RUNNER_TEMP/usage.json"
+
+      - name: Search the first page
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 api-examples/usage_search.py --max-pages 1 --out "$RUNNER_TEMP/usage.json"
+
+      - name: Upload usage.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-examples-usage
+          path: ${{ runner.temp }}/usage.json
+          if-no-files-found: error
