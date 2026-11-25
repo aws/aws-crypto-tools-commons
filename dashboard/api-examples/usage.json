@@ -1,0 +1,2792 @@
+{
+ "generated_by": "api-examples/usage_search.py",
+ "generated_at": "2026-11-25T01:03:19Z",
+ "excluded_owners": [
+  "aws",
+  "aws-samples",
+  "awslabs"
+ ],
+ "languages": {
+  "java": {
+   "files": 108,
+   "repos": 55,
+   "calls": 286
+  },
+  "python": {
+   "files": 453,
+   "repos": 116,
+   "calls": 1467
+  },
+  "javascript": {
+   "files": 330,
+   "repos": 138,
+   "calls": 1359
+  },
+  "dotnet": {
+   "files": 5,
+   "repos": 5,
+   "calls": 31
+  },
+  "go": {
+   "files": 5,
+   "repos": 2,
+   "calls": 22
+  },
+  "rust": {
+   "files": 8,
+   "repos": 3,
+   "calls": 30
+  }
+ },
+ "apis": {
+  "esdk|client": {
+   "commitmentPolicy": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 519,
+     "languages": {
+      "java": 43,
+      "python": 219,
+      "javascript": 250,
+      "dotnet": 2,
+      "go": 3,
+      "rust": 2
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java",
+       "line": 46,
+       "language": "java",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java#L46"
+      },
+      {
+       "repo": "Apress/Snowflake-Recipes",
+       "path": "Chapter-2/demo-aws/src/main/java/com/snowrecipes/encryption/CSEWithKMS.java",
+       "line": 47,
+       "language": "java",
+       "url": "https://github.com/Apress/Snowflake-Recipes/blob/a96411e51a012827a174c008d0b706dd0118e54d/Chapter-2/demo-aws/src/main/java/com/snowrecipes/encryption/CSEWithKMS.java#L47"
+      },
+      {
+       "repo": "Tune-Fun/TUNE_FUN_BACKEND_V1",
+       "path": "src/main/java/com/tune_fun/v1/external/aws/kms/KmsProvider.java",
+       "line": 36,
+       "language": "java",
+       "url": "https://github.com/Tune-Fun/TUNE_FUN_BACKEND_V1/blob/053d0f5ef5ebc06df77abe2bb4e4aad2cee6ef1b/src/main/java/com/tune_fun/v1/external/aws/kms/KmsProvider.java#L36"
+      },
+      {
+       "repo": "algorythmist/aws-encryption-sdk-spring",
+       "path": "src/main/java/com/tecacet/awssecurity/service/AwsSdkEncryptionService.java",
+       "line": 21,
+       "language": "java",
+       "url": "https://github.com/algorythmist/aws-encryption-sdk-spring/blob/15bc73054036fb3fb7d7359f7f967e6520eeacdf/src/main/java/com/tecacet/awssecurity/service/AwsSdkEncryptionService.java#L21"
+      },
+      {
+       "repo": "amazon-science/DeclarativeDataPipeline",
+       "path": "core/src/main/java/com/amazonaws/declarative/data/pipeline/infrastructure/util/CryptoUtils.java",
+       "line": 31,
+       "language": "java",
+       "url": "https://github.com/amazon-science/DeclarativeDataPipeline/blob/25ad53612a887445f4a1e69eb812678bc542fa2a/core/src/main/java/com/amazonaws/declarative/data/pipeline/infrastructure/util/CryptoUtils.java#L31"
+      }
+     ]
+    }
+   ],
+   "maxEncryptedDataKeys": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 19,
+     "languages": {
+      "python": 18,
+      "go": 1
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-cli-master/src/aws_encryption_sdk_cli/internal/io_handling.py",
+       "line": 216,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-cli-master/src/aws_encryption_sdk_cli/internal/io_handling.py#L216"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "test/integration/test_i_aws_encrytion_sdk_client.py",
+       "line": 798,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/test/integration/test_i_aws_encrytion_sdk_client.py#L798"
+      },
+      {
+       "repo": "Specter099/envault-cli",
+       "path": "src/envault/crypto.py",
+       "line": 291,
+       "language": "python",
+       "url": "https://github.com/Specter099/envault-cli/blob/a58ea77d010194f1738d812bd914cef628f37786/src/envault/crypto.py#L291"
+      },
+      {
+       "repo": "acctbl/accountable-arch",
+       "path": "internal/platform/crypto/crypto_aws.go",
+       "line": 51,
+       "language": "go",
+       "url": "https://github.com/acctbl/accountable-arch/blob/efe90209e6de2438fa758e5565152fb3710ec671/internal/platform/crypto/crypto_aws.go#L51"
+      }
+     ]
+    }
+   ]
+  },
+  "esdk|decrypt": {
+   "ciphertext": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 462,
+     "languages": {
+      "java": 61,
+      "python": 227,
+      "javascript": 169,
+      "dotnet": 1,
+      "go": 2,
+      "rust": 2
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java",
+       "line": 68,
+       "language": "java",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java#L68"
+      },
+      {
+       "repo": "JiSeungGu/ToyProject-Backend",
+       "path": "src/main/java/com/example/aws/AwsServiceConnect.java",
+       "line": 198,
+       "language": "java",
+       "url": "https://github.com/JiSeungGu/ToyProject-Backend/blob/ae4b8c11a44dd128576dc419bff76fc49679d943/src/main/java/com/example/aws/AwsServiceConnect.java#L198"
+      },
+      {
+       "repo": "MaSomChaturvedi/gridgain",
+       "path": "modules/aws/src/main/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionService.java",
+       "line": 126,
+       "language": "java",
+       "url": "https://github.com/MaSomChaturvedi/gridgain/blob/b0bc736924f49baf820df5682285e2041005b943/modules/aws/src/main/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionService.java#L126"
+      },
+      {
+       "repo": "MarkKlimenko/temporal-samples-java",
+       "path": "core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/KeyringCodec.java",
+       "line": 134,
+       "language": "java",
+       "url": "https://github.com/MarkKlimenko/temporal-samples-java/blob/3ef0717333e93e678a379153215feca24c369aaf/core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/KeyringCodec.java#L134"
+      },
+      {
+       "repo": "MaslovMykhailo/SecureStorage",
+       "path": "src/main/java/com/mm/securestorage/service/security/crypto/AwsKmsCrypto.java",
+       "line": 27,
+       "language": "java",
+       "url": "https://github.com/MaslovMykhailo/SecureStorage/blob/ce1ca911a4ad9225edfbf2bece9af82b62008cbe/src/main/java/com/mm/securestorage/service/security/crypto/AwsKmsCrypto.java#L27"
+      }
+     ]
+    },
+    {
+     "conversion": "base64 decode",
+     "from": "base64 text",
+     "count": 125,
+     "languages": {
+      "java": 17,
+      "python": 41,
+      "javascript": 65,
+      "dotnet": 2
+     },
+     "examples": [
+      {
+       "repo": "Wenting-glue/redshift-direct-query",
+       "path": "athena-federation-sdk/src/main/java/com/amazonaws/athena/connector/lambda/security/KmsEncryptionProvider.java",
+       "line": 100,
+       "language": "java",
+       "url": "https://github.com/Wenting-glue/redshift-direct-query/blob/8189550775b74aec10b8f7f545a1274d24067f39/athena-federation-sdk/src/main/java/com/amazonaws/athena/connector/lambda/security/KmsEncryptionProvider.java#L100"
+      },
+      {
+       "repo": "aws-cloudformation/cloudformation-cli-java-plugin",
+       "path": "src/main/java/software/amazon/cloudformation/encryption/KMSCipher.java",
+       "line": 89,
+       "language": "java",
+       "url": "https://github.com/aws-cloudformation/cloudformation-cli-java-plugin/blob/4464c463d0c91b559f2f52f237b3ef3744735cc0/src/main/java/software/amazon/cloudformation/encryption/KMSCipher.java#L89"
+      },
+      {
+       "repo": "bancolombia/data-mask",
+       "path": "aws/src/main/java/co/com/bancolombia/datamask/aws/cipher/AWSEncryptionSdkDecipher.java",
+       "line": 23,
+       "language": "java",
+       "url": "https://github.com/bancolombia/data-mask/blob/30a541fe2a383d04345fda4233297e3d4150f759/aws/src/main/java/co/com/bancolombia/datamask/aws/cipher/AWSEncryptionSdkDecipher.java#L23"
+      },
+      {
+       "repo": "dharmana-prasanna/cloudfront-sample-fle",
+       "path": "src/main/java/com/example/fle/crypto/FleDecryptor.java",
+       "line": 50,
+       "language": "java",
+       "url": "https://github.com/dharmana-prasanna/cloudfront-sample-fle/blob/d78a58469a8736bb4667785a14ffaaea3c67b956/src/main/java/com/example/fle/crypto/FleDecryptor.java#L50"
+      },
+      {
+       "repo": "diegopacheco/java-pocs",
+       "path": "pocs/security-kms-fun/src/main/java/SimpleCryptoService.java",
+       "line": 50,
+       "language": "java",
+       "url": "https://github.com/diegopacheco/java-pocs/blob/74442f601f8683aa4fa59006e0698b0e33267b17/pocs/security-kms-fun/src/main/java/SimpleCryptoService.java#L50"
+      }
+     ]
+    },
+    {
+     "conversion": ".getBytes(...)",
+     "from": "a string",
+     "count": 16,
+     "languages": {
+      "java": 16
+     },
+     "examples": [
+      {
+       "repo": "MaSomChaturvedi/gridgain",
+       "path": "modules/aws/src/test/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java",
+       "line": 64,
+       "language": "java",
+       "url": "https://github.com/MaSomChaturvedi/gridgain/blob/b0bc736924f49baf820df5682285e2041005b943/modules/aws/src/test/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java#L64"
+      },
+      {
+       "repo": "STAMP-project/dspot-experiments",
+       "path": "benchmark/training/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java",
+       "line": 57,
+       "language": "java",
+       "url": "https://github.com/STAMP-project/dspot-experiments/blob/121487e65cdce6988081b67f21bbc6731354a47f/benchmark/training/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java#L57"
+      },
+      {
+       "repo": "Wenting-glue/redshift-direct-query",
+       "path": "athena-federation-sdk/src/test/java/com/amazonaws/athena/connector/lambda/security/KmsEncryptionProviderTest.java",
+       "line": 72,
+       "language": "java",
+       "url": "https://github.com/Wenting-glue/redshift-direct-query/blob/8189550775b74aec10b8f7f545a1274d24067f39/athena-federation-sdk/src/test/java/com/amazonaws/athena/connector/lambda/security/KmsEncryptionProviderTest.java#L72"
+      },
+      {
+       "repo": "amazon-science/DeclarativeDataPipeline",
+       "path": "core/src/test/java/com/amazonaws/declarative/data/pipeline/infrastructure/util/CryptoUtilsTest.java",
+       "line": 61,
+       "language": "java",
+       "url": "https://github.com/amazon-science/DeclarativeDataPipeline/blob/25ad53612a887445f4a1e69eb812678bc542fa2a/core/src/test/java/com/amazonaws/declarative/data/pipeline/infrastructure/util/CryptoUtilsTest.java#L61"
+      },
+      {
+       "repo": "apache/ignite-extensions",
+       "path": "modules/aws-ext/src/test/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java",
+       "line": 64,
+       "language": "java",
+       "url": "https://github.com/apache/ignite-extensions/blob/542d9604955174181c819b3447b4739402c1277f/modules/aws-ext/src/test/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java#L64"
+      }
+     ]
+    },
+    {
+     "conversion": "Buffer.from(...)",
+     "from": "a string",
+     "count": 11,
+     "languages": {
+      "javascript": 11
+     },
+     "examples": [
+      {
+       "repo": "Asherlc/dofek",
+       "path": "src/security/credential-encryption.ts",
+       "line": 61,
+       "language": "javascript",
+       "url": "https://github.com/Asherlc/dofek/blob/702af1cc1e85ea9db8f27b08dff7fd5018ea6d22/src/security/credential-encryption.ts#L61"
+      },
+      {
+       "repo": "SaadNamoune/ObservaBoard",
+       "path": "src/plugins/data_source/server/cryptography_service.ts",
+       "line": 71,
+       "language": "javascript",
+       "url": "https://github.com/SaadNamoune/ObservaBoard/blob/d11d08e3c56ff0423518e5a11fdf8d95df71ed5b/src/plugins/data_source/server/cryptography_service.ts#L71"
+      },
+      {
+       "repo": "SuriyaRuk/oui",
+       "path": "plugins/data_source/server/cryptography_service.js",
+       "line": 69,
+       "language": "javascript",
+       "url": "https://github.com/SuriyaRuk/oui/blob/897cf99f0cf4c325182922cfe0fd6f850f2f865b/plugins/data_source/server/cryptography_service.js#L69"
+      },
+      {
+       "repo": "ccbruce-kag/mizts-dashboard",
+       "path": "src/plugins/data_source/server/cryptography_service.ts",
+       "line": 71,
+       "language": "javascript",
+       "url": "https://github.com/ccbruce-kag/mizts-dashboard/blob/f5a0dcb51e30a9060658d81d898840f2e9f2bb4a/src/plugins/data_source/server/cryptography_service.ts#L71"
+      },
+      {
+       "repo": "cybermaker/wazuh",
+       "path": "src/plugins/data_source/server/cryptography_service.ts",
+       "line": 71,
+       "language": "javascript",
+       "url": "https://github.com/cybermaker/wazuh/blob/90e5599e5a5a62b64450d1a219275ce29e647c00/src/plugins/data_source/server/cryptography_service.ts#L71"
+      }
+     ]
+    },
+    {
+     "conversion": ".read()",
+     "from": "a file or stream",
+     "count": 10,
+     "languages": {
+      "python": 10
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/test/functional/test_f_aws_encryption_sdk_client.py",
+       "line": 355,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/test/functional/test_f_aws_encryption_sdk_client.py#L355"
+      },
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 95,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L95"
+      },
+      {
+       "repo": "Gustavo-Sanchez0507/AWS-Examples",
+       "path": "s3/encryption-client/decrypted.py",
+       "line": 25,
+       "language": "python",
+       "url": "https://github.com/Gustavo-Sanchez0507/AWS-Examples/blob/2d9840a15d995bbdb4fc9ea8f3e3d83a3dc6eef2/s3/encryption-client/decrypted.py#L25"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "test/functional/test_f_aws_encryption_sdk_client.py",
+       "line": 355,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/test/functional/test_f_aws_encryption_sdk_client.py#L355"
+      },
+      {
+       "repo": "chrissu777/encryption-script",
+       "path": "decrypt_download.py",
+       "line": 48,
+       "language": "python",
+       "url": "https://github.com/chrissu777/encryption-script/blob/4225f960b2d011fc259accfb3425e53250f2f3fe/decrypt_download.py#L48"
+      }
+     ]
+    },
+    {
+     "conversion": "new MemoryStream(...)",
+     "from": "a byte array",
+     "count": 4,
+     "languages": {
+      "dotnet": 4
+     },
+     "examples": [
+      {
+       "repo": "bdiaze/TanatosAPICdk",
+       "path": "TanatosAPI/Helpers/KMSHelper.cs",
+       "line": 25,
+       "language": "dotnet",
+       "url": "https://github.com/bdiaze/TanatosAPICdk/blob/eaf773c02d886d525adc6fe0906269bd0b257b51/TanatosAPI/Helpers/KMSHelper.cs#L25"
+      },
+      {
+       "repo": "minhthanhnguyen/PADISSOPOC",
+       "path": "PADISSOPOC/src/Infrastructure/Kms/EncryptionSdkCodeDecryptor.cs",
+       "line": 41,
+       "language": "dotnet",
+       "url": "https://github.com/minhthanhnguyen/PADISSOPOC/blob/409be190e54e14c140e052b2e15f9e41ad0565a6/PADISSOPOC/src/Infrastructure/Kms/EncryptionSdkCodeDecryptor.cs#L41"
+      },
+      {
+       "repo": "nearlyheadlessarvie/conscia",
+       "path": "src/Conscia.CognitoCustomEmailSender/AwsEncryptionSdkCognitoCodeDecryptor.cs",
+       "line": 38,
+       "language": "dotnet",
+       "url": "https://github.com/nearlyheadlessarvie/conscia/blob/a3bf242113a5d824cbe4378e72ee75e165512b85/src/Conscia.CognitoCustomEmailSender/AwsEncryptionSdkCognitoCodeDecryptor.cs#L38"
+      },
+      {
+       "repo": "oproto/fluent-dynamodb",
+       "path": "Oproto.FluentDynamoDb.Encryption.Kms/AwsEncryptionSdkFieldEncryptor.cs",
+       "line": 267,
+       "language": "dotnet",
+       "url": "https://github.com/oproto/fluent-dynamodb/blob/fda96d661692e4eb57fe7a91eee33662ebcc6f6f/Oproto.FluentDynamoDb.Encryption.Kms/AwsEncryptionSdkFieldEncryptor.cs#L267"
+      }
+     ]
+    },
+    {
+     "conversion": ".encode()",
+     "from": "a string",
+     "count": 3,
+     "languages": {
+      "python": 3
+     },
+     "examples": [
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 162,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L162"
+      },
+      {
+       "repo": "jithenms/whistle",
+       "path": "whistle/whistle/fields.py",
+       "line": 79,
+       "language": "python",
+       "url": "https://github.com/jithenms/whistle/blob/2da17c7b3cd0431b54264fd17bd958080447c5b3/whistle/whistle/fields.py#L79"
+      },
+      {
+       "repo": "lucasvieirasilva/aws-ssm-secrets-cli",
+       "path": "aws_secrets/miscellaneous/crypto.py",
+       "line": 60,
+       "language": "python",
+       "url": "https://github.com/lucasvieirasilva/aws-ssm-secrets-cli/blob/342de5a36e641b0e176f5d549a3ddb1dd55744c1/aws_secrets/miscellaneous/crypto.py#L60"
+      }
+     ]
+    },
+    {
+     "conversion": "b\"...\" literal",
+     "from": "a string",
+     "count": 3,
+     "languages": {
+      "python": 3
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/test/integration/test_i_aws_encrytion_sdk_client.py",
+       "line": 159,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/test/integration/test_i_aws_encrytion_sdk_client.py#L159"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "test/integration/test_i_aws_encrytion_sdk_client.py",
+       "line": 159,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/test/integration/test_i_aws_encrytion_sdk_client.py#L159"
+      },
+      {
+       "repo": "rishav-karanjit/AWS-ESDK-python-playground",
+       "path": "encryptDecryptString.py",
+       "line": 41,
+       "language": "python",
+       "url": "https://github.com/rishav-karanjit/AWS-ESDK-python-playground/blob/e5a14b067df926da18735f966d833895fcc7d2d6/encryptDecryptString.py#L41"
+      }
+     ]
+    },
+    {
+     "conversion": "hex decode",
+     "from": "hex text",
+     "count": 1,
+     "languages": {
+      "python": 1
+     },
+     "examples": [
+      {
+       "repo": "SatoshiImai/cryptoconfigparser",
+       "path": "src/cryptoconfigparser/KMSCryptoConfigParser.py",
+       "line": 85,
+       "language": "python",
+       "url": "https://github.com/SatoshiImai/cryptoconfigparser/blob/50e7429d55070526b76909cc01b972e18d90b16e/src/cryptoconfigparser/KMSCryptoConfigParser.py#L85"
+      }
+     ]
+    },
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 1,
+     "languages": {
+      "javascript": 1
+     },
+     "examples": [
+      {
+       "repo": "JossySola/scheduler",
+       "path": "app/lib/tests/unit-testing/utils.client.test.ts",
+       "line": 73,
+       "language": "javascript",
+       "url": "https://github.com/JossySola/scheduler/blob/ccfc1d61dbca1925bffa3b51f84b1e93e33dd65e/app/lib/tests/unit-testing/utils.client.test.ts#L73"
+      }
+     ]
+    }
+   ],
+   "encryptionContext": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 41,
+     "languages": {
+      "python": 38,
+      "go": 2,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/src/aws_encryption_sdk/key_providers/raw.py",
+       "line": 181,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/src/aws_encryption_sdk/key_providers/raw.py#L181"
+      },
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 164,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L164"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "src/aws_encryption_sdk/key_providers/raw.py",
+       "line": 181,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/src/aws_encryption_sdk/key_providers/raw.py#L181"
+      },
+      {
+       "repo": "acloudfan/Amazon-Aurora-DAS-Setup",
+       "path": "lambda/code/lambda_function.py",
+       "line": 90,
+       "language": "python",
+       "url": "https://github.com/acloudfan/Amazon-Aurora-DAS-Setup/blob/9c5ca4ac3705e78e877fc51b9ba927a7d367d029/lambda/code/lambda_function.py#L90"
+      },
+      {
+       "repo": "bit63-org/kythira",
+       "path": "services/kms/tests/clients/kms_clients.py",
+       "line": 122,
+       "language": "python",
+       "url": "https://github.com/bit63-org/kythira/blob/ddbfd31a658607690cfb869b721770d6fe09fda6/services/kms/tests/clients/kms_clients.py#L122"
+      }
+     ]
+    }
+   ],
+   "keyring": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 21,
+     "languages": {
+      "python": 12,
+      "dotnet": 5,
+      "go": 2,
+      "rust": 2
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 96,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L96"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 94,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L94"
+      },
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 163,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L163"
+      },
+      {
+       "repo": "DanBloy/blog-ecr",
+       "path": "connect-encryption/lambda_function.py",
+       "line": 113,
+       "language": "python",
+       "url": "https://github.com/DanBloy/blog-ecr/blob/b9baf689a06b5504bce78799230a0f8a30f4e2cc/connect-encryption/lambda_function.py#L113"
+      },
+      {
+       "repo": "TomHRMC/pilot-public",
+       "path": "backend/lambda/custom_email_sender/handler.py",
+       "line": 234,
+       "language": "python",
+       "url": "https://github.com/TomHRMC/pilot-public/blob/38daf3a8e97ccc89eb3220614d22df6c42486458/backend/lambda/custom_email_sender/handler.py#L234"
+      }
+     ]
+    }
+   ],
+   "materialsManager": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 21,
+     "languages": {
+      "python": 21
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/test/functional/test_f_aws_encryption_sdk_client.py",
+       "line": 517,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/test/functional/test_f_aws_encryption_sdk_client.py#L517"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "test/functional/test_f_aws_encryption_sdk_client.py",
+       "line": 517,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/test/functional/test_f_aws_encryption_sdk_client.py#L517"
+      },
+      {
+       "repo": "acaremrullah/aws-community-day-demo",
+       "path": "kmsfunctions.py",
+       "line": 207,
+       "language": "python",
+       "url": "https://github.com/acaremrullah/aws-community-day-demo/blob/dbc85b8ec236be8b595a4266663d685765bcca02/kmsfunctions.py#L207"
+      },
+      {
+       "repo": "acloudfan/Amazon-Aurora-DAS-Setup",
+       "path": "lambda/code/lambda_function.py",
+       "line": 55,
+       "language": "python",
+       "url": "https://github.com/acloudfan/Amazon-Aurora-DAS-Setup/blob/9c5ca4ac3705e78e877fc51b9ba927a7d367d029/lambda/code/lambda_function.py#L55"
+      },
+      {
+       "repo": "benkehoe/serverless-example-project",
+       "path": "src/common/pagination.py",
+       "line": 49,
+       "language": "python",
+       "url": "https://github.com/benkehoe/serverless-example-project/blob/d24558ae0236e03b965665fbef987896051047c7/src/common/pagination.py#L49"
+      }
+     ]
+    }
+   ]
+  },
+  "esdk|encrypt": {
+   "algorithmSuiteId": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 79,
+     "languages": {
+      "python": 68,
+      "javascript": 10,
+      "dotnet": 1
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/decrypt_oracle/test/test_n_generate_test_vectors.py",
+       "line": 51,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/decrypt_oracle/test/test_n_generate_test_vectors.py#L51"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 87,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L87"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "decrypt_oracle/test/test_n_generate_test_vectors.py",
+       "line": 51,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/decrypt_oracle/test/test_n_generate_test_vectors.py#L51"
+      },
+      {
+       "repo": "raytfitzgerald/tallowbrook-platform",
+       "path": "services/reporting-python/src/tallowbrook_reporting/cloud/kms_envelope.py",
+       "line": 62,
+       "language": "python",
+       "url": "https://github.com/raytfitzgerald/tallowbrook-platform/blob/8eb2e780c0930670ea484d17dd9b585057d8b388/services/reporting-python/src/tallowbrook_reporting/cloud/kms_envelope.py#L62"
+      },
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 135,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L135"
+      }
+     ]
+    }
+   ],
+   "encryptionContext": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 291,
+     "languages": {
+      "java": 22,
+      "python": 158,
+      "javascript": 106,
+      "dotnet": 2,
+      "go": 2,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "MarkKlimenko/temporal-samples-java",
+       "path": "core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/KeyringCodec.java",
+       "line": 122,
+       "language": "java",
+       "url": "https://github.com/MarkKlimenko/temporal-samples-java/blob/3ef0717333e93e678a379153215feca24c369aaf/core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/KeyringCodec.java#L122"
+      },
+      {
+       "repo": "Miniland1333/direct-file",
+       "path": "direct-file/libs/data-models/src/main/java/gov/irs/directfile/models/encryption/DataEncryptDecrypt.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/Miniland1333/direct-file/blob/e0d5c84451cc52b72d20d04652e306bf4af1a43c/direct-file/libs/data-models/src/main/java/gov/irs/directfile/models/encryption/DataEncryptDecrypt.java#L24"
+      },
+      {
+       "repo": "ToonLink123/FreeTax",
+       "path": "direct-file/direct-file-main/direct-file/libs/data-models/src/main/java/gov/irs/directfile/models/encryption/DataEncryptDecrypt.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/ToonLink123/FreeTax/blob/dd42d9d3a1546268d82896d7dea1b19eca2938a6/direct-file/direct-file-main/direct-file/libs/data-models/src/main/java/gov/irs/directfile/models/encryption/DataEncryptDecrypt.java#L24"
+      },
+      {
+       "repo": "amazon-science/DeclarativeDataPipeline",
+       "path": "core/src/test/java/com/amazonaws/declarative/data/pipeline/infrastructure/util/CryptoUtilsTest.java",
+       "line": 47,
+       "language": "java",
+       "url": "https://github.com/amazon-science/DeclarativeDataPipeline/blob/25ad53612a887445f4a1e69eb812678bc542fa2a/core/src/test/java/com/amazonaws/declarative/data/pipeline/infrastructure/util/CryptoUtilsTest.java#L47"
+      },
+      {
+       "repo": "cabinetoffice/gap-find-admin-backend",
+       "path": "src/main/java/gov/cabinetoffice/gap/adminbackend/services/encryption/AwsEncryptionServiceImpl.java",
+       "line": 46,
+       "language": "java",
+       "url": "https://github.com/cabinetoffice/gap-find-admin-backend/blob/4826d18e281547ab4487450fd3eb17652cbb110f/src/main/java/gov/cabinetoffice/gap/adminbackend/services/encryption/AwsEncryptionServiceImpl.java#L46"
+      }
+     ]
+    },
+    {
+     "conversion": "map literal",
+     "from": "key/value pairs",
+     "count": 24,
+     "languages": {
+      "java": 24
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java",
+       "line": 64,
+       "language": "java",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java#L64"
+      },
+      {
+       "repo": "Apress/Snowflake-Recipes",
+       "path": "Chapter-2/demo-aws/src/main/java/com/snowrecipes/encryption/CSEWithKMS.java",
+       "line": 83,
+       "language": "java",
+       "url": "https://github.com/Apress/Snowflake-Recipes/blob/a96411e51a012827a174c008d0b706dd0118e54d/Chapter-2/demo-aws/src/main/java/com/snowrecipes/encryption/CSEWithKMS.java#L83"
+      },
+      {
+       "repo": "JiSeungGu/ToyProject-Backend",
+       "path": "src/main/java/com/example/aws/AwsServiceConnect.java",
+       "line": 181,
+       "language": "java",
+       "url": "https://github.com/JiSeungGu/ToyProject-Backend/blob/ae4b8c11a44dd128576dc419bff76fc49679d943/src/main/java/com/example/aws/AwsServiceConnect.java#L181"
+      },
+      {
+       "repo": "Miniland1333/direct-file",
+       "path": "direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/Miniland1333/direct-file/blob/e0d5c84451cc52b72d20d04652e306bf4af1a43c/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      },
+      {
+       "repo": "ToonLink123/FreeTax",
+       "path": "direct-file/direct-file-main/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/ToonLink123/FreeTax/blob/dd42d9d3a1546268d82896d7dea1b19eca2938a6/direct-file/direct-file-main/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      }
+     ]
+    },
+    {
+     "conversion": "str(...)",
+     "from": "a value that is not a string",
+     "count": 10,
+     "languages": {
+      "python": 10
+     },
+     "examples": [
+      {
+       "repo": "melihcatal/vibench",
+       "path": "outputs/ablations/agentic_mechanism/task_disclosure/a4_disclosure_20s_extension_3m_5c/runs/S17/gpt-5.4-mini/full_disclosure/r004/attempt_001/final_snapshot/envelope_encrypt.py",
+       "line": 41,
+       "language": "python",
+       "url": "https://github.com/melihcatal/vibench/blob/bdb995360850c3398a7c96461f1a01f5b6afb136/outputs/ablations/agentic_mechanism/task_disclosure/a4_disclosure_20s_extension_3m_5c/runs/S17/gpt-5.4-mini/full_disclosure/r004/attempt_001/final_snapshot/envelope_encrypt.py#L41"
+      }
+     ]
+    },
+    {
+     "conversion": ".toString()",
+     "from": "a value that is not a string",
+     "count": 6,
+     "languages": {
+      "java": 6
+     },
+     "examples": [
+      {
+       "repo": "Miniland1333/direct-file",
+       "path": "direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/Miniland1333/direct-file/blob/e0d5c84451cc52b72d20d04652e306bf4af1a43c/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      },
+      {
+       "repo": "ToonLink123/FreeTax",
+       "path": "direct-file/direct-file-main/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/ToonLink123/FreeTax/blob/dd42d9d3a1546268d82896d7dea1b19eca2938a6/direct-file/direct-file-main/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      },
+      {
+       "repo": "djdrisco/djdrisco-direct-file",
+       "path": "direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/djdrisco/djdrisco-direct-file/blob/e0d5c84451cc52b72d20d04652e306bf4af1a43c/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      },
+      {
+       "repo": "jcolano/direct-file",
+       "path": "direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/jcolano/direct-file/blob/e0d5c84451cc52b72d20d04652e306bf4af1a43c/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      },
+      {
+       "repo": "openfiletax/openfile",
+       "path": "direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/openfiletax/openfile/blob/35ded36d32105e205bc746de753ee22eb19262f3/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      }
+     ]
+    }
+   ],
+   "frameLength": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 92,
+     "languages": {
+      "python": 89,
+      "javascript": 2,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/test/functional/test_f_aws_encryption_sdk_client.py",
+       "line": 352,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/test/functional/test_f_aws_encryption_sdk_client.py#L352"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "test/functional/test_f_aws_encryption_sdk_client.py",
+       "line": 352,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/test/functional/test_f_aws_encryption_sdk_client.py#L352"
+      },
+      {
+       "repo": "bit63-org/kythira",
+       "path": "services/kms/tests/clients/kms_clients.py",
+       "line": 320,
+       "language": "python",
+       "url": "https://github.com/bit63-org/kythira/blob/ddbfd31a658607690cfb869b721770d6fe09fda6/services/kms/tests/clients/kms_clients.py#L320"
+      },
+      {
+       "repo": "carlonicora/nestjs-neo4jsonapi",
+       "path": "src/foundations/s3/cipher/s3-cipher.core.ts",
+       "line": 327,
+       "language": "javascript",
+       "url": "https://github.com/carlonicora/nestjs-neo4jsonapi/blob/54805f5696d987b701b7f29158685ca4d53c6a02/src/foundations/s3/cipher/s3-cipher.core.ts#L327"
+      },
+      {
+       "repo": "folklorehq/enclave",
+       "path": "enclave/src/crypto/esdk-client.ts",
+       "line": 31,
+       "language": "javascript",
+       "url": "https://github.com/folklorehq/enclave/blob/ea8404b808af1956aad8450ad05329ec6fc5b4d2/enclave/src/crypto/esdk-client.ts#L31"
+      }
+     ]
+    }
+   ],
+   "keyring": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 25,
+     "languages": {
+      "python": 19,
+      "dotnet": 2,
+      "go": 2,
+      "rust": 2
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 64,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L64"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 85,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L85"
+      },
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 142,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L142"
+      },
+      {
+       "repo": "JoeyLee-22/weapon-watch-cameras",
+       "path": "cloud/encrypt_upload.py",
+       "line": 49,
+       "language": "python",
+       "url": "https://github.com/JoeyLee-22/weapon-watch-cameras/blob/ec4b66d30884826ef5586b62edb25788512e1769/cloud/encrypt_upload.py#L49"
+      },
+      {
+       "repo": "aipotheosis-labs/aci",
+       "path": "backend/aci/common/encryption.py",
+       "line": 42,
+       "language": "python",
+       "url": "https://github.com/aipotheosis-labs/aci/blob/ba14b1916eff02b4cd9dcd5ce8ba879d209c7df7/backend/aci/common/encryption.py#L42"
+      }
+     ]
+    }
+   ],
+   "materialsManager": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 61,
+     "languages": {
+      "python": 61
+     },
+     "examples": [
+      {
+       "repo": "201hid/AWS-project",
+       "path": "src/lambda/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 165,
+       "language": "python",
+       "url": "https://github.com/201hid/AWS-project/blob/e79bce0e6cab15d78574c089cfae608882c477bf/src/lambda/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L165"
+      },
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/examples/src/data_key_caching_basic.py",
+       "line": 57,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/examples/src/data_key_caching_basic.py#L57"
+      },
+      {
+       "repo": "Arno-ATU/ARNO-LAMBDA",
+       "path": "arno-aws-rest-api-gateway/testing-rest-api/.aws-sam/deps/39d7e413-8ca0-49ce-af33-831285f99169/aws_lambda_powertools/utilities/_data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 140,
+       "language": "python",
+       "url": "https://github.com/Arno-ATU/ARNO-LAMBDA/blob/bf3b0e125947d2fa85ed0eb5d5fae003c0be29fd/arno-aws-rest-api-gateway/testing-rest-api/.aws-sam/deps/39d7e413-8ca0-49ce-af33-831285f99169/aws_lambda_powertools/utilities/_data_masking/provider/kms/aws_encryption_sdk.py#L140"
+      },
+      {
+       "repo": "BGill8/AWS-SAM-Sandbox",
+       "path": "sam-app/.aws-sam/deps/4116f0c6-89d4-4a4e-8d44-66e4bc564fc8/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 170,
+       "language": "python",
+       "url": "https://github.com/BGill8/AWS-SAM-Sandbox/blob/337617632e8899ca58aa782a68cc6d26aeec75e2/sam-app/.aws-sam/deps/4116f0c6-89d4-4a4e-8d44-66e4bc564fc8/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L170"
+      },
+      {
+       "repo": "BPHeasley/board-game-app",
+       "path": "python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 166,
+       "language": "python",
+       "url": "https://github.com/BPHeasley/board-game-app/blob/f827d2de4106fd919578f4ecf81acd30d8003316/python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L166"
+      }
+     ]
+    }
+   ],
+   "plaintext": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 324,
+     "languages": {
+      "java": 43,
+      "python": 165,
+      "javascript": 111,
+      "dotnet": 1,
+      "go": 2,
+      "rust": 2
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicMultiRegionKeyEncryptionExample.java",
+       "line": 85,
+       "language": "java",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicMultiRegionKeyEncryptionExample.java#L85"
+      },
+      {
+       "repo": "Apress/Snowflake-Recipes",
+       "path": "Chapter-2/demo-aws/src/main/java/com/snowrecipes/encryption/CSEWithKMS.java",
+       "line": 83,
+       "language": "java",
+       "url": "https://github.com/Apress/Snowflake-Recipes/blob/a96411e51a012827a174c008d0b706dd0118e54d/Chapter-2/demo-aws/src/main/java/com/snowrecipes/encryption/CSEWithKMS.java#L83"
+      },
+      {
+       "repo": "JiSeungGu/ToyProject-Backend",
+       "path": "src/main/java/com/example/aws/AwsServiceConnect.java",
+       "line": 181,
+       "language": "java",
+       "url": "https://github.com/JiSeungGu/ToyProject-Backend/blob/ae4b8c11a44dd128576dc419bff76fc49679d943/src/main/java/com/example/aws/AwsServiceConnect.java#L181"
+      },
+      {
+       "repo": "MaSomChaturvedi/gridgain",
+       "path": "modules/aws/src/main/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionService.java",
+       "line": 118,
+       "language": "java",
+       "url": "https://github.com/MaSomChaturvedi/gridgain/blob/b0bc736924f49baf820df5682285e2041005b943/modules/aws/src/main/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionService.java#L118"
+      },
+      {
+       "repo": "MarkKlimenko/temporal-samples-java",
+       "path": "core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/KeyringCodec.java",
+       "line": 122,
+       "language": "java",
+       "url": "https://github.com/MarkKlimenko/temporal-samples-java/blob/3ef0717333e93e678a379153215feca24c369aaf/core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/KeyringCodec.java#L122"
+      }
+     ]
+    },
+    {
+     "conversion": ".encode()",
+     "from": "a string",
+     "count": 61,
+     "languages": {
+      "python": 61
+     },
+     "examples": [
+      {
+       "repo": "201hid/AWS-project",
+       "path": "src/lambda/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 164,
+       "language": "python",
+       "url": "https://github.com/201hid/AWS-project/blob/e79bce0e6cab15d78574c089cfae608882c477bf/src/lambda/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L164"
+      },
+      {
+       "repo": "BGill8/AWS-SAM-Sandbox",
+       "path": "sam-app/.aws-sam/deps/4116f0c6-89d4-4a4e-8d44-66e4bc564fc8/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 169,
+       "language": "python",
+       "url": "https://github.com/BGill8/AWS-SAM-Sandbox/blob/337617632e8899ca58aa782a68cc6d26aeec75e2/sam-app/.aws-sam/deps/4116f0c6-89d4-4a4e-8d44-66e4bc564fc8/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L169"
+      },
+      {
+       "repo": "BPHeasley/board-game-app",
+       "path": "python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 165,
+       "language": "python",
+       "url": "https://github.com/BPHeasley/board-game-app/blob/f827d2de4106fd919578f4ecf81acd30d8003316/python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L165"
+      },
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 141,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L141"
+      },
+      {
+       "repo": "EducloudHQ/multi-modal-rag-api-langchain-pinecone",
+       "path": ".aws-sam/auto-dependency-layer/ApiIntegrations/ApiIntegrationsGenerateEmbeddingsFunction81acc7a7DepLayer/python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 164,
+       "language": "python",
+       "url": "https://github.com/EducloudHQ/multi-modal-rag-api-langchain-pinecone/blob/a2f0bca77382ec491c85542266b98a0691a9d0ba/.aws-sam/auto-dependency-layer/ApiIntegrations/ApiIntegrationsGenerateEmbeddingsFunction81acc7a7DepLayer/python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L164"
+      }
+     ]
+    },
+    {
+     "conversion": ".getBytes(...)",
+     "from": "a string",
+     "count": 45,
+     "languages": {
+      "java": 45
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java",
+       "line": 64,
+       "language": "java",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-java-master/src/examples/java/com/amazonaws/crypto/examples/BasicEncryptionExample.java#L64"
+      },
+      {
+       "repo": "MaSomChaturvedi/gridgain",
+       "path": "modules/aws/src/test/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java",
+       "line": 61,
+       "language": "java",
+       "url": "https://github.com/MaSomChaturvedi/gridgain/blob/b0bc736924f49baf820df5682285e2041005b943/modules/aws/src/test/java/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java#L61"
+      },
+      {
+       "repo": "Miniland1333/direct-file",
+       "path": "direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/Miniland1333/direct-file/blob/e0d5c84451cc52b72d20d04652e306bf4af1a43c/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      },
+      {
+       "repo": "STAMP-project/dspot-experiments",
+       "path": "benchmark/training/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java",
+       "line": 55,
+       "language": "java",
+       "url": "https://github.com/STAMP-project/dspot-experiments/blob/121487e65cdce6988081b67f21bbc6731354a47f/benchmark/training/org/apache/ignite/spi/discovery/tcp/ipfinder/s3/encrypt/AwsKmsEncryptionServiceTest.java#L55"
+      },
+      {
+       "repo": "ToonLink123/FreeTax",
+       "path": "direct-file/direct-file-main/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java",
+       "line": 24,
+       "language": "java",
+       "url": "https://github.com/ToonLink123/FreeTax/blob/dd42d9d3a1546268d82896d7dea1b19eca2938a6/direct-file/direct-file-main/direct-file/backend/src/main/java/gov/irs/directfile/api/taxreturn/EncryptionCacheWarmingService.java#L24"
+      }
+     ]
+    },
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 37,
+     "languages": {
+      "python": 4,
+      "javascript": 33
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/examples/src/data_key_caching_basic.py",
+       "line": 57,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/examples/src/data_key_caching_basic.py#L57"
+      },
+      {
+       "repo": "ApplauseOSS/kms-encryption-toolbox",
+       "path": "test.py",
+       "line": 13,
+       "language": "python",
+       "url": "https://github.com/ApplauseOSS/kms-encryption-toolbox/blob/16349cf8f397aa5f2ad293b5cce30bf543eaa4c5/test.py#L13"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "examples/src/data_key_caching_basic.py",
+       "line": 57,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/examples/src/data_key_caching_basic.py#L57"
+      },
+      {
+       "repo": "sebsto/kms-demo",
+       "path": "main.py",
+       "line": 219,
+       "language": "python",
+       "url": "https://github.com/sebsto/kms-demo/blob/9e11cfe4f55969a1d6e6c45ec03186bb8081c993/main.py#L219"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-node/src/aes_simple.ts",
+       "line": 71,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-node/src/aes_simple.ts#L71"
+      }
+     ]
+    },
+    {
+     "conversion": "b\"...\" literal",
+     "from": "a string",
+     "count": 24,
+     "languages": {
+      "python": 24
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/decrypt_oracle/test/unit/key_providers/test_u_counting.py",
+       "line": 35,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/decrypt_oracle/test/unit/key_providers/test_u_counting.py#L35"
+      },
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 63,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L63"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "decrypt_oracle/test/unit/key_providers/test_u_counting.py",
+       "line": 35,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/decrypt_oracle/test/unit/key_providers/test_u_counting.py#L35"
+      },
+      {
+       "repo": "PaulDuvall/aws-encryption-workshop",
+       "path": "lesson3-develop/ceoa-3-sdk.py",
+       "line": 12,
+       "language": "python",
+       "url": "https://github.com/PaulDuvall/aws-encryption-workshop/blob/6d537e0855627e48bd07fa85c45146d6032d50d0/lesson3-develop/ceoa-3-sdk.py#L12"
+      },
+      {
+       "repo": "acaremrullah/aws-community-day-demo",
+       "path": "kmsfunctions.py",
+       "line": 168,
+       "language": "python",
+       "url": "https://github.com/acaremrullah/aws-community-day-demo/blob/dbc85b8ec236be8b595a4266663d685765bcca02/kmsfunctions.py#L168"
+      }
+     ]
+    },
+    {
+     "conversion": ".read()",
+     "from": "a file or stream",
+     "count": 5,
+     "languages": {
+      "python": 5
+     },
+     "examples": [
+      {
+       "repo": "Gustavo-Sanchez0507/AWS-Examples",
+       "path": "s3/encryption-client/upload_encrypted.py",
+       "line": 46,
+       "language": "python",
+       "url": "https://github.com/Gustavo-Sanchez0507/AWS-Examples/blob/2d9840a15d995bbdb4fc9ea8f3e3d83a3dc6eef2/s3/encryption-client/upload_encrypted.py#L46"
+      },
+      {
+       "repo": "cloudandrain/TeachingDemos",
+       "path": "Security/Client-Side-Encryption/SpotlightLabProjects/SalesAnalytics_c9.py",
+       "line": 270,
+       "language": "python",
+       "url": "https://github.com/cloudandrain/TeachingDemos/blob/b301874e1fb88e7aa55e54a0322fc615ed9c0f50/Security/Client-Side-Encryption/SpotlightLabProjects/SalesAnalytics_c9.py#L270"
+      },
+      {
+       "repo": "jcagudelo12/DiplomadoAWS",
+       "path": "KMS_S3_DynamoDB.py",
+       "line": 272,
+       "language": "python",
+       "url": "https://github.com/jcagudelo12/DiplomadoAWS/blob/c17c9a5e3e4d0fde7648446cc705b2b42c1ddae9/KMS_S3_DynamoDB.py#L272"
+      },
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 132,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L132"
+      },
+      {
+       "repo": "sim-my/aws-encryption-sdk",
+       "path": "app.py",
+       "line": 28,
+       "language": "python",
+       "url": "https://github.com/sim-my/aws-encryption-sdk/blob/4a625139456a185d974bf0fdd1c55edfd5f9680d/app.py#L28"
+      }
+     ]
+    },
+    {
+     "conversion": "Buffer.from(...)",
+     "from": "a string",
+     "count": 3,
+     "languages": {
+      "javascript": 3
+     },
+     "examples": [
+      {
+       "repo": "noCharger/aws-encryption-sdk-poc",
+       "path": "src/index.ts",
+       "line": 48,
+       "language": "javascript",
+       "url": "https://github.com/noCharger/aws-encryption-sdk-poc/blob/2d1936ad1f918e69d2dcfc782a95542464f3ab35/src/index.ts#L48"
+      },
+      {
+       "repo": "prxu3/AWS-Examples",
+       "path": "s3/encryption-client/encrypt.ts",
+       "line": 42,
+       "language": "javascript",
+       "url": "https://github.com/prxu3/AWS-Examples/blob/389821dd9b74610e054a5852531ef34cd17a87ac/s3/encryption-client/encrypt.ts#L42"
+      },
+      {
+       "repo": "steveandroulakis/temporal-benchmark-kms-encryption",
+       "path": "src/temporal/encryptDecryptKMS.ts",
+       "line": 104,
+       "language": "javascript",
+       "url": "https://github.com/steveandroulakis/temporal-benchmark-kms-encryption/blob/533466c474d66473049c7c58b4a1617c15b66bf3/src/temporal/encryptDecryptKMS.ts#L104"
+      }
+     ]
+    },
+    {
+     "conversion": "base64 decode",
+     "from": "base64 text",
+     "count": 3,
+     "languages": {
+      "javascript": 3
+     },
+     "examples": [
+      {
+       "repo": "BloomLabsInc/nango",
+       "path": "scripts/wrap-dek/wrap-dek.ts",
+       "line": 68,
+       "language": "javascript",
+       "url": "https://github.com/BloomLabsInc/nango/blob/f367f2382a708a08e959a596d4ad539eb76904e9/scripts/wrap-dek/wrap-dek.ts#L68"
+      },
+      {
+       "repo": "NangoHQ/nango",
+       "path": "scripts/wrap-dek/wrap-dek.ts",
+       "line": 71,
+       "language": "javascript",
+       "url": "https://github.com/NangoHQ/nango/blob/2be41bf1ef1a0a156c70f0dcd862ed80caf33f81/scripts/wrap-dek/wrap-dek.ts#L71"
+      },
+      {
+       "repo": "saurabhkumar9901/MausNest",
+       "path": "nango/scripts/wrap-dek/wrap-dek.ts",
+       "line": 71,
+       "language": "javascript",
+       "url": "https://github.com/saurabhkumar9901/MausNest/blob/45f9aa3be48442c377de849d5861edc36c6149fc/nango/scripts/wrap-dek/wrap-dek.ts#L71"
+      }
+     ]
+    },
+    {
+     "conversion": "TextEncoder.encode",
+     "from": "a string",
+     "count": 2,
+     "languages": {
+      "javascript": 2
+     },
+     "examples": [
+      {
+       "repo": "JossySola/scheduler",
+       "path": "app/lib/tests/unit-testing/utils.client.test.ts",
+       "line": 33,
+       "language": "javascript",
+       "url": "https://github.com/JossySola/scheduler/blob/ccfc1d61dbca1925bffa3b51f84b1e93e33dd65e/app/lib/tests/unit-testing/utils.client.test.ts#L33"
+      }
+     ]
+    },
+    {
+     "conversion": ".toString()",
+     "from": "a value that is not a string",
+     "count": 1,
+     "languages": {
+      "javascript": 1
+     },
+     "examples": [
+      {
+       "repo": "dementia-forecast/dementia-forecast",
+       "path": "backend/apps/my-predictions/domain/PredictionService.js",
+       "line": 160,
+       "language": "javascript",
+       "url": "https://github.com/dementia-forecast/dementia-forecast/blob/56a585e357a9b07fd93dc026788659a26aafb9e2/backend/apps/my-predictions/domain/PredictionService.js#L160"
+      }
+     ]
+    },
+    {
+     "conversion": "map literal",
+     "from": "key/value pairs",
+     "count": 1,
+     "languages": {
+      "java": 1
+     },
+     "examples": [
+      {
+       "repo": "huahua0601/springboot-nitro-enclaves",
+       "path": "examples/kms-decrypt/spring-boot-kms-decrypt-server/src/main/java/com/awsdemo/springbootkmsdecryptserver/handler/KMSTest.java",
+       "line": 40,
+       "language": "java",
+       "url": "https://github.com/huahua0601/springboot-nitro-enclaves/blob/74ba1164e5da2528e91a2f279fbf91b82d7c0813/examples/kms-decrypt/spring-boot-kms-decrypt-server/src/main/java/com/awsdemo/springbootkmsdecryptserver/handler/KMSTest.java#L40"
+      }
+     ]
+    },
+    {
+     "conversion": "new MemoryStream(...)",
+     "from": "a byte array",
+     "count": 1,
+     "languages": {
+      "dotnet": 1
+     },
+     "examples": [
+      {
+       "repo": "oproto/fluent-dynamodb",
+       "path": "Oproto.FluentDynamoDb.Encryption.Kms/AwsEncryptionSdkFieldEncryptor.cs",
+       "line": 187,
+       "language": "dotnet",
+       "url": "https://github.com/oproto/fluent-dynamodb/blob/fda96d661692e4eb57fe7a91eee33662ebcc6f6f/Oproto.FluentDynamoDb.Encryption.Kms/AwsEncryptionSdkFieldEncryptor.cs#L187"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|aws-kms-keyring": {
+   "kmsClient": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 20,
+     "languages": {
+      "python": 13,
+      "dotnet": 5,
+      "go": 1,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/aws.py",
+       "line": 256,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/aws.py#L256"
+      },
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 77,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L77"
+      },
+      {
+       "repo": "JoeyLee-22/weapon-watch-cameras",
+       "path": "cloud/encrypt_upload.py",
+       "line": 38,
+       "language": "python",
+       "url": "https://github.com/JoeyLee-22/weapon-watch-cameras/blob/ec4b66d30884826ef5586b62edb25788512e1769/cloud/encrypt_upload.py#L38"
+      },
+      {
+       "repo": "TomHRMC/pilot-public",
+       "path": "backend/lambda/custom_email_sender/handler.py",
+       "line": 194,
+       "language": "python",
+       "url": "https://github.com/TomHRMC/pilot-public/blob/38daf3a8e97ccc89eb3220614d22df6c42486458/backend/lambda/custom_email_sender/handler.py#L194"
+      },
+      {
+       "repo": "aipotheosis-labs/aci",
+       "path": "backend/aci/common/encryption.py",
+       "line": 34,
+       "language": "python",
+       "url": "https://github.com/aipotheosis-labs/aci/blob/ba14b1916eff02b4cd9dcd5ce8ba879d209c7df7/backend/aci/common/encryption.py#L34"
+      }
+     ]
+    }
+   ],
+   "kmsKeyId": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 15,
+     "languages": {
+      "python": 10,
+      "dotnet": 4,
+      "go": 1
+     },
+     "examples": [
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/aws.py",
+       "line": 255,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/aws.py#L255"
+      },
+      {
+       "repo": "Colton-z/AstraBox",
+       "path": "astrabox/providers/secret_store_aws_kms.py",
+       "line": 76,
+       "language": "python",
+       "url": "https://github.com/Colton-z/AstraBox/blob/66084d4c73af75145f377b3bb6e61221fea72ad6/astrabox/providers/secret_store_aws_kms.py#L76"
+      },
+      {
+       "repo": "JoeyLee-22/weapon-watch-cameras",
+       "path": "cloud/encrypt_upload.py",
+       "line": 37,
+       "language": "python",
+       "url": "https://github.com/JoeyLee-22/weapon-watch-cameras/blob/ec4b66d30884826ef5586b62edb25788512e1769/cloud/encrypt_upload.py#L37"
+      },
+      {
+       "repo": "aipotheosis-labs/aci",
+       "path": "backend/aci/common/encryption.py",
+       "line": 33,
+       "language": "python",
+       "url": "https://github.com/aipotheosis-labs/aci/blob/ba14b1916eff02b4cd9dcd5ce8ba879d209c7df7/backend/aci/common/encryption.py#L33"
+      },
+      {
+       "repo": "chrissu777/encryption-script",
+       "path": "decrypt_download.py",
+       "line": 33,
+       "language": "python",
+       "url": "https://github.com/chrissu777/encryption-script/blob/4225f960b2d011fc259accfb3425e53250f2f3fe/decrypt_download.py#L33"
+      }
+     ]
+    },
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 3,
+     "languages": {
+      "python": 2,
+      "dotnet": 1
+     },
+     "examples": [
+      {
+       "repo": "bandirishi23/ACI-Everyday",
+       "path": "backend/aci/common/encryption.py",
+       "line": 42,
+       "language": "python",
+       "url": "https://github.com/bandirishi23/ACI-Everyday/blob/805ef39812dfcfe72a433792055c0736b1979bcb/backend/aci/common/encryption.py#L42"
+      },
+      {
+       "repo": "chrissu777/admin-app",
+       "path": "backend2/videos/views.py",
+       "line": 50,
+       "language": "python",
+       "url": "https://github.com/chrissu777/admin-app/blob/a0839d7a3c7062e2187c469d2510b7e69de9476b/backend2/videos/views.py#L50"
+      },
+      {
+       "repo": "janovbyrnisson/digital_sky",
+       "path": "apps/DigitalSkyServer/Services/AWSCryptoService.cs",
+       "line": 32,
+       "language": "dotnet",
+       "url": "https://github.com/janovbyrnisson/digital_sky/blob/2b4de67b66abb23e9afacffc02b4f13aa7f3e3e3/apps/DigitalSkyServer/Services/AWSCryptoService.cs#L32"
+      }
+     ]
+    },
+    {
+     "conversion": "environment variable",
+     "from": "your config",
+     "count": 2,
+     "languages": {
+      "python": 1,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "TomHRMC/pilot-public",
+       "path": "backend/lambda/custom_email_sender/handler.py",
+       "line": 193,
+       "language": "python",
+       "url": "https://github.com/TomHRMC/pilot-public/blob/38daf3a8e97ccc89eb3220614d22df6c42486458/backend/lambda/custom_email_sender/handler.py#L193"
+      },
+      {
+       "repo": "JackPriceBurns/decomp-academy-be",
+       "path": "api/src/bin/email_sender.rs",
+       "line": 101,
+       "language": "rust",
+       "url": "https://github.com/JackPriceBurns/decomp-academy-be/blob/d80447dad332e9c15ac4549d8d42a28a0a9daedd/api/src/bin/email_sender.rs#L101"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|aws-kms-multi-keyring": {
+   "generator": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 96,
+     "languages": {
+      "java": 2,
+      "javascript": 94
+     },
+     "examples": [
+      {
+       "repo": "Tune-Fun/TUNE_FUN_BACKEND_V1",
+       "path": "src/main/java/com/tune_fun/v1/external/aws/kms/KmsProvider.java",
+       "line": 72,
+       "language": "java",
+       "url": "https://github.com/Tune-Fun/TUNE_FUN_BACKEND_V1/blob/053d0f5ef5ebc06df77abe2bb4e4aad2cee6ef1b/src/main/java/com/tune_fun/v1/external/aws/kms/KmsProvider.java#L72"
+      },
+      {
+       "repo": "romanovosad87/cognito-custom-email-lambda",
+       "path": "src/main/java/CognitoCustomEmailMessage.java",
+       "line": 75,
+       "language": "java",
+       "url": "https://github.com/romanovosad87/cognito-custom-email-lambda/blob/eca137ce263b151dc77df3244affaf8f8c94a024/src/main/java/CognitoCustomEmailMessage.java#L75"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/caching_cmm.ts",
+       "line": 92,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/caching_cmm.ts#L92"
+      },
+      {
+       "repo": "BloomLabsInc/nango",
+       "path": "scripts/wrap-dek/wrap-dek.ts",
+       "line": 68,
+       "language": "javascript",
+       "url": "https://github.com/BloomLabsInc/nango/blob/f367f2382a708a08e959a596d4ad539eb76904e9/scripts/wrap-dek/wrap-dek.ts#L68"
+      },
+      {
+       "repo": "Dylan-Dipasupil/Fargate-Websocket-ChatStream",
+       "path": "src/helpers/idc/encryption-helpers.ts",
+       "line": 14,
+       "language": "javascript",
+       "url": "https://github.com/Dylan-Dipasupil/Fargate-Websocket-ChatStream/blob/6908f9f03f9caf16a74b6931c68d3efb64d42746/src/helpers/idc/encryption-helpers.ts#L14"
+      }
+     ]
+    },
+    {
+     "conversion": "environment variable",
+     "from": "your config",
+     "count": 37,
+     "languages": {
+      "java": 3,
+      "javascript": 34
+     },
+     "examples": [
+      {
+       "repo": "MarkKlimenko/temporal-samples-java",
+       "path": "core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/EncryptedPayloads.java",
+       "line": 38,
+       "language": "java",
+       "url": "https://github.com/MarkKlimenko/temporal-samples-java/blob/3ef0717333e93e678a379153215feca24c369aaf/core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/EncryptedPayloads.java#L38"
+      },
+      {
+       "repo": "sajid-moinuddin/temporal-samples",
+       "path": "core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/EncryptedPayloads.java",
+       "line": 55,
+       "language": "java",
+       "url": "https://github.com/sajid-moinuddin/temporal-samples/blob/6b609a9e42b1a86b5d77a7530df9e8daaf4553c1/core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/EncryptedPayloads.java#L55"
+      },
+      {
+       "repo": "temporalio/samples-java",
+       "path": "core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/EncryptedPayloads.java",
+       "line": 38,
+       "language": "java",
+       "url": "https://github.com/temporalio/samples-java/blob/fa7de0933657a37a6f2b6805cd30c568b1e6eeec/core/src/main/java/io/temporal/samples/keymanagementencryption/awsencryptionsdk/EncryptedPayloads.java#L38"
+      },
+      {
+       "repo": "BlueS-3e/sellink-app",
+       "path": "backend/src/key-release-service.js",
+       "line": 13,
+       "language": "javascript",
+       "url": "https://github.com/BlueS-3e/sellink-app/blob/2b0cfefee51239fdc90a52e3f131a563b9d64d20/backend/src/key-release-service.js#L13"
+      },
+      {
+       "repo": "Depaa/cognito-triggers",
+       "path": "backend/src/lambdas/trigger-custom-sender/index.js",
+       "line": 9,
+       "language": "javascript",
+       "url": "https://github.com/Depaa/cognito-triggers/blob/cafedd2df7f2ef0a834811d367f46863681a54ee/backend/src/lambdas/trigger-custom-sender/index.js#L9"
+      }
+     ]
+    },
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 15,
+     "languages": {
+      "javascript": 15
+     },
+     "examples": [
+      {
+       "repo": "AHaydar/encryption",
+       "path": "fe/src/index.js",
+       "line": 34,
+       "language": "javascript",
+       "url": "https://github.com/AHaydar/encryption/blob/69e2239a76d38b60532bf7df4b5b28629505c74a/fe/src/index.js#L34"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/kms_max_encrypted_data_keys.ts",
+       "line": 50,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/kms_max_encrypted_data_keys.ts#L50"
+      },
+      {
+       "repo": "HarukiKondo/aws-crypto-client-node",
+       "path": "src/app.js",
+       "line": 17,
+       "language": "javascript",
+       "url": "https://github.com/HarukiKondo/aws-crypto-client-node/blob/802dee802fc0bce99716dd889b2ac3a5f4df5660/src/app.js#L17"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/example-browser/src/kms_max_encrypted_data_keys.ts",
+       "line": 50,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/example-browser/src/kms_max_encrypted_data_keys.ts#L50"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/example-browser/src/kms_max_encrypted_data_keys.ts",
+       "line": 50,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/example-browser/src/kms_max_encrypted_data_keys.ts#L50"
+      }
+     ]
+    }
+   ],
+   "kmsKeyIds": [
+    {
+     "conversion": "list literal",
+     "from": "separate values",
+     "count": 206,
+     "languages": {
+      "python": 87,
+      "javascript": 119
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/decrypt_oracle/test/integration/integration_test_utils.py",
+       "line": 84,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/decrypt_oracle/test/integration/integration_test_utils.py#L84"
+      },
+      {
+       "repo": "ApplauseOSS/kms-encryption-toolbox",
+       "path": "test.py",
+       "line": 3,
+       "language": "python",
+       "url": "https://github.com/ApplauseOSS/kms-encryption-toolbox/blob/16349cf8f397aa5f2ad293b5cce30bf543eaa4c5/test.py#L3"
+      },
+      {
+       "repo": "Gustavo-Sanchez0507/AWS-Examples",
+       "path": "s3/encryption-client/decrypted.py",
+       "line": 16,
+       "language": "python",
+       "url": "https://github.com/Gustavo-Sanchez0507/AWS-Examples/blob/2d9840a15d995bbdb4fc9ea8f3e3d83a3dc6eef2/s3/encryption-client/decrypted.py#L16"
+      },
+      {
+       "repo": "Licktopia/CanopyHub.ai---Public",
+       "path": "lambda_function.py",
+       "line": 16,
+       "language": "python",
+       "url": "https://github.com/Licktopia/CanopyHub.ai---Public/blob/885838d6edad71e32e0f7860bd4a0801c228828e/lambda_function.py#L16"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-python",
+       "path": "decrypt_oracle/test/integration/integration_test_utils.py",
+       "line": 84,
+       "language": "python",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-python/blob/d726277709a8f191869befaeffb53e6c687577d9/decrypt_oracle/test/integration/integration_test_utils.py#L84"
+      }
+     ]
+    },
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 79,
+     "languages": {
+      "python": 65,
+      "javascript": 14
+     },
+     "examples": [
+      {
+       "repo": "201hid/AWS-project",
+       "path": "src/lambda/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 130,
+       "language": "python",
+       "url": "https://github.com/201hid/AWS-project/blob/e79bce0e6cab15d78574c089cfae608882c477bf/src/lambda/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L130"
+      },
+      {
+       "repo": "AWS-BugBust-01/python_repos",
+       "path": "aws-encryption-sdk-python-master/test/unit/test_providers_kms_master_key_provider.py",
+       "line": 58,
+       "language": "python",
+       "url": "https://github.com/AWS-BugBust-01/python_repos/blob/b62073103605fbb6ebaadb40cce3b8539d8debf9/aws-encryption-sdk-python-master/test/unit/test_providers_kms_master_key_provider.py#L58"
+      },
+      {
+       "repo": "Arno-ATU/ARNO-LAMBDA",
+       "path": "arno-aws-rest-api-gateway/testing-rest-api/.aws-sam/deps/39d7e413-8ca0-49ce-af33-831285f99169/aws_lambda_powertools/utilities/_data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 113,
+       "language": "python",
+       "url": "https://github.com/Arno-ATU/ARNO-LAMBDA/blob/bf3b0e125947d2fa85ed0eb5d5fae003c0be29fd/arno-aws-rest-api-gateway/testing-rest-api/.aws-sam/deps/39d7e413-8ca0-49ce-af33-831285f99169/aws_lambda_powertools/utilities/_data_masking/provider/kms/aws_encryption_sdk.py#L113"
+      },
+      {
+       "repo": "BGill8/AWS-SAM-Sandbox",
+       "path": "sam-app/.aws-sam/deps/4116f0c6-89d4-4a4e-8d44-66e4bc564fc8/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 135,
+       "language": "python",
+       "url": "https://github.com/BGill8/AWS-SAM-Sandbox/blob/337617632e8899ca58aa782a68cc6d26aeec75e2/sam-app/.aws-sam/deps/4116f0c6-89d4-4a4e-8d44-66e4bc564fc8/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L135"
+      },
+      {
+       "repo": "BPHeasley/board-game-app",
+       "path": "python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py",
+       "line": 131,
+       "language": "python",
+       "url": "https://github.com/BPHeasley/board-game-app/blob/f827d2de4106fd919578f4ecf81acd30d8003316/python/aws_lambda_powertools/utilities/data_masking/provider/kms/aws_encryption_sdk.py#L131"
+      }
+     ]
+    },
+    {
+     "conversion": "environment variable",
+     "from": "your config",
+     "count": 28,
+     "languages": {
+      "python": 4,
+      "javascript": 24
+     },
+     "examples": [
+      {
+       "repo": "ericdummer/vibe-protected",
+       "path": "infra/events/lambdas/cognito_email_sender.py",
+       "line": 37,
+       "language": "python",
+       "url": "https://github.com/ericdummer/vibe-protected/blob/bc8f11117f8830c562583f3440d3de6e4e1c0229/infra/events/lambdas/cognito_email_sender.py#L37"
+      },
+      {
+       "repo": "gcorsaw/Digital-Library-System",
+       "path": "lambda_function.py",
+       "line": 10,
+       "language": "python",
+       "url": "https://github.com/gcorsaw/Digital-Library-System/blob/19e863619c1fd1cbcf37eff1d5e2724dd402c4a5/lambda_function.py#L10"
+      },
+      {
+       "repo": "yusufbesirarslan/fitness-coach",
+       "path": "infra/cognito-email-sender/src/handler.py",
+       "line": 65,
+       "language": "python",
+       "url": "https://github.com/yusufbesirarslan/fitness-coach/blob/16cb17c892c6ed4ba05f0e9d89fdaebfa779edaa/infra/cognito-email-sender/src/handler.py#L65"
+      },
+      {
+       "repo": "Andiewitz/Meshwork-Studio",
+       "path": "infra/aws/functions/src/worker.mjs",
+       "line": 156,
+       "language": "javascript",
+       "url": "https://github.com/Andiewitz/Meshwork-Studio/blob/791dc6107ea99766c5bdbb67252830378a3499a8/infra/aws/functions/src/worker.mjs#L156"
+      },
+      {
+       "repo": "Arshadiqball/Connect-SMTP-Lambda-for-Cognito-Service",
+       "path": "index.mjs",
+       "line": 16,
+       "language": "javascript",
+       "url": "https://github.com/Arshadiqball/Connect-SMTP-Lambda-for-Cognito-Service/blob/fc3a59fc27adf9b5ace5e2f8d61ce8a1c181c9c7/index.mjs#L16"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|default-cmm": {
+   "keyring": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 2,
+     "languages": {
+      "python": 2
+     },
+     "examples": [
+      {
+       "repo": "gcorsaw/Digital-Library-System",
+       "path": "package/aws_encryption_sdk/streaming_client.py",
+       "line": 180,
+       "language": "python",
+       "url": "https://github.com/gcorsaw/Digital-Library-System/blob/19e863619c1fd1cbcf37eff1d5e2724dd402c4a5/package/aws_encryption_sdk/streaming_client.py#L180"
+      },
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 78,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L78"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|hierarchical-keyring": {
+   "branchKeyId": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "java": 1
+     },
+     "examples": [
+      {
+       "repo": "mridehalgh/edispark-v3",
+       "path": "platform/tenant-crypto/src/main/java/com/edispark/crypto/HierarchicalTenantCipher.java",
+       "line": 65,
+       "language": "java",
+       "url": "https://github.com/mridehalgh/edispark-v3/blob/95455f101d406da8f0ac179f86107733ba506174/platform/tenant-crypto/src/main/java/com/edispark/crypto/HierarchicalTenantCipher.java#L65"
+      }
+     ]
+    }
+   ],
+   "keyStore": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "java": 1
+     },
+     "examples": [
+      {
+       "repo": "mridehalgh/edispark-v3",
+       "path": "platform/tenant-crypto/src/main/java/com/edispark/crypto/HierarchicalTenantCipher.java",
+       "line": 64,
+       "language": "java",
+       "url": "https://github.com/mridehalgh/edispark-v3/blob/95455f101d406da8f0ac179f86107733ba506174/platform/tenant-crypto/src/main/java/com/edispark/crypto/HierarchicalTenantCipher.java#L64"
+      }
+     ]
+    }
+   ],
+   "ttlSeconds": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "java": 1
+     },
+     "examples": [
+      {
+       "repo": "mridehalgh/edispark-v3",
+       "path": "platform/tenant-crypto/src/main/java/com/edispark/crypto/HierarchicalTenantCipher.java",
+       "line": 66,
+       "language": "java",
+       "url": "https://github.com/mridehalgh/edispark-v3/blob/95455f101d406da8f0ac179f86107733ba506174/platform/tenant-crypto/src/main/java/com/edispark/crypto/HierarchicalTenantCipher.java#L66"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|multi-keyring": {
+   "childKeyrings": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 488,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L488"
+      }
+     ]
+    }
+   ],
+   "generator": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 487,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L487"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|raw-aes-keyring": {
+   "keyName": [
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 42,
+     "languages": {
+      "python": 1,
+      "javascript": 40,
+      "go": 1
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 56,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L56"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/aes_simple.ts",
+       "line": 55,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/aes_simple.ts#L55"
+      },
+      {
+       "repo": "BloomLabsInc/nango",
+       "path": "packages/kms/lib/envelope.unit.test.ts",
+       "line": 17,
+       "language": "javascript",
+       "url": "https://github.com/BloomLabsInc/nango/blob/f367f2382a708a08e959a596d4ad539eb76904e9/packages/kms/lib/envelope.unit.test.ts#L17"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/example-browser/src/aes_simple.ts",
+       "line": 55,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/example-browser/src/aes_simple.ts#L55"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/example-browser/src/aes_simple.ts",
+       "line": 55,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/example-browser/src/aes_simple.ts#L55"
+      }
+     ]
+    },
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 27,
+     "languages": {
+      "python": 4,
+      "javascript": 23
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 83,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L83"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 63,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L63"
+      },
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 72,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L72"
+      },
+      {
+       "repo": "schladt/MAVEN",
+       "path": "tools/aws/secrets.py",
+       "line": 123,
+       "language": "python",
+       "url": "https://github.com/schladt/MAVEN/blob/5e16e8f5ec85eb8725b5d6b043789f80f87d72d0/tools/aws/secrets.py#L123"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 123,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L123"
+      }
+     ]
+    },
+    {
+     "conversion": "environment variable",
+     "from": "your config",
+     "count": 3,
+     "languages": {
+      "javascript": 3
+     },
+     "examples": [
+      {
+       "repo": "cabinetoffice/gap-find-apply-web",
+       "path": "packages/admin/src/utils/encryption.js",
+       "line": 33,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-apply-web/blob/b8caba5dd632121e191cfc7a723dbcb8dfb8fb52/packages/admin/src/utils/encryption.js#L33"
+      },
+      {
+       "repo": "cabinetoffice/gap-find-web",
+       "path": "src/utils/encryption.js",
+       "line": 21,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-web/blob/9704b69a246aa9e831a2b5d212e79fab24a78bee/src/utils/encryption.js#L21"
+      }
+     ]
+    }
+   ],
+   "keyNamespace": [
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 46,
+     "languages": {
+      "python": 3,
+      "javascript": 42,
+      "go": 1
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 55,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L55"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 62,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L62"
+      },
+      {
+       "repo": "schladt/MAVEN",
+       "path": "tools/aws/secrets.py",
+       "line": 122,
+       "language": "python",
+       "url": "https://github.com/schladt/MAVEN/blob/5e16e8f5ec85eb8725b5d6b043789f80f87d72d0/tools/aws/secrets.py#L122"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/aes_simple.ts",
+       "line": 56,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/aes_simple.ts#L56"
+      },
+      {
+       "repo": "BloomLabsInc/nango",
+       "path": "packages/kms/lib/envelope.unit.test.ts",
+       "line": 18,
+       "language": "javascript",
+       "url": "https://github.com/BloomLabsInc/nango/blob/f367f2382a708a08e959a596d4ad539eb76904e9/packages/kms/lib/envelope.unit.test.ts#L18"
+      }
+     ]
+    },
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 23,
+     "languages": {
+      "python": 2,
+      "javascript": 21
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 82,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L82"
+      },
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 71,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L71"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 124,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L124"
+      },
+      {
+       "repo": "Asherlc/dofek",
+       "path": "src/security/credential-encryption.ts",
+       "line": 41,
+       "language": "javascript",
+       "url": "https://github.com/Asherlc/dofek/blob/702af1cc1e85ea9db8f27b08dff7fd5018ea6d22/src/security/credential-encryption.ts#L41"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 124,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L124"
+      }
+     ]
+    },
+    {
+     "conversion": "environment variable",
+     "from": "your config",
+     "count": 3,
+     "languages": {
+      "javascript": 3
+     },
+     "examples": [
+      {
+       "repo": "cabinetoffice/gap-find-apply-web",
+       "path": "packages/admin/src/utils/encryption.js",
+       "line": 34,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-apply-web/blob/b8caba5dd632121e191cfc7a723dbcb8dfb8fb52/packages/admin/src/utils/encryption.js#L34"
+      },
+      {
+       "repo": "cabinetoffice/gap-find-web",
+       "path": "src/utils/encryption.js",
+       "line": 22,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-web/blob/9704b69a246aa9e831a2b5d212e79fab24a78bee/src/utils/encryption.js#L22"
+      }
+     ]
+    }
+   ],
+   "wrappingAlg": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 75,
+     "languages": {
+      "python": 5,
+      "javascript": 69,
+      "go": 1
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 58,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L58"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 65,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L65"
+      },
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 74,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L74"
+      },
+      {
+       "repo": "schladt/MAVEN",
+       "path": "tools/aws/secrets.py",
+       "line": 125,
+       "language": "python",
+       "url": "https://github.com/schladt/MAVEN/blob/5e16e8f5ec85eb8725b5d6b043789f80f87d72d0/tools/aws/secrets.py#L125"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/aes_simple.ts",
+       "line": 57,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/aes_simple.ts#L57"
+      }
+     ]
+    }
+   ],
+   "wrappingKey": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 56,
+     "languages": {
+      "python": 3,
+      "javascript": 52,
+      "go": 1
+     },
+     "examples": [
+      {
+       "repo": "AlMaVis/AWS-examples",
+       "path": "s3/encryption-client-side/encrypt.py",
+       "line": 57,
+       "language": "python",
+       "url": "https://github.com/AlMaVis/AWS-examples/blob/7511b5173a9c1c9d73bc0ee56c9216e2771e2112/s3/encryption-client-side/encrypt.py#L57"
+      },
+      {
+       "repo": "CedynGroup/aequorOS",
+       "path": "backend/app/core/key_management/sdk.py",
+       "line": 64,
+       "language": "python",
+       "url": "https://github.com/CedynGroup/aequorOS/blob/7aa42adf3187304167317c19821f260617d9d596/backend/app/core/key_management/sdk.py#L64"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-node/src/aes_simple.ts",
+       "line": 48,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-node/src/aes_simple.ts#L48"
+      },
+      {
+       "repo": "Asherlc/dofek",
+       "path": "src/security/credential-encryption.ts",
+       "line": 42,
+       "language": "javascript",
+       "url": "https://github.com/Asherlc/dofek/blob/702af1cc1e85ea9db8f27b08dff7fd5018ea6d22/src/security/credential-encryption.ts#L42"
+      },
+      {
+       "repo": "BloomLabsInc/nango",
+       "path": "packages/kms/lib/envelope.unit.test.ts",
+       "line": 19,
+       "language": "javascript",
+       "url": "https://github.com/BloomLabsInc/nango/blob/f367f2382a708a08e959a596d4ad539eb76904e9/packages/kms/lib/envelope.unit.test.ts#L19"
+      }
+     ]
+    },
+    {
+     "conversion": "TextEncoder.encode",
+     "from": "a string",
+     "count": 5,
+     "languages": {
+      "javascript": 5
+     },
+     "examples": [
+      {
+       "repo": "cabinetoffice/gap-find-apply-web",
+       "path": "packages/admin/src/utils/encryption.js",
+       "line": 35,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-apply-web/blob/b8caba5dd632121e191cfc7a723dbcb8dfb8fb52/packages/admin/src/utils/encryption.js#L35"
+      },
+      {
+       "repo": "cabinetoffice/gap-find-backend",
+       "path": "src/encryption/encryption.service.ts",
+       "line": 33,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-backend/blob/12f99249561e2b5480ee37c713ffce78851470ea/src/encryption/encryption.service.ts#L33"
+      },
+      {
+       "repo": "cabinetoffice/gap-find-web",
+       "path": "src/utils/encryption.js",
+       "line": 23,
+       "language": "javascript",
+       "url": "https://github.com/cabinetoffice/gap-find-web/blob/9704b69a246aa9e831a2b5d212e79fab24a78bee/src/utils/encryption.js#L23"
+      },
+      {
+       "repo": "john-tco/cognito-migration",
+       "path": "encryption.ts",
+       "line": 26,
+       "language": "javascript",
+       "url": "https://github.com/john-tco/cognito-migration/blob/31f352efa07030fb1ad76058dde867cf7c31b34e/encryption.ts#L26"
+      }
+     ]
+    },
+    {
+     "conversion": ".read()",
+     "from": "a file or stream",
+     "count": 1,
+     "languages": {
+      "python": 1
+     },
+     "examples": [
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 73,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L73"
+      }
+     ]
+    },
+    {
+     "conversion": "base64 decode",
+     "from": "base64 text",
+     "count": 1,
+     "languages": {
+      "python": 1
+     },
+     "examples": [
+      {
+       "repo": "schladt/MAVEN",
+       "path": "tools/aws/secrets.py",
+       "line": 124,
+       "language": "python",
+       "url": "https://github.com/schladt/MAVEN/blob/5e16e8f5ec85eb8725b5d6b043789f80f87d72d0/tools/aws/secrets.py#L124"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|raw-rsa-keyring": {
+   "keyName": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 9,
+     "languages": {
+      "python": 1,
+      "javascript": 6,
+      "rust": 2
+     },
+     "examples": [
+      {
+       "repo": "DanBloy/blog-ecr",
+       "path": "connect-encryption/lambda_function.py",
+       "line": 101,
+       "language": "python",
+       "url": "https://github.com/DanBloy/blog-ecr/blob/b9baf689a06b5504bce78799230a0f8a30f4e2cc/connect-encryption/lambda_function.py#L101"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 135,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L135"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 135,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L135"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 135,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L135"
+      },
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 420,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L420"
+      }
+     ]
+    },
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 9,
+     "languages": {
+      "javascript": 8,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/rsa_simple.ts",
+       "line": 77,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/rsa_simple.ts#L77"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/example-browser/src/rsa_simple.ts",
+       "line": 77,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/example-browser/src/rsa_simple.ts#L77"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/example-browser/src/rsa_simple.ts",
+       "line": 77,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/example-browser/src/rsa_simple.ts#L77"
+      },
+      {
+       "repo": "nationwide-group-oss/cryptoptic",
+       "path": "cbom-test-suite/encryption-at-rest/aws-aesjs.js",
+       "line": 44,
+       "language": "javascript",
+       "url": "https://github.com/nationwide-group-oss/cryptoptic/blob/58e45717959a1c0d38fa293f12d78ec35e2f922d/cbom-test-suite/encryption-at-rest/aws-aesjs.js#L44"
+      },
+      {
+       "repo": "prxu3/AWS-Examples",
+       "path": "s3/encryption-client/encrypt.ts",
+       "line": 22,
+       "language": "javascript",
+       "url": "https://github.com/prxu3/AWS-Examples/blob/389821dd9b74610e054a5852531ef34cd17a87ac/s3/encryption-client/encrypt.ts#L22"
+      }
+     ]
+    },
+    {
+     "conversion": "environment variable",
+     "from": "your config",
+     "count": 1,
+     "languages": {
+      "javascript": 1
+     },
+     "examples": [
+      {
+       "repo": "customer-dynamics/c3-amazon-connect",
+       "path": "lib/lambda/c3-utils-layer/lib/nodejs/decryption.js",
+       "line": 64,
+       "language": "javascript",
+       "url": "https://github.com/customer-dynamics/c3-amazon-connect/blob/247dbe88805e72039117ad0b6ac8f41ebdfaa3d0/lib/lambda/c3-utils-layer/lib/nodejs/decryption.js#L64"
+      }
+     ]
+    }
+   ],
+   "keyNamespace": [
+    {
+     "conversion": "string literal",
+     "from": "a string",
+     "count": 11,
+     "languages": {
+      "python": 1,
+      "javascript": 9,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "DanBloy/blog-ecr",
+       "path": "connect-encryption/lambda_function.py",
+       "line": 100,
+       "language": "python",
+       "url": "https://github.com/DanBloy/blog-ecr/blob/b9baf689a06b5504bce78799230a0f8a30f4e2cc/connect-encryption/lambda_function.py#L100"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/example-browser/src/rsa_simple.ts",
+       "line": 78,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/example-browser/src/rsa_simple.ts#L78"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/example-browser/src/rsa_simple.ts",
+       "line": 78,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/example-browser/src/rsa_simple.ts#L78"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/example-browser/src/rsa_simple.ts",
+       "line": 78,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/example-browser/src/rsa_simple.ts#L78"
+      },
+      {
+       "repo": "customer-dynamics/c3-amazon-connect",
+       "path": "lib/lambda/c3-utils-layer/lib/nodejs/decryption.js",
+       "line": 65,
+       "language": "javascript",
+       "url": "https://github.com/customer-dynamics/c3-amazon-connect/blob/247dbe88805e72039117ad0b6ac8f41ebdfaa3d0/lib/lambda/c3-utils-layer/lib/nodejs/decryption.js#L65"
+      }
+     ]
+    },
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 7,
+     "languages": {
+      "javascript": 6,
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 135,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L135"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 135,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L135"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts",
+       "line": 135,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/integration-browser/src/decrypt_materials_manager_web_crypto.ts#L135"
+      },
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 419,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L419"
+      }
+     ]
+    },
+    {
+     "conversion": ".to_string()",
+     "from": "a &str",
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 469,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L469"
+      }
+     ]
+    }
+   ],
+   "paddingScheme": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 8,
+     "languages": {
+      "python": 1,
+      "javascript": 4,
+      "rust": 3
+     },
+     "examples": [
+      {
+       "repo": "DanBloy/blog-ecr",
+       "path": "connect-encryption/lambda_function.py",
+       "line": 103,
+       "language": "python",
+       "url": "https://github.com/DanBloy/blog-ecr/blob/b9baf689a06b5504bce78799230a0f8a30f4e2cc/connect-encryption/lambda_function.py#L103"
+      },
+      {
+       "repo": "AWS-BugBust-01/java_repos",
+       "path": "aws-encryption-sdk-javascript-master/modules/integration-node/src/decrypt_materials_manager_node.ts",
+       "line": 107,
+       "language": "javascript",
+       "url": "https://github.com/AWS-BugBust-01/java_repos/blob/24497b05bcec9534823a65b58bcab1ac4d8e26a5/aws-encryption-sdk-javascript-master/modules/integration-node/src/decrypt_materials_manager_node.ts#L107"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript",
+       "path": "modules/integration-node/src/decrypt_materials_manager_node.ts",
+       "line": 107,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript/blob/08d600976dabbfe2bfab6c929eb082631b58402d/modules/integration-node/src/decrypt_materials_manager_node.ts#L107"
+      },
+      {
+       "repo": "MrE-Fog/aws-encryption-sdk-javascript2",
+       "path": "modules/integration-node/src/decrypt_materials_manager_node.ts",
+       "line": 107,
+       "language": "javascript",
+       "url": "https://github.com/MrE-Fog/aws-encryption-sdk-javascript2/blob/357612d1e8825c2b54d780684a2e60429e392ecc/modules/integration-node/src/decrypt_materials_manager_node.ts#L107"
+      },
+      {
+       "repo": "prxu3/AWS-Examples",
+       "path": "s3/encryption-client/encrypt.ts",
+       "line": 25,
+       "language": "javascript",
+       "url": "https://github.com/prxu3/AWS-Examples/blob/389821dd9b74610e054a5852531ef34cd17a87ac/s3/encryption-client/encrypt.ts#L25"
+      }
+     ]
+    }
+   ],
+   "privateKey": [
+    {
+     "conversion": ".encode()",
+     "from": "a string",
+     "count": 1,
+     "languages": {
+      "python": 1
+     },
+     "examples": [
+      {
+       "repo": "DanBloy/blog-ecr",
+       "path": "connect-encryption/lambda_function.py",
+       "line": 102,
+       "language": "python",
+       "url": "https://github.com/DanBloy/blog-ecr/blob/b9baf689a06b5504bce78799230a0f8a30f4e2cc/connect-encryption/lambda_function.py#L102"
+      }
+     ]
+    },
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 422,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L422"
+      }
+     ]
+    }
+   ],
+   "publicKey": [
+    {
+     "conversion": ".as_bytes()",
+     "from": "a string",
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 472,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L472"
+      }
+     ]
+    },
+    {
+     "conversion": ".to_vec()",
+     "from": "a byte slice",
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "WILLFX/swarm-s3-gateway",
+       "path": "trustless-proxy/src/aws_esdk.rs",
+       "line": 472,
+       "language": "rust",
+       "url": "https://github.com/WILLFX/swarm-s3-gateway/blob/328c5366e0f28429b44cbd880c9a354d4ab3b8ec/trustless-proxy/src/aws_esdk.rs#L472"
+      }
+     ]
+    },
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "rust": 1
+     },
+     "examples": [
+      {
+       "repo": "TechX-Corp/data-odbc-source",
+       "path": "src/common/encryption.rs",
+       "line": 46,
+       "language": "rust",
+       "url": "https://github.com/TechX-Corp/data-odbc-source/blob/08353461876607b902d28acd6fce61ba4dce62c6/src/common/encryption.rs#L46"
+      }
+     ]
+    }
+   ]
+  },
+  "mpl|required-encryption-context-cmm": {
+   "requiredEncryptionContextKeys": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "python": 1
+     },
+     "examples": [
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 90,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L90"
+      }
+     ]
+    }
+   ],
+   "underlyingCmm": [
+    {
+     "conversion": "passed as is",
+     "from": null,
+     "count": 1,
+     "languages": {
+      "python": 1
+     },
+     "examples": [
+      {
+       "repo": "riddler/encryptor",
+       "path": "test/interop/python/interop.py",
+       "line": 90,
+       "language": "python",
+       "url": "https://github.com/riddler/encryptor/blob/0617911326b9826b7c4fc75b1772f8c713ea1148/test/interop/python/interop.py#L90"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
