@@ -27,6 +27,8 @@ jobs:
     runs-on: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -37,8 +39,10 @@ jobs:
         id: made
         run: |
           python3 - >> "$GITHUB_OUTPUT" <<'EOF'
-          import json
+          import json, re
           page = json.load(open("dashboard/api-examples/types.json"))
+          assert re.fullmatch(r"[0-9a-f]{40}", page["rust_commit"]), page["rust_commit"]
+          assert re.fullmatch(r"\d+\.\d+\.\d+", page["rustc"]), page["rustc"]
           print("commit=" + page["rust_commit"])
           print("rustc=" + page["rustc"])
           EOF
@@ -60,13 +64,8 @@ jobs:
         with:
           toolchain: ${{ steps.made.outputs.rustc }}
 
-      # The trials and run tests build into .types-rust/esdk/target. rust_types.py keeps the crates
-      # it reads, and its scanner, in ~/.cache/crypto-tools-api-examples.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: .types-rust/esdk
-          cache-directories: ~/.cache/crypto-tools-api-examples
-
+      # No build cache: this job runs code from another repo, and a cache saved on main is read by
+      # every branch. The job takes about three minutes without one.
       - name: Compile and run the Rust rows
         working-directory: api-examples/types
         run: python3 compile_rust_types.py --rust-repo "$GITHUB_WORKSPACE/.types-rust"
