@@ -67,27 +67,83 @@ The thing MUST be blue.
 The box MUST be red.
 The lid MUST be green.
 Helpers MUST count.
+Every keyring MUST pass.
+Every keyring MUST also pass this.
+The keyring MAY skip this.
 """
 
+CONTRACT = '''package x;
 
-def gate_line(method, result="would-run"):
+interface Contract {
+
+    @KeyringTest
+    default void inherited(Mpl mpl) {
+        //= spec/doc.md#sec
+        //= type=test
+        //# Every keyring MUST pass.
+        mpl.check();
+    }
+
+    @KeyringTest
+    default void overridden(Mpl mpl) {
+        //= spec/doc.md#sec
+        //= type=test
+        //# Every keyring MUST also pass this.
+        mpl.check();
+    }
+}
+'''
+
+KEYRING_TESTS = '''package x;
+
+@KeyringFeature("raw-aes")
+public class KeyringTests implements KeyringTestDefaults, Contract {
+
+    @Override
+    @KeyringTest
+    public void overridden(Mpl mpl) {
+        //= spec/doc.md#sec
+        //= type=test
+        //# The thing MUST be blue.
+        Contract.super.overridden(mpl);
+    }
+}
+'''
+
+CONTRACT_EXCEPTION = '''
+    @Override
+    @KeyringTest
+    @ContractException(reason = "this keyring may skip it")
+    public void inherited(Mpl mpl) {
+        //= spec/doc.md#sec
+        //= type=exception
+        //= reason=this keyring may skip it
+        //# The keyring MAY skip this.
+    }
+}
+'''
+
+
+def gate_line(method, result="would-run", cls="SampleTests"):
     return json.dumps({
-        "id": f"[engine:junit-jupiter]/[class:x.SampleTests]/[test-template:{method}(x.T)]"
+        "id": f"[engine:junit-jupiter]/[class:x.{cls}]/[test-template:{method}(x.T)]"
               "/[test-template-invocation:#1]",
         "name": method, "targets": [], "features": [], "result": result})
 
 
 class PickerTest(unittest.TestCase):
 
-    def run_picker(self, tests=TESTS, extra_args=()):
+    def run_picker(self, tests=TESTS, extra_args=(), files=None, gate_lines=()):
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         (root / "tests").mkdir()
         (root / "tests" / "SampleTests.java").write_text(tests)
+        for name, text in (files or {}).items():
+            (root / "tests" / name).write_text(text)
         (root / "spec").mkdir()
         (root / "spec" / "doc.md").write_text(SPEC)
         (root / "gate.jsonl").write_text("\n".join([
             gate_line("runs"), gate_line("skipped", "skipped"), gate_line("knownBug"),
-            gate_line("callsHelper"), gate_line("wrongQuote")]) + "\n")
+            gate_line("callsHelper"), gate_line("wrongQuote"), *gate_lines]) + "\n")
         (root / "bugs.json").write_text('["lid-is-grey"]')
         out = root / "out" / "esdk.java"
         code = picker.main([
@@ -130,6 +186,24 @@ class PickerTest(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn("//# The thing MUST be blue.", out)
         self.assertNotIn("The lid MUST be green.", out)
+
+    def test_credits_a_default_method_only_when_the_class_does_not_override_it(self):
+        code, out = self.run_picker(
+            files={"Contract.java": CONTRACT, "KeyringTests.java": KEYRING_TESTS},
+            gate_lines=[gate_line("inherited", cls="KeyringTests"), gate_line("overridden", cls="KeyringTests")])
+        self.assertEqual(0, code)
+        self.assertIn("// Contract#inherited\n//= spec/doc.md#sec\n//= type=test\n//# Every keyring MUST pass.", out)
+        self.assertIn("// KeyringTests#overridden\n//= spec/doc.md#sec\n//= type=test\n//# The thing MUST be blue.", out)
+        self.assertNotIn("Every keyring MUST also pass this.", out)
+
+    def test_keeps_an_exception_annotation_whose_test_is_skipped(self):
+        tests = KEYRING_TESTS.rstrip().removesuffix("}") + CONTRACT_EXCEPTION
+        code, out = self.run_picker(
+            files={"Contract.java": CONTRACT, "KeyringTests.java": tests},
+            gate_lines=[gate_line("inherited", "skipped", cls="KeyringTests")])
+        self.assertEqual(0, code)
+        self.assertIn("//= type=exception\n//= reason=this keyring may skip it\n//# The keyring MAY skip this.", out)
+        self.assertNotIn("Every keyring MUST pass.", out)
 
     def test_refuses_an_implementation_annotation(self):
         tests = TESTS.replace("//= type=test\n        //# The thing MUST be blue.",

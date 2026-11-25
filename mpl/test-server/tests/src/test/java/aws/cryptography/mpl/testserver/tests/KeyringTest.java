@@ -33,8 +33,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(KeyringTestExtension.class)
 @interface KeyringTest {
 
-    /** The features from feature-set.json that every language in the run must support. */
-    String[] feature();
+    /**
+     * The features from feature-set.json that every language in the run must support.
+     * When empty, the features come from the {@link KeyringFeature} of the test class.
+     */
+    String[] feature() default {};
 
     /**
      * The name of each run in the test report, such as {@code "[aws-kms] Decrypt request {0}"}.
