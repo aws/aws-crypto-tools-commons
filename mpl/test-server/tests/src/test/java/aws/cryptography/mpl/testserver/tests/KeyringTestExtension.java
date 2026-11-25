@@ -34,8 +34,8 @@ import org.junit.platform.commons.support.ReflectionSupport;
  *       Then it builds the test server client.
  *       In a dry run, building the client stops the run and logs it as one that would run.</li>
  *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.
- *       It also gives a new {@link FakeKms} for each {@code FakeKms} parameter.</li>
- *   <li>After the test body, {@link Run#afterEach} stops each FakeKms.
+ *       It also gives a new {@link MockKms} for each {@code MockKms} parameter.</li>
+ *   <li>After the test body, {@link Run#afterEach} stops each MockKms.
  *       Then it fails the test if a {@link FailureCheck} failed and the test did not mark it with a known bug.</li>
  * </ol>
  */
@@ -97,8 +97,8 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
         private final Object languageServer;
         /** One per {@code Mpl} parameter, in parameter order. Set by {@link #beforeEach}. */
         private List<Mpl> mpls;
-        /** One per {@code FakeKms} parameter. {@link #afterEach} stops them. */
-        private final List<FakeKms> fakeKmses = new ArrayList<>();
+        /** One per {@code MockKms} parameter. {@link #afterEach} stops them. */
+        private final List<MockKms> mockKmses = new ArrayList<>();
 
         Run(Set<String> features, KeyringTest settings, Method testMethod, Object input, Object languageServer) {
             this.features = features;
@@ -143,21 +143,21 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
             }
         }
 
-        /** An {@code Mpl}, a {@code FakeKms}, or a parameter that the input fits. */
+        /** An {@code Mpl}, a {@code MockKms}, or a parameter that the input fits. */
         @Override
         public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
             Class<?> type = parameterContext.getParameter().getType();
-            return type == Mpl.class || type == FakeKms.class
+            return type == Mpl.class || type == MockKms.class
                 || (input != NO_INPUT && boxed(type).isInstance(input));
         }
 
         @Override
         public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
             Parameter parameter = parameterContext.getParameter();
-            if (parameter.getType() == FakeKms.class) {
-                FakeKms fakeKms = new FakeKms();
-                fakeKmses.add(fakeKms);
-                return fakeKms;
+            if (parameter.getType() == MockKms.class) {
+                MockKms mockKms = new MockKms();
+                mockKmses.add(mockKms);
+                return mockKms;
             }
             if (parameter.getType() != Mpl.class) {
                 return input;
@@ -190,10 +190,10 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
 
         @Override
         public void afterEach(ExtensionContext context) {
-            for (FakeKms fakeKms : fakeKmses) {
-                fakeKms.close();
+            for (MockKms mockKms : mockKmses) {
+                mockKms.close();
             }
-            fakeKmses.clear();
+            mockKmses.clear();
             if (mpls != null) {
                 for (Mpl mpl : mpls) {
                     mpl.throwUnresolvedFailure();

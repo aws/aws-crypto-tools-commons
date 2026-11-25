@@ -30,21 +30,21 @@ import java.util.Queue;
  *
  * <p>A test scripts the reply for a KMS call right before the keyring call that makes it:
  * <pre>{@code
- * fakeKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
+ * mockKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
  * keyring.onEncrypt(materials);
- * fakeKms.nextGenerateDataKeyFailsWith("NotFoundException");
+ * mockKms.nextGenerateDataKeyFailsWith("NotFoundException");
  * keyring.onEncryptFailsWith(materials, expectedError);
  * }</pre>
  * Each {@code next...} method adds one reply after the replies not used yet for that operation.
  * So when one keyring call makes several KMS calls, the test scripts their replies in order.
  * A request with no reply left gets a 400 error, so the keyring sees a failed KMS call.
  *
- * <p>When a test does not check a reply's data key or ciphertext, FakeKms fills in
+ * <p>When a test does not check a reply's data key or ciphertext, MockKms fills in
  * {@link #DATA_KEY} and {@link #CIPHERTEXT}.
  *
- * <p>FakeKms speaks KMS's awsJson1_1 protocol and ignores request signatures.
+ * <p>MockKms speaks KMS's awsJson1_1 protocol and ignores request signatures.
  */
-final class FakeKms implements AutoCloseable {
+final class MockKms implements AutoCloseable {
 
     private static final String GENERATE_DATA_KEY = "GenerateDataKey";
     private static final String ENCRYPT = "Encrypt";
@@ -100,7 +100,7 @@ final class FakeKms implements AutoCloseable {
 
         /** Never a 5xx, which SDKs retry. */
         static Reply error(String type) {
-            return new Reply(400, Map.of("__type", type, "message", "FakeKms scripted " + type));
+            return new Reply(400, Map.of("__type", type, "message", "MockKms scripted " + type));
         }
     }
 
@@ -108,7 +108,7 @@ final class FakeKms implements AutoCloseable {
     private final Map<String, Queue<Reply>> replies = new HashMap<>();
     private final List<Request> requests = new ArrayList<>();
 
-    FakeKms() {
+    MockKms() {
         try {
             server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         } catch (IOException e) {
@@ -230,7 +230,7 @@ final class FakeKms implements AutoCloseable {
         }
         if (reply == null) {
             reply = new Reply(400, Map.of("__type", "ValidationException",
-                "message", "FakeKms has no reply scripted for " + operation));
+                "message", "MockKms has no reply scripted for " + operation));
         }
         byte[] response = JSON.writeValueAsBytes(reply.body());
         exchange.getResponseHeaders().set("Content-Type", "application/x-amz-json-1.1");

@@ -7,7 +7,7 @@ import aws.cryptography.testserver.tests.ExpectedError;
 /** The errors that an AWS KMS keyring raises for {@link KmsKeys#KMS_KEY_ARN}. */
 final class KmsErrors {
 
-    /** The error code that real KMS returns for a key it cannot find. FakeKms replies with it to make a call fail. */
+    /** The error code that real KMS returns for a key it cannot find. MockKms replies with it to make a call fail. */
     static final String KMS_ERROR_CODE = "NotFoundException";
 
     private static final String KMS_KEY_RESOURCE = "KmsKey:" + KMS_KEY_ARN;
