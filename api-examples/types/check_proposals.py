@@ -57,20 +57,22 @@ def fits(name, params, how):
 def other_rows(rows, spec):
     """Another language's rows under a proposal: the listed kinds become as is, except paths.
 
-    A changed row is called like the type the language takes as is today. Each row ends with its cost today.
+    A changed row is called like the type the language takes as is today. Each row also gets
+    `today`, its number of calls today, and `proposed`, whether its code uses the proposal.
     """
     kinds = spec.get("as_is", [])
-    today = next((r for r in rows if r[1] == 0 and r[3] == "bytes"), None) or next((r for r in rows if r[1] == 0), None)
+    today = next((r for r in rows if r["calls"] == 0 and r["kind"] == "bytes"), None) or \
+        next((r for r in rows if r["calls"] == 0), None)
     rename = spec.get("rename") or []
     out = []
     for r in rows:
-        if today and r[3] in kinds and r[1] != 0 and not PATH_LIKE.search(r[0]):
-            code = today[2]
-            if rename and (len(rename) < 3 or r[3] == rename[2]):
+        if today and r["kind"] in kinds and r["calls"] != 0 and not PATH_LIKE.search(r["type"]):
+            code = today["code"]
+            if rename and (len(rename) < 3 or r["kind"] == rename[2]):
                 code = code.replace(rename[0], rename[1])
-            out.append([r[0], 0, code, r[3], r[1], True])
+            out.append({**r, "calls": 0, "code": code, "today": r["calls"], "proposed": True})
         else:
-            out.append(r + [r[1], False])
+            out.append({**r, "today": r["calls"], "proposed": False})
     return out
 
 
@@ -87,6 +89,7 @@ def main():
         raise SystemExit(f"unknown options: {sorted(unknown)}")
     rust_specs = {key: spec["rust"] for key, spec in options.items() if spec.get("rust")}
     held, scratch = crt.prepare(rust_repo, "\n".join(s.get("code", "") for s in rust_specs.values()))
+    # Proposals are compiled but not run, because their code only models the API, with todo!() bodies.
 
     # Today's setters first, then one module per proposal with its types and setters.
     trials, lines = crt.setter_trials(held)
@@ -129,7 +132,7 @@ def main():
             replaced = set(rust["setters"])
             best, breaks = {}, {}
             # Each candidate is (cost, uses a proposed setter, call). A tie goes to today's setter.
-            for n, (k, label, kind, cost, how, glue, call) in enumerate(trials):
+            for n, (k, label, _, kind, cost, how, glue, call) in enumerate(trials):
                 if k != key or n in failed:
                     continue
                 real = f"set_{setter_of[key]}" if how == "set" else setter_of[key]
@@ -141,11 +144,12 @@ def main():
                 if k == key and (key, label, how, glue, name) in compiled:
                     best.setdefault(label, []).append((cost, True, f"{before_of[key]}.{name}({glue})"))
             rows = []
-            for label, cost_today, _, kind in today[key]:
-                found = sorted(best.get(label, []))
+            for now in today[key]:
+                found = sorted(best.get(now["type"], []))
                 cost, new, call = found[0] if found else (None, False, "")
-                rows.append([label, cost, call, kind, cost_today, new])
-            rows.sort(key=lambda r: (r[1] is None, r[1] or 0, r[0]))
+                rows.append({"type": now["type"], "calls": cost, "code": call, "kind": now["kind"],
+                             "today": now["calls"], "proposed": new})
+            rows.sort(key=lambda r: (r["calls"] is None, r["calls"] or 0, r["type"]))
             languages["rust"] = {"signature": rust["signature"], "rows": rows,
                                  "breaks": [f"{call} with {', '.join(sorted(set(labels)))}"
                                             for call, labels in sorted(breaks.items())]}

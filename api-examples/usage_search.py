@@ -10,6 +10,10 @@ reads each file, and finds the argument of every option in smithy-names.json.
 It then classifies the conversion that the argument does, or that the line
 which assigns the argument's variable does (`.getBytes(UTF_8)`, `Buffer.from(`).
 
+Every hit is kept with its line of code and a link, so each count can be checked.
+Hits in one file, or in copies of one file, count as one source. Copies of AWS
+code, like AWS Lambda Powertools, are listed but not counted.
+
 Usage:
   usage_search.py [--names api-examples/smithy-names.json] [--out dashboard/api-examples/usage.json]
                   [--max-pages 10]
@@ -45,6 +49,12 @@ AWS_OWNERS = {"aws", "awslabs", "aws-samples"}
 SKIP_PATH = re.compile(r"(^|/)(node_modules|site-packages|vendor|dist|build|target)/")
 # Copies of a library's own source. Their calls into the library are not customer calls.
 LIBRARY_COPY = re.compile(r"(^|/)(com/amazonaws/encryptionsdk|software/amazon/cryptography)/(?!.*[Ee]xample)")
+# AWS code copied into a customer repo, like AWS Lambda Powertools in a Lambda layer, or a copy of an
+# ESDK repo. Its calls are AWS's, so they don't count, but usage.json still lists them.
+AWS_CODE_COPY = re.compile(r"(^|/)(aws_lambda_powertools|aws-encryption-sdk[\w.-]*"
+                           r"|aws-cryptographic-material-providers[\w.-]*)/")
+# Hits whose paths end in the same TAIL parts and whose call lines match are copies of one file.
+TAIL = 3
 
 
 # ---------- languages ----------
@@ -415,13 +425,20 @@ def classify(arg, before, lang):
     before is the lines above the call, nearest last. An argument that matches
     no rule gets [AS_IS].
     """
+    return classify_with_source(arg, before, lang)[0]
+
+
+def classify_with_source(arg, before, lang):
+    """classify(), plus the assignment that matched when the conversion is on an earlier line, else None."""
     hits = [r for r in RULES if r.matches(arg, lang)]
     var = re.fullmatch(r"[&*]?(mut\s+)?(\w+)(\.clone\(\))?", arg)
     if not hits and var:
         rhs = _assignment(before, var.group(2))
         if rhs is not None:
             hits = [r for r in RULES if r.matches(rhs.rstrip(";, "), lang)]
-    return hits or [AS_IS]
+            if hits:
+                return hits, f"{var.group(2)} = {rhs.strip()}"
+    return hits or [AS_IS], None
 
 
 # ---------- searching ----------
@@ -467,7 +484,10 @@ def is_customer(item):
 
 
 def search(auth, lang, max_pages):
-    """{(repo, path): (commit, html url)} of every customer file that a search for this language finds."""
+    """{(repo, path): (commit, blob sha)} of every customer file that a search for this language finds.
+
+    Files with the same blob sha have the same content.
+    """
     files = {}
     spec = LANGUAGES[lang]
     for query in spec["queries"]:
@@ -478,7 +498,7 @@ def search(auth, lang, max_pages):
                 items = get(url, auth)["items"]
                 for item in filter(is_customer, items):
                     commit = urllib.parse.parse_qs(urllib.parse.urlparse(item["url"]).query)["ref"][0]
-                    files[(item["repository"]["full_name"], item["path"])] = commit
+                    files[(item["repository"]["full_name"], item["path"])] = (commit, item.get("sha"))
                 if len(items) < PAGE_SIZE:
                     break
     return files
@@ -498,7 +518,10 @@ def fetch(repo, commit, path):
 # ---------- usage.json ----------
 
 def calls(code, lang, sites):
-    """Every option argument in one file: [(lib, api, option key, conversion, line)]."""
+    """Every option argument in one file: [(lib, api, option key, conversion, line, code, assignment)].
+
+    code is the call's line. assignment is the earlier line that converted the argument, or None.
+    """
     if not re.search(LANGUAGES[lang]["imports"], code):
         return []
     lines = code.split("\n")
@@ -508,26 +531,76 @@ def calls(code, lang, sites):
             continue
         for member, arg, at in args(code, site, lang):
             line = code.count("\n", 0, at)
-            for conv in classify(arg, lines[max(0, line - LOOKBACK):line], lang):
-                out.append((site.lib, site.api, option_key(member), conv, line + 1))
+            convs, assignment = classify_with_source(arg, lines[max(0, line - LOOKBACK):line], lang)
+            for conv in convs:
+                out.append((site.lib, site.api, option_key(member), conv, line + 1, lines[line].strip()[:200],
+                            assignment and assignment[:200]))
     return out
 
 
-def add(apis, lang, repo, path, commit, hit):
-    lib, api, option, conv, line = hit
+def add(apis, lang, repo, path, commit, hit, blob=None):
+    """Record one hit. Every hit is kept. A copy of AWS code is listed but not counted."""
+    lib, api, option, conv, line = hit[:5]
+    code, assignment = (hit[5:] + (None, None))[:2]
     label, from_ = (AS_IS, None) if conv == AS_IS else (conv.label, conv.from_)
     convs = apis.setdefault(f"{lib}|{api}", {}).setdefault(option, {})
-    c = convs.setdefault(label, {"conversion": label, "from": from_, "count": 0, "languages": {}, "examples": []})
+    c = convs.setdefault(label, {"conversion": label, "from": from_, "count": 0, "languages": {}, "examples": [],
+                                 "hits": []})
+    url = f"https://github.com/{repo}/blob/{commit}/{urllib.parse.quote(path)}#L{line}"
+    aws_copy = bool(AWS_CODE_COPY.search(path))
+    c["hits"].append({"repo": repo, "path": path, "line": line, "language": lang, "url": url, "code": code,
+                      "assignment": assignment, "blob": blob, "aws_copy": aws_copy})
+    if aws_copy:
+        return
     c["count"] += 1
     c["languages"][lang] = c["languages"].get(lang, 0) + 1
     # Examples from different repos show more ways of reaching the call.
     if len(c["examples"]) < MAX_EXAMPLES and all(e["repo"] != repo for e in c["examples"]):
-        c["examples"].append({"repo": repo, "path": path, "line": line, "language": lang,
-                              "url": f"https://github.com/{repo}/blob/{commit}/{urllib.parse.quote(path)}#L{line}"})
+        c["examples"].append({"repo": repo, "path": path, "line": line, "language": lang, "url": url})
+
+
+def group_copies(hits):
+    """Give each hit a source number. Hits in the same file, or in copies of one file, share a number.
+
+    Two hits come from copies when their files have the same blob sha, or when their paths end in the
+    same TAIL parts and their call lines are the same. Returns the number of sources.
+    """
+    parent = list(range(len(hits)))
+
+    def root(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    first = {}
+    for i, h in enumerate(hits):
+        keys = [("file", h["repo"], h["path"])]
+        if h.get("blob"):
+            keys.append(("blob", h["blob"]))
+        parts_ = h["path"].split("/")
+        if len(parts_) >= TAIL and h.get("code"):
+            keys.append(("tail", "/".join(parts_[-TAIL:]), h["code"]))
+        for key in keys:
+            if key in first:
+                parent[root(i)] = root(first[key])
+            else:
+                first[key] = i
+    numbers = {}
+    for i, h in enumerate(hits):
+        h["source"] = numbers.setdefault(root(i), len(numbers))
+    return len(numbers)
 
 
 def ranked(apis):
-    """{api: {option: [conversion, most calls first]}}."""
+    """{api: {option: [conversion, most calls first]}}, with repo and source counts for each conversion."""
+    for options in apis.values():
+        for convs in options.values():
+            for c in convs.values():
+                counted = [h for h in c.get("hits", []) if not h["aws_copy"]]
+                c["repos"] = len({h["repo"] for h in counted})
+                c["sources"] = group_copies(counted) if counted else 0
+                c["aws_copies"] = sum(1 for h in c.get("hits", []) if h["aws_copy"])
     return {api: {opt: sorted(convs.values(), key=lambda c: (-c["count"], c["conversion"]))
                   for opt, convs in sorted(options.items())}
             for api, options in sorted(apis.items())}
@@ -547,10 +620,10 @@ def main(argv=None):
     for lang in LANGUAGES:
         files = search(auth, lang, min(a.max_pages, 10))
         n_calls, repos = 0, set()
-        for (repo, path), commit in sorted(files.items()):
+        for (repo, path), (commit, blob) in sorted(files.items()):
             code = fetch(repo, commit, path)
             for hit in calls(code or "", lang, sites):
-                add(apis, lang, repo, path, commit, hit)
+                add(apis, lang, repo, path, commit, hit, blob)
                 n_calls += 1
                 repos.add(repo)
         languages[lang] = {"files": len(files), "repos": len(repos), "calls": n_calls}
@@ -560,6 +633,18 @@ def main(argv=None):
         "generated_by": "api-examples/usage_search.py",
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "excluded_owners": sorted(AWS_OWNERS),
+        # How the search ran, so anyone can check a count or run it again.
+        "search": {
+            "queries": {lang: {"github_languages": spec["search"], "queries": spec["queries"]}
+                        for lang, spec in LANGUAGES.items()},
+            "pages_per_query": min(a.max_pages, 10),
+            "skipped": ["repos owned by " + ", ".join(sorted(AWS_OWNERS)), "forks", "private repos",
+                        f"paths matching {SKIP_PATH.pattern}", f"copies of a library's source: {LIBRARY_COPY.pattern}",
+                        "files that don't import the ESDK or MPL"],
+            "listed_not_counted": f"copies of AWS code: {AWS_CODE_COPY.pattern}",
+            "sources": f"Hits in one file, in files with the same content, or in files whose paths end in the same "
+                       f"{TAIL} parts with the same call line, count as one source.",
+        },
         "languages": languages,
         "apis": ranked(apis),
     }

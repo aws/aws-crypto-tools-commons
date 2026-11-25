@@ -1,0 +1,13 @@
+{
+  "note": "Rules a person wrote for what an option should not take as is. The types page checks every row of these options against them, in every language.",
+  "rules": {
+    "mpl/RawAesKeyring.wrapping_key": {
+      "refuse": ["text", "optional text"],
+      "why": "Text such as a password is not a key. Turning text into a key should take an explicit conversion."
+    },
+    "esdk/decrypt.ciphertext": {
+      "refuse": ["text", "optional text"],
+      "why": "Ciphertext held as text is usually base64. Its bytes are not a message, so passing them as is fails."
+    }
+  }
+}

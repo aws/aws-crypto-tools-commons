@@ -25,28 +25,33 @@ class FitsTest(unittest.TestCase):
         self.assertFalse(fits("entry", ["String"], "pair"))
 
 
+def row(type_, calls, code, kind):
+    return {"type": type_, "calls": calls, "code": code, "kind": kind}
+
+
 class OtherRowsTest(unittest.TestCase):
-    ROWS = [["byte[]", 0, "crypto.encryptData(keyring, x)", "bytes"],
-            ["String", 2, "crypto.encryptData(keyring, x.getBytes(UTF_8))", "text"],
-            ["Path", 3, "crypto.encryptData(keyring, Files.readAllBytes(x))", "file / stream"]]
+    ROWS = [row("byte[]", 0, "crypto.encryptData(keyring, x)", "bytes"),
+            row("String", 1, "crypto.encryptData(keyring, x.getBytes(UTF_8))", "text"),
+            row("Path", 1, "crypto.encryptData(keyring, Files.readAllBytes(x))", "file / stream")]
 
     def test_listed_kinds_become_as_is_and_keep_todays_cost(self):
         rows = other_rows(self.ROWS, {"as_is": ["text", "file / stream"]})
-        self.assertEqual(rows[1], ["String", 0, "crypto.encryptData(keyring, x)", "text", 2, True])
+        self.assertEqual(rows[1], {**row("String", 0, "crypto.encryptData(keyring, x)", "text"),
+                                   "today": 1, "proposed": True})
 
     def test_paths_and_unlisted_kinds_stay(self):
         rows = other_rows(self.ROWS, {"as_is": ["file / stream"]})
-        self.assertEqual(rows[1][1:], [2, "crypto.encryptData(keyring, x.getBytes(UTF_8))", "text", 2, False])
-        self.assertEqual(rows[2][1], 3)
+        self.assertEqual(rows[1], {**self.ROWS[1], "today": 1, "proposed": False})
+        self.assertEqual(rows[2]["calls"], 1)
 
     def test_rename_changes_the_field_only_for_its_kind(self):
-        go = [["[]byte", 0, "EncryptInput{Plaintext: x}", "bytes"],
-              ["*bytes.Buffer", 2, "EncryptInput{Plaintext: x.Bytes()}", "bytes"],
-              ["io.Reader", 4, "data, err := io.ReadAll(x)", "file / stream"]]
+        go = [row("[]byte", 0, "EncryptInput{Plaintext: x}", "bytes"),
+              row("*bytes.Buffer", 1, "EncryptInput{Plaintext: x.Bytes()}", "bytes"),
+              row("io.Reader", 3, "data, err := io.ReadAll(x)", "file / stream")]
         spec = {"as_is": ["bytes", "file / stream"], "rename": ["Plaintext:", "PlaintextReader:", "file / stream"]}
         rows = other_rows(go, spec)
-        self.assertEqual(rows[1][2], "EncryptInput{Plaintext: x}")
-        self.assertEqual(rows[2][2], "EncryptInput{PlaintextReader: x}")
+        self.assertEqual(rows[1]["code"], "EncryptInput{Plaintext: x}")
+        self.assertEqual(rows[2]["code"], "EncryptInput{PlaintextReader: x}")
 
 
 if __name__ == "__main__":

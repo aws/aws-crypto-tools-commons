@@ -191,6 +191,60 @@ class CallsTest(unittest.TestCase):
         self.assertEqual([e["repo"] for e in out[0]["examples"]], ["a/x", "b/y"])
         self.assertEqual(out[0]["examples"][0]["url"], "https://github.com/a/x/blob/c0ffee/app.py#L3")
 
+    def test_each_call_keeps_its_line_and_the_assignment_that_converted_it(self):
+        code = "import aws_encryption_sdk\npt = text.encode()\nclient.encrypt(source=pt)"
+        hits = us.calls(code, "python", SITES)
+        self.assertEqual([(h[4], h[5], h[6]) for h in hits], [(3, "client.encrypt(source=pt)", "pt = text.encode()")])
+
+    def test_the_assignment_is_kept_only_when_it_did_the_conversion(self):
+        def found(arg, before):
+            hits, assignment = us.classify_with_source(arg, before, "python")
+            return [h if h == us.AS_IS else h.label for h in hits], assignment
+        self.assertEqual(found("pt", ["pt = text.encode()"]), ([".encode()"], "pt = text.encode()"))
+        self.assertEqual(found("text.encode()", ["pt = other.encode()"]), ([".encode()"], None))
+        self.assertEqual(found("pt", ["pt = load()"]), ([us.AS_IS], None))
+
+    def test_copies_of_aws_code_are_listed_but_not_counted(self):
+        apis = {}
+        rule = next(r for r in us.RULES if r.label == ".encode()")
+        hit = ("esdk", "encrypt", "plaintext", rule, 3, "client.encrypt(source=s.encode())", None)
+        us.add(apis, "python", "a/x", "app.py", "c0ffee", hit, "b1")
+        us.add(apis, "python", "b/y", "lambda/aws_lambda_powertools/utilities/kms.py", "c0ffee", hit, "b2")
+        c = us.ranked(apis)["esdk|encrypt"]["plaintext"][0]
+        self.assertEqual((c["count"], c["languages"], c["repos"], c["sources"], c["aws_copies"]),
+                         (1, {"python": 1}, 1, 1, 1))
+        self.assertEqual([(h["repo"], h["aws_copy"]) for h in c["hits"]], [("a/x", False), ("b/y", True)])
+        self.assertEqual([e["repo"] for e in c["examples"]], ["a/x"])
+
+    def test_aws_code_copies_are_folders_named_after_aws_code(self):
+        for path in ("aws_lambda_powertools/utilities/kms.py", "deps/aws-encryption-sdk-python/src/basic.py",
+                     "x/aws-cryptographic-material-providers-library/src/keyring.py"):
+            self.assertTrue(us.AWS_CODE_COPY.search(path), path)
+        for path in ("app/aws_encryption.py", "src/aws-encryption-sdk.py", "my-aws-encryption-sdk-app/main.py"):
+            self.assertFalse(us.AWS_CODE_COPY.search(path), path)
+
+
+class GroupCopiesTest(unittest.TestCase):
+
+    def test_hits_in_one_file_or_in_copies_of_a_file_share_a_source(self):
+        def hit(repo, path, code, blob=None):
+            return {"repo": repo, "path": path, "code": code, "blob": blob}
+        hits = [hit("a/x", "app/main.py", "one"), hit("a/x", "app/main.py", "two"),  # one file
+                hit("b/y", "other.py", "one", "f00d"), hit("c/z", "renamed.py", "two", "f00d"),  # same content
+                hit("d/w", "src/pkg/crypto.py", "same"), hit("e/v", "lib/src/pkg/crypto.py", "same"),  # same tail and line
+                hit("f/u", "lib/src/pkg/crypto.py", "other"),  # same tail, another line
+                hit("g/t", "pkg/crypto.py", "same")]  # a tail shorter than TAIL parts
+        self.assertEqual(us.group_copies(hits), 5)
+        self.assertEqual([h["source"] for h in hits], [0, 0, 1, 1, 2, 2, 3, 4])
+
+    def test_a_hit_that_links_two_sources_joins_them(self):
+        # The last hit is in the second hit's file, and has the first hit's line in a copy of its file.
+        hits = [{"repo": "a/x", "path": "one/src/pkg/crypto.py", "code": "first", "blob": None},
+                {"repo": "b/y", "path": "two/src/pkg/crypto.py", "code": "second", "blob": None},
+                {"repo": "b/y", "path": "two/src/pkg/crypto.py", "code": "first", "blob": None}]
+        self.assertEqual(us.group_copies(hits), 1)
+        self.assertEqual({h["source"] for h in hits}, {0})
+
 
 if __name__ == "__main__":
     unittest.main()

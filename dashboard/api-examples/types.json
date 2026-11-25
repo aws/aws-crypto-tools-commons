@@ -1,5 +1,5 @@
 {
-  "note": "Rust: 1,107 tries compiled on aws-crypto-tools-rust at e77da77. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25. Other languages: the latest released signatures, not compiled. Customers: public GitHub code.",
+  "note": "Rust: 1,107 tries compiled and 142 calls run on aws-crypto-tools-rust at e77da77 with rustc 1.99.1. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25. Other languages: the latest released signatures, not compiled.",
   "apis": [
     {
       "name": "Raw AES keyring",
@@ -66,1048 +66,2012 @@
   },
   "rust": {
     "mpl/RawAesKeyring.wrapping_key": [
-      [
-        "&[u8]",
-        0,
-        ".wrapping_key(x)",
-        "bytes"
-      ],
-      [
-        "&str",
-        0,
-        ".wrapping_key(x)",
-        "text"
-      ],
-      [
-        "Blob",
-        0,
-        ".wrapping_key(x)",
-        "bytes"
-      ],
-      [
-        "Box<[u8]>",
-        0,
-        ".wrapping_key(x)",
-        "bytes"
-      ],
-      [
-        "Bytes",
-        0,
-        ".wrapping_key(x)",
-        "bytes"
-      ],
-      [
-        "Option<Vec<u8>>",
-        0,
-        ".set_wrapping_key(x)",
-        "optional bytes"
-      ],
-      [
-        "String",
-        0,
-        ".wrapping_key(x)",
-        "text"
-      ],
-      [
-        "Vec<u8>",
-        0,
-        ".wrapping_key(x)",
-        "bytes"
-      ],
-      [
-        "[u8; 32]",
-        0,
-        ".wrapping_key(x)",
-        "bytes"
-      ],
-      [
-        "&String",
-        2,
-        ".wrapping_key(x.clone())",
-        "text"
-      ],
-      [
-        "Cow<str>",
-        2,
-        ".wrapping_key(x.to_string())",
-        "text"
-      ],
-      [
-        "Option<&[u8]>",
-        2,
-        ".set_wrapping_key(x.map(Into::into))",
-        "optional bytes"
-      ],
-      [
-        "Option<&str>",
-        2,
-        ".set_wrapping_key(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Option<Blob>",
-        2,
-        ".set_wrapping_key(x.map(Into::into))",
-        "optional bytes"
-      ],
-      [
-        "Option<String>",
-        2,
-        ".set_wrapping_key(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".wrapping_key(x.to_string())",
-        "text"
-      ],
-      [
-        "char",
-        2,
-        ".wrapping_key(x.to_string())",
-        "text"
-      ],
-      [
-        "&Path",
-        3,
-        ".wrapping_key(std::fs::read(x).unwrap())",
-        "path"
-      ],
-      [
-        "ByteStream",
-        3,
-        ".wrapping_key(x.bytes().unwrap())",
-        "stream"
-      ],
-      [
-        "Option<&Blob>",
-        3,
-        ".set_wrapping_key(x.map(|b| b.clone().into_inner()))",
-        "optional bytes"
-      ],
-      [
-        "Option<Cow<str>>",
-        3,
-        ".wrapping_key(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "PathBuf",
-        3,
-        ".wrapping_key(std::fs::read(x).unwrap())",
-        "path"
-      ],
-      [
-        "SdkBody",
-        3,
-        ".wrapping_key(x.bytes().unwrap())",
-        "stream"
-      ],
-      [
-        "File",
-        5,
-        ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
-        "reader"
-      ],
-      [
-        "TcpStream",
-        5,
-        ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
-        "reader"
-      ],
-      [
-        "Option<&AppName>",
-        null,
-        "",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ]
+      {
+        "type": "&[u8]",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 4,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1574
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "text",
+        "trial": 110,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1586
+      },
+      {
+        "type": "Blob",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 54,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1598
+      },
+      {
+        "type": "Box<[u8]>",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 24,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1609
+      },
+      {
+        "type": "Bytes",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 34,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1620
+      },
+      {
+        "type": "Option<Vec<u8>>",
+        "calls": 0,
+        "code": ".set_wrapping_key(x)",
+        "kind": "optional bytes",
+        "trial": 73,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1631
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "text",
+        "trial": 119,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1643
+      },
+      {
+        "type": "Vec<u8>",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 14,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1654
+      },
+      {
+        "type": "[u8; 32]",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 44,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1665
+      },
+      {
+        "type": "&String",
+        "calls": 1,
+        "code": ".wrapping_key(x.clone())",
+        "kind": "text",
+        "trial": 148,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1677
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 1,
+        "code": ".wrapping_key(x.to_string())",
+        "kind": "text",
+        "trial": 140,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1689
+      },
+      {
+        "type": "Option<&[u8]>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional bytes",
+        "trial": 65,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1700
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 165,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1713
+      },
+      {
+        "type": "Option<Blob>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional bytes",
+        "trial": 92,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1726
+      },
+      {
+        "type": "Option<String>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 170,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1738
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".wrapping_key(x.to_string())",
+        "kind": "text",
+        "trial": 158,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1750
+      },
+      {
+        "type": "char",
+        "calls": 1,
+        "code": ".wrapping_key(x.to_string())",
+        "kind": "text",
+        "trial": 131,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1761
+      },
+      {
+        "type": "&Path",
+        "calls": 2,
+        "code": ".wrapping_key(std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 193,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1768
+      },
+      {
+        "type": "ByteStream",
+        "calls": 2,
+        "code": ".wrapping_key(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 101,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1780
+      },
+      {
+        "type": "Option<&Blob>",
+        "calls": 2,
+        "code": ".wrapping_key(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 88,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1791
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 2,
+        "code": ".wrapping_key(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 178,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1804
+      },
+      {
+        "type": "PathBuf",
+        "calls": 2,
+        "code": ".wrapping_key(std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 190,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1816
+      },
+      {
+        "type": "SdkBody",
+        "calls": 2,
+        "code": ".wrapping_key(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 106,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1827
+      },
+      {
+        "type": "File",
+        "calls": 3,
+        "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 196,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1838
+      },
+      {
+        "type": "TcpStream",
+        "calls": 3,
+        "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 199,
+        "run": {
+          "skipped": "needs a network connection"
+        },
+        "test": 1849
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      }
     ],
     "mpl/RawAesKeyring.key_name": [
-      [
-        "&String",
-        0,
-        ".key_name(x)",
-        "text"
-      ],
-      [
-        "&str",
-        0,
-        ".key_name(x)",
-        "text"
-      ],
-      [
-        "Cow<str>",
-        0,
-        ".key_name(x)",
-        "text"
-      ],
-      [
-        "Option<String>",
-        0,
-        ".set_key_name(x)",
-        "optional text"
-      ],
-      [
-        "String",
-        0,
-        ".key_name(x)",
-        "text"
-      ],
-      [
-        "char",
-        0,
-        ".key_name(x)",
-        "text"
-      ],
-      [
-        "Option<&str>",
-        2,
-        ".set_key_name(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Option<Cow<str>>",
-        2,
-        ".set_key_name(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".key_name(x.to_string())",
-        "text"
-      ],
-      [
-        "Option<&AppName>",
-        3,
-        ".set_key_name(x.map(|s| s.to_string()))",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ]
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 237,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1466
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 201,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1478
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 228,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1490
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_key_name(x)",
+        "kind": "optional text",
+        "trial": 260,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1501
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 210,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1513
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 219,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1524
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_key_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 256,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1531
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_key_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 266,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1544
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".key_name(x.to_string())",
+        "kind": "text",
+        "trial": 249,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1556
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": 2,
+        "code": ".set_key_name(x.map(|s| s.to_string()))",
+        "kind": "optional text",
+        "trial": 272,
+        "run": {
+          "skipped": "an AWS SDK name type, not text"
+        },
+        "test": 1567
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      }
     ],
     "mpl/AwsKmsKeyring.kms_key_id": [
-      [
-        "&String",
-        0,
-        ".kms_key_id(x)",
-        "text"
-      ],
-      [
-        "&str",
-        0,
-        ".kms_key_id(x)",
-        "text"
-      ],
-      [
-        "Cow<str>",
-        0,
-        ".kms_key_id(x)",
-        "text"
-      ],
-      [
-        "Option<String>",
-        0,
-        ".set_kms_key_id(x)",
-        "optional text"
-      ],
-      [
-        "String",
-        0,
-        ".kms_key_id(x)",
-        "text"
-      ],
-      [
-        "char",
-        0,
-        ".kms_key_id(x)",
-        "text"
-      ],
-      [
-        "Option<&str>",
-        2,
-        ".set_kms_key_id(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Option<Cow<str>>",
-        2,
-        ".set_kms_key_id(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".kms_key_id(x.to_string())",
-        "text"
-      ],
-      [
-        "Option<&AppName>",
-        3,
-        ".set_kms_key_id(x.map(|s| s.to_string()))",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ]
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 316,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1140
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 280,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1152
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 307,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1164
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_kms_key_id(x)",
+        "kind": "optional text",
+        "trial": 339,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1175
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 289,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1187
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 298,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1198
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_kms_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 335,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1205
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_kms_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 345,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1218
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".kms_key_id(x.to_string())",
+        "kind": "text",
+        "trial": 328,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1230
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": 2,
+        "code": ".set_kms_key_id(x.map(|s| s.to_string()))",
+        "kind": "optional text",
+        "trial": 351,
+        "run": {
+          "skipped": "an AWS SDK name type, not text"
+        },
+        "test": 1241
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      }
     ],
     "mpl/AwsKmsKeyring.kms_client": [
-      [
-        "kms::Client",
-        0,
-        ".kms_client(x)",
-        "named"
-      ],
-      [
-        "&kms::Client",
-        2,
-        ".kms_client(x.clone())",
-        "named"
-      ],
-      [
-        "&SdkConfig",
-        3,
-        ".kms_client(aws_sdk_kms::Client::new(x))",
-        "ctor"
-      ],
-      [
-        "Arc<kms::Client>",
-        3,
-        ".kms_client((*x).clone())",
-        "named"
-      ],
-      [
-        "SdkConfig",
-        3,
-        ".kms_client(aws_sdk_kms::Client::new(&x))",
-        "ctor"
-      ],
-      [
-        "kms::Config",
-        3,
-        ".kms_client(aws_sdk_kms::Client::from_conf(x))",
-        "ctor"
-      ]
+      {
+        "type": "kms::Client",
+        "calls": 0,
+        "code": ".kms_client(x)",
+        "kind": "named",
+        "trial": 359,
+        "run": {
+          "builds": true
+        },
+        "test": 1072
+      },
+      {
+        "type": "&SdkConfig",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::new(x))",
+        "kind": "ctor",
+        "trial": 378,
+        "run": {
+          "builds": true
+        },
+        "test": 1083
+      },
+      {
+        "type": "&kms::Client",
+        "calls": 1,
+        "code": ".kms_client(x.clone())",
+        "kind": "named",
+        "trial": 364,
+        "run": {
+          "builds": true
+        },
+        "test": 1095
+      },
+      {
+        "type": "Arc<kms::Client>",
+        "calls": 1,
+        "code": ".kms_client((*x).clone())",
+        "kind": "named",
+        "trial": 369,
+        "run": {
+          "builds": true
+        },
+        "test": 1107
+      },
+      {
+        "type": "SdkConfig",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::new(&x))",
+        "kind": "ctor",
+        "trial": 376,
+        "run": {
+          "builds": true
+        },
+        "test": 1118
+      },
+      {
+        "type": "kms::Config",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::from_conf(x))",
+        "kind": "ctor",
+        "trial": 373,
+        "run": {
+          "builds": true
+        },
+        "test": 1129
+      }
     ],
     "mpl/AwsKmsKeyring.grant_tokens": [
-      [
-        "&String",
-        0,
-        ".grant_tokens(x)",
-        "text"
-      ],
-      [
-        "&str",
-        0,
-        ".grant_tokens(x)",
-        "text"
-      ],
-      [
-        "Cow<str>",
-        0,
-        ".grant_tokens(x)",
-        "text"
-      ],
-      [
-        "Option<Vec<String>>",
-        0,
-        ".set_grant_tokens(x)",
-        "optional list"
-      ],
-      [
-        "String",
-        0,
-        ".grant_tokens(x)",
-        "text"
-      ],
-      [
-        "char",
-        0,
-        ".grant_tokens(x)",
-        "text"
-      ],
-      [
-        "Vec<String>",
-        1,
-        ".set_grant_tokens(Some(x))",
-        "list"
-      ],
-      [
-        "&[String]",
-        2,
-        ".set_grant_tokens(Some(x.to_vec()))",
-        "list"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".grant_tokens(x.to_string())",
-        "text"
-      ],
-      [
-        "&[&str]",
-        3,
-        ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
-        "list"
-      ],
-      [
-        "Option<&str>",
-        3,
-        ".grant_tokens(x.unwrap())",
-        "optional text"
-      ],
-      [
-        "Option<Cow<str>>",
-        3,
-        ".grant_tokens(x.unwrap())",
-        "optional text"
-      ],
-      [
-        "Option<String>",
-        3,
-        ".grant_tokens(x.unwrap())",
-        "optional text"
-      ],
-      [
-        "Option<&AppName>",
-        null,
-        "",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ]
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 415,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 923
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 379,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 935
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 406,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 947
+      },
+      {
+        "type": "Option<Vec<String>>",
+        "calls": 0,
+        "code": ".set_grant_tokens(x)",
+        "kind": "optional list",
+        "trial": 473,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 958
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 388,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 970
+      },
+      {
+        "type": "Vec<String>",
+        "calls": 0,
+        "code": ".set_grant_tokens(Some(x))",
+        "kind": "list",
+        "trial": 470,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 981
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 397,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 992
+      },
+      {
+        "type": "&[String]",
+        "calls": 1,
+        "code": ".set_grant_tokens(Some(x.to_vec()))",
+        "kind": "list",
+        "trial": 466,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 999
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 436,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1011
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 446,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1024
+      },
+      {
+        "type": "Option<String>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 441,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1036
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".grant_tokens(x.to_string())",
+        "kind": "text",
+        "trial": 427,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1048
+      },
+      {
+        "type": "&[&str]",
+        "calls": 4,
+        "code": ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
+        "kind": "list",
+        "trial": 462,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1059
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      }
     ],
     "mpl/HierarchicalKeyring.ttl": [
-      [
-        "Duration",
-        0,
-        ".ttl(x)",
-        "duration"
-      ],
-      [
-        "u16",
-        3,
-        ".ttl(std::time::Duration::from_secs(x.into()))",
-        "number"
-      ],
-      [
-        "u32",
-        3,
-        ".ttl(std::time::Duration::from_secs(x.into()))",
-        "number"
-      ],
-      [
-        "u64",
-        3,
-        ".ttl(std::time::Duration::from_secs(x.into()))",
-        "number"
-      ],
-      [
-        "u8",
-        3,
-        ".ttl(std::time::Duration::from_secs(x.into()))",
-        "number"
-      ],
-      [
-        "i16",
-        4,
-        ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
-        "number"
-      ],
-      [
-        "i32",
-        4,
-        ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
-        "number"
-      ],
-      [
-        "i64",
-        4,
-        ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
-        "number"
-      ],
-      [
-        "i8",
-        4,
-        ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
-        "number"
-      ],
-      [
-        "usize",
-        4,
-        ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
-        "number"
-      ]
+      {
+        "type": "Duration",
+        "calls": 0,
+        "code": ".ttl(x)",
+        "kind": "duration",
+        "trial": 475,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1356
+      },
+      {
+        "type": "u16",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 501,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1367
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 491,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1378
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 486,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1389
+      },
+      {
+        "type": "u8",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 496,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1400
+      },
+      {
+        "type": "i16",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 517,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1411
+      },
+      {
+        "type": "i32",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 507,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1422
+      },
+      {
+        "type": "i64",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 512,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1433
+      },
+      {
+        "type": "i8",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 522,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1444
+      },
+      {
+        "type": "usize",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 482,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1455
+      }
     ],
     "mpl/HierarchicalKeyring.branch_key_id": [
-      [
-        "&String",
-        0,
-        ".branch_key_id(x)",
-        "text"
-      ],
-      [
-        "&str",
-        0,
-        ".branch_key_id(x)",
-        "text"
-      ],
-      [
-        "Cow<str>",
-        0,
-        ".branch_key_id(x)",
-        "text"
-      ],
-      [
-        "Option<String>",
-        0,
-        ".set_branch_key_id(x)",
-        "optional text"
-      ],
-      [
-        "String",
-        0,
-        ".branch_key_id(x)",
-        "text"
-      ],
-      [
-        "char",
-        0,
-        ".branch_key_id(x)",
-        "text"
-      ],
-      [
-        "Option<&str>",
-        2,
-        ".set_branch_key_id(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Option<Cow<str>>",
-        2,
-        ".set_branch_key_id(x.map(Into::into))",
-        "optional text"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".branch_key_id(x.to_string())",
-        "text"
-      ],
-      [
-        "Option<&AppName>",
-        3,
-        ".set_branch_key_id(x.map(|s| s.to_string()))",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ]
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 559,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1248
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 523,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1260
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 550,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1272
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_branch_key_id(x)",
+        "kind": "optional text",
+        "trial": 582,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1283
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 532,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1295
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 541,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1306
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_branch_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 578,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1313
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_branch_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 588,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1326
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".branch_key_id(x.to_string())",
+        "kind": "text",
+        "trial": 571,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1338
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": 2,
+        "code": ".set_branch_key_id(x.map(|s| s.to_string()))",
+        "kind": "optional text",
+        "trial": 594,
+        "run": {
+          "skipped": "an AWS SDK name type, not text"
+        },
+        "test": 1349
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      }
     ],
     "esdk/encrypt.plaintext": [
-      [
-        "&[u8]",
-        0,
-        ".encrypt().plaintext(x)",
-        "bytes"
-      ],
-      [
-        "Option<&[u8]>",
-        0,
-        ".encrypt().set_plaintext(x)",
-        "optional bytes"
-      ],
-      [
-        "Box<[u8]>",
-        1,
-        ".encrypt().plaintext(&x)",
-        "bytes"
-      ],
-      [
-        "Bytes",
-        1,
-        ".encrypt().plaintext(&x)",
-        "bytes"
-      ],
-      [
-        "Vec<u8>",
-        1,
-        ".encrypt().plaintext(&x)",
-        "bytes"
-      ],
-      [
-        "[u8; 32]",
-        1,
-        ".encrypt().plaintext(&x)",
-        "bytes"
-      ],
-      [
-        "&String",
-        2,
-        ".encrypt().plaintext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "&str",
-        2,
-        ".encrypt().plaintext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "Blob",
-        2,
-        ".encrypt().plaintext(x.as_ref())",
-        "bytes"
-      ],
-      [
-        "Cow<str>",
-        2,
-        ".encrypt().plaintext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "String",
-        2,
-        ".encrypt().plaintext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".encrypt().plaintext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "ByteStream",
-        3,
-        ".encrypt().plaintext(x.bytes().unwrap())",
-        "stream"
-      ],
-      [
-        "Option<&Blob>",
-        3,
-        ".encrypt().plaintext(x.unwrap().as_ref())",
-        "optional bytes"
-      ],
-      [
-        "Option<&str>",
-        3,
-        ".encrypt().plaintext(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "Option<Blob>",
-        3,
-        ".encrypt().plaintext(x.unwrap().as_ref())",
-        "optional bytes"
-      ],
-      [
-        "Option<Cow<str>>",
-        3,
-        ".encrypt().plaintext(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "Option<String>",
-        3,
-        ".encrypt().plaintext(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "Option<Vec<u8>>",
-        3,
-        ".encrypt().plaintext(x.unwrap().as_ref())",
-        "optional bytes"
-      ],
-      [
-        "SdkBody",
-        3,
-        ".encrypt().plaintext(x.bytes().unwrap())",
-        "stream"
-      ],
-      [
-        "&Path",
-        4,
-        ".encrypt().plaintext(&std::fs::read(x).unwrap())",
-        "path"
-      ],
-      [
-        "PathBuf",
-        4,
-        ".encrypt().plaintext(&std::fs::read(x).unwrap())",
-        "path"
-      ],
-      [
-        "File",
-        6,
-        ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
-        "reader"
-      ],
-      [
-        "TcpStream",
-        6,
-        ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
-        "reader"
-      ],
-      [
-        "Option<&AppName>",
-        null,
-        "",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ],
-      [
-        "char",
-        null,
-        "",
-        "text"
-      ]
+      {
+        "type": "&[u8]",
+        "calls": 0,
+        "code": ".encrypt().plaintext(x)",
+        "kind": "bytes",
+        "trial": 602,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 607
+      },
+      {
+        "type": "Box<[u8]>",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 623,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 622
+      },
+      {
+        "type": "Bytes",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 633,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 636
+      },
+      {
+        "type": "Option<&[u8]>",
+        "calls": 0,
+        "code": ".encrypt().set_plaintext(x)",
+        "kind": "optional bytes",
+        "trial": 662,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 650
+      },
+      {
+        "type": "Vec<u8>",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 613,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 666
+      },
+      {
+        "type": "[u8; 32]",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 643,
+        "run": {
+          "skipped": "the value is not 32 bytes"
+        },
+        "test": 680
+      },
+      {
+        "type": "&String",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 749,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 695
+      },
+      {
+        "type": "&str",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 713,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 710
+      },
+      {
+        "type": "Blob",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_ref())",
+        "kind": "bytes",
+        "trial": 657,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 725
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 740,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 739
+      },
+      {
+        "type": "String",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 722,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 753
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 758,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 767
+      },
+      {
+        "type": "&Path",
+        "calls": 2,
+        "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 792,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 781
+      },
+      {
+        "type": "ByteStream",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 699,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 792
+      },
+      {
+        "type": "Option<&Blob>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 686,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 806
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 766,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 822
+      },
+      {
+        "type": "Option<Blob>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 695,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 838
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 776,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 849
+      },
+      {
+        "type": "Option<String>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 771,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 860
+      },
+      {
+        "type": "Option<Vec<u8>>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 677,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 871
+      },
+      {
+        "type": "PathBuf",
+        "calls": 2,
+        "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 789,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 882
+      },
+      {
+        "type": "SdkBody",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 704,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 892
+      },
+      {
+        "type": "File",
+        "calls": 3,
+        "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 795,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 906
+      },
+      {
+        "type": "TcpStream",
+        "calls": 3,
+        "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 798,
+        "run": {
+          "skipped": "needs a network connection"
+        },
+        "test": 916
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      },
+      {
+        "type": "char",
+        "calls": null,
+        "code": "",
+        "kind": "text",
+        "trial": null
+      }
     ],
     "esdk/decrypt.ciphertext": [
-      [
-        "&[u8]",
-        0,
-        ".decrypt().ciphertext(x)",
-        "bytes"
-      ],
-      [
-        "Option<&[u8]>",
-        0,
-        ".decrypt().set_ciphertext(x)",
-        "optional bytes"
-      ],
-      [
-        "Box<[u8]>",
-        1,
-        ".decrypt().ciphertext(&x)",
-        "bytes"
-      ],
-      [
-        "Bytes",
-        1,
-        ".decrypt().ciphertext(&x)",
-        "bytes"
-      ],
-      [
-        "Vec<u8>",
-        1,
-        ".decrypt().ciphertext(&x)",
-        "bytes"
-      ],
-      [
-        "[u8; 32]",
-        1,
-        ".decrypt().ciphertext(&x)",
-        "bytes"
-      ],
-      [
-        "&String",
-        2,
-        ".decrypt().ciphertext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "&str",
-        2,
-        ".decrypt().ciphertext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "Blob",
-        2,
-        ".decrypt().ciphertext(x.as_ref())",
-        "bytes"
-      ],
-      [
-        "Cow<str>",
-        2,
-        ".decrypt().ciphertext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "String",
-        2,
-        ".decrypt().ciphertext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "Zeroizing<String>",
-        2,
-        ".decrypt().ciphertext(x.as_bytes())",
-        "text"
-      ],
-      [
-        "ByteStream",
-        3,
-        ".decrypt().ciphertext(x.bytes().unwrap())",
-        "stream"
-      ],
-      [
-        "Option<&Blob>",
-        3,
-        ".decrypt().ciphertext(x.unwrap().as_ref())",
-        "optional bytes"
-      ],
-      [
-        "Option<&str>",
-        3,
-        ".decrypt().ciphertext(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "Option<Blob>",
-        3,
-        ".decrypt().ciphertext(x.unwrap().as_ref())",
-        "optional bytes"
-      ],
-      [
-        "Option<Cow<str>>",
-        3,
-        ".decrypt().ciphertext(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "Option<String>",
-        3,
-        ".decrypt().ciphertext(x.unwrap().as_bytes())",
-        "optional text"
-      ],
-      [
-        "Option<Vec<u8>>",
-        3,
-        ".decrypt().ciphertext(x.unwrap().as_ref())",
-        "optional bytes"
-      ],
-      [
-        "SdkBody",
-        3,
-        ".decrypt().ciphertext(x.bytes().unwrap())",
-        "stream"
-      ],
-      [
-        "&Path",
-        4,
-        ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
-        "path"
-      ],
-      [
-        "PathBuf",
-        4,
-        ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
-        "path"
-      ],
-      [
-        "File",
-        6,
-        ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
-        "reader"
-      ],
-      [
-        "TcpStream",
-        6,
-        ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
-        "reader"
-      ],
-      [
-        "Option<&AppName>",
-        null,
-        "",
-        "optional text"
-      ],
-      [
-        "Option<&SigningRegionSet>",
-        null,
-        "",
-        "optional text"
-      ],
-      [
-        "char",
-        null,
-        "",
-        "text"
-      ]
+      {
+        "type": "&[u8]",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(x)",
+        "kind": "bytes",
+        "trial": 799,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 110
+      },
+      {
+        "type": "Box<[u8]>",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 820,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 125
+      },
+      {
+        "type": "Bytes",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 830,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 139
+      },
+      {
+        "type": "Option<&[u8]>",
+        "calls": 0,
+        "code": ".decrypt().set_ciphertext(x)",
+        "kind": "optional bytes",
+        "trial": 859,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 153
+      },
+      {
+        "type": "Vec<u8>",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 810,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 169
+      },
+      {
+        "type": "[u8; 32]",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 840,
+        "run": {
+          "skipped": "the value is not 32 bytes"
+        },
+        "test": 183
+      },
+      {
+        "type": "&String",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 946,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 198
+      },
+      {
+        "type": "&str",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 910,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 213
+      },
+      {
+        "type": "Blob",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_ref())",
+        "kind": "bytes",
+        "trial": 854,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 228
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 937,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 242
+      },
+      {
+        "type": "String",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 919,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 256
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 955,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 270
+      },
+      {
+        "type": "&Path",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 989,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 284
+      },
+      {
+        "type": "ByteStream",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 896,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 295
+      },
+      {
+        "type": "Option<&Blob>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 883,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 309
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 963,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 325
+      },
+      {
+        "type": "Option<Blob>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 892,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 341
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 973,
+        "run": {
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 352
+      },
+      {
+        "type": "Option<String>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 968,
+        "run": {
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 363
+      },
+      {
+        "type": "Option<Vec<u8>>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 874,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 374
+      },
+      {
+        "type": "PathBuf",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 986,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 385
+      },
+      {
+        "type": "SdkBody",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 901,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 395
+      },
+      {
+        "type": "File",
+        "calls": 3,
+        "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 992,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 409
+      },
+      {
+        "type": "TcpStream",
+        "calls": 3,
+        "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 995,
+        "run": {
+          "skipped": "needs a network connection"
+        },
+        "test": 419
+      },
+      {
+        "type": "Option<&AppName>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      },
+      {
+        "type": "Option<&SigningRegionSet>",
+        "calls": null,
+        "code": "",
+        "kind": "optional text",
+        "trial": null
+      },
+      {
+        "type": "char",
+        "calls": null,
+        "code": "",
+        "kind": "text",
+        "trial": null
+      }
     ],
     "esdk/encrypt.encryption_context": [
-      [
-        "(&String, &String)",
-        0,
-        ".encrypt().encryption_context(x, y)",
-        "pair"
-      ],
-      [
-        "(&str, &str)",
-        0,
-        ".encrypt().encryption_context(x, y)",
-        "pair"
-      ],
-      [
-        "(Cow<str>, Cow<str>)",
-        0,
-        ".encrypt().encryption_context(x, y)",
-        "pair"
-      ],
-      [
-        "(String, String)",
-        0,
-        ".encrypt().encryption_context(x, y)",
-        "pair"
-      ],
-      [
-        "(char, char)",
-        0,
-        ".encrypt().encryption_context(x, y)",
-        "pair"
-      ],
-      [
-        "(Zeroizing<String>, Zeroizing<String>)",
-        2,
-        ".encrypt().encryption_context(x.to_string(), y.to_string())",
-        "pair"
-      ],
-      [
-        "HashMap<String, String>",
-        2,
-        ".encrypt().set_encryption_context(Some(x.into()))",
-        "map"
-      ]
+      {
+        "type": "(&String, &String)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1015,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 426
+      },
+      {
+        "type": "(&str, &str)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1003,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 440
+      },
+      {
+        "type": "(Cow<str>, Cow<str>)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1012,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 454
+      },
+      {
+        "type": "(String, String)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1006,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 466
+      },
+      {
+        "type": "(char, char)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1009,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 478
+      },
+      {
+        "type": "HashMap<String, String>",
+        "calls": 1,
+        "code": ".encrypt().set_encryption_context(Some(x.into()))",
+        "kind": "map",
+        "trial": 999,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 485
+      },
+      {
+        "type": "(Zeroizing<String>, Zeroizing<String>)",
+        "calls": 2,
+        "code": ".encrypt().encryption_context(x.to_string(), y.to_string())",
+        "kind": "pair",
+        "trial": 1020,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 496
+      }
     ],
     "esdk/encrypt.frame_length": [
-      [
-        "u32",
-        0,
-        ".encrypt().frame_length(x)",
-        "number"
-      ],
-      [
-        "u16",
-        2,
-        ".encrypt().frame_length(x.into())",
-        "number"
-      ],
-      [
-        "u8",
-        2,
-        ".encrypt().frame_length(x.into())",
-        "number"
-      ],
-      [
-        "i16",
-        3,
-        ".encrypt().frame_length(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "i32",
-        3,
-        ".encrypt().frame_length(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "i64",
-        3,
-        ".encrypt().frame_length(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "i8",
-        3,
-        ".encrypt().frame_length(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "u64",
-        3,
-        ".encrypt().frame_length(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "usize",
-        3,
-        ".encrypt().frame_length(x.try_into().unwrap())",
-        "number"
-      ]
+      {
+        "type": "u32",
+        "calls": 0,
+        "code": ".encrypt().frame_length(x)",
+        "kind": "number",
+        "trial": 1031,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 508
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".encrypt().frame_length(x.into())",
+        "kind": "number",
+        "trial": 1042,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 519
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".encrypt().frame_length(x.into())",
+        "kind": "number",
+        "trial": 1037,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 530
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1058,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 541
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1048,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 552
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1053,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 563
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1063,
+        "run": {
+          "skipped": "the value does not fit in an i8"
+        },
+        "test": 574
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1028,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 585
+      },
+      {
+        "type": "usize",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1023,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 596
+      }
     ],
     "esdk/Client.max_encrypted_data_keys": [
-      [
-        "usize",
-        0,
-        ".max_encrypted_data_keys(x)",
-        "number"
-      ],
-      [
-        "u16",
-        2,
-        ".max_encrypted_data_keys(x.into())",
-        "number"
-      ],
-      [
-        "u8",
-        2,
-        ".max_encrypted_data_keys(x.into())",
-        "number"
-      ],
-      [
-        "i16",
-        3,
-        ".max_encrypted_data_keys(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "i32",
-        3,
-        ".max_encrypted_data_keys(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "i64",
-        3,
-        ".max_encrypted_data_keys(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "i8",
-        3,
-        ".max_encrypted_data_keys(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "u32",
-        3,
-        ".max_encrypted_data_keys(x.try_into().unwrap())",
-        "number"
-      ],
-      [
-        "u64",
-        3,
-        ".max_encrypted_data_keys(x.try_into().unwrap())",
-        "number"
-      ]
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".max_encrypted_data_keys(x)",
+        "kind": "number",
+        "trial": 1066,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 11
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".max_encrypted_data_keys(x.into())",
+        "kind": "number",
+        "trial": 1087,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 22
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".max_encrypted_data_keys(x.into())",
+        "kind": "number",
+        "trial": 1082,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 33
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1103,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 44
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1093,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 55
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1098,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 66
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1108,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 77
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1078,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 88
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1073,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 99
+      }
     ]
   },
   "shipped": {
@@ -1334,1100 +2298,1143 @@
       ]
     }
   },
-  "customers": {
-    "esdk/encrypt.plaintext": {
-      "text": ".encode() 61× · .getBytes() 45×",
-      "file / stream": ".read() 5×"
-    },
-    "esdk/decrypt.ciphertext": {
-      "text": ".getBytes() 16×",
-      "base64 text": "base64 decode 125×",
-      "file / stream": ".read() 10×"
-    },
-    "esdk/encrypt.encryption_context": {
-      "map": "map literal 24×"
-    }
-  },
   "others": {
     "mpl/RawAesKeyring.wrapping_key": {
       "java": [
-        [
-          "ByteBuffer",
-          0,
-          "CreateRawAesKeyringInput.builder().wrappingKey(x)",
-          "bytes"
-        ],
-        [
-          "String",
-          2,
-          "CreateRawAesKeyringInput.builder().wrappingKey(StandardCharsets.UTF_8.encode(x))",
-          "text"
-        ],
-        [
-          "byte[]",
-          2,
-          "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(x))",
-          "bytes"
-        ],
-        [
-          "InputStream",
-          3,
-          "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(x.readAllBytes()))",
-          "file / stream"
-        ],
-        [
-          "Path",
-          3,
-          "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(Files.readAllBytes(x)))",
-          "file / stream"
-        ],
-        [
-          "String (base64)",
-          3,
-          "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(Base64.getDecoder().decode(x)))",
-          "base64 text"
-        ]
+        {
+          "type": "ByteBuffer",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput.builder().wrappingKey(x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "String",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput.builder().wrappingKey(StandardCharsets.UTF_8.encode(x))",
+          "kind": "text"
+        },
+        {
+          "type": "byte[]",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(x))",
+          "kind": "bytes"
+        },
+        {
+          "type": "InputStream",
+          "calls": 2,
+          "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(x.readAllBytes()))",
+          "kind": "file / stream"
+        },
+        {
+          "type": "Path",
+          "calls": 2,
+          "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(Files.readAllBytes(x)))",
+          "kind": "file / stream"
+        },
+        {
+          "type": "String (base64)",
+          "calls": 3,
+          "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(Base64.getDecoder().decode(x)))",
+          "kind": "base64 text"
+        }
       ],
       "python": [
-        [
-          "bytearray",
-          0,
-          "CreateRawAesKeyringInput(wrapping_key=x)",
-          "bytes"
-        ],
-        [
-          "bytes",
-          0,
-          "CreateRawAesKeyringInput(wrapping_key=x)",
-          "bytes"
-        ],
-        [
-          "BinaryIO",
-          2,
-          "CreateRawAesKeyringInput(wrapping_key=x.read())",
-          "file / stream"
-        ],
-        [
-          "pathlib.Path",
-          2,
-          "CreateRawAesKeyringInput(wrapping_key=x.read_bytes())",
-          "file / stream"
-        ],
-        [
-          "str",
-          2,
-          "CreateRawAesKeyringInput(wrapping_key=x.encode())",
-          "text"
-        ],
-        [
-          "str (base64)",
-          2,
-          "CreateRawAesKeyringInput(wrapping_key=base64.b64decode(x))",
-          "base64 text"
-        ]
+        {
+          "type": "bytearray",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput(wrapping_key=x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "bytes",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput(wrapping_key=x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "BinaryIO",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput(wrapping_key=x.read())",
+          "kind": "file / stream"
+        },
+        {
+          "type": "pathlib.Path",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput(wrapping_key=x.read_bytes())",
+          "kind": "file / stream"
+        },
+        {
+          "type": "str",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput(wrapping_key=x.encode())",
+          "kind": "text"
+        },
+        {
+          "type": "str (base64)",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput(wrapping_key=base64.b64decode(x))",
+          "kind": "base64 text"
+        }
       ],
       "dotnet": [
-        [
-          "MemoryStream",
-          0,
-          "new CreateRawAesKeyringInput { WrappingKey = x }",
-          "bytes"
-        ],
-        [
-          "byte[]",
-          2,
-          "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(x) }",
-          "bytes"
-        ],
-        [
-          "FileInfo",
-          3,
-          "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
-          "file / stream"
-        ],
-        [
-          "string",
-          3,
-          "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
-          "text"
-        ],
-        [
-          "string (base64)",
-          3,
-          "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(Convert.FromBase64String(x)) }",
-          "base64 text"
-        ],
-        [
-          "Stream",
-          4,
-          "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew CreateRawAesKeyringInput { WrappingKey = copy }",
-          "file / stream"
-        ]
+        {
+          "type": "MemoryStream",
+          "calls": 0,
+          "code": "new CreateRawAesKeyringInput { WrappingKey = x }",
+          "kind": "bytes"
+        },
+        {
+          "type": "byte[]",
+          "calls": 1,
+          "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(x) }",
+          "kind": "bytes"
+        },
+        {
+          "type": "FileInfo",
+          "calls": 2,
+          "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string",
+          "calls": 2,
+          "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "kind": "text"
+        },
+        {
+          "type": "string (base64)",
+          "calls": 2,
+          "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(Convert.FromBase64String(x)) }",
+          "kind": "base64 text"
+        },
+        {
+          "type": "Stream",
+          "calls": 4,
+          "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew CreateRawAesKeyringInput { WrappingKey = copy }",
+          "kind": "file / stream"
+        }
       ],
       "go": [
-        [
-          "[]byte",
-          0,
-          "CreateRawAesKeyringInput{WrappingKey: x}",
-          "bytes"
-        ],
-        [
-          "string",
-          2,
-          "CreateRawAesKeyringInput{WrappingKey: []byte(x)}",
-          "text"
-        ],
-        [
-          "io.Reader",
-          4,
-          "data, err := io.ReadAll(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
-          "file / stream"
-        ],
-        [
-          "string (base64)",
-          4,
-          "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
-          "base64 text"
-        ],
-        [
-          "string (path)",
-          4,
-          "data, err := os.ReadFile(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
-          "file / stream"
-        ]
+        {
+          "type": "[]byte",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput{WrappingKey: x}",
+          "kind": "bytes"
+        },
+        {
+          "type": "string",
+          "calls": 1,
+          "code": "CreateRawAesKeyringInput{WrappingKey: []byte(x)}",
+          "kind": "text"
+        },
+        {
+          "type": "io.Reader",
+          "calls": 3,
+          "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string (base64)",
+          "calls": 3,
+          "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
+          "kind": "base64 text"
+        },
+        {
+          "type": "string (path)",
+          "calls": 3,
+          "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
+          "kind": "file / stream"
+        }
       ],
       "javascript": [
-        [
-          "Buffer",
-          0,
-          "new RawAesKeyringNode({ unencryptedMasterKey: x })",
-          "bytes"
-        ],
-        [
-          "Uint8Array",
-          0,
-          "new RawAesKeyringNode({ unencryptedMasterKey: x })",
-          "bytes"
-        ],
-        [
-          "string",
-          2,
-          "new RawAesKeyringNode({ unencryptedMasterKey: new TextEncoder().encode(x) })",
-          "text"
-        ],
-        [
-          "string (base64)",
-          2,
-          "new RawAesKeyringNode({ unencryptedMasterKey: Buffer.from(x, \"base64\") })",
-          "base64 text"
-        ],
-        [
-          "string (path)",
-          2,
-          "new RawAesKeyringNode({ unencryptedMasterKey: fs.readFileSync(x) })",
-          "file / stream"
-        ],
-        [
-          "Readable",
-          3,
-          "new RawAesKeyringNode({ unencryptedMasterKey: Buffer.concat(await x.toArray()) })",
-          "file / stream"
-        ]
+        {
+          "type": "Buffer",
+          "calls": 0,
+          "code": "new RawAesKeyringNode({ unencryptedMasterKey: x })",
+          "kind": "bytes"
+        },
+        {
+          "type": "Uint8Array",
+          "calls": 0,
+          "code": "new RawAesKeyringNode({ unencryptedMasterKey: x })",
+          "kind": "bytes"
+        },
+        {
+          "type": "string (base64)",
+          "calls": 1,
+          "code": "new RawAesKeyringNode({ unencryptedMasterKey: Buffer.from(x, \"base64\") })",
+          "kind": "base64 text"
+        },
+        {
+          "type": "string (path)",
+          "calls": 1,
+          "code": "new RawAesKeyringNode({ unencryptedMasterKey: fs.readFileSync(x) })",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string",
+          "calls": 2,
+          "code": "new RawAesKeyringNode({ unencryptedMasterKey: new TextEncoder().encode(x) })",
+          "kind": "text"
+        },
+        {
+          "type": "Readable",
+          "calls": 3,
+          "code": "new RawAesKeyringNode({ unencryptedMasterKey: Buffer.concat(await x.toArray()) })",
+          "kind": "file / stream"
+        }
       ]
     },
     "mpl/RawAesKeyring.key_name": {
       "java": [
-        [
-          "String",
-          0,
-          "CreateRawAesKeyringInput.builder().keyName(x)",
-          "text"
-        ]
+        {
+          "type": "String",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput.builder().keyName(x)",
+          "kind": "text"
+        }
       ],
       "python": [
-        [
-          "str",
-          0,
-          "CreateRawAesKeyringInput(key_name=x)",
-          "text"
-        ]
+        {
+          "type": "str",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput(key_name=x)",
+          "kind": "text"
+        }
       ],
       "dotnet": [
-        [
-          "string",
-          0,
-          "new CreateRawAesKeyringInput { KeyName = x }",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new CreateRawAesKeyringInput { KeyName = x }",
+          "kind": "text"
+        }
       ],
       "go": [
-        [
-          "string",
-          0,
-          "CreateRawAesKeyringInput{KeyName: x}",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "CreateRawAesKeyringInput{KeyName: x}",
+          "kind": "text"
+        }
       ],
       "javascript": [
-        [
-          "string",
-          0,
-          "new RawAesKeyringNode({ keyName: x })",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new RawAesKeyringNode({ keyName: x })",
+          "kind": "text"
+        }
       ]
     },
     "mpl/AwsKmsKeyring.kms_key_id": {
       "java": [
-        [
-          "String",
-          0,
-          "CreateAwsKmsKeyringInput.builder().kmsKeyId(x)",
-          "text"
-        ]
+        {
+          "type": "String",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput.builder().kmsKeyId(x)",
+          "kind": "text"
+        }
       ],
       "python": [
-        [
-          "str",
-          0,
-          "CreateAwsKmsKeyringInput(kms_key_id=x)",
-          "text"
-        ]
+        {
+          "type": "str",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput(kms_key_id=x)",
+          "kind": "text"
+        }
       ],
       "dotnet": [
-        [
-          "string",
-          0,
-          "new CreateAwsKmsKeyringInput { KmsKeyId = x }",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new CreateAwsKmsKeyringInput { KmsKeyId = x }",
+          "kind": "text"
+        }
       ],
       "go": [
-        [
-          "string",
-          0,
-          "CreateAwsKmsKeyringInput{KmsKeyId: x}",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput{KmsKeyId: x}",
+          "kind": "text"
+        }
       ],
       "javascript": [
-        [
-          "string",
-          0,
-          "new KmsKeyringNode({ generatorKeyId: x })",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new KmsKeyringNode({ generatorKeyId: x })",
+          "kind": "text"
+        }
       ]
     },
     "mpl/AwsKmsKeyring.kms_client": {
       "java": [
-        [
-          "KmsClient",
-          0,
-          "CreateAwsKmsKeyringInput.builder().kmsClient(x)",
-          "the type itself"
-        ],
-        [
-          "Region",
-          3,
-          "CreateAwsKmsKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
-          "what builds it"
-        ]
+        {
+          "type": "KmsClient",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput.builder().kmsClient(x)",
+          "kind": "the type itself"
+        },
+        {
+          "type": "Region",
+          "calls": 3,
+          "code": "CreateAwsKmsKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "kind": "what builds it"
+        }
       ],
       "python": [
-        [
-          "BaseClient",
-          0,
-          "CreateAwsKmsKeyringInput(kms_client=x)",
-          "the type itself"
-        ],
-        [
-          "boto3.Session",
-          2,
-          "CreateAwsKmsKeyringInput(kms_client=x.client(\"kms\"))",
-          "what builds it"
-        ]
+        {
+          "type": "BaseClient",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput(kms_client=x)",
+          "kind": "the type itself"
+        },
+        {
+          "type": "boto3.Session",
+          "calls": 1,
+          "code": "CreateAwsKmsKeyringInput(kms_client=x.client(\"kms\"))",
+          "kind": "what builds it"
+        }
       ],
       "dotnet": [
-        [
-          "AmazonKeyManagementServiceClient",
-          0,
-          "new CreateAwsKmsKeyringInput { KmsClient = x }",
-          "the type itself"
-        ],
-        [
-          "AmazonKeyManagementServiceConfig",
-          2,
-          "new CreateAwsKmsKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
-          "what builds it"
-        ]
+        {
+          "type": "AmazonKeyManagementServiceClient",
+          "calls": 0,
+          "code": "new CreateAwsKmsKeyringInput { KmsClient = x }",
+          "kind": "the type itself"
+        },
+        {
+          "type": "AmazonKeyManagementServiceConfig",
+          "calls": 1,
+          "code": "new CreateAwsKmsKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "kind": "what builds it"
+        }
       ],
       "go": [
-        [
-          "*kms.Client",
-          0,
-          "CreateAwsKmsKeyringInput{KmsClient: x}",
-          "the type itself"
-        ],
-        [
-          "aws.Config",
-          2,
-          "CreateAwsKmsKeyringInput{KmsClient: kms.NewFromConfig(x)}",
-          "what builds it"
-        ]
+        {
+          "type": "*kms.Client",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput{KmsClient: x}",
+          "kind": "the type itself"
+        },
+        {
+          "type": "aws.Config",
+          "calls": 1,
+          "code": "CreateAwsKmsKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "kind": "what builds it"
+        }
       ],
       "javascript": [
-        [
-          "KMSClient",
-          2,
-          "new KmsKeyringNode({ clientProvider: () => x })",
-          "the type itself"
-        ],
-        [
-          "KMSClientConfig",
-          2,
-          "new KmsKeyringNode({ clientProvider: getClient(KMS, x) })",
-          "what builds it"
-        ]
+        {
+          "type": "KMSClient",
+          "calls": 1,
+          "code": "new KmsKeyringNode({ clientProvider: () => x })",
+          "kind": "the type itself"
+        },
+        {
+          "type": "KMSClientConfig",
+          "calls": 1,
+          "code": "new KmsKeyringNode({ clientProvider: getClient(KMS, x) })",
+          "kind": "what builds it"
+        }
       ]
     },
     "mpl/AwsKmsKeyring.grant_tokens": {
       "java": [
-        [
-          "List<String>",
-          0,
-          "CreateAwsKmsKeyringInput.builder().grantTokens(x)",
-          "list"
-        ],
-        [
-          "String",
-          2,
-          "CreateAwsKmsKeyringInput.builder().grantTokens(List.of(x))",
-          "text"
-        ],
-        [
-          "String[]",
-          2,
-          "CreateAwsKmsKeyringInput.builder().grantTokens(List.of(x))",
-          "list"
-        ]
+        {
+          "type": "List<String>",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput.builder().grantTokens(x)",
+          "kind": "list"
+        },
+        {
+          "type": "String",
+          "calls": 1,
+          "code": "CreateAwsKmsKeyringInput.builder().grantTokens(List.of(x))",
+          "kind": "text"
+        },
+        {
+          "type": "String[]",
+          "calls": 1,
+          "code": "CreateAwsKmsKeyringInput.builder().grantTokens(List.of(x))",
+          "kind": "list"
+        }
       ],
       "python": [
-        [
-          "list[str]",
-          0,
-          "CreateAwsKmsKeyringInput(grant_tokens=x)",
-          "list"
-        ],
-        [
-          "str",
-          2,
-          "CreateAwsKmsKeyringInput(grant_tokens=[x])",
-          "text"
-        ],
-        [
-          "tuple[str, ...]",
-          2,
-          "CreateAwsKmsKeyringInput(grant_tokens=list(x))",
-          "list"
-        ]
+        {
+          "type": "list[str]",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput(grant_tokens=x)",
+          "kind": "list"
+        },
+        {
+          "type": "str",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput(grant_tokens=[x])",
+          "kind": "text"
+        },
+        {
+          "type": "tuple[str, ...]",
+          "calls": 1,
+          "code": "CreateAwsKmsKeyringInput(grant_tokens=list(x))",
+          "kind": "list"
+        }
       ],
       "dotnet": [
-        [
-          "List<string>",
-          0,
-          "new CreateAwsKmsKeyringInput { GrantTokens = x }",
-          "list"
-        ],
-        [
-          "string",
-          2,
-          "new CreateAwsKmsKeyringInput { GrantTokens = new List<string> { x } }",
-          "text"
-        ],
-        [
-          "string[]",
-          2,
-          "new CreateAwsKmsKeyringInput { GrantTokens = x.ToList() }",
-          "list"
-        ]
+        {
+          "type": "List<string>",
+          "calls": 0,
+          "code": "new CreateAwsKmsKeyringInput { GrantTokens = x }",
+          "kind": "list"
+        },
+        {
+          "type": "string",
+          "calls": 1,
+          "code": "new CreateAwsKmsKeyringInput { GrantTokens = new List<string> { x } }",
+          "kind": "text"
+        },
+        {
+          "type": "string[]",
+          "calls": 1,
+          "code": "new CreateAwsKmsKeyringInput { GrantTokens = x.ToList() }",
+          "kind": "list"
+        }
       ],
       "go": [
-        [
-          "[]string",
-          0,
-          "CreateAwsKmsKeyringInput{GrantTokens: x}",
-          "list"
-        ],
-        [
-          "string",
-          2,
-          "CreateAwsKmsKeyringInput{GrantTokens: []string{x}}",
-          "text"
-        ]
+        {
+          "type": "[]string",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput{GrantTokens: x}",
+          "kind": "list"
+        },
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "CreateAwsKmsKeyringInput{GrantTokens: []string{x}}",
+          "kind": "text"
+        }
       ],
       "javascript": [
-        [
-          "string[]",
-          0,
-          "new KmsKeyringNode({ grantTokens: x })",
-          "list"
-        ],
-        [
-          "string",
-          2,
-          "new KmsKeyringNode({ grantTokens: [x] })",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new KmsKeyringNode({ grantTokens: [x] })",
+          "kind": "text"
+        },
+        {
+          "type": "string[]",
+          "calls": 0,
+          "code": "new KmsKeyringNode({ grantTokens: x })",
+          "kind": "list"
+        }
       ]
     },
     "mpl/HierarchicalKeyring.ttl": {
       "java": [
-        [
-          "int",
-          0,
-          "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x)",
-          "number"
-        ],
-        [
-          "long",
-          0,
-          "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x)",
-          "number"
-        ],
-        [
-          "Duration",
-          2,
-          "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x.getSeconds())",
-          "Duration"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x)",
+          "kind": "number"
+        },
+        {
+          "type": "long",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x)",
+          "kind": "number"
+        },
+        {
+          "type": "Duration",
+          "calls": 1,
+          "code": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x.getSeconds())",
+          "kind": "Duration"
+        }
       ],
       "python": [
-        [
-          "int",
-          0,
-          "CreateAwsKmsHierarchicalKeyringInput(ttl_seconds=x)",
-          "number"
-        ],
-        [
-          "timedelta",
-          2,
-          "CreateAwsKmsHierarchicalKeyringInput(ttl_seconds=int(x.total_seconds()))",
-          "Duration"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput(ttl_seconds=x)",
+          "kind": "number"
+        },
+        {
+          "type": "timedelta",
+          "calls": 2,
+          "code": "CreateAwsKmsHierarchicalKeyringInput(ttl_seconds=int(x.total_seconds()))",
+          "kind": "Duration"
+        }
       ],
       "dotnet": [
-        [
-          "int",
-          0,
-          "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = x }",
-          "number"
-        ],
-        [
-          "long",
-          0,
-          "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = x }",
-          "number"
-        ],
-        [
-          "TimeSpan",
-          2,
-          "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = (long)x.TotalSeconds }",
-          "Duration"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = x }",
+          "kind": "number"
+        },
+        {
+          "type": "long",
+          "calls": 0,
+          "code": "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = x }",
+          "kind": "number"
+        },
+        {
+          "type": "TimeSpan",
+          "calls": 1,
+          "code": "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = (long)x.TotalSeconds }",
+          "kind": "Duration"
+        }
       ],
       "go": [
-        [
-          "int64",
-          0,
-          "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: x}",
-          "number"
-        ],
-        [
-          "int",
-          2,
-          "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: int64(x)}",
-          "number"
-        ],
-        [
-          "time.Duration",
-          2,
-          "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: int64(x.Seconds())}",
-          "Duration"
-        ]
+        {
+          "type": "int64",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: x}",
+          "kind": "number"
+        },
+        {
+          "type": "int",
+          "calls": 1,
+          "code": "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: int64(x)}",
+          "kind": "number"
+        },
+        {
+          "type": "time.Duration",
+          "calls": 2,
+          "code": "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: int64(x.Seconds())}",
+          "kind": "Duration"
+        }
       ],
       "javascript": [
-        [
-          "number",
-          0,
-          "new KmsHierarchicalKeyRingNode({ cacheLimitTtl: x })",
-          "number"
-        ]
+        {
+          "type": "number",
+          "calls": 0,
+          "code": "new KmsHierarchicalKeyRingNode({ cacheLimitTtl: x })",
+          "kind": "number"
+        }
       ]
     },
     "mpl/HierarchicalKeyring.branch_key_id": {
       "java": [
-        [
-          "String",
-          0,
-          "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(x)",
-          "text"
-        ]
+        {
+          "type": "String",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(x)",
+          "kind": "text"
+        }
       ],
       "python": [
-        [
-          "str",
-          0,
-          "CreateAwsKmsHierarchicalKeyringInput(branch_key_id=x)",
-          "text"
-        ]
+        {
+          "type": "str",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput(branch_key_id=x)",
+          "kind": "text"
+        }
       ],
       "dotnet": [
-        [
-          "string",
-          0,
-          "new CreateAwsKmsHierarchicalKeyringInput { BranchKeyId = x }",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new CreateAwsKmsHierarchicalKeyringInput { BranchKeyId = x }",
+          "kind": "text"
+        }
       ],
       "go": [
-        [
-          "string",
-          1,
-          "CreateAwsKmsHierarchicalKeyringInput{BranchKeyId: &x}",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "CreateAwsKmsHierarchicalKeyringInput{BranchKeyId: &x}",
+          "kind": "text"
+        }
       ],
       "javascript": [
-        [
-          "string",
-          0,
-          "new KmsHierarchicalKeyRingNode({ branchKeyId: x })",
-          "text"
-        ]
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "new KmsHierarchicalKeyRingNode({ branchKeyId: x })",
+          "kind": "text"
+        }
       ]
     },
     "esdk/encrypt.plaintext": {
       "java": [
-        [
-          "InputStream",
-          0,
-          "crypto.createEncryptingStream(provider, x, encryptionContext)",
-          "file / stream"
-        ],
-        [
-          "String",
-          0,
-          "crypto.encryptString(provider, x, encryptionContext)",
-          "text"
-        ],
-        [
-          "byte[]",
-          0,
-          "crypto.encryptData(keyring, x)",
-          "bytes"
-        ],
-        [
-          "ByteBuffer",
-          2,
-          "crypto.encryptData(keyring, x.array())",
-          "bytes"
-        ],
-        [
-          "Path",
-          2,
-          "crypto.createEncryptingStream(provider, Files.newInputStream(x), encryptionContext)",
-          "file / stream"
-        ]
+        {
+          "type": "InputStream",
+          "calls": 0,
+          "code": "crypto.createEncryptingStream(provider, x, encryptionContext)",
+          "kind": "file / stream"
+        },
+        {
+          "type": "String",
+          "calls": 0,
+          "code": "crypto.encryptString(provider, x, encryptionContext)",
+          "kind": "text"
+        },
+        {
+          "type": "byte[]",
+          "calls": 0,
+          "code": "crypto.encryptData(keyring, x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "ByteBuffer",
+          "calls": 1,
+          "code": "crypto.encryptData(keyring, x.array())",
+          "kind": "bytes"
+        },
+        {
+          "type": "Path",
+          "calls": 1,
+          "code": "crypto.createEncryptingStream(provider, Files.newInputStream(x), encryptionContext)",
+          "kind": "file / stream"
+        }
       ],
       "python": [
-        [
-          "BinaryIO",
-          0,
-          "client.encrypt(source=x)",
-          "file / stream"
-        ],
-        [
-          "bytes",
-          0,
-          "client.encrypt(source=x)",
-          "bytes"
-        ],
-        [
-          "str",
-          0,
-          "client.encrypt(source=x)",
-          "text"
-        ],
-        [
-          "bytearray",
-          2,
-          "client.encrypt(source=bytes(x))",
-          "bytes"
-        ],
-        [
-          "pathlib.Path",
-          2,
-          "client.encrypt(source=open(x, \"rb\"))",
-          "file / stream"
-        ]
+        {
+          "type": "BinaryIO",
+          "calls": 0,
+          "code": "client.encrypt(source=x)",
+          "kind": "file / stream"
+        },
+        {
+          "type": "bytes",
+          "calls": 0,
+          "code": "client.encrypt(source=x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "str",
+          "calls": 0,
+          "code": "client.encrypt(source=x)",
+          "kind": "text"
+        },
+        {
+          "type": "bytearray",
+          "calls": 1,
+          "code": "client.encrypt(source=bytes(x))",
+          "kind": "bytes"
+        },
+        {
+          "type": "pathlib.Path",
+          "calls": 1,
+          "code": "client.encrypt(source=open(x, \"rb\"))",
+          "kind": "file / stream"
+        }
       ],
       "dotnet": [
-        [
-          "MemoryStream",
-          0,
-          "new EncryptInput { Plaintext = x }",
-          "bytes"
-        ],
-        [
-          "byte[]",
-          2,
-          "new EncryptInput { Plaintext = new MemoryStream(x) }",
-          "bytes"
-        ],
-        [
-          "FileInfo",
-          3,
-          "new EncryptInput { Plaintext = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
-          "file / stream"
-        ],
-        [
-          "string",
-          3,
-          "new EncryptInput { Plaintext = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
-          "text"
-        ],
-        [
-          "Stream",
-          4,
-          "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew EncryptInput { Plaintext = copy }",
-          "file / stream"
-        ]
+        {
+          "type": "MemoryStream",
+          "calls": 0,
+          "code": "new EncryptInput { Plaintext = x }",
+          "kind": "bytes"
+        },
+        {
+          "type": "byte[]",
+          "calls": 1,
+          "code": "new EncryptInput { Plaintext = new MemoryStream(x) }",
+          "kind": "bytes"
+        },
+        {
+          "type": "FileInfo",
+          "calls": 2,
+          "code": "new EncryptInput { Plaintext = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string",
+          "calls": 2,
+          "code": "new EncryptInput { Plaintext = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "kind": "text"
+        },
+        {
+          "type": "Stream",
+          "calls": 4,
+          "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew EncryptInput { Plaintext = copy }",
+          "kind": "file / stream"
+        }
       ],
       "go": [
-        [
-          "[]byte",
-          0,
-          "EncryptInput{Plaintext: x}",
-          "bytes"
-        ],
-        [
-          "string",
-          2,
-          "EncryptInput{Plaintext: []byte(x)}",
-          "text"
-        ],
-        [
-          "io.Reader",
-          4,
-          "data, err := io.ReadAll(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
-          "file / stream"
-        ],
-        [
-          "string (path)",
-          4,
-          "data, err := os.ReadFile(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
-          "file / stream"
-        ]
+        {
+          "type": "[]byte",
+          "calls": 0,
+          "code": "EncryptInput{Plaintext: x}",
+          "kind": "bytes"
+        },
+        {
+          "type": "string",
+          "calls": 1,
+          "code": "EncryptInput{Plaintext: []byte(x)}",
+          "kind": "text"
+        },
+        {
+          "type": "io.Reader",
+          "calls": 3,
+          "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string (path)",
+          "calls": 3,
+          "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
+          "kind": "file / stream"
+        }
       ],
       "javascript": [
-        [
-          "Buffer",
-          0,
-          "encrypt(keyring, x)",
-          "bytes"
-        ],
-        [
-          "Readable",
-          0,
-          "encrypt(keyring, x)",
-          "file / stream"
-        ],
-        [
-          "Uint8Array",
-          0,
-          "encrypt(keyring, x)",
-          "bytes"
-        ],
-        [
-          "string",
-          0,
-          "encrypt(keyring, x)",
-          "text"
-        ],
-        [
-          "string (path)",
-          2,
-          "encrypt(keyring, fs.createReadStream(x))",
-          "file / stream"
-        ]
+        {
+          "type": "Buffer",
+          "calls": 0,
+          "code": "encrypt(keyring, x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "Readable",
+          "calls": 0,
+          "code": "encrypt(keyring, x)",
+          "kind": "file / stream"
+        },
+        {
+          "type": "Uint8Array",
+          "calls": 0,
+          "code": "encrypt(keyring, x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "encrypt(keyring, x)",
+          "kind": "text"
+        },
+        {
+          "type": "string (path)",
+          "calls": 1,
+          "code": "encrypt(keyring, fs.createReadStream(x))",
+          "kind": "file / stream"
+        }
       ]
     },
     "esdk/decrypt.ciphertext": {
       "java": [
-        [
-          "InputStream",
-          0,
-          "crypto.createUnsignedMessageDecryptingStream(provider, x)",
-          "file / stream"
-        ],
-        [
-          "String",
-          0,
-          "crypto.decryptString(provider, x)",
-          "text"
-        ],
-        [
-          "String (base64)",
-          0,
-          "crypto.decryptString(provider, x)",
-          "base64 text"
-        ],
-        [
-          "byte[]",
-          0,
-          "crypto.decryptData(provider, x)",
-          "bytes"
-        ],
-        [
-          "ByteBuffer",
-          2,
-          "crypto.decryptData(provider, x.array())",
-          "bytes"
-        ],
-        [
-          "Path",
-          2,
-          "crypto.createUnsignedMessageDecryptingStream(provider, Files.newInputStream(x))",
-          "file / stream"
-        ]
+        {
+          "type": "InputStream",
+          "calls": 0,
+          "code": "crypto.createUnsignedMessageDecryptingStream(provider, x)",
+          "kind": "file / stream"
+        },
+        {
+          "type": "String",
+          "calls": 0,
+          "code": "crypto.decryptString(provider, x)",
+          "kind": "text"
+        },
+        {
+          "type": "String (base64)",
+          "calls": 0,
+          "code": "crypto.decryptString(provider, x)",
+          "kind": "base64 text"
+        },
+        {
+          "type": "byte[]",
+          "calls": 0,
+          "code": "crypto.decryptData(provider, x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "ByteBuffer",
+          "calls": 1,
+          "code": "crypto.decryptData(provider, x.array())",
+          "kind": "bytes"
+        },
+        {
+          "type": "Path",
+          "calls": 1,
+          "code": "crypto.createUnsignedMessageDecryptingStream(provider, Files.newInputStream(x))",
+          "kind": "file / stream"
+        }
       ],
       "python": [
-        [
-          "BinaryIO",
-          0,
-          "client.decrypt(source=x)",
-          "file / stream"
-        ],
-        [
-          "bytes",
-          0,
-          "client.decrypt(source=x)",
-          "bytes"
-        ],
-        [
-          "str",
-          0,
-          "client.decrypt(source=x)",
-          "text"
-        ],
-        [
-          "bytearray",
-          2,
-          "client.decrypt(source=bytes(x))",
-          "bytes"
-        ],
-        [
-          "pathlib.Path",
-          2,
-          "client.decrypt(source=open(x, \"rb\"))",
-          "file / stream"
-        ],
-        [
-          "str (base64)",
-          2,
-          "client.decrypt(source=base64.b64decode(x))",
-          "base64 text"
-        ]
+        {
+          "type": "BinaryIO",
+          "calls": 0,
+          "code": "client.decrypt(source=x)",
+          "kind": "file / stream"
+        },
+        {
+          "type": "bytes",
+          "calls": 0,
+          "code": "client.decrypt(source=x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "str",
+          "calls": 0,
+          "code": "client.decrypt(source=x)",
+          "kind": "text"
+        },
+        {
+          "type": "bytearray",
+          "calls": 1,
+          "code": "client.decrypt(source=bytes(x))",
+          "kind": "bytes"
+        },
+        {
+          "type": "pathlib.Path",
+          "calls": 1,
+          "code": "client.decrypt(source=open(x, \"rb\"))",
+          "kind": "file / stream"
+        },
+        {
+          "type": "str (base64)",
+          "calls": 1,
+          "code": "client.decrypt(source=base64.b64decode(x))",
+          "kind": "base64 text"
+        }
       ],
       "dotnet": [
-        [
-          "MemoryStream",
-          0,
-          "new DecryptInput { Ciphertext = x }",
-          "bytes"
-        ],
-        [
-          "byte[]",
-          2,
-          "new DecryptInput { Ciphertext = new MemoryStream(x) }",
-          "bytes"
-        ],
-        [
-          "FileInfo",
-          3,
-          "new DecryptInput { Ciphertext = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
-          "file / stream"
-        ],
-        [
-          "string",
-          3,
-          "new DecryptInput { Ciphertext = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
-          "text"
-        ],
-        [
-          "string (base64)",
-          3,
-          "new DecryptInput { Ciphertext = new MemoryStream(Convert.FromBase64String(x)) }",
-          "base64 text"
-        ],
-        [
-          "Stream",
-          4,
-          "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew DecryptInput { Ciphertext = copy }",
-          "file / stream"
-        ]
+        {
+          "type": "MemoryStream",
+          "calls": 0,
+          "code": "new DecryptInput { Ciphertext = x }",
+          "kind": "bytes"
+        },
+        {
+          "type": "byte[]",
+          "calls": 1,
+          "code": "new DecryptInput { Ciphertext = new MemoryStream(x) }",
+          "kind": "bytes"
+        },
+        {
+          "type": "FileInfo",
+          "calls": 2,
+          "code": "new DecryptInput { Ciphertext = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string",
+          "calls": 2,
+          "code": "new DecryptInput { Ciphertext = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "kind": "text"
+        },
+        {
+          "type": "string (base64)",
+          "calls": 2,
+          "code": "new DecryptInput { Ciphertext = new MemoryStream(Convert.FromBase64String(x)) }",
+          "kind": "base64 text"
+        },
+        {
+          "type": "Stream",
+          "calls": 4,
+          "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew DecryptInput { Ciphertext = copy }",
+          "kind": "file / stream"
+        }
       ],
       "go": [
-        [
-          "[]byte",
-          0,
-          "DecryptInput{Ciphertext: x}",
-          "bytes"
-        ],
-        [
-          "string",
-          2,
-          "DecryptInput{Ciphertext: []byte(x)}",
-          "text"
-        ],
-        [
-          "io.Reader",
-          4,
-          "data, err := io.ReadAll(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
-          "file / stream"
-        ],
-        [
-          "string (base64)",
-          4,
-          "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
-          "base64 text"
-        ],
-        [
-          "string (path)",
-          4,
-          "data, err := os.ReadFile(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
-          "file / stream"
-        ]
+        {
+          "type": "[]byte",
+          "calls": 0,
+          "code": "DecryptInput{Ciphertext: x}",
+          "kind": "bytes"
+        },
+        {
+          "type": "string",
+          "calls": 1,
+          "code": "DecryptInput{Ciphertext: []byte(x)}",
+          "kind": "text"
+        },
+        {
+          "type": "io.Reader",
+          "calls": 3,
+          "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
+          "kind": "file / stream"
+        },
+        {
+          "type": "string (base64)",
+          "calls": 3,
+          "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
+          "kind": "base64 text"
+        },
+        {
+          "type": "string (path)",
+          "calls": 3,
+          "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
+          "kind": "file / stream"
+        }
       ],
       "javascript": [
-        [
-          "Buffer",
-          0,
-          "decrypt(keyring, x)",
-          "bytes"
-        ],
-        [
-          "Readable",
-          0,
-          "decrypt(keyring, x)",
-          "file / stream"
-        ],
-        [
-          "Uint8Array",
-          0,
-          "decrypt(keyring, x)",
-          "bytes"
-        ],
-        [
-          "string",
-          0,
-          "decrypt(keyring, x)",
-          "text"
-        ],
-        [
-          "string (base64)",
-          2,
-          "decrypt(keyring, Buffer.from(x, \"base64\"))",
-          "base64 text"
-        ],
-        [
-          "string (path)",
-          2,
-          "decrypt(keyring, fs.createReadStream(x))",
-          "file / stream"
-        ]
+        {
+          "type": "Buffer",
+          "calls": 0,
+          "code": "decrypt(keyring, x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "Readable",
+          "calls": 0,
+          "code": "decrypt(keyring, x)",
+          "kind": "file / stream"
+        },
+        {
+          "type": "Uint8Array",
+          "calls": 0,
+          "code": "decrypt(keyring, x)",
+          "kind": "bytes"
+        },
+        {
+          "type": "string",
+          "calls": 0,
+          "code": "decrypt(keyring, x)",
+          "kind": "text"
+        },
+        {
+          "type": "string (base64)",
+          "calls": 1,
+          "code": "decrypt(keyring, Buffer.from(x, \"base64\"))",
+          "kind": "base64 text"
+        },
+        {
+          "type": "string (path)",
+          "calls": 1,
+          "code": "decrypt(keyring, fs.createReadStream(x))",
+          "kind": "file / stream"
+        }
       ]
     },
     "esdk/encrypt.encryption_context": {
       "java": [
-        [
-          "Map<String, String>",
-          0,
-          "crypto.encryptData(keyring, plaintext, x)",
-          "map"
-        ],
-        [
-          "(String, String)",
-          2,
-          "crypto.encryptData(keyring, plaintext, Map.of(k, v))",
-          "pairs"
-        ]
+        {
+          "type": "Map<String, String>",
+          "calls": 0,
+          "code": "crypto.encryptData(keyring, plaintext, x)",
+          "kind": "map"
+        },
+        {
+          "type": "(String, String)",
+          "calls": 1,
+          "code": "crypto.encryptData(keyring, plaintext, Map.of(k, v))",
+          "kind": "pairs"
+        }
       ],
       "python": [
-        [
-          "dict",
-          0,
-          "client.encrypt(encryption_context=x)",
-          "map"
-        ],
-        [
-          "(str, str)",
-          2,
-          "client.encrypt(encryption_context={k: v})",
-          "pairs"
-        ]
+        {
+          "type": "(str, str)",
+          "calls": 0,
+          "code": "client.encrypt(encryption_context={k: v})",
+          "kind": "pairs"
+        },
+        {
+          "type": "dict",
+          "calls": 0,
+          "code": "client.encrypt(encryption_context=x)",
+          "kind": "map"
+        }
       ],
       "dotnet": [
-        [
-          "Dictionary<string, string>",
-          0,
-          "new EncryptInput { EncryptionContext = x }",
-          "map"
-        ],
-        [
-          "(string, string)",
-          2,
-          "new EncryptInput { EncryptionContext = new Dictionary<string, string> { [k] = v } }",
-          "pairs"
-        ]
+        {
+          "type": "Dictionary<string, string>",
+          "calls": 0,
+          "code": "new EncryptInput { EncryptionContext = x }",
+          "kind": "map"
+        },
+        {
+          "type": "(string, string)",
+          "calls": 1,
+          "code": "new EncryptInput { EncryptionContext = new Dictionary<string, string> { [k] = v } }",
+          "kind": "pairs"
+        }
       ],
       "go": [
-        [
-          "map[string]string",
-          0,
-          "EncryptInput{EncryptionContext: x}",
-          "map"
-        ],
-        [
-          "(string, string)",
-          2,
-          "EncryptInput{EncryptionContext: map[string]string{k: v}}",
-          "pairs"
-        ]
+        {
+          "type": "(string, string)",
+          "calls": 0,
+          "code": "EncryptInput{EncryptionContext: map[string]string{k: v}}",
+          "kind": "pairs"
+        },
+        {
+          "type": "map[string]string",
+          "calls": 0,
+          "code": "EncryptInput{EncryptionContext: x}",
+          "kind": "map"
+        }
       ],
       "javascript": [
-        [
-          "Record<string, string>",
-          0,
-          "encrypt(keyring, plaintext, { encryptionContext: x })",
-          "map"
-        ],
-        [
-          "[string, string]",
-          2,
-          "encrypt(keyring, plaintext, { encryptionContext: { [k]: v } })",
-          "pairs"
-        ]
+        {
+          "type": "Record<string, string>",
+          "calls": 0,
+          "code": "encrypt(keyring, plaintext, { encryptionContext: x })",
+          "kind": "map"
+        },
+        {
+          "type": "[string, string]",
+          "calls": 0,
+          "code": "encrypt(keyring, plaintext, { encryptionContext: { [k]: v } })",
+          "kind": "pairs"
+        }
       ]
     },
     "esdk/encrypt.frame_length": {
       "java": [],
       "python": [
-        [
-          "int",
-          0,
-          "client.encrypt(frame_length=x)",
-          "number"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "client.encrypt(frame_length=x)",
+          "kind": "number"
+        }
       ],
       "dotnet": [
-        [
-          "int",
-          0,
-          "new EncryptInput { FrameLength = x }",
-          "number"
-        ],
-        [
-          "long",
-          0,
-          "new EncryptInput { FrameLength = x }",
-          "number"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "new EncryptInput { FrameLength = x }",
+          "kind": "number"
+        },
+        {
+          "type": "long",
+          "calls": 0,
+          "code": "new EncryptInput { FrameLength = x }",
+          "kind": "number"
+        }
       ],
       "go": [
-        [
-          "int64",
-          1,
-          "EncryptInput{FrameLength: &x}",
-          "number"
-        ],
-        [
-          "int",
-          3,
-          "EncryptInput{FrameLength: aws.Int64(int64(x))}",
-          "number"
-        ]
+        {
+          "type": "int64",
+          "calls": 0,
+          "code": "EncryptInput{FrameLength: &x}",
+          "kind": "number"
+        },
+        {
+          "type": "int",
+          "calls": 2,
+          "code": "EncryptInput{FrameLength: aws.Int64(int64(x))}",
+          "kind": "number"
+        }
       ],
       "javascript": [
-        [
-          "number",
-          0,
-          "encrypt(keyring, plaintext, { frameLength: x })",
-          "number"
-        ]
+        {
+          "type": "number",
+          "calls": 0,
+          "code": "encrypt(keyring, plaintext, { frameLength: x })",
+          "kind": "number"
+        }
       ]
     },
     "esdk/Client.max_encrypted_data_keys": {
       "java": [
-        [
-          "int",
-          0,
-          "AwsCrypto.builder().withMaxEncryptedDataKeys(x)",
-          "number"
-        ],
-        [
-          "long",
-          2,
-          "AwsCrypto.builder().withMaxEncryptedDataKeys(Math.toIntExact(x))",
-          "number"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "AwsCrypto.builder().withMaxEncryptedDataKeys(x)",
+          "kind": "number"
+        },
+        {
+          "type": "long",
+          "calls": 1,
+          "code": "AwsCrypto.builder().withMaxEncryptedDataKeys(Math.toIntExact(x))",
+          "kind": "number"
+        }
       ],
       "python": [
-        [
-          "int",
-          0,
-          "EncryptionSDKClient(max_encrypted_data_keys=x)",
-          "number"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "EncryptionSDKClient(max_encrypted_data_keys=x)",
+          "kind": "number"
+        }
       ],
       "dotnet": [
-        [
-          "int",
-          0,
-          "new AwsEncryptionSdkConfig { MaxEncryptedDataKeys = x }",
-          "number"
-        ],
-        [
-          "long",
-          0,
-          "new AwsEncryptionSdkConfig { MaxEncryptedDataKeys = x }",
-          "number"
-        ]
+        {
+          "type": "int",
+          "calls": 0,
+          "code": "new AwsEncryptionSdkConfig { MaxEncryptedDataKeys = x }",
+          "kind": "number"
+        },
+        {
+          "type": "long",
+          "calls": 0,
+          "code": "new AwsEncryptionSdkConfig { MaxEncryptedDataKeys = x }",
+          "kind": "number"
+        }
       ],
       "go": [
-        [
-          "int64",
-          1,
-          "AwsEncryptionSdkConfig{MaxEncryptedDataKeys: &x}",
-          "number"
-        ],
-        [
-          "int",
-          3,
-          "AwsEncryptionSdkConfig{MaxEncryptedDataKeys: aws.Int64(int64(x))}",
-          "number"
-        ]
+        {
+          "type": "int64",
+          "calls": 0,
+          "code": "AwsEncryptionSdkConfig{MaxEncryptedDataKeys: &x}",
+          "kind": "number"
+        },
+        {
+          "type": "int",
+          "calls": 2,
+          "code": "AwsEncryptionSdkConfig{MaxEncryptedDataKeys: aws.Int64(int64(x))}",
+          "kind": "number"
+        }
       ],
       "javascript": [
-        [
-          "number",
-          0,
-          "buildClient({ maxEncryptedDataKeys: x })",
-          "number"
-        ]
+        {
+          "type": "number",
+          "calls": 0,
+          "code": "buildClient({ maxEncryptedDataKeys: x })",
+          "kind": "number"
+        }
       ]
     }
   },
-  "others_note": "Java, Python, .NET, Go, JS: calls written from each release's signatures, not compiled. api-examples/types/other_languages.py writes them."
+  "others_note": "Java, Python, .NET, Go, JS: calls written from each release's signatures, not compiled. api-examples/types/other_languages.py writes them.",
+  "usage_keys": {
+    "mpl/RawAesKeyring.wrapping_key": [
+      "mpl|raw-aes-keyring",
+      "wrappingKey"
+    ],
+    "mpl/RawAesKeyring.key_name": [
+      "mpl|raw-aes-keyring",
+      "keyName"
+    ],
+    "mpl/AwsKmsKeyring.kms_key_id": [
+      "mpl|aws-kms-keyring",
+      "kmsKeyId"
+    ],
+    "mpl/AwsKmsKeyring.kms_client": [
+      "mpl|aws-kms-keyring",
+      "kmsClient"
+    ],
+    "mpl/AwsKmsKeyring.grant_tokens": [
+      "mpl|aws-kms-keyring",
+      "grantTokens"
+    ],
+    "mpl/HierarchicalKeyring.ttl": [
+      "mpl|hierarchical-keyring",
+      "ttlSeconds"
+    ],
+    "mpl/HierarchicalKeyring.branch_key_id": [
+      "mpl|hierarchical-keyring",
+      "branchKeyId"
+    ],
+    "esdk/encrypt.plaintext": [
+      "esdk|encrypt",
+      "plaintext"
+    ],
+    "esdk/decrypt.ciphertext": [
+      "esdk|decrypt",
+      "ciphertext"
+    ],
+    "esdk/encrypt.encryption_context": [
+      "esdk|encrypt",
+      "encryptionContext"
+    ],
+    "esdk/encrypt.frame_length": [
+      "esdk|encrypt",
+      "frameLength"
+    ],
+    "esdk/Client.max_encrypted_data_keys": [
+      "esdk|client",
+      "maxEncryptedDataKeys"
+    ]
+  },
+  "rust_commit": "e77da7789ee19d516e44d4b4b389942290b7a0b2",
+  "files": {
+    "trials": "api-examples/types/rust_trials.rs",
+    "runs": "api-examples/types/rust_runs.rs",
+    "check": ".github/workflows/api-examples-types.yml"
+  },
+  "rustc": "1.99.1"
 }

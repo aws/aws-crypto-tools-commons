@@ -6,6 +6,8 @@
 <style>
   body { font-family: system-ui, sans-serif; font-size: 13px; color: #1f2328; margin: 16px 20px; }
   h1 { font-size: 18px; margin: 0 0 10px; }
+  h2 { font-size: 14px; margin: 14px 0 6px; }
+  a { color: #0969da; }
   .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
   .bar button { border: 1px solid #d0d7de; background: #fff; border-radius: 14px; padding: 3px 10px; cursor: pointer; font-size: 12px; color: #1f2328; }
   .bar button.on { background: #0969da; border-color: #0969da; color: #fff; }
@@ -19,16 +21,23 @@
   td.none { color: #8c959f; font-style: italic; }
   .chip { display: inline-block; margin: 2px; padding: 1px 7px; border-radius: 10px; font-family: ui-monospace, monospace; font-size: 11px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
   .b0 { background: #dafbe1; color: #116329; }
-  .b1 { background: #f0fbf3; color: #1a7f37; border-color: #aceebb; }
-  .b2 { background: #fff8c5; color: #7d4e00; }
-  .b4 { background: #ffe8d6; color: #953800; }
+  .b1 { background: #fff8c5; color: #7d4e00; }
+  .b2 { background: #ffe8d6; color: #953800; }
   .bx { background: #f6f8fa; color: #57606a; border-color: #d0d7de; }
   .warn { border-color: #cf222e; color: #a40e26; }
+  .failed { text-decoration: line-through; }
   .sel { outline: 2px solid #0969da; }
-  td.ck { text-align: center; }
+  td.ck { text-align: center; cursor: pointer; }
   td.ck small { display: block; color: #57606a; font-family: ui-monospace, monospace; font-size: 10px; }
+  td.kind { cursor: pointer; white-space: nowrap; }
+  tr.detail td { background: #fbfcfd; text-align: left; vertical-align: top; }
+  tr.detail .lang { font-weight: 600; font-size: 11px; color: #57606a; margin-bottom: 2px; }
   .ev { font-size: 11px; color: #57606a; }
-  pre { background: #0d1117; color: #e6edf3; padding: 8px 10px; border-radius: 6px; margin: 4px 0 0; font-size: 12px; white-space: pre-wrap; }
+  .panel { border: 1px solid #d0d7de; border-radius: 6px; padding: 8px 10px; margin-top: 4px; }
+  .panel pre { background: #0d1117; color: #e6edf3; padding: 8px 10px; border-radius: 6px; margin: 4px 0; font-size: 12px; white-space: pre-wrap; }
+  .panel ul { margin: 4px 0; padding-left: 18px; }
+  .panel li { margin: 2px 0; }
+  .title { font-weight: 600; }
   .foot { color: #57606a; font-size: 11px; margin-top: 6px; }
   .prop { margin-top: 4px; border: 1px solid #8250df; background: #fff; color: #8250df; border-radius: 10px; padding: 1px 8px; font-size: 11px; cursor: pointer; }
   .prop.on { background: #8250df; color: #fff; }
@@ -36,79 +45,109 @@
   .why { margin-top: 2px; color: #57606a; font-size: 11px; white-space: normal; max-width: 260px; }
   .breaks { margin-top: 2px; color: #cf222e; font-family: ui-monospace, monospace; font-size: 11px; white-space: normal; max-width: 260px; }
   .load { border: 1px dashed #8250df; color: #8250df; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+  details { margin: 3px 0; }
+  details summary { cursor: pointer; }
+  .hits { margin: 4px 0 6px 16px; }
+  .hits code { font-size: 11px; background: #f6f8fa; padding: 0 3px; border-radius: 3px; }
+  .hits .where { font-size: 11px; }
+  .hits .source { margin-bottom: 6px; }
+  .tag { font-size: 10px; border: 1px solid #d0d7de; border-radius: 8px; padding: 0 5px; color: #57606a; }
 </style>
 </head>
 <body>
 <h1>What each option takes</h1>
 <div class="bar" id="apis"></div>
 <div class="bar" id="langs"></div>
-<div class="bar"><span class="chip b0">as is</span><span class="chip b1">+ &amp; or Some</span><span class="chip b2">one call</span><span class="chip b4">real work</span><span class="chip bx">no fix found</span><span class="chip warn">⚠ works, risky</span><span class="chip bx">▲ ▼ moved by a proposal</span></div>
+<div class="bar"><span class="chip b0">as is</span><span class="chip b1">one call</span><span class="chip b2">&gt;1 call</span><span class="chip bx">no fix found</span><span class="chip warn">⚠ risky, or breaks a rule</span><span class="chip failed">✗ compiles, but the run fails</span><span class="chip bx">▲ ▼ moved by a proposal</span></div>
 <div id="view"></div>
-<pre id="code">Click any type to see its code.</pre>
+<div id="panel" class="panel">Click any type to see its code and checks.</div>
 <div class="foot" id="foot"></div>
 <script>
-// types.json holds, for each option, each type a customer may hold and the shortest call that takes it.
-// Rust rows come from a compiler run: rust_types.py picks the types from real crates, compile_rust_types.py tries them.
-// Other languages' rows come from other_languages.py, written from each release's signatures and not compiled.
-// A row is [type, cost, code, kind]. The cost is null when no fix works.
+// The page draws four files from this folder:
+//   types.json        Rust rows from compile_rust_types.py, which compiles each held type on each option and runs the
+//                     call that compiled. Other languages' rows from other_languages.py, not compiled.
+//   usage.json        how public customer code calls each option, from api-examples/usage_search.py.
+//   expectations.json rules a person wrote for what an option should not take as is.
+//   proposals.json    proposed signatures, when the api-signature-proposals skill ran here. Optional.
+// A row is {type, calls, code, kind}. calls counts the calls in the code (calls.py), or is null when nothing compiled.
+// A Rust row also has trial (its line in rust_trials.rs), test (its line in rust_runs.rs) and run (what the test found).
 const LANGS = [["Rust", "rust"], ["Java", "java"], ["Python", "python"], [".NET", "dotnet"], ["Go", "go"], ["JS", "javascript"]];
-const KINDS = ["bytes", "text", "pairs", "base64 text", "file / stream", "map", "list", "number", "Duration", "the type itself", "what builds it"];
+const KINDS = ["bytes", "text", "pairs", "base64 text", "hex text", "file / stream", "map", "list", "number", "Duration",
+  "the type itself", "what builds it", "your config", "other"];
 // Rust kinds under the comparison's rows. Optional values have no row, because the other languages take null instead.
 const RUST_KIND = { bytes: "bytes", text: "text", pair: "pairs", path: "file / stream", reader: "file / stream",
   stream: "file / stream", number: "number", duration: "Duration", list: "list", map: "map",
   named: "the type itself", ctor: "what builds it" };
-const LEVEL = { 0: "as is", 1: "+ & or Some", 2: "one call", 4: "real work", x: "no fix found" };
-let data = null, api = 0, lang = "rust", picked = "";
+// What a customer had before a conversion, as usage.json says it, and the row it goes under.
+const FROM_KIND = { "a string": "text", "a &str": "text", "a file": "file / stream", "a file or stream": "file / stream",
+  "base64 text": "base64 text", "hex text": "hex text", "your config": "your config", "a byte array": "bytes",
+  "a byte slice": "bytes", "separate values": "list", "key/value pairs": "pairs",
+  "a value that is not a string": "other", "a value that converts with into()": "other" };
+const LEVEL = { 0: "as is", 1: "one call", 2: ">1 call", x: "no fix found" };
+const COMMONS = "https://github.com/aws/aws-crypto-tools-commons";
+// Links go to this branch of commons. Open the page with ?ref=<branch> to link a branch other than main.
+const REF = new URLSearchParams(location.search).get("ref") || "main";
+let data = null, usage = null, expectations = { rules: {} }, proposals = null;
+let api = 0, lang = "rust";
+const proposed = new Set();
+const opened = new Set();     // option|kind rows that are open in the comparison
+const openDetails = new Set(); // customer lists that are open
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const level = calls => calls === null || calls === undefined ? "x" : Math.min(calls, 2);
+const option = key => key.split(".")[1];
+const blob = (file, line) => `${COMMONS}/blob/${REF.split("/").map(encodeURIComponent).join("/")}/${file}#L${line}`;
+const ciLink = () => `${COMMONS}/actions/workflows/api-examples-types.yml?query=${encodeURIComponent("branch:" + REF)}`;
 
-// Cost 0 passes the value as is, 1 adds & or Some, 2 or 3 adds one call, 4 or more is real work.
-const level = cost => cost === null ? "x" : cost === 0 ? 0 : cost === 1 ? 1 : cost <= 3 ? 2 : 4;
-
-// Proposals come from proposals.json, which check_proposals.py writes from the api-signature-proposals skill.
-// The page loads it from this folder when it is there, or from the Load proposals button.
-// A proposal's row is [type, cost under the proposal, code, kind, cost today, true if the code uses a proposed setter].
-let proposals = null;
-const proposed = new Set();
-
-const rawRows = (key, l) => (l === "rust" ? data.rust[key] : ((data.others || {})[key] || {})[l]) || [];
 const proposalOf = key => ((proposals || {}).options || {})[key];
 const proposalFor = (key, l) => ((proposalOf(key) || {}).languages || {})[l];
 const hasProposal = key => Object.keys((proposalOf(key) || {}).languages || {}).length > 0;
+const rawRows = (key, l) => (l === "rust" ? data.rust[key] : ((data.others || {})[key] || {})[l]) || [];
 const rowsOf = (key, l) => (proposed.has(key) && proposalFor(key, l) ? proposalFor(key, l).rows : rawRows(key, l));
-const kindOf = (row, l) => l === "rust" ? RUST_KIND[row[3]] : row[3];
+const kindOf = (row, l) => l === "rust" ? RUST_KIND[row.kind] : row.kind;
 const takesOf = (key, l) => l === "rust" ? data.takes[key] : ((data.shipped[key] || {})[l] || []).join(", ");
 
-// Calls that work but are likely mistakes.
-function risk(key, row) {
-  if (row[1] === null) return "";
-  if (key === "mpl/RawAesKeyring.wrapping_key" && (row[3] === "text" || row[3] === "optional text")) return "Text becomes the key bytes.";
-  if (row[0] === "char" && row[1] === 0) return "A single char compiles.";
-  return "";
+// A rule from expectations.json, checked against one row: ok is false when the row takes a refused kind as is.
+function expected(key, row) {
+  const rule = (expectations.rules || {})[key];
+  if (!rule || !rule.refuse.includes(row.kind) || row.calls === null || row.calls === undefined) return null;
+  return row.calls === 0
+    ? { ok: false, text: `Takes ${row.kind} as is, which the rule refuses. ${rule.why}` }
+    : { ok: true, text: `Needs a conversion, as the rule asks. ${rule.why}` };
 }
+
+// Calls that compile but are likely mistakes.
+function risk(row) {
+  return row.type === "char" && row.calls === 0 ? "A single char compiles." : "";
+}
+
+// Whether a Rust row's run failed: the build or call returned an error, or the result differs from the reference.
+const runFailed = row => !!(row.run && !row.run.skipped && (row.run.builds === false || row.run.same === false));
 
 // ▲ marks a row the proposal makes cheaper, and ▼ one it makes dearer.
 function moved(row) {
-  if (row.length < 5 || level(row[1]) === level(row[4])) return "";
-  return row[4] === null || (row[1] !== null && row[1] < row[4]) ? " ▲" : " ▼";
+  if (!("today" in row) || level(row.calls) === level(row.today)) return "";
+  return row.today === null || (row.calls !== null && row.calls < row.today) ? " ▲" : " ▼";
 }
 
 function chip(key, l, row, text) {
-  const warn = risk(key, row);
-  const id = [key, l, row[0]].join("|");
-  const was = row.length > 4 ? ` title="was ${LEVEL[level(row[4])]}"` : "";
-  return `<span class="chip b${level(row[1])}${warn ? " warn" : ""}${picked === id ? " sel" : ""}"${was} data-key="${esc(key)}" data-lang="${l}" data-type="${esc(row[0])}">${esc(text)}${warn ? " ⚠" : ""}${moved(row)}</span>`;
+  const rule = expected(key, row);
+  const warn = (rule && !rule.ok) || risk(row);
+  const failed = runFailed(row);
+  const was = "today" in row ? ` title="was ${esc(LEVEL[level(row.today)])}"` : "";
+  return `<span class="chip b${level(row.calls)}${warn ? " warn" : ""}${failed ? " failed" : ""}"${was} data-key="${esc(key)}" `
+    + `data-lang="${l}" data-type="${esc(row.type)}">${esc(text)}${warn ? " ⚠" : ""}${failed ? " ✗" : ""}${moved(row)}</span>`;
 }
 
-// The option cell: its name, what it takes, and the proposal button and text.
 function propButton(key) {
   const on = proposed.has(key);
   return `<button class="prop${on ? " on" : ""}" data-prop="${esc(key)}">${on ? "Proposed ▾" : "Proposed ▸"}</button>`;
 }
 
+// The option cell: its name, what it takes, and the proposal button and text.
 function optionCell(key, takes) {
   const p = proposalOf(key);
-  let html = `<td class="opt"><b>${esc(key.split(".")[1])}</b><div>${esc(takes || "not offered")}</div>`;
+  let html = `<td class="opt"><b>${esc(option(key))}</b><div>${esc(takes || "not offered")}</div>`;
   if (!p) return html + "</td>";
   if (!hasProposal(key)) return html + `<div class="why">No proposal. ${esc(p.why)}</div></td>`;
   html += propButton(key);
@@ -121,7 +160,7 @@ function optionCell(key, takes) {
 }
 
 function mapView() {
-  const levels = [0, 1, 2, 4, "x"];
+  const levels = [0, 1, 2, "x"];
   let html = "<table><tr><th>Option · takes</th>" + levels.map(l => `<th>${esc(LEVEL[l][0].toUpperCase() + LEVEL[l].slice(1))}</th>`).join("") + "</tr>";
   for (const key of data.apis[api].options) {
     const takes = takesOf(key, lang);
@@ -130,65 +169,157 @@ function mapView() {
       html += `<td class="none" colspan="${levels.length}">Not offered</td></tr>`;
       continue;
     }
-    const cells = { 0: "", 1: "", 2: "", 4: "", x: "" };
-    for (const row of rowsOf(key, lang)) cells[level(row[1])] += chip(key, lang, row, row[0]);
+    const cells = { 0: "", 1: "", 2: "", x: "" };
+    for (const row of rowsOf(key, lang)) cells[level(row.calls)] += chip(key, lang, row, row.type);
     html += levels.map(l => `<td>${cells[l]}</td>`).join("") + "</tr>";
   }
   return html + "</table>";
 }
 
 // The cheaper of two rows. A row with no fix found loses.
-const cheaper = (a, b) => !b || (a[1] !== null && (b[1] === null || a[1] < b[1]));
+const cheaper = (a, b) => !b || (a.calls !== null && (b.calls === null || a.calls < b.calls));
+
+// usage.json's conversions for one option, each with the row it goes under.
+function conversions(key) {
+  const [apiKey, name] = (data.usage_keys || {})[key] || [];
+  const list = (((usage || {}).apis || {})[apiKey] || {})[name] || [];
+  return list.map(c => ({ ...c, kind: c.from === null ? "passed as is" : FROM_KIND[c.from] || "other" }));
+}
 
 function compareView() {
   let html = "";
   for (const key of data.apis[api].options) {
-    const best = {};
+    const all = {}, best = {};
     for (const [, l] of LANGS) {
       for (const row of rowsOf(key, l)) {
         const kind = kindOf(row, l);
         if (!kind) continue;
+        ((all[kind] = all[kind] || {})[l] = all[kind][l] || []).push(row);
         best[kind] = best[kind] || {};
         if (cheaper(row, best[kind][l])) best[kind][l] = row;
       }
     }
-    const customers = data.customers[key] || {};
+    const convs = conversions(key);
     const on = proposed.has(key);
     const button = hasProposal(key) ? " " + propButton(key) : "";
     const sig = on && proposalFor(key, "rust") ? `<div class="propsig">${esc(proposalFor(key, "rust").signature)}</div>` : "";
-    html += `<table><tr><th>${esc(key.split(".")[1])}${button}${sig}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("") + "<th>Customers convert</th></tr>";
-    for (const kind of KINDS.filter(k => best[k] || customers[k])) {
-      html += `<tr><td>${esc(kind)}</td>`;
+    html += `<table><tr><th>${esc(option(key))}${button}${sig}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("")
+      + "<th>What customers convert</th></tr>";
+    for (const kind of KINDS.filter(k => all[k] || convs.some(c => c.kind === k))) {
+      const id = `${key}|${kind}`;
+      const isOpen = opened.has(id);
+      html += `<tr data-open="${esc(id)}"><td class="kind">${isOpen ? "▾" : "▸"} ${esc(kind)}</td>`;
       for (const [, l] of LANGS) {
         const row = (best[kind] || {})[l];
+        const n = ((all[kind] || {})[l] || []).length;
+        const more = n > 1 ? ` +${n - 1}` : "";
         const none = takesOf(key, l) ? "" : "not offered";
-        html += `<td class="ck">${row ? chip(key, l, row, LEVEL[level(row[1])]) + `<small>${esc(row[0])}</small>` : `<small>${none}</small>`}</td>`;
+        html += `<td class="ck">${row ? chip(key, l, row, LEVEL[level(row.calls)]) + `<small>${esc(row.type)}${more}</small>` : `<small>${none}</small>`}</td>`;
       }
-      html += `<td class="ev">${esc(customers[kind] || "")}</td></tr>`;
+      const mine = convs.filter(c => c.kind === kind && c.sources > 0).sort((a, b) => b.sources - a.sources);
+      html += `<td class="ev">${mine.slice(0, 3).map(c => `${esc(c.conversion)} · ${c.sources} ${c.sources === 1 ? "source" : "sources"}`).join("<br>")}</td></tr>`;
+      if (isOpen) html += detailRow(key, kind, all[kind] || {}, mine);
     }
-    html += "</table>";
+    html += "</table>" + customerList(key, convs);
   }
   return html;
 }
 
+// Every type of one kind in each language, and the customer calls under it.
+function detailRow(key, kind, byLang, convs) {
+  let html = `<tr class="detail"><td></td>`;
+  for (const [name, l] of LANGS) {
+    const rows = (byLang[l] || []).slice().sort((a, b) => (a.calls === null) - (b.calls === null) || (a.calls || 0) - (b.calls || 0));
+    html += `<td><div class="lang">${name}</div>${rows.map(r => chip(key, l, r, r.type)).join("<br>") || "<span class=\"ev\">none</span>"}</td>`;
+  }
+  return html + `<td class="ev">${convs.map(c => `${esc(c.conversion)}: ${c.sources} sources, ${c.count} hits in ${c.repos} repos`).join("<br>")}</td></tr>`;
+}
+
+// Every customer call for one option, grouped by conversion and then by source. Copies of AWS code come last.
+function customerList(key, convs) {
+  if (!usage) return `<div class="ev">usage.json didn't load, so customer calls are hidden.</div>`;
+  if (!convs.length) return `<div class="ev">The customer search found no calls that set ${esc(option(key))}.</div>`;
+  let html = `<details data-id="${esc(key)}|customers"${openDetails.has(key + "|customers") ? " open" : ""}>`
+    + `<summary><b>How customers call ${esc(option(key))}</b> <span class="ev">${convs.reduce((n, c) => n + c.count, 0)} hits</span></summary>`;
+  for (const c of convs.slice().sort((a, b) => b.sources - a.sources)) {
+    const id = `${key}|${c.conversion}`;
+    const langs = Object.entries(c.languages).map(([l, n]) => `${l} ${n}`).join(", ");
+    const copies = c.aws_copies ? `, plus ${c.aws_copies} in copies of AWS code` : "";
+    html += `<details data-id="${esc(id)}"${openDetails.has(id) ? " open" : ""}><summary><code>${esc(c.conversion)}</code>`
+      + ` <span class="ev">from ${esc(c.from || "the same type")} · ${c.sources} sources · ${c.count} hits in ${c.repos} repos (${esc(langs)})${copies}</span></summary>`
+      + `<div class="hits">${hitList(c.hits || [])}</div></details>`;
+  }
+  return html + "</details>";
+}
+
+const hitLink = h => `<a href="${esc(h.url)}" target="_blank">${esc(h.repo)}/${esc(h.path)}#L${h.line}</a>`;
+
+// Every hit, grouped by source. Each line of code shows once, above every place it appears.
+function hitList(hits) {
+  const groups = {};
+  for (const h of hits.filter(h => !h.aws_copy)) (groups[h.source] = groups[h.source] || []).push(h);
+  let html = Object.values(groups).map(group => {
+    const files = new Set(group.map(h => `${h.repo}/${h.path}`)).size;
+    const tag = files > 1 ? `${files} copies` : group.length > 1 ? `${group.length} calls in one file` : "";
+    const lines = {};
+    for (const h of group) {
+      const id = `${h.code}\n${h.assignment}`;
+      (lines[id] = lines[id] || []).push(h);
+    }
+    const body = Object.values(lines).map(same => {
+      const via = same[0].assignment ? `<br><code>${esc(same[0].assignment)}</code>` : "";
+      return `<div><code>${esc(same[0].code || "")}</code>${via}<div class="where">${same.map(hitLink).join("<br>")}</div></div>`;
+    }).join("");
+    return `<div class="source">${tag ? `<span class="tag">${tag}</span>` : ""}${body}</div>`;
+  }).join("");
+  const aws = hits.filter(h => h.aws_copy);
+  if (aws.length) {
+    html += `<div class="ev">Copies of AWS code, not counted:</div><div class="where">${aws.map(hitLink).join("<br>")}</div>`;
+  }
+  return html;
+}
+
+// What the run test found, in words.
+function runText(run) {
+  if (run.skipped) return `⏭ Not run: ${run.skipped}.`;
+  if (!run.builds) return `❌ Ran: it failed with ${run.error || "an error"}.`;
+  let text = "✅ Ran: it works";
+  if (run.same === true) text += ", and gives the same result as the reference value";
+  if (run.same === false) text = "❌ Ran: it works, but the result differs from the reference value";
+  if (run.copies === true) text += ". Passing the value copies it";
+  if (run.copies === false) text += ". Passing the value doesn't copy it";
+  return text + ".";
+}
+
 function show(key, l, type) {
-  const row = rowsOf(key, l).find(r => r[0] === type);
+  const row = rowsOf(key, l).find(r => r.type === type);
   const name = LANGS.find(x => x[1] === l)[0];
   // A pair row stands for two values: x and y in Rust, k and v in the other languages.
-  const pair = row[3] === "pair" || row[3] === "pairs";
+  const pair = row.kind === "pair" || row.kind === "pairs";
   const held = pair ? `${l === "rust" ? "x, y" : "k, v"}: ${type.slice(1, -1).split(", ")[0]}` : `x: ${type}`;
-  if (row[1] === null) {
-    $("code").textContent = `// ${name}, ${held}\n// No fix in the list works.`;
-    return;
+  const checks = [];
+  let code = "No fix in the list works.";
+  if (row.calls !== null && row.calls !== undefined) {
+    code = l === "rust" ? data.apis[api].call + row.code : row.code;
+    checks.push(`${LEVEL[level(row.calls)]}: ${row.calls} ${row.calls === 1 ? "call" : "calls"}.`);
   }
-  const warn = risk(key, row);
-  const code = l === "rust" ? data.apis[api].call + row[2] : row[2];
-  let proof = l === "rust" ? "// ✅ compiled" : "// ⚙ written from the release's signature, not compiled";
-  if (row[5]) {
-    const checked = l === "rust" ? "Compiled against a model of it" : "Not compiled";
-    proof = `// ✏️ proposed: ${proposalFor(key, l).signature}. ${checked}. Today: ${LEVEL[level(row[4])]}.`;
+  if (row.proposed) {
+    const checked = l === "rust" ? "Compiled against a model of it, not run" : "Not compiled";
+    checks.push(`✏️ Proposed: <code>${esc(proposalFor(key, l).signature)}</code>. ${checked}. Today: ${LEVEL[level(row.today)]}.`);
+  } else if (l === "rust") {
+    if (row.trial) checks.push(`✅ Compiled. <a href="${blob(data.files.trials, row.trial)}" target="_blank">See the code it compiled ↗</a>`);
+    else checks.push("❌ No fix in the list compiled.");
+    if (row.run) checks.push(`${esc(runText(row.run))} <a href="${blob(data.files.runs, row.test)}" target="_blank">See the test ↗</a>`);
+    checks.push(`<a href="${ciLink()}" target="_blank">CI compiles and runs these again ↗</a> on aws-crypto-tools-rust at `
+      + `<a href="https://github.com/aws/aws-crypto-tools-rust/tree/${data.rust_commit}" target="_blank">${data.rust_commit.slice(0, 7)}</a>`
+      + ` with rustc ${esc(data.rustc)}.`);
+  } else {
+    checks.push("⚙ Written from the release's signature. Not compiled or run.");
   }
-  $("code").textContent = `// ${name}, ${held}\n${code}\n${proof}` + (warn ? `\n// ⚠ ${warn}` : "");
+  const rule = expected(key, row);
+  if (rule) checks.push(`${rule.ok ? "✅" : "⚠"} Rule: ${esc(rule.text)}`);
+  if (risk(row)) checks.push(`⚠ ${esc(risk(row))}`);
+  $("panel").innerHTML = `<div class="title">${esc(name)}, ${esc(held)}</div><pre>${esc(code)}</pre><ul>${checks.map(c => `<li>${c}</li>`).join("")}</ul>`;
 }
 
 function draw() {
@@ -204,8 +335,15 @@ function draw() {
 }
 
 function reset() {
-  picked = "";
-  $("code").textContent = "Click any type to see its code.";
+  $("panel").textContent = "Click any type to see its code and checks.";
+}
+
+function foot() {
+  const parts = [data.note, data.others_note];
+  if (usage) parts.push(`Customers: GitHub code search on ${usage.generated_at}, ${Object.values(usage.languages).reduce((n, l) => n + l.calls, 0)} calls. `
+    + `Skipped: ${usage.search ? usage.search.skipped.join("; ") : "AWS repos and forks"}. ${usage.search ? usage.search.sources : ""}`);
+  if (proposals) parts.push(proposals.checked);
+  $("foot").textContent = parts.filter(Boolean).join(" ");
 }
 
 $("apis").addEventListener("click", e => {
@@ -230,6 +368,10 @@ $("langs").addEventListener("click", e => {
   reset();
   draw();
 });
+$("langs").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if (file) file.text().then(text => useProposals(JSON.parse(text)));
+});
 $("view").addEventListener("click", e => {
   const prop = e.target.closest(".prop");
   if (prop) {
@@ -239,35 +381,46 @@ $("view").addEventListener("click", e => {
     return;
   }
   const c = e.target.closest(".chip");
-  if (!c || !c.dataset.key) return;
-  picked = [c.dataset.key, c.dataset.lang, c.dataset.type].join("|");
-  draw();
-  show(c.dataset.key, c.dataset.lang, c.dataset.type);
+  if (c && c.dataset.key) {
+    // Mark the picked chip without redrawing, so open rows and lists stay open.
+    for (const s of document.querySelectorAll(".chip.sel")) s.classList.remove("sel");
+    c.classList.add("sel");
+    show(c.dataset.key, c.dataset.lang, c.dataset.type);
+    return;
+  }
+  const row = e.target.closest("tr[data-open]");
+  if (row && !e.target.closest("details")) {
+    const id = row.dataset.open;
+    opened.has(id) ? opened.delete(id) : opened.add(id);
+    draw();
+  }
 });
-
-$("langs").addEventListener("change", e => {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
-  file.text().then(text => { useProposals(JSON.parse(text)); });
-});
+$("view").addEventListener("toggle", e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (id) e.target.open ? openDetails.add(id) : openDetails.delete(id);
+}, true);
 
 function useProposals(found) {
   proposals = found;
   proposed.clear();
   reset();
   draw();
-  $("foot").textContent = [data.note, data.others_note, proposals && proposals.checked].filter(Boolean).join(" ");
+  foot();
 }
 
-fetch("types.json")
-  .then(r => r.json())
-  .then(d => {
-    data = d;
-    useProposals(null);
-    // proposals.json is only here when someone ran the skill and check_proposals.py in this checkout.
-    fetch("proposals.json").then(r => (r.ok ? r.json() : null)).then(p => { if (p) useProposals(p); }).catch(() => {});
-  })
-  .catch(e => { $("view").textContent = "Could not load types.json: " + e; });
+const json = name => fetch(name).then(r => (r.ok ? r.json() : null)).catch(() => null);
+Promise.all([json("types.json"), json("usage.json"), json("expectations.json")]).then(([d, u, x]) => {
+  if (!d) {
+    $("view").textContent = "Could not load types.json.";
+    return;
+  }
+  data = d;
+  usage = u;
+  if (x) expectations = x;
+  useProposals(null);
+  // proposals.json is only here when someone ran the skill and check_proposals.py in this checkout.
+  json("proposals.json").then(p => { if (p) useProposals(p); });
+});
 </script>
 </body>
 </html>

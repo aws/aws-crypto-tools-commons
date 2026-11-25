@@ -1,0 +1,80 @@
+# Compiles and runs the Rust rows of the types page again, and fails when the results differ from
+# the committed ones. dashboard/api-examples/types.html links each Rust cell's checks to this workflow.
+
+name: API examples types
+
+on:
+  pull_request:
+    paths:
+      - "api-examples/types/**"
+      - "dashboard/api-examples/types.json"
+      - ".github/workflows/api-examples-types.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "api-examples/types/**"
+      - "dashboard/api-examples/types.json"
+      - ".github/workflows/api-examples-types.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: compile and run the Rust rows
+    runs-on: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # types.json names the aws-crypto-tools-rust commit and the rustc version that made the committed rows.
+      - name: Read what made the committed rows
+        id: made
+        run: |
+          python3 - >> "$GITHUB_OUTPUT" <<'EOF'
+          import json
+          page = json.load(open("dashboard/api-examples/types.json"))
+          print("commit=" + page["rust_commit"])
+          print("rustc=" + page["rustc"])
+          EOF
+
+      - uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-rust
+          ref: ${{ steps.made.outputs.commit }}
+          path: .types-rust
+          persist-credentials: false
+
+      # aws-lc-sys needs Go to build.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.made.outputs.rustc }}
+
+      # The trials and run tests build into .types-rust/esdk/target. rust_types.py keeps the crates
+      # it reads, and its scanner, in ~/.cache/crypto-tools-api-examples.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .types-rust/esdk
+          cache-directories: ~/.cache/crypto-tools-api-examples
+
+      - name: Compile and run the Rust rows
+        working-directory: api-examples/types
+        run: python3 compile_rust_types.py --rust-repo "$GITHUB_WORKSPACE/.types-rust"
+
+      - name: Check that the committed rows match
+        run: |
+          if ! git diff --exit-code -- dashboard/api-examples/types.json api-examples/types/rust_trials.rs \
+            api-examples/types/rust_runs.rs; then
+            echo "::error::These results differ from the committed ones. Run api-examples/types/compile_rust_types.py and commit what it writes."
+            exit 1
+          fi
