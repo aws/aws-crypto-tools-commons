@@ -447,10 +447,13 @@ def get(url, auth):
             if e.code not in (403, 429):
                 raise
             body = e.read().decode(errors="replace")
-            if "rate limit" not in body.lower() and e.headers.get("x-ratelimit-remaining") != "0":
+            limited = e.code == 429 or "rate limit" in body.lower() or e.headers.get("x-ratelimit-remaining") == "0"
+            if not limited:
                 raise SystemExit(f"GitHub refused {url}: {e.code} {body}")
+            # A secondary limit says {"message": "try again in 187.2s"} and may send no headers.
+            later = re.search(r"try again in ([\d.]+)s", body)
             reset = int(e.headers.get("x-ratelimit-reset", time.time() + 60))
-            wait = int(e.headers.get("retry-after") or max(reset - time.time(), 1)) + 1
+            wait = int(e.headers.get("retry-after") or (later and float(later.group(1))) or max(reset - time.time(), 1)) + 1
             print(f"rate limited; waiting {wait}s", file=sys.stderr)
             time.sleep(wait)
     raise SystemExit(f"still rate limited after 10 waits: {url}")
