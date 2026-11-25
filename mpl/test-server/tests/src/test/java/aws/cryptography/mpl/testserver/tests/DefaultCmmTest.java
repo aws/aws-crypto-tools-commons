@@ -1,17 +1,11 @@
 package aws.cryptography.mpl.testserver.tests;
 
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.PUBLIC_KEY_EC_KEY;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.bytes;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.createCmm;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.decrypt;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.decryptMaterials;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.encrypt;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.getEncryptionMaterials;
+import static aws.cryptography.mpl.testserver.tests.Cmm.PUBLIC_KEY_EC_KEY;
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
@@ -19,7 +13,6 @@ import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
 import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsOutput;
-import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.testserver.tests.FeatureGate;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
@@ -105,10 +98,10 @@ public class DefaultCmmTest {
         AlgorithmSuiteId suite = AlgorithmSuiteId.ALG_AES_128_GCM_IV12_TAG16_NO_KDF;
         CommitmentPolicy policy = compatiblePolicy(suite);
 
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), Map.of(), policy, suite);
-        DecryptMaterialsOutput decrypted = decrypt(
-            MplTestServerClients.forEndpoint(pair.decryptEndpoint()), encrypted, policy);
+        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(Map.of(), policy, suite);
+        DecryptMaterialsOutput decrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.decryptEndpoint())).decryptMaterials(encrypted, policy);
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(Map.of(), decrypted.getEncryptionContext());
@@ -120,8 +113,8 @@ public class DefaultCmmTest {
         FeatureGate.require(FEATURES, pair);
         CommitmentPolicy policy = compatiblePolicy(suite);
 
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), ROOT_EC, policy, suite);
+        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC, policy, suite);
 
         assertEquals(suite.getValue(), encrypted.getAlgorithmSuiteId().getValue());
         assertEquals(dataKeyLength(suite), encrypted.getPlaintextDataKey().remaining());
@@ -135,8 +128,8 @@ public class DefaultCmmTest {
             assertEquals(ROOT_EC, encrypted.getEncryptionContext());
         }
 
-        DecryptMaterialsOutput decrypted = decrypt(
-            MplTestServerClients.forEndpoint(pair.decryptEndpoint()), encrypted, policy);
+        DecryptMaterialsOutput decrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.decryptEndpoint())).decryptMaterials(encrypted, policy);
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(encrypted.getEncryptionContext(), decrypted.getEncryptionContext());
@@ -173,8 +166,8 @@ public class DefaultCmmTest {
     void defaultSuitePerPolicy(CommitmentPolicy policy, AlgorithmSuiteId expected,
             LanguageServerTarget target) {
         FeatureGate.require(FEATURES, target);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(target.endpoint()), ROOT_EC, policy, null);
+        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(target.endpoint())).getEncryptionMaterials(ROOT_EC, policy, null);
         assertEquals(expected.getValue(), encrypted.getAlgorithmSuiteId().getValue());
     }
 
@@ -193,10 +186,8 @@ public class DefaultCmmTest {
     void encryptRejectsSuiteOutsidePolicy(CommitmentPolicy policy, AlgorithmSuiteId suite,
             LanguageServerTarget target) {
         FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client);
-        assertThrows(MPLClientError.class, () -> client.getEncryptionMaterials(
-            getEncryptionMaterials(cmmId, ROOT_EC, policy, suite).build()));
+        Cmm.defaultCmm(MplTestServerClients.forEndpoint(target.endpoint()))
+            .getEncryptionMaterialsFails(ROOT_EC, policy, suite);
     }
 
     static Stream<Arguments> decryptPolicies() {
@@ -218,18 +209,17 @@ public class DefaultCmmTest {
     void decryptHonorsPolicy(AlgorithmSuiteId suite, CommitmentPolicy decryptPolicy, boolean allowed,
             TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), ROOT_EC,
+        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC,
             compatiblePolicy(suite), suite);
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
 
         if (allowed) {
-            DecryptMaterialsOutput decrypted = decrypt(dec, encrypted, decryptPolicy);
+            DecryptMaterialsOutput decrypted = Cmm.defaultCmm(dec).decryptMaterials(encrypted, decryptPolicy);
             assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         } else {
-            String cmmId = createCmm(dec);
-            assertThrows(MPLClientError.class, () -> dec.decryptMaterials(
-                decryptMaterials(cmmId, encrypted, decryptPolicy).build()));
+            Cmm cmm = Cmm.defaultCmm(dec);
+            cmm.decryptMaterialsFails(cmm.decryptMaterialsRequest(encrypted, decryptPolicy));
         }
     }
 
@@ -250,16 +240,14 @@ public class DefaultCmmTest {
     void reproducedSubsetAccepted(Map<String, String> reproduced, TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
         CommitmentPolicy policy = compatiblePolicy(COMMIT_NO_SIGNING_SUITE);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), ROOT_EC, policy,
+        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC, policy,
             COMMIT_NO_SIGNING_SUITE);
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        String cmmId = createCmm(dec);
+        Cmm cmm = Cmm.defaultCmm(dec);
 
-        DecryptMaterialsOutput decrypted = MplTestServerClients.withRetry(() ->
-            dec.decryptMaterials(decryptMaterials(cmmId, encrypted, policy)
-                .reproducedEncryptionContext(reproduced)
-                .build()));
+        DecryptMaterialsOutput decrypted = cmm.decryptMaterials(cmm.decryptMaterialsRequest(encrypted, policy)
+            .reproducedEncryptionContext(reproduced));
 
         assertArrayEquals(bytes(encrypted.getPlaintextDataKey()), bytes(decrypted.getPlaintextDataKey()));
         assertEquals(ROOT_EC, decrypted.getEncryptionContext());
@@ -288,15 +276,13 @@ public class DefaultCmmTest {
     void reproducedMismatchRejected(Map<String, String> reproduced, TargetPair pair) {
         FeatureGate.require(FEATURES, pair);
         CommitmentPolicy policy = compatiblePolicy(COMMIT_NO_SIGNING_SUITE);
-        GetEncryptionMaterialsOutput encrypted = encrypt(
-            MplTestServerClients.forEndpoint(pair.encryptEndpoint()), ROOT_EC, policy,
+        GetEncryptionMaterialsOutput encrypted = Cmm.defaultCmm(
+            MplTestServerClients.forEndpoint(pair.encryptEndpoint())).getEncryptionMaterials(ROOT_EC, policy,
             COMMIT_NO_SIGNING_SUITE);
         MPLTestServerClient dec = MplTestServerClients.forEndpoint(pair.decryptEndpoint());
-        String cmmId = createCmm(dec);
+        Cmm cmm = Cmm.defaultCmm(dec);
 
-        assertThrows(MPLClientError.class, () -> dec.decryptMaterials(
-            decryptMaterials(cmmId, encrypted, policy)
-                .reproducedEncryptionContext(reproduced)
-                .build()));
+        cmm.decryptMaterialsFails(cmm.decryptMaterialsRequest(encrypted, policy)
+            .reproducedEncryptionContext(reproduced));
     }
 }

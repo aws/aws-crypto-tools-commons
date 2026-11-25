@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -33,6 +34,8 @@ import org.junit.platform.commons.support.ReflectionSupport;
  *       Then it builds the test server client.
  *       In a dry run, building the client stops the run and logs it as one that would run.</li>
  *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.</li>
+ *   <li>After the test body, {@link Run#afterEach} fails the test if a {@link FailureCheck} failed
+ *       and the test did not mark it with a known bug.</li>
  * </ol>
  */
 final class KeyringTestExtension implements TestTemplateInvocationContextProvider {
@@ -79,7 +82,8 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
     }
 
     /** One run of a test: one input on one language server, or on one pair of language servers. */
-    private static final class Run implements TestTemplateInvocationContext, BeforeEachCallback, ParameterResolver {
+    private static final class Run
+            implements TestTemplateInvocationContext, BeforeEachCallback, ParameterResolver, AfterEachCallback {
 
         /** The input of a test that has no {@link KeyringTest#inputs()}. */
         static final Object NO_INPUT = new Object();
@@ -173,6 +177,15 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
                 return Boolean.class;
             }
             return type;
+        }
+
+        @Override
+        public void afterEach(ExtensionContext context) {
+            if (mpls != null) {
+                for (Mpl mpl : mpls) {
+                    mpl.throwUnresolvedFailure();
+                }
+            }
         }
 
         /** How many {@code Mpl} parameters come before parameter {@code index}. */

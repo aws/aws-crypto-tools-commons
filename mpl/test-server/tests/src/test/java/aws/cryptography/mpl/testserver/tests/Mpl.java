@@ -1,23 +1,14 @@
 package aws.cryptography.mpl.testserver.tests;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
-import aws.cryptography.mpl.testserver.client.model.InitializeDecryptionMaterialsInput;
-import aws.cryptography.mpl.testserver.client.model.InitializeEncryptionMaterialsInput;
-import aws.cryptography.mpl.testserver.client.model.MPLClientError;
 import aws.cryptography.testserver.tests.ExpectedError;
-import aws.cryptography.testserver.tests.KnownBugGate;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.nio.ByteBuffer;
-import java.util.List;
-import org.junit.jupiter.api.function.Executable;
 
 /**
  * One language's MPL, as a {@link KeyringTest} sees it.
@@ -32,6 +23,8 @@ final class Mpl {
     private final MPLTestServerClient testServer;
     /** The test class's suite and encryption context, or null when it sets none. */
     private final KeyringTestDefaults defaults;
+    /** A failed {@link FailureCheck} that the test has not yet marked with a known bug, or null. */
+    private FailureCheck unresolved;
 
     /**
      * @throws org.opentest4j.TestAbortedException in a dry run, which stops the test here
@@ -49,12 +42,39 @@ final class Mpl {
 
     /** The test server client, for the {@link Keyring} calls. */
     MPLTestServerClient testServer() {
+        throwUnresolvedFailure();
         return testServer;
     }
 
     /** Start building a Raw AES keyring. */
     RawAesKeyringBuilder rawAesKeyring() {
+        throwUnresolvedFailure();
         return new RawAesKeyringBuilder();
+    }
+
+    /**
+     * Throw the failure of a {@link FailureCheck} that the test did not mark with
+     * {@link FailureCheck#unlessKnownBug}.
+     * Each MPL call runs this first, and so does the end of the test.
+     */
+    void throwUnresolvedFailure() {
+        FailureCheck check = unresolved;
+        unresolved = null;
+        if (check != null) {
+            check.throwIfFailed();
+        }
+    }
+
+    /** Keep {@code check}, which failed, until the test marks it with a known bug or makes another MPL call. */
+    void keepUnresolved(FailureCheck check) {
+        unresolved = check;
+    }
+
+    /** The test has decided {@code check}, so its failure is no longer kept here. */
+    void forgetUnresolved(FailureCheck check) {
+        if (unresolved == check) {
+            unresolved = null;
+        }
     }
 
     /** New encryption materials with the test class's suite and encryption context, and no data key yet. */
@@ -64,14 +84,8 @@ final class Mpl {
 
     /** New encryption materials with {@code suite}, the test class's encryption context, and no data key yet. */
     EncryptionMaterials newEncryptionMaterials(AlgorithmSuiteId suite) {
-        EncryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            testServer.initializeEncryptionMaterials(InitializeEncryptionMaterialsInput.builder()
-                .algorithmSuiteId(suite)
-                .encryptionContext(requireDefaults().encryptionContext())
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "new encryption materials hold no data key");
-        return materials;
+        throwUnresolvedFailure();
+        return Materials.newEncryptionMaterials(testServer, suite, requireDefaults().encryptionContext());
     }
 
     /** New decryption materials with the test class's suite and encryption context, and no data key yet. */
@@ -81,24 +95,8 @@ final class Mpl {
 
     /** New decryption materials with {@code suite}, the test class's encryption context, and no data key yet. */
     DecryptionMaterials newDecryptionMaterials(AlgorithmSuiteId suite) {
-        DecryptionMaterials materials = MplTestServerClients.withRetry(() ->
-            testServer.initializeDecryptionMaterials(InitializeDecryptionMaterialsInput.builder()
-                .algorithmSuiteId(suite)
-                .encryptionContext(requireDefaults().encryptionContext())
-                .requiredEncryptionContextKeys(List.of())
-                .build())).getMaterials();
-        assertNull(materials.getPlaintextDataKey(), "new decryption materials hold no data key");
-        return materials;
-    }
-
-    /**
-     * Run {@code assertion}, which a known bug in some language's MPL breaks.
-     * When this language's bug-config.json lists {@code bugId}, a failing assertion skips the test.
-     * A passing one then fails the test, because the bug-config.json entry is out of date.
-     * For other languages, the assertion runs as usual.
-     */
-    void knownBug(String bugId, Executable assertion) {
-        KnownBugGate.gateDeclared(bugId, languageServer, assertion);
+        throwUnresolvedFailure();
+        return Materials.newDecryptionMaterials(testServer, suite, requireDefaults().encryptionContext());
     }
 
     private KeyringTestDefaults requireDefaults() {
@@ -107,13 +105,6 @@ final class Mpl {
                 "new materials need a suite and encryption context: implement KeyringTestDefaults in the test class");
         }
         return defaults;
-    }
-
-    /** Run {@code create}, and check that the MPL rejects the keyring settings with {@code expected}. */
-    private MPLClientError createFailsWith(Executable create, ExpectedError expected) {
-        MPLClientError error = assertThrows(MPLClientError.class, create);
-        MplErrors.expectError(languageServer, error).matches(expected);
-        return error;
     }
 
     /** The settings of a Raw AES keyring. {@link #create()} sends them to the MPL. */
@@ -147,13 +138,13 @@ final class Mpl {
         Keyring create() {
             CreateRawAesKeyringInput request = input.build();
             return new Keyring(Mpl.this, MplTestServerClients.withRetry(() ->
-                testServer.createRawAesKeyring(request)).getKeyringId());
+                testServer().createRawAesKeyring(request)).getKeyringId());
         }
 
         /** Create the keyring, which must fail with {@code expected}. */
-        MPLClientError createFailsWith(ExpectedError expected) {
+        FailureCheck createFailsWith(ExpectedError expected) {
             CreateRawAesKeyringInput request = input.build();
-            return Mpl.this.createFailsWith(() -> MplTestServerClients.withRetry(() ->
+            return FailureCheck.run(Mpl.this, () -> MplTestServerClients.withRetry(() ->
                 testServer.createRawAesKeyring(request)), expected);
         }
     }

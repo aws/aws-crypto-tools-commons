@@ -40,7 +40,7 @@ METHOD = re.compile(
     r"^\s*(?:(?:public|protected|private|static|final|synchronized|abstract|default)\s+)*"
     r"(?:<[^>]*>\s+)?[\w.$<>\[\],? ]+?\s+(\w+)\s*\(")
 NOT_METHOD = re.compile(r"^\s*(?:return|new|if|for|while|switch|catch|throw|else|do|try|case)\b")
-GATE_DECLARED = re.compile(r'(?:gateDeclared|knownBug)\(\s*"([^"]+)"')
+GATE_DECLARED = re.compile(r'(?:gateDeclared|knownBug|unlessKnownBug)\(\s*"([^"]+)"')
 CALL = re.compile(r"\b(\w+)\s*\(")
 GATE_ID_SEGMENT = re.compile(r"\[(\w[\w-]*):([^\]]*)\]")
 TEST_SEGMENTS = {"method", "test-template", "test-factory", "property", "example"}
