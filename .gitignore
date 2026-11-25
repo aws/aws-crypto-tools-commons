@@ -3,3 +3,6 @@
 .jqwik-database
 
 __pycache__/
+
+# Proposals from a local run of the api-signature-proposals skill. The types page shows them when they are here.
+dashboard/api-examples/proposals.json

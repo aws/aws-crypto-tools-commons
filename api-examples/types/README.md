@@ -10,3 +10,9 @@ To update the page, run these from this folder, in order:
 4. `python3 other_languages.py --shipped <folder>` writes the rows for the other languages. The folder holds the `api-examples-*-shipped` artifacts from a run of `api-examples-shipped.yml`, which `gh run download` can fetch. These calls are not compiled.
 
 `rust-types.json` lists the rules it used. For each type, it gives how many crates use it and names three of them.
+
+## Proposed signatures
+
+The page has no proposals of its own. The `api-signature-proposals` skill in CryptoToolsAISkills writes them, because choosing a signature takes judgment. Then `python3 check_proposals.py --input <proposals file> --rust-repo <aws-crypto-tools-rust checkout>` compiles every held type against each Rust proposal. It lists the calls that would stop compiling, and writes `dashboard/api-examples/proposals.json`.
+
+Git ignores `proposals.json`. The page shows it when it sits next to `types.json`. On another machine, use the page's Load proposals button to open the file. The file also holds its own input, so it can be checked again.

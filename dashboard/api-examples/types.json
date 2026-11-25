@@ -1,5 +1,5 @@
 {
-  "note": "Rust: 1,076 tries compiled on aws-crypto-tools-rust at e77da77. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25. Other languages: the latest released signatures, not compiled. Customers: public GitHub code.",
+  "note": "Rust: 1,107 tries compiled on aws-crypto-tools-rust at e77da77. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25. Other languages: the latest released signatures, not compiled. Customers: public GitHub code.",
   "apis": [
     {
       "name": "Raw AES keyring",

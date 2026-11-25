@@ -24,6 +24,7 @@ READ_ALL = "{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(
 # Fixes to try for each kind of held type, as (cost, code, how).
 # Cost 0 passes the value as is, 1 adds & or Some, 2 adds one call, 3 or more adds several calls.
 # "set" passes the code to set_<option>, which takes an Option. "pair" passes two values, x and y.
+# Every kind tries x as is, even where no setter takes it today, so a proposed setter that takes it shows.
 FIXES = {
     "bytes": [(0, "x", "base"), (1, "&x", "base"), (1, "&x[..]", "base"), (2, "x.clone()", "base"),
               (2, "x.to_vec()", "base"), (2, "x.as_ref()", "base"), (2, "x.into_inner()", "base"),
@@ -32,7 +33,7 @@ FIXES = {
                        (3, "x.map(|b| b.clone().into_inner())", "set"), (3, "x.map(|b| b.into_inner())", "set"),
                        (3, "x.unwrap()", "base"), (3, "x.unwrap().as_ref()", "base"),
                        (3, "x.unwrap().into_inner()", "base"), (3, "&x.unwrap().into_inner()", "base")],
-    "stream": [(3, "x.bytes().unwrap()", "base"), (4, "x.bytes().unwrap().to_vec()", "base"),
+    "stream": [(0, "x", "base"), (3, "x.bytes().unwrap()", "base"), (4, "x.bytes().unwrap().to_vec()", "base"),
                (5, "&x.collect().await.unwrap().into_bytes()", "base"),
                (6, "x.collect().await.unwrap().into_bytes().to_vec()", "base")],
     "text": [(0, "x", "base"), (1, "&x", "base"), (2, "x.clone()", "base"), (2, "x.to_string()", "base"),
@@ -40,16 +41,17 @@ FIXES = {
              (1, "Some(x)", "set"), (2, "Some(x.to_string())", "set")],
     "optional text": [(0, "x", "set"), (2, "x.map(Into::into)", "set"), (3, "x.map(|s| s.to_string())", "set"),
                       (3, "x.unwrap()", "base"), (3, "x.unwrap().as_bytes()", "base")],
-    "path": [(3, "std::fs::read(x).unwrap()", "base"), (4, "&std::fs::read(x).unwrap()", "base")],
-    "reader": [(5, READ_ALL, "base"), (6, "&" + READ_ALL, "base")],
+    "path": [(0, "x", "base"), (3, "std::fs::read(x).unwrap()", "base"), (4, "&std::fs::read(x).unwrap()", "base")],
+    "reader": [(0, "x", "base"), (5, READ_ALL, "base"), (6, "&" + READ_ALL, "base")],
     "number": [(0, "x", "base"), (2, "x.into()", "base"), (3, "x.try_into().unwrap()", "base"),
                (3, "std::time::Duration::from_secs(x.into())", "base"),
                (4, "std::time::Duration::from_secs(x.try_into().unwrap())", "base")],
     "duration": [(0, "x", "base"), (2, "x.as_secs()", "base"), (3, "x.as_secs().try_into().unwrap()", "base")],
-    "list": [(1, "Some(x)", "set"), (2, "Some(x.to_vec())", "set"),
+    "list": [(0, "x", "base"), (1, "&x", "base"), (1, "Some(x)", "set"), (2, "Some(x.to_vec())", "set"),
              (3, "Some(x.iter().map(|s| s.to_string()).collect())", "set")],
     "optional list": [(0, "x", "set"), (3, "x.map(|v| v.iter().map(|s| s.to_string()).collect())", "set")],
-    "map": [(1, "Some(x)", "set"), (2, "Some(x.into())", "set"), (3, "Some(x.clone().into())", "set"),
+    "map": [(0, "x", "base"), (1, "&x", "base"), (1, "Some(x)", "set"), (2, "Some(x.into())", "set"),
+            (3, "Some(x.clone().into())", "set"),
             (3, "Some(x.into_iter().collect())", "set"),
             (4, "Some(x.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())", "set")],
     "pair": [(0, "x, y", "pair"), (1, "&x, &y", "pair"), (2, "x.to_string(), y.to_string()", "pair")],
@@ -94,21 +96,24 @@ class Scratch:
         shutil.copy(Path(rust_repo) / "esdk" / "Cargo.lock", self.dir / "Cargo.lock")
 
     def errors(self, lines):
-        """Line numbers in `lines`, counting from 0, that failed to compile."""
+        """The lines in `lines`, counting from 0, that failed to compile, each with the compiler's messages."""
         (self.dir / "lib.rs").write_text("#![allow(warnings)]\n" + "\n".join(lines) + "\n")
         out = subprocess.run(["cargo", "build", "--lib", "--message-format=json", "--target-dir", str(self.target)],
                              cwd=self.dir, capture_output=True, text=True)
-        failed = set()
+        failed = {}
         for raw in out.stdout.splitlines():
             msg = json.loads(raw) if raw.startswith("{") else {}
             if msg.get("reason") != "compiler-message" or msg["message"]["level"] != "error":
                 continue
             for span in msg["message"]["spans"]:
                 if span["is_primary"] and span["file_name"].endswith("lib.rs"):
-                    failed.add(span["line_start"] - 2)
+                    failed.setdefault(span["line_start"] - 2, []).append(msg["message"]["rendered"])
         if out.returncode != 0 and not failed:
             raise SystemExit(out.stderr[-3000:])
         return failed
+
+    def remove(self):
+        shutil.rmtree(self.dir)
 
 
 def locked_crates(rust_repo):
@@ -159,17 +164,19 @@ def named_types(path):
             if home:
                 shown = re.sub(rf"(?<![\w:]){n}(?![\w:])", f"{short}::{n}", shown)
                 ty = re.sub(rf"(?<![\w:]){n}(?![\w:])", home[0], ty)
-        held.append((shown, ty, "ctor", [(3, f"{path}::{fn}({'&x' if param.startswith('&') else 'x'})", "base")]))
+        as_is = [(0, "x", "base"), (1, "&x", "base")]
+        held.append((shown, ty, "ctor", as_is + [(3, f"{path}::{fn}({'&x' if param.startswith('&') else 'x'})", "base")]))
         if param.startswith("&"):
-            held.append(("&" + shown, "&" + ty, "ctor", [(3, f"{path}::{fn}(x)", "base")]))
+            held.append(("&" + shown, "&" + ty, "ctor", as_is[:1] + [(3, f"{path}::{fn}(x)", "base")]))
     return held, defines
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--rust-repo", required=True)
-    args = parser.parse_args()
-    rust_repo = str(Path(args.rust_repo).resolve())
+def prepare(rust_repo, extra_code=""):
+    """Held types for each option as (label, Rust type, kind, fixes), and a scratch crate that can name them.
+
+    Types whose names have no working path are left out. Crates that `extra_code` names become
+    dependencies of the scratch crate too.
+    """
     data = json.loads(rust_types.OUT.read_text())
     kept = {kind: [r["type"] for r in rows if r["kept"]] for kind, rows in data["kinds"].items()}
     paths = {name: list(found) for name, found in data["paths"].items()}
@@ -199,6 +206,7 @@ def main():
     crates = {in_lock[p.split("::")[0]] for _, p in tries}
     crates |= {in_lock[p.split("::")[0]] for held in per_option.values() for _, ty, _, _ in held
                for p in re.findall(r"\b(\w+)::", ty) if p in in_lock}
+    crates |= {in_lock[p] for p in re.findall(r"\b(\w+)::", extra_code) if p in in_lock}
     scratch = Scratch(rust_repo, crates)
     failed = scratch.errors([f"use {p} as Name{i};" for i, (_, p) in enumerate(tries)])
     chosen = dict(rust_types.STD_PATHS)
@@ -211,33 +219,56 @@ def main():
             return None
         return re.sub(NAME, lambda m: chosen.get(m.group(1), m.group(1)), ty)
 
-    # Drop types that still do not compile as a parameter type, then try every fix.
+    held = {key: [(label, code(ty), kind, fixes) for label, ty, kind, fixes in found if code(ty)]
+            for key, found in per_option.items()}
+    return held, scratch
+
+
+def trial(n, params, expr, how, glue, call):
+    """One line that compiles a call: a fn taking the held value as x, and as y too for a pair."""
+    arg = f"x: {expr}, y: {expr}" if how == "pair" else f"x: {expr}"
+    # Only fixes that await need an async fn. An async fn rejects types with a hidden lifetime.
+    asyncness = "async " if ".await" in glue else ""
+    return f"{asyncness}fn t{n}({params}{arg}) {{ let _ = {call}; }}"
+
+
+def setter_trials(held):
+    """Trials of every fix on each option's real setter, as (key, label, kind, cost, how, glue, shown call)."""
     trials, lines = [], []
     for key, recv, shown, setter, _ in OPTIONS:
         params = "client: &aws_esdk::Client, " if recv.startswith("client") else ""
-        for label, ty, kind, fixes in per_option[key]:
-            expr = code(ty)
-            if expr is None:
-                continue
+        for label, expr, kind, fixes in held[key]:
             for cost, glue, how in fixes:
                 call = f"{recv}.set_{setter}({glue})" if how == "set" else f"{recv}.{setter}({glue})"
-                arg = f"x: {expr}, y: {expr}" if how == "pair" else f"x: {expr}"
-                # Only fixes that await need an async fn. An async fn rejects types with a hidden lifetime.
-                asyncness = "async " if ".await" in glue else ""
-                lines.append(f"{asyncness}fn t{len(trials)}({params}{arg}) {{ let _ = {call}; }}")
-                shown_call = call[len(shown):] if shown else call[len(recv):]
-                trials.append((key, label, kind, cost, shown_call))
-    failed = scratch.errors(lines)
+                lines.append(trial(len(trials), params, expr, how, glue, call))
+                trials.append((key, label, kind, cost, how, glue, call[len(shown):] if shown else call[len(recv):]))
+    return trials, lines
+
+
+def best_rows(trials, failed):
+    """For each option, each held type's cheapest call that compiled, as [label, cost, call, kind]."""
     rows = {}
-    for n, (key, label, kind, cost, call) in enumerate(trials):
+    for n, (key, label, kind, cost, _, _, call) in enumerate(trials):
         best = rows.setdefault(key, {}).setdefault(label, [label, None, "", kind])
         if n not in failed and (best[1] is None or cost < best[1]):
             best[1], best[2] = cost, call
-    shutil.rmtree(scratch.dir)
+    return {key: sorted(found.values(), key=lambda r: (r[1] is None, r[1] or 0, r[0])) for key, found in rows.items()}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--rust-repo", required=True)
+    args = parser.parse_args()
+    rust_repo = str(Path(args.rust_repo).resolve())
+    data = json.loads(rust_types.OUT.read_text())
+    held, scratch = prepare(rust_repo)
+    trials, lines = setter_trials(held)
+    failed = scratch.errors(lines)
+    scratch.remove()
 
     page = json.loads(PAGE.read_text())
-    page["rust"] = {key: sorted(found.values(), key=lambda r: (r[1] is None, r[1] or 0, r[0]))
-                    for key, found in rows.items()}
+    rows = best_rows(trials, failed)
+    page["rust"] = rows
     commit = subprocess.run(["git", "-C", rust_repo, "rev-parse", "--short", "HEAD"], capture_output=True,
                             text=True, check=True).stdout.strip()
     page["note"] = (f"Rust: {len(trials):,} tries compiled on aws-crypto-tools-rust at {commit}. "
