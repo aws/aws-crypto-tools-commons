@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.platform.commons.support.AnnotationSupport;
 import org.junit.platform.commons.support.ReflectionSupport;
 
@@ -36,6 +37,7 @@ import org.junit.platform.commons.support.ReflectionSupport;
  *       Then it builds the test server client.
  *       In a dry run, building the client stops the run and logs it as one that would run.</li>
  *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.
+ *       An {@link Arguments} input fills one parameter with each of its arguments, in order.
  *       It also gives a new {@link MockKms} for each {@code MockKms} parameter.</li>
  *   <li>After the test body, {@link Run#afterEach} stops each MockKms.
  *       Then it fails the test if a {@link FailureCheck} failed and the test did not mark it with a known bug.</li>
@@ -110,7 +112,11 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
         private final Set<String> features;
         private final KeyringTest settings;
         private final Method testMethod;
-        private final Object input;
+        /**
+         * The input's values, one for each test parameter that is not an {@code Mpl} or a {@code MockKms}.
+         * An {@link Arguments} input gives one value for each of its arguments; any other input is one value.
+         */
+        private final List<Object> inputValues;
         /** A {@link LanguageServerTarget}, or a {@link TargetPair} for a test with {@link KeyringTest#pairs()}. */
         private final Object languageServer;
         /** One per {@code Mpl} parameter, in parameter order. Set by {@link #beforeEach}. */
@@ -122,18 +128,29 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
             this.features = features;
             this.settings = settings;
             this.testMethod = testMethod;
-            this.input = input;
+            if (input == NO_INPUT) {
+                this.inputValues = List.of();
+            } else if (input instanceof Arguments arguments) {
+                this.inputValues = Arrays.asList(arguments.get());
+            } else {
+                this.inputValues = List.of(input);
+            }
             this.languageServer = languageServer;
         }
 
         /** Fill the {@link KeyringTest#name()} pattern the same way a {@code @ParameterizedTest} name is. */
         @Override
         public String getDisplayName(int invocationIndex) {
-            List<Object> arguments = input == NO_INPUT ? List.of(languageServer) : List.of(input, languageServer);
+            List<Object> arguments = new ArrayList<>(inputValues);
+            arguments.add(languageServer);
             String pattern = settings.name();
             if (pattern.isEmpty()) {
-                pattern = "[" + String.join(", ", new TreeSet<>(features)) + "] " + testMethod.getName()
-                    + (input == NO_INPUT ? " {0}" : " {0} {1}");
+                StringBuilder defaultPattern = new StringBuilder("[" + String.join(", ", new TreeSet<>(features)) + "] "
+                    + testMethod.getName());
+                for (int i = 0; i < arguments.size(); i++) {
+                    defaultPattern.append(" {").append(i).append("}");
+                }
+                pattern = defaultPattern.toString();
             }
             for (int i = 0; i < arguments.size(); i++) {
                 pattern = pattern.replace("{" + i + "}", String.valueOf(arguments.get(i)));
@@ -170,12 +187,16 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
             }
         }
 
-        /** An {@code Mpl}, a {@code MockKms}, or a parameter that the input fits. */
+        /** An {@code Mpl}, a {@code MockKms}, or a parameter that its input value fits. */
         @Override
         public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
             Class<?> type = parameterContext.getParameter().getType();
-            return type == Mpl.class || type == MockKms.class
-                || (input != NO_INPUT && boxed(type).isInstance(input));
+            if (type == Mpl.class || type == MockKms.class) {
+                return true;
+            }
+            int valueIndex = inputValueIndex(parameterContext.getIndex());
+            return valueIndex < inputValues.size()
+                && (inputValues.get(valueIndex) == null || boxed(type).isInstance(inputValues.get(valueIndex)));
         }
 
         @Override
@@ -187,7 +208,7 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
                 return mockKms;
             }
             if (parameter.getType() != Mpl.class) {
-                return input;
+                return inputValues.get(inputValueIndex(parameterContext.getIndex()));
             }
             int mplIndex = mplIndex(parameterContext.getIndex());
             if (mplIndex >= mpls.size()) {
@@ -226,6 +247,19 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
                     mpl.throwUnresolvedFailure();
                 }
             }
+        }
+
+        /** How many parameters that take an input value come before parameter {@code index}. */
+        private int inputValueIndex(int index) {
+            Parameter[] parameters = testMethod.getParameters();
+            int count = 0;
+            for (int i = 0; i < index; i++) {
+                Class<?> type = parameters[i].getType();
+                if (type != Mpl.class && type != MockKms.class) {
+                    count++;
+                }
+            }
+            return count;
         }
 
         /** How many {@code Mpl} parameters come before parameter {@code index}. */

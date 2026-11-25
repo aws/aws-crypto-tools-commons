@@ -5,6 +5,7 @@ import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterialsCacheInput;
+import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
 import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
 import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
@@ -170,6 +171,29 @@ final class Mpl {
             return FailureCheck.run(Mpl.this, () -> MplTestServerClients.withRetry(() ->
                 testServer.createRawAesKeyring(request)), expected);
         }
+    }
+
+    /**
+     * A new Default CMM over a Raw AES keyring with {@link Cmm}'s fixed wrapping key.
+     * Every language builds the same keyring this way, so one language's CMM decrypts another's EDKs.
+     */
+    Cmm defaultCmm() {
+        Keyring keyring = rawAesKeyring()
+            .keyNamespace(Cmm.NAMESPACE)
+            .keyName(Cmm.KEY_NAME)
+            .wrappingKey(Cmm.WRAPPING_KEY)
+            .wrappingAlg(AesWrappingAlg.ALG_AES256_GCM_IV12_TAG16)
+            .create();
+        return defaultCmm(keyring);
+    }
+
+    /** A new Default CMM over {@code keyring}, which this MPL created. */
+    Cmm defaultCmm(Keyring keyring) {
+        CreateDefaultCmmInput request = CreateDefaultCmmInput.builder()
+            .keyringId(keyring.id())
+            .build();
+        return new Cmm(this, MplTestServerClients.withRetry(() ->
+            testServer().createDefaultCmm(request)).getCmmId());
     }
 
     /** Start building an AWS KMS Hierarchical keyring. */
