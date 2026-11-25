@@ -92,7 +92,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
         // AWS KMS key identifier not provided: fails
         mpl.awsKmsKeyring()
-            .kmsClient(realKms(REGION))
+            .kmsClient(mockKms.client())
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
@@ -173,7 +173,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         // invalid Grant Tokens: fails
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
-            .kmsClient(realKms(REGION))
+            .kmsClient(mockKms.client())
             .grantTokens(grantTokens.value())
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
@@ -195,7 +195,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         // empty: fails
         mpl.awsKmsKeyring()
             .kmsKeyId("")
-            .kmsClient(realKms(REGION))
+            .kmsClient(mockKms.client())
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
@@ -223,7 +223,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         // not a valid identifier: fails
         mpl.awsKmsKeyring()
             .kmsKeyId(malformed.value())
-            .kmsClient(realKms(REGION))
+            .kmsClient(mockKms.client())
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
