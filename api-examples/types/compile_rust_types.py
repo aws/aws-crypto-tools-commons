@@ -13,7 +13,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import tomllib
 from pathlib import Path
 
 import rust_types
@@ -114,6 +113,8 @@ class Scratch:
 
 def locked_crates(rust_repo):
     """crates.io crates that esdk already builds, by the name code uses for them."""
+    import tomllib  # Python 3.11 or newer.
+
     lock = tomllib.loads((Path(rust_repo) / "esdk" / "Cargo.lock").read_text())
     return {p["name"].replace("-", "_"): p["name"] for p in lock["package"] if "source" in p}
 

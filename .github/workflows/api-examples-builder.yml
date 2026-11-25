@@ -30,6 +30,9 @@ jobs:
       - name: Unit tests
         run: python3 -m unittest discover -s api-examples -v
 
+      - name: Types page tool tests
+        run: python3 -m unittest discover -s api-examples/types -v
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

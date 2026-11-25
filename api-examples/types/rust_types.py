@@ -17,7 +17,6 @@ import re
 import subprocess
 import tarfile
 import time
-import tomllib
 import urllib.request
 from collections import defaultdict
 from datetime import date
@@ -97,6 +96,8 @@ def checksum(name, version):
 
 
 def our_dependencies(rust_repo):
+    import tomllib  # Python 3.11 or newer. Only refresh needs it.
+
     names = set()
     for crate in ("mpl", "esdk"):
         manifest = tomllib.loads((Path(rust_repo) / crate / "Cargo.toml").read_text())
@@ -274,7 +275,7 @@ def is_kind(text, kind, ev):
 
 def classify(t, ev):
     """The kind of value a customer holds, or None when the type is not one we try."""
-    if t.startswith("&mut ") or "_" in t or "; N]" in t or t.startswith(("impl ", "dyn ", "&dyn ")):
+    if "_" in t or "; N]" in t or t.startswith(("impl ", "dyn ", "&dyn ")):
         return None
     inner = unref(t)
     for kind in ("bytes", "text", "path", "reader", "stream"):
