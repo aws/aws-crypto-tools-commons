@@ -692,4 +692,13 @@ structure MPLClientError {
     retryable: Boolean
     retryKind: String
     conflictReason: String
+
+    /// The messages of the errors the MPL collected before it failed, in
+    /// order, such as one per encrypted data key a keyring tried.
+    /// Absent when the error collected none.
+    collectedErrors: ErrorMessageList
+}
+
+list ErrorMessageList {
+    member: String
 }
