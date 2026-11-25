@@ -5,25 +5,31 @@
 //! It reads every .rs file except tests, benches, examples and build scripts.
 //! An item counts as public when it is marked `pub`, even inside a private module.
 //! It prints these lines, sorted:
-//!   {"pos":"param","type":"&[u8]","count":3}     a parameter of a pub fn
-//!   {"pos":"return","type":"Vec<u8>","count":2}   a return type, with one Result layer removed
-//!   {"pos":"field","type":"Blob","count":1}       a pub struct field or an enum variant field
-//!   {"defines":"Bytes","path":"bytes::Bytes"}     a pub type, at the module path of its file
-//!   {"defines":"Bytes","path":"uuid::Bytes","alias":"[u8; 16]"}  a pub type alias and its target
+//!   {"pos":"param","type":"&[u8]","count":3,...}   a parameter of a pub fn
+//!   {"pos":"return","type":"Vec<u8>","count":2,...} a return type, with one Result layer removed
+//!   {"pos":"field","type":"Blob","count":1,...}     a pub struct field or an enum variant field
+//!   {"defines":"Bytes","path":"bytes::Bytes",...}   a pub type, at the module path of its file
+//!   {"defines":"Bytes","path":"uuid::Bytes","alias":"[u8; 16]",...}  a pub type alias and its target
 //!   {"impl":"AsRef<[u8]>","for":"Bytes"}          a trait impl that says what a type holds
 //!   {"ctor":"Client","fn":"new","param":"&SdkConfig"}  a pub fn in `impl Client` that takes one value and returns Self
 //!   {"parse_errors":0}
 //! A generic parameter shows as `_`, and a generic fn parameter `x: T` shows as `impl` plus T's bounds.
+//! The "..." is where the first one is: "file" (relative to the crate dir), "line", and "item", like
+//! "SdkConfig::app_name" or "Blob.inner". A type's line also has "doc": the first two paragraphs of its
+//! doc comment, when it has one.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
+use serde_json::{json, Value};
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 use syn::{
-    Expr, FnArg, GenericArgument, GenericParam, Generics, ImplItem, Item, Lit, PathArguments, ReturnType,
-    Signature, TraitBoundModifier, TraitItem, Type, TypeParamBound, Visibility, WherePredicate,
+    Attribute, Expr, FnArg, GenericArgument, GenericParam, Generics, ImplItem, Item, Lit, Meta, PathArguments,
+    ReturnType, Signature, TraitBoundModifier, TraitItem, Type, TypeParamBound, Visibility, WherePredicate,
 };
 
 // Traits whose impls say what a type holds: bytes, text, a path or a reader.
@@ -34,14 +40,39 @@ const AUTO_TRAITS: &[&str] = &["Send", "Sync", "Unpin"];
 // Generic names in scope, each with its rendered trait bounds.
 type Generic = BTreeMap<String, Vec<String>>;
 
+// Where something is in the crate: its file, its line, and the item it belongs to.
+#[derive(Clone)]
+struct Site {
+    file: String,
+    line: usize,
+    item: String,
+}
+
+impl Site {
+    // The fields this site adds to a printed line, plus a doc comment when there is one.
+    fn fields(&self, mut line: Value, doc: &str) -> Value {
+        line["file"] = json!(self.file);
+        line["line"] = json!(self.line);
+        line["item"] = json!(self.item);
+        if !doc.is_empty() {
+            line["doc"] = json!(doc);
+        }
+        line
+    }
+}
+
 #[derive(Default)]
 struct Scan {
-    types: BTreeMap<(String, String), u64>,
-    defines: BTreeSet<(String, String)>,
-    aliases: BTreeSet<(String, String, String)>,
+    // (pos, type) -> how many times it shows up, and the first place.
+    types: BTreeMap<(String, String), (u64, Option<Site>)>,
+    // (name, path) and (name, path, target) -> where the type is defined, and its doc comment.
+    defines: BTreeMap<(String, String), (Site, String)>,
+    aliases: BTreeMap<(String, String, String), (Site, String)>,
     impls: BTreeSet<(String, String)>,
     ctors: BTreeSet<(String, String, String)>,
     parse_errors: u64,
+    // The file being read, relative to the crate dir.
+    file: String,
 }
 
 fn main() {
@@ -62,26 +93,69 @@ fn main() {
             scan.parse_errors += 1;
             continue;
         };
+        let rel = file.strip_prefix(&root).unwrap_or(&file);
+        scan.file = rel.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>().join("/");
         let mut module = vec![crate_name.clone()];
         module.extend(module_path(&root, &file));
         scan.items(&parsed.items, &module, &Generic::new());
     }
-    for ((pos, ty), count) in &scan.types {
-        println!("{}", serde_json::json!({"pos": pos, "type": ty, "count": count}));
+    for ((pos, ty), (count, site)) in &scan.types {
+        let line = json!({"pos": pos, "type": ty, "count": count});
+        println!("{}", site.as_ref().map_or(line.clone(), |s| s.fields(line, "")));
     }
-    for (name, path) in &scan.defines {
-        println!("{}", serde_json::json!({"defines": name, "path": path}));
+    for ((name, path), (site, doc)) in &scan.defines {
+        println!("{}", site.fields(json!({"defines": name, "path": path}), doc));
     }
-    for (name, path, target) in &scan.aliases {
-        println!("{}", serde_json::json!({"defines": name, "path": path, "alias": target}));
+    for ((name, path, target), (site, doc)) in &scan.aliases {
+        println!("{}", site.fields(json!({"defines": name, "path": path, "alias": target}), doc));
     }
     for (tr, ty) in &scan.impls {
-        println!("{}", serde_json::json!({"impl": tr, "for": ty}));
+        println!("{}", json!({"impl": tr, "for": ty}));
     }
     for (ty, name, param) in &scan.ctors {
-        println!("{}", serde_json::json!({"ctor": ty, "fn": name, "param": param}));
+        println!("{}", json!({"ctor": ty, "fn": name, "param": param}));
     }
-    println!("{}", serde_json::json!({"parse_errors": scan.parse_errors}));
+    println!("{}", json!({"parse_errors": scan.parse_errors}));
+}
+
+// The first two paragraphs of an item's doc comment. It stops at a code block or a heading.
+// Each `///` line is its own doc attribute, and a `/** */` comment is one attribute with many lines.
+fn doc_text(attrs: &[Attribute]) -> String {
+    let mut lines = Vec::new();
+    for attr in attrs.iter().filter(|a| a.path().is_ident("doc")) {
+        if let Meta::NameValue(nv) = &attr.meta {
+            if let Expr::Lit(lit) = &nv.value {
+                if let Lit::Str(s) = &lit.lit {
+                    // split keeps the empty line that a bare `///` gives, which ends a paragraph.
+                    lines.extend(s.value().split('\n').map(|l| l.trim().to_string()));
+                }
+            }
+        }
+    }
+    let mut paragraphs: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for line in lines {
+        if line.starts_with("```") || line.starts_with('#') {
+            break;
+        }
+        if line.is_empty() {
+            if !current.is_empty() {
+                paragraphs.push(std::mem::take(&mut current));
+                if paragraphs.len() == 2 {
+                    break;
+                }
+            }
+            continue;
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(&line);
+    }
+    if !current.is_empty() && paragraphs.len() < 2 {
+        paragraphs.push(current);
+    }
+    paragraphs.join("\n\n")
 }
 
 // Every .rs file under `dir`, skipping tests, benches, examples, build scripts and build output.
@@ -118,22 +192,40 @@ fn is_pub(vis: &Visibility) -> bool {
     matches!(vis, Visibility::Public(_))
 }
 
-// Names that follow `pub struct` or `pub enum` in a macro's tokens.
-fn pub_types_in(tokens: TokenStream) -> Vec<syn::Ident> {
+// Names that follow `pub struct` or `pub enum` in a macro's tokens, each with the attributes in front of
+// it. The attributes hold its doc comment, because `///` lines reach a macro as `#[doc = "..."]` tokens.
+fn pub_types_in(tokens: TokenStream) -> Vec<(syn::Ident, Vec<Attribute>)> {
     let trees: Vec<TokenTree> = tokens.into_iter().collect();
     let mut out = Vec::new();
-    for (i, tree) in trees.iter().enumerate() {
-        match tree {
-            TokenTree::Group(g) => out.extend(pub_types_in(g.stream())),
+    let mut attrs = Vec::new();
+    let mut i = 0;
+    while i < trees.len() {
+        match &trees[i] {
+            TokenTree::Punct(p) if p.as_char() == '#' => {
+                if let Some(TokenTree::Group(g)) = trees.get(i + 1) {
+                    if g.delimiter() == Delimiter::Bracket {
+                        let attr: TokenStream = trees[i..i + 2].iter().cloned().collect();
+                        attrs.extend(Attribute::parse_outer.parse2(attr).unwrap_or_default());
+                        i += 2;
+                        continue;
+                    }
+                }
+            }
+            // A group is another item's body, so the attributes before it were that item's.
+            TokenTree::Group(g) => {
+                out.extend(pub_types_in(g.stream()));
+                attrs.clear();
+            }
             TokenTree::Ident(word) if word == "pub" => {
                 if let (Some(TokenTree::Ident(kind)), Some(TokenTree::Ident(name))) = (trees.get(i + 1), trees.get(i + 2)) {
                     if kind == "struct" || kind == "enum" {
-                        out.push(name.clone());
+                        out.push((name.clone(), std::mem::take(&mut attrs)));
                     }
                 }
             }
             _ => {}
         }
+        i += 1;
     }
     out
 }
@@ -142,30 +234,33 @@ impl Scan {
     fn items(&mut self, items: &[Item], module: &[String], outer: &Generic) {
         for item in items {
             match item {
-                Item::Fn(f) if is_pub(&f.vis) => self.signature(&f.sig, outer, None),
+                Item::Fn(f) if is_pub(&f.vis) => self.signature(&f.sig, outer, None, f.sig.ident.to_string()),
                 Item::Impl(imp) => self.impl_block(imp, outer),
                 Item::Trait(t) if is_pub(&t.vis) => {
-                    self.define(&t.ident, module);
+                    self.define(&t.ident, module, &t.attrs);
                     let g = with_generics(outer, &t.generics);
                     for ti in &t.items {
                         if let TraitItem::Fn(m) = ti {
-                            self.signature(&m.sig, &g, None);
+                            self.signature(&m.sig, &g, None, format!("{}::{}", t.ident, m.sig.ident));
                         }
                     }
                 }
                 Item::Struct(s) if is_pub(&s.vis) => {
-                    self.define(&s.ident, module);
+                    self.define(&s.ident, module, &s.attrs);
                     let g = with_generics(outer, &s.generics);
-                    for field in s.fields.iter().filter(|f| is_pub(&f.vis)) {
-                        self.add("field", render(&field.ty, &g));
+                    for (i, field) in s.fields.iter().enumerate().filter(|(_, f)| is_pub(&f.vis)) {
+                        let name = field.ident.as_ref().map_or(i.to_string(), |n| n.to_string());
+                        let site = self.site(field.ty.span(), format!("{}.{name}", s.ident));
+                        self.add("field", render(&field.ty, &g), &site);
                     }
                 }
                 Item::Enum(e) if is_pub(&e.vis) => {
-                    self.define(&e.ident, module);
+                    self.define(&e.ident, module, &e.attrs);
                     let g = with_generics(outer, &e.generics);
                     for variant in &e.variants {
+                        let site = self.site(variant.ident.span(), format!("{}::{}", e.ident, variant.ident));
                         for field in variant.fields.iter() {
-                            self.add("field", render(&field.ty, &g));
+                            self.add("field", render(&field.ty, &g), &site);
                         }
                     }
                 }
@@ -173,9 +268,10 @@ impl Scan {
                     let mut path = module.to_vec();
                     path.push(t.ident.to_string());
                     let target = render(&t.ty, &with_generics(outer, &t.generics)).unwrap_or_else(|| "_".to_string());
-                    self.aliases.insert((t.ident.to_string(), path.join("::"), target));
+                    let site = self.site(t.ident.span(), t.ident.to_string());
+                    self.aliases.entry((t.ident.to_string(), path.join("::"), target)).or_insert((site, doc_text(&t.attrs)));
                 }
-                Item::Union(u) if is_pub(&u.vis) => self.define(&u.ident, module),
+                Item::Union(u) if is_pub(&u.vis) => self.define(&u.ident, module, &u.attrs),
                 Item::Mod(m) => {
                     if let Some((_, inner)) = &m.content {
                         let mut path = module.to_vec();
@@ -185,8 +281,8 @@ impl Scan {
                 }
                 // Macros like pin_project! wrap type definitions, so look for `pub struct Name` in their tokens.
                 Item::Macro(m) => {
-                    for name in pub_types_in(m.mac.tokens.clone()) {
-                        self.define(&name, module);
+                    for (name, attrs) in pub_types_in(m.mac.tokens.clone()) {
+                        self.define(&name, module, &attrs);
                     }
                 }
                 _ => {}
@@ -221,14 +317,16 @@ impl Scan {
         for ii in &imp.items {
             if let ImplItem::Fn(m) = ii {
                 if is_pub(&m.vis) {
-                    self.signature(&m.sig, &g, Some(&base));
+                    self.signature(&m.sig, &g, Some(&base), format!("{base}::{}", m.sig.ident));
                 }
             }
         }
     }
 
     // `owner` is the type of an inherent impl, so a pub fn there that returns Self is a constructor.
-    fn signature(&mut self, sig: &Signature, outer: &Generic, owner: Option<&str>) {
+    // `item` names the fn where the page links to it, like SdkConfig::app_name.
+    fn signature(&mut self, sig: &Signature, outer: &Generic, owner: Option<&str>, item: String) {
+        let site = self.site(sig.ident.span(), item);
         let g = with_generics(outer, &sig.generics);
         let returns_self = match &sig.output {
             ReturnType::Type(_, ty) => owner.is_some_and(|o| names_type(unwrap_result(ty), o)),
@@ -244,24 +342,32 @@ impl Scan {
                         self.ctors.insert((o.to_string(), sig.ident.to_string(), t.clone()));
                     }
                 }
-                self.add("param", ty);
+                self.add("param", ty, &site);
             }
         }
         if let ReturnType::Type(_, ty) = &sig.output {
-            self.add("return", render(unwrap_result(ty), &g));
+            self.add("return", render(unwrap_result(ty), &g), &site);
         }
     }
 
-    fn add(&mut self, pos: &str, ty: Option<String>) {
+    fn site(&self, span: Span, item: String) -> Site {
+        Site { file: self.file.clone(), line: span.start().line, item }
+    }
+
+    // Counts one more `ty` at `pos`. The first one keeps its site.
+    fn add(&mut self, pos: &str, ty: Option<String>, site: &Site) {
         if let Some(ty) = ty {
-            *self.types.entry((pos.to_string(), ty)).or_default() += 1;
+            let entry = self.types.entry((pos.to_string(), ty)).or_insert((0, None));
+            entry.0 += 1;
+            entry.1.get_or_insert_with(|| site.clone());
         }
     }
 
-    fn define(&mut self, ident: &syn::Ident, module: &[String]) {
+    fn define(&mut self, ident: &syn::Ident, module: &[String], attrs: &[Attribute]) {
         let mut path = module.to_vec();
         path.push(ident.to_string());
-        self.defines.insert((ident.to_string(), path.join("::")));
+        let site = self.site(ident.span(), ident.to_string());
+        self.defines.entry((ident.to_string(), path.join("::"))).or_insert((site, doc_text(attrs)));
     }
 }
 

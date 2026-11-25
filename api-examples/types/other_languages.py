@@ -37,6 +37,117 @@ OPTIONS = {
 # For each language: held value -> (kind, [(type the library takes, conversion)]).
 # A conversion is code using x, or (setup lines, value) when it needs statements first. A pair uses k and v.
 # A conversion's cost is its number of calls (calls.py). When two conversions cost the same, the first wins.
+# What each held type is, in plain words, and its docs page. The page shows this when someone clicks a type.
+JAVA = "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/"
+JLS = "https://docs.oracle.com/javase/specs/jls/se17/html/"
+PY = "https://docs.python.org/3/library/"
+NET = "https://learn.microsoft.com/en-us/dotnet/"
+GO = "https://go.dev/ref/spec#"
+MDN = "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/"
+ABOUT = {
+    "java": {
+        "byte[]": ("An array of bytes.", JLS + "jls-10.html"),
+        "ByteBuffer": ("Bytes in a buffer that keeps track of where you are reading.", JAVA + "nio/ByteBuffer.html"),
+        "String": ("Text. It can't be changed.", JAVA + "lang/String.html"),
+        "String (base64)": ("Text that holds bytes written as base64, like a stored ciphertext.",
+                            JAVA + "util/Base64.html"),
+        "Path": ("A file path.", JAVA + "nio/file/Path.html"),
+        "InputStream": ("Bytes you read one piece at a time, like an open file.", JAVA + "io/InputStream.html"),
+        "Map<String, String>": ("A lookup table from text keys to text values.", JAVA + "util/Map.html"),
+        "(String, String)": ("Two strings, like one key and one value. Java has no pair type, so they are two "
+                             "variables.", None),
+        "List<String>": ("A list of strings.", JAVA + "util/List.html"),
+        "String[]": ("An array of strings.", JLS + "jls-10.html"),
+        "int": ("A whole number from -2^31 to 2^31 - 1.", JLS + "jls-4.html#jls-4.2.1"),
+        "long": ("A whole number from -2^63 to 2^63 - 1.", JLS + "jls-4.html#jls-4.2.1"),
+        "Duration": ("A span of time, like 5 seconds.", JAVA + "time/Duration.html"),
+        "KmsClient": ("The AWS SDK for Java client for AWS KMS.",
+                      "https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/services/kms/KmsClient.html"),
+        "Region": ("An AWS Region, like us-west-2.",
+                   "https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/regions/Region.html"),
+    },
+    "python": {
+        "bytes": ("Bytes. They can't be changed.", PY + "stdtypes.html#bytes"),
+        "bytearray": ("Bytes that can be changed.", PY + "stdtypes.html#bytearray"),
+        "str": ("Text.", PY + "stdtypes.html#text-sequence-type-str"),
+        "str (base64)": ("Text that holds bytes written as base64, like a stored ciphertext.", PY + "base64.html"),
+        "pathlib.Path": ("A file path.", PY + "pathlib.html"),
+        "BinaryIO": ("An open file, or another stream of bytes.", PY + "typing.html#typing.BinaryIO"),
+        "dict": ("A lookup table from keys to values.", PY + "stdtypes.html#dict"),
+        "(str, str)": ("Two strings, like one key and one value.", PY + "stdtypes.html#tuple"),
+        "list[str]": ("A list of strings.", PY + "stdtypes.html#list"),
+        "tuple[str, ...]": ("Strings in a row that can't be changed.", PY + "stdtypes.html#tuple"),
+        "int": ("A whole number of any size.", PY + "functions.html#int"),
+        "timedelta": ("A span of time, like 5 seconds.", PY + "datetime.html#timedelta-objects"),
+        "BaseClient": ("A boto3 client, like boto3.client(\"kms\").",
+                       "https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/kms.html"),
+        "boto3.Session": ("AWS settings and credentials that make clients.",
+                          "https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html"),
+    },
+    "dotnet": {
+        "byte[]": ("An array of bytes.", NET + "csharp/language-reference/builtin-types/arrays"),
+        "MemoryStream": ("Bytes in memory that you read like a stream.", NET + "api/system.io.memorystream"),
+        "string": ("Text. It can't be changed.", NET + "api/system.string"),
+        "string (base64)": ("Text that holds bytes written as base64, like a stored ciphertext.",
+                            NET + "api/system.convert.frombase64string"),
+        "FileInfo": ("A file on disk.", NET + "api/system.io.fileinfo"),
+        "Stream": ("Bytes you read one piece at a time, like an open file.", NET + "api/system.io.stream"),
+        "Dictionary<string, string>": ("A lookup table from text keys to text values.",
+                                       NET + "api/system.collections.generic.dictionary-2"),
+        "(string, string)": ("Two strings, like one key and one value.",
+                             NET + "csharp/language-reference/builtin-types/value-tuples"),
+        "List<string>": ("A list of strings.", NET + "api/system.collections.generic.list-1"),
+        "string[]": ("An array of strings.", NET + "csharp/language-reference/builtin-types/arrays"),
+        "int": ("A whole number from -2^31 to 2^31 - 1.", NET + "api/system.int32"),
+        "long": ("A whole number from -2^63 to 2^63 - 1.", NET + "api/system.int64"),
+        "TimeSpan": ("A span of time, like 5 seconds.", NET + "api/system.timespan"),
+        "AmazonKeyManagementServiceClient": (
+            "The AWS SDK for .NET client for AWS KMS.",
+            "https://docs.aws.amazon.com/sdkfornet/v3/apidocs/items/KeyManagementService/TKeyManagementServiceClient.html"),
+        "AmazonKeyManagementServiceConfig": (
+            "Settings that build a KMS client, like the Region.",
+            "https://docs.aws.amazon.com/sdkfornet/v3/apidocs/items/KeyManagementService/TKeyManagementServiceConfig.html"),
+    },
+    "go": {
+        "[]byte": ("A slice of bytes.", GO + "Slice_types"),
+        "string": ("Text. It can't be changed.", GO + "String_types"),
+        "string (base64)": ("Text that holds bytes written as base64, like a stored ciphertext.",
+                            "https://pkg.go.dev/encoding/base64"),
+        "string (path)": ("Text that holds a file path.", "https://pkg.go.dev/os#ReadFile"),
+        "io.Reader": ("Bytes you read one piece at a time, like an open file.", "https://pkg.go.dev/io#Reader"),
+        "map[string]string": ("A lookup table from text keys to text values.", GO + "Map_types"),
+        "(string, string)": ("Two strings, like one key and one value. Go has no pair type, so they are two "
+                             "variables.", None),
+        "[]string": ("A slice of strings.", GO + "Slice_types"),
+        "int": ("A whole number, 64 bits on most machines.", GO + "Numeric_types"),
+        "int64": ("A whole number from -2^63 to 2^63 - 1.", GO + "Numeric_types"),
+        "time.Duration": ("A span of time, like 5 seconds.", "https://pkg.go.dev/time#Duration"),
+        "*kms.Client": ("The AWS SDK for Go client for AWS KMS.",
+                        "https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/kms#Client"),
+        "aws.Config": ("AWS settings that build clients, like the Region and credentials.",
+                       "https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/aws#Config"),
+    },
+    "javascript": {
+        "Uint8Array": ("An array of bytes.", MDN + "Uint8Array"),
+        "Buffer": ("Node.js bytes. A Buffer is also a Uint8Array.", "https://nodejs.org/api/buffer.html"),
+        "string": ("Text.", MDN + "String"),
+        "string (base64)": ("Text that holds bytes written as base64, like a stored ciphertext.",
+                            "https://nodejs.org/api/buffer.html#buffers-and-character-encodings"),
+        "string (path)": ("Text that holds a file path.", "https://nodejs.org/api/fs.html"),
+        "Readable": ("A Node.js stream of bytes you read piece by piece, like an open file.",
+                     "https://nodejs.org/api/stream.html#readable-streams"),
+        "Record<string, string>": ("An object from text keys to text values.",
+                                   "https://www.typescriptlang.org/docs/handbook/utility-types.html#recordkeys-type"),
+        "[string, string]": ("Two strings, like one key and one value.",
+                             "https://www.typescriptlang.org/docs/handbook/2/objects.html#tuple-types"),
+        "string[]": ("An array of strings.", MDN + "Array"),
+        "number": ("A number. Whole numbers are exact up to 2^53 - 1.", MDN + "Number"),
+        "KMSClient": ("The AWS SDK for JavaScript client for AWS KMS.",
+                      "https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kms/"),
+        "KMSClientConfig": ("Settings that build a KMS client, like the Region.",
+                            "https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kms/"),
+    },
+}
 RETURN_ON_ERROR = "if err != nil { return err }"
 HELD = {
     "java": {
@@ -211,6 +322,10 @@ def main():
             others.setdefault(key, {})[lang] = sorted(rows, key=lambda r: (r["calls"] is None, r["calls"] or 0, r["type"]))
     page = json.loads(PAGE.read_text())
     page["others"] = others
+    about = page.setdefault("about", {})
+    for lang, held in HELD.items():
+        about[lang] = {label: {"parts": [{"name": label, "text": ABOUT[lang][label][0], "url": ABOUT[lang][label][1]}]}
+                       for label in held}
     # Where each option's customer calls are in usage.json: its API and its Smithy option name.
     page["usage_keys"] = {key: [f"{key.split('/')[0]}|{api}", row] for key, (api, row, _) in OPTIONS.items()}
     page["others_note"] = ("Java, Python, .NET, Go, JS: calls written from each release's signatures, not compiled. "

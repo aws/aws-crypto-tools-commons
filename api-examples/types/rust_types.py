@@ -211,6 +211,8 @@ class Evidence:
     def __init__(self, impls, definers, aliases):
         found = defaultdict(lambda: defaultdict(set))  # kind -> name -> crates with the impl
         deref = defaultdict(dict)  # wrapper name -> crate -> Deref target, like "_" for Zeroizing<_>
+        # name -> (crate, trait) for each impl that decided its kind, so the page can say why it is listed.
+        self.traits = defaultdict(set)
         for crate, trait, ty in impls:
             base = ty.split("<")[0]
             if trait in ("AsRef<[u8]>", "Deref<Target = [u8]>", "Borrow<[u8]>"):
@@ -225,6 +227,9 @@ class Evidence:
                 found["made from bytes"][base].add(crate)
             elif trait in ("Deref<Target = _>", "Deref<Target = [_]>") and "<" in ty:
                 deref[base][crate] = trait[len("Deref<Target = "):-1]
+            else:
+                continue
+            self.traits[base].add((crate, trait))
         self.holds = {kind: {name for name, crates in names.items() if crates >= definers.get(name, crates)}
                       for kind, names in found.items()}
         self.holds = defaultdict(set, self.holds)
@@ -237,6 +242,24 @@ class Evidence:
             self.holds.setdefault(kind, set())
         for kind, names in list(self.holds.items()):
             names -= {n for n in names if any(not is_kind(t, kind, self) for t in aliases.get(n, ()))}
+
+    def why(self, t, crate_names):
+        """Which impl made a third-party type in `t` count, like "aws-types implements AsRef<str> for AppName".
+
+        crate_names maps a crate's code name, like aws_types, to its crates.io name. None for std types.
+        """
+        for name in names_in(t):
+            counted = any(name in names for names in self.holds.values()) or name in self.deref
+            if not counted or not self.traits[name]:
+                continue
+            crate, trait = sorted(self.traits[name])[0]
+            crate = crate_names.get(crate, crate)
+            if trait.startswith("Deref<Target = _"):
+                return f"{crate} implements Deref for {name}, so a {name} reads as the value inside it."
+            if name in self.holds["stream"]:
+                return f"{crate} implements {trait} for {name}, but nothing that lends its bytes, so it is a stream."
+            return f"{crate} implements {trait} for {name}."
+        return None
 
     def wraps(self, text, kind):
         """True for a wrapper like Zeroizing<Vec<u8>> whose Deref target is the kind."""
@@ -327,6 +350,27 @@ def names_in(t):
     return [n for n in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", t) if n not in PRELUDE and n not in STD_PATHS]
 
 
+def summary(doc):
+    """The part of a doc comment the page shows: the first paragraph, plus the next one when the first is short.
+
+    A markdown link keeps only its text, so [`Region`](crate::Region) becomes `Region`.
+    """
+    paragraphs = [p.strip() for p in doc.split("\n\n") if p.strip()]
+    if not paragraphs:
+        return ""
+    text = paragraphs[0]
+    if len(text) < 60 and len(paragraphs) > 1:
+        text = text.rstrip(".") + ". " + paragraphs[1]
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\[[^\]]*\]", r"\1", text)
+    text = re.sub(r"\[(`[^`]+`)\]", r"\1", text)
+    if len(text) > 300:
+        cut = text[:300]
+        end = cut.rfind(". ")
+        text = cut[:end + 1] if end > 0 else cut.rsplit(" ", 1)[0] + " ..."
+    return text
+
+
 def build():
     lock_text = LOCK.read_text()
     lock = json.loads(lock_text)
@@ -338,6 +382,12 @@ def build():
     aliases = defaultdict(set)
     impls = set()
     downloads = {c["name"]: c["downloads"] for c in lock["crates"]}
+    versions = {c["name"]: c["version"] for c in lock["crates"]}
+    crate_names = {c["name"].replace("-", "_"): c["name"] for c in lock["crates"]}
+    # (type, crate, pos) -> the first place the crate has that type there, for the page's example links.
+    sites = {}
+    # name -> where each crate defines it, with its doc comment.
+    docs = defaultdict(list)
     parse_errors = 0
     for crate in lock["crates"]:
         ident = crate["name"].replace("-", "_")
@@ -346,8 +396,12 @@ def build():
                 entry = seen[row["type"]]
                 entry["takes" if row["pos"] == "param" else "held"].add(crate["name"])
                 entry[row["pos"]] += row["count"]
+                sites[(row["type"], crate["name"], row["pos"])] = {k: row[k] for k in ("item", "file", "line")}
             elif "defines" in row:
                 defines[row["defines"]].update({f"{ident}::{row['defines']}", row["path"]})
+                docs[row["defines"]].append({"crate": crate["name"], "version": crate["version"], "path": row["path"],
+                                             "doc": summary(row.get("doc", "")), "file": row["file"],
+                                             "line": row["line"]})
                 if "alias" in row:
                     aliases[row["defines"]].add(row["alias"])
                 else:
@@ -409,6 +463,14 @@ def build():
         for t in dict.fromkeys(listed):
             row = entry(t, "held")
             row["kept"] = chosen.get(t)
+            if row["kept"]:
+                # One place in each named crate that hands the type out, so a reader can see how it is used.
+                row["examples"] = [next({"crate": c, "version": versions[c], "pos": pos, **sites[(t, c, pos)]}
+                                        for pos in ("return", "field") if (t, c, pos) in sites)
+                                   for c in row["seen_in"]]
+                why = ev.why(t, crate_names)
+                if why:
+                    row["why"] = why
             rows.append(row)
         kinds[kind] = rows
         kept.extend(chosen)
@@ -437,6 +499,8 @@ def build():
         "accepts": {k: [entry(t, "takes") for t in sorted(v, key=lambda t: (-len(seen[t]["takes"] & scanned), t))[:LISTED]]
                     for k, v in sorted(accepts.items())},
         "paths": paths,
+        # Where each name in a kept type is defined, with the start of its doc comment.
+        "docs": {name: docs[name] for name in paths},
     }
     OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
     print(f"read {len(lock['crates'])} crates, {len(seen)} types, {parse_errors} files failed to parse")

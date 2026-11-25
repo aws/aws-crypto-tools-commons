@@ -3436,5 +3436,2377 @@
     "runs": "api-examples/types/rust_runs.rs",
     "check": ".github/workflows/api-examples-types.yml"
   },
-  "rustc": "1.99.1"
+  "rustc": "1.99.1",
+  "about": {
+    "rust": {
+      "&Path": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "Path",
+            "text": "A file path. You usually borrow it, as &Path.",
+            "url": "https://doc.rust-lang.org/std/path/struct.Path.html"
+          }
+        ],
+        "held": {
+          "text": "3 of the 100 most-downloaded crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "Attribute::path",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/attr.rs#190"
+            },
+            {
+              "crate": "cc",
+              "item": "CompileCommand::directory",
+              "pos": "return",
+              "url": "https://docs.rs/crate/cc/1.11.3/source/src/logger.rs#134"
+            },
+            {
+              "crate": "tempfile",
+              "item": "TempDir::path",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tempfile/3.27.0/source/src/dir/mod.rs#379"
+            }
+          ]
+        }
+      },
+      "&SdkConfig": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "SdkConfig",
+            "text": "AWS Shared Configuration",
+            "from": "aws-types 1.7.0",
+            "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/sdk_config.rs#117"
+          }
+        ]
+      },
+      "&String": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "1 of the 100 most-downloaded crates and 2 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "serde_json",
+              "item": "Entry::key",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/map.rs#667"
+            },
+            {
+              "crate": "aws-sdk-s3",
+              "item": "AnalyticsFilter::as_prefix",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/types/_analytics_filter.rs#39"
+            },
+            {
+              "crate": "aws-sdk-dynamodb",
+              "item": "AttributeValue::as_n",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/types/_attribute_value.rs#119"
+            }
+          ]
+        }
+      },
+      "&[&str]": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "[ ]",
+            "text": "Several values in a row, like part of a list.",
+            "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ],
+        "held": {
+          "text": "1 of the 100 most-downloaded crates and 6 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "serde",
+              "item": "AdjacentlyTaggedEnumVariantSeed.variants",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/private/de.rs#3451"
+            },
+            {
+              "crate": "aws-sdk-sts",
+              "item": "WebIdentityTokenSubjectModeType::values",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/types/_web_identity_token_subject_mode_type.rs#79"
+            },
+            {
+              "crate": "aws-sdk-ssooidc",
+              "item": "AccessDeniedExceptionReason::values",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-ssooidc/1.124.0/source/src/types/_access_denied_exception_reason.rs#74"
+            }
+          ]
+        }
+      },
+      "&[String]": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "[ ]",
+            "text": "Several values in a row, like part of a list.",
+            "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "1 of the 100 most-downloaded crates and 6 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "regex",
+              "item": "RegexSet::patterns",
+              "pos": "return",
+              "url": "https://docs.rs/crate/regex/1.13.2/source/src/regexset/bytes.rs#448"
+            },
+            {
+              "crate": "aws-sdk-sts",
+              "item": "AssumeRoleInput::transitive_tag_keys",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/operation/assume_role/_assume_role_input.rs#108"
+            },
+            {
+              "crate": "aws-sdk-ssooidc",
+              "item": "CreateTokenInput::scope",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-ssooidc/1.124.0/source/src/operation/create_token/_create_token_input.rs#61"
+            }
+          ]
+        }
+      },
+      "&[u8]": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "[ ]",
+            "text": "Several values in a row, like part of a list.",
+            "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+          },
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "19 of the 100 most-downloaded crates, 3 of the 26 AWS SDK crates and 20 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "memchr",
+              "item": "Imp::as_slice",
+              "pos": "return",
+              "url": "https://docs.rs/crate/memchr/2.8.3/source/src/cow.rs#90"
+            },
+            {
+              "crate": "serde",
+              "item": "Unexpected::Bytes",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/de/mod.rs#361"
+            },
+            {
+              "crate": "regex-syntax",
+              "item": "Literal::as_bytes",
+              "pos": "return",
+              "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/literal.rs#2064"
+            }
+          ]
+        }
+      },
+      "&kms::Client": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "kms::Client",
+            "text": "Client for AWS Key Management Service. Client for invoking operations on AWS Key Management Service. Each operation on AWS Key Management Service is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+            "from": "aws-sdk-kms 1.133.0",
+            "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/client.rs#78"
+          }
+        ]
+      },
+      "&str": {
+        "parts": [
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ],
+        "held": {
+          "text": "26 of the 100 most-downloaded crates, 20 of the 26 AWS SDK crates and 14 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "LitStr::suffix",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#274"
+            },
+            {
+              "crate": "bitflags",
+              "item": "Flag::name",
+              "pos": "return",
+              "url": "https://docs.rs/crate/bitflags/2.13.2/source/src/traits.rs#35"
+            },
+            {
+              "crate": "base64",
+              "item": "Alphabet::as_str",
+              "pos": "return",
+              "url": "https://docs.rs/crate/base64/0.23.1/source/src/alphabet.rs#137"
+            }
+          ]
+        }
+      },
+      "(&String, &String)": {
+        "parts": [
+          {
+            "name": "( , )",
+            "text": "Two values side by side.",
+            "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ]
+      },
+      "(&str, &str)": {
+        "parts": [
+          {
+            "name": "( , )",
+            "text": "Two values side by side.",
+            "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ]
+      },
+      "(Cow<str>, Cow<str>)": {
+        "parts": [
+          {
+            "name": "( , )",
+            "text": "Two values side by side.",
+            "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+          },
+          {
+            "name": "Cow",
+            "text": "Either borrows a value or owns it. It copies the value only if you change it.",
+            "url": "https://doc.rust-lang.org/std/borrow/enum.Cow.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ]
+      },
+      "(String, String)": {
+        "parts": [
+          {
+            "name": "( , )",
+            "text": "Two values side by side.",
+            "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ]
+      },
+      "(Zeroizing<String>, Zeroizing<String>)": {
+        "parts": [
+          {
+            "name": "( , )",
+            "text": "Two values side by side.",
+            "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+          },
+          {
+            "name": "Zeroizing",
+            "text": "`Zeroizing` is a wrapper for any `Z: Zeroize` type which implements a `Drop` handler which zeroizes dropped values.",
+            "from": "zeroize 1.9.2",
+            "url": "https://docs.rs/crate/zeroize/1.9.2/source/src/lib.rs#584"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ]
+      },
+      "(char, char)": {
+        "parts": [
+          {
+            "name": "( , )",
+            "text": "Two values side by side.",
+            "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+          },
+          {
+            "name": "char",
+            "text": "One character, like 'a'. Not a whole string.",
+            "url": "https://doc.rust-lang.org/std/primitive.char.html"
+          }
+        ]
+      },
+      "Arc<kms::Client>": {
+        "parts": [
+          {
+            "name": "Arc",
+            "text": "A value that many owners share, even across threads. They can read it but not change it.",
+            "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+          },
+          {
+            "name": "kms::Client",
+            "text": "Client for AWS Key Management Service. Client for invoking operations on AWS Key Management Service. Each operation on AWS Key Management Service is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+            "from": "aws-sdk-kms 1.133.0",
+            "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/client.rs#78"
+          }
+        ]
+      },
+      "Blob": {
+        "parts": [
+          {
+            "name": "Blob",
+            "text": "Binary Blob Type. Blobs represent protocol-agnostic binary content.",
+            "from": "aws-smithy-types 1.9.5",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#18"
+          }
+        ],
+        "held": {
+          "text": "2 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-smithy-types implements AsRef<[u8]> for Blob.",
+          "examples": [
+            {
+              "crate": "aws-smithy-schema",
+              "item": "ShapeDeserializer::read_blob",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-schema/1.2.0/source/src/schema/serde/deserializer.rs#133"
+            },
+            {
+              "crate": "aws-sdk-dynamodb",
+              "item": "AttributeValue::B",
+              "pos": "field",
+              "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/types/_attribute_value.rs#11"
+            }
+          ]
+        }
+      },
+      "Box<[u8]>": {
+        "parts": [
+          {
+            "name": "Box",
+            "text": "Owns one value, kept in its own spot in memory.",
+            "url": "https://doc.rust-lang.org/std/boxed/struct.Box.html"
+          },
+          {
+            "name": "[ ]",
+            "text": "Several values in a row, like part of a list.",
+            "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+          },
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "3 of the 100 most-downloaded crates and 6 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "regex-syntax",
+              "item": "Literal.0",
+              "pos": "field",
+              "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/mod.rs#801"
+            },
+            {
+              "crate": "digest",
+              "item": "DynDigest::finalize_reset",
+              "pos": "return",
+              "url": "https://docs.rs/crate/digest/0.11.3/source/src/digest.rs#142"
+            },
+            {
+              "crate": "time",
+              "item": "OwnedFormatItem::Literal",
+              "pos": "field",
+              "url": "https://docs.rs/crate/time/0.3.55/source/src/format_description/owned_format_item.rs#23"
+            }
+          ]
+        }
+      },
+      "ByteStream": {
+        "parts": [
+          {
+            "name": "ByteStream",
+            "text": "Stream of binary data. `ByteStream` wraps a stream of binary data for ease of use.",
+            "from": "aws-smithy-types 1.9.5",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/byte_stream.rs#266"
+          }
+        ],
+        "held": {
+          "text": "2 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-smithy-types implements From<Bytes> for ByteStream, but nothing that lends its bytes, so it is a stream.",
+          "examples": [
+            {
+              "crate": "aws-smithy-types",
+              "item": "FsBuilder::build",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/byte_stream/bytestream_util.rs#181"
+            },
+            {
+              "crate": "aws-sdk-s3",
+              "item": "de_annotation_payload_payload",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/protocol_serde/shape_get_object_annotation_output.rs#2"
+            }
+          ]
+        }
+      },
+      "Bytes": {
+        "parts": [
+          {
+            "name": "Bytes",
+            "text": "A cheaply cloneable and sliceable chunk of contiguous memory.",
+            "from": "bytes 1.12.2",
+            "url": "https://docs.rs/crate/bytes/1.12.2/source/src/bytes.rs#101"
+          }
+        ],
+        "held": {
+          "text": "2 of the 100 most-downloaded crates and 4 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "bytes implements AsRef<[u8]> for Bytes.",
+          "examples": [
+            {
+              "crate": "bytes",
+              "item": "Buf::copy_to_bytes",
+              "pos": "return",
+              "url": "https://docs.rs/crate/bytes/1.12.2/source/src/buf/buf_impl.rs#2364"
+            },
+            {
+              "crate": "hyper",
+              "item": "Parts.read_buf",
+              "pos": "field",
+              "url": "https://docs.rs/crate/hyper/1.13.0/source/src/client/conn/http1.rs#44"
+            },
+            {
+              "crate": "aws-smithy-types",
+              "item": "Blob::into_bytes",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#65"
+            }
+          ]
+        }
+      },
+      "Cow<str>": {
+        "parts": [
+          {
+            "name": "Cow",
+            "text": "Either borrows a value or owns it. It copies the value only if you change it.",
+            "url": "https://doc.rust-lang.org/std/borrow/enum.Cow.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ],
+        "held": {
+          "text": "8 of the 100 most-downloaded crates, 5 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "serde",
+              "item": "from_utf8_lossy",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/string.rs#5"
+            },
+            {
+              "crate": "rustix",
+              "item": "Arg::to_string_lossy",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rustix/1.1.6/source/src/path/arg.rs#75"
+            },
+            {
+              "crate": "regex",
+              "item": "Regex::replace",
+              "pos": "return",
+              "url": "https://docs.rs/crate/regex/1.13.2/source/src/regex/string.rs#791"
+            }
+          ]
+        }
+      },
+      "Duration": {
+        "parts": [
+          {
+            "name": "Duration",
+            "text": "A span of time, like 5 seconds.",
+            "url": "https://doc.rust-lang.org/std/time/struct.Duration.html"
+          }
+        ],
+        "held": {
+          "text": "3 of the 100 most-downloaded crates, 7 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "socket2",
+              "item": "Socket::tcp_keepalive_time",
+              "pos": "return",
+              "url": "https://docs.rs/crate/socket2/0.6.5/source/src/socket.rs#2247"
+            },
+            {
+              "crate": "rustix",
+              "item": "tcp_keepidle",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rustix/1.1.6/source/src/net/sockopt.rs#1513"
+            },
+            {
+              "crate": "tokio",
+              "item": "Instant::duration_since",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tokio/1.54.1/source/src/time/instant.rs#64"
+            }
+          ]
+        }
+      },
+      "File": {
+        "parts": [
+          {
+            "name": "File",
+            "text": "An open file.",
+            "url": "https://doc.rust-lang.org/std/fs/struct.File.html"
+          }
+        ],
+        "held": {
+          "text": "3 of the 100 most-downloaded crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "Fold::fold_file",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/gen/fold.rs#368"
+            },
+            {
+              "crate": "tokio",
+              "item": "File::open",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tokio/1.54.1/source/src/fs/file.rs#157"
+            },
+            {
+              "crate": "tempfile",
+              "item": "create_named",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tempfile/3.27.0/source/src/file/imp/other.rs#12"
+            }
+          ]
+        }
+      },
+      "HashMap<String, String>": {
+        "parts": [
+          {
+            "name": "HashMap",
+            "text": "A lookup table from keys to values.",
+            "url": "https://doc.rust-lang.org/std/collections/struct.HashMap.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "2 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "aws-sdk-sts",
+              "item": "de_transaction_context_identity_provider_map_type",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/protocol_serde/shape_transaction_context_identity_provider_map_type.rs#2"
+            },
+            {
+              "crate": "aws-smithy-schema",
+              "item": "ShapeDeserializer::read_string_string_map",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-schema/1.2.0/source/src/schema/serde/deserializer.rs#274"
+            }
+          ]
+        }
+      },
+      "Option<&AppName>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "AppName",
+            "text": "App name that can be configured with an AWS SDK client to become part of the user agent string.",
+            "from": "aws-types 1.7.0",
+            "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/app_name.rs#28"
+          }
+        ],
+        "held": {
+          "text": "8 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-types implements AsRef<str> for AppName.",
+          "examples": [
+            {
+              "crate": "aws-types",
+              "item": "SdkConfig::app_name",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/sdk_config.rs#1106"
+            },
+            {
+              "crate": "aws-sdk-sts",
+              "item": "Config::app_name",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/config.rs#116"
+            },
+            {
+              "crate": "aws-sdk-sso",
+              "item": "Config::app_name",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sso/1.122.0/source/src/config.rs#116"
+            }
+          ]
+        }
+      },
+      "Option<&Blob>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "Blob",
+            "text": "Binary Blob Type. Blobs represent protocol-agnostic binary content.",
+            "from": "aws-smithy-types 1.9.5",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#18"
+          }
+        ],
+        "held": {
+          "text": "3 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-smithy-types implements AsRef<[u8]> for Blob.",
+          "examples": [
+            {
+              "crate": "aws-sdk-s3",
+              "item": "RecordsEvent::payload",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/types/_records_event.rs#12"
+            },
+            {
+              "crate": "aws-sdk-secretsmanager",
+              "item": "CreateSecretInput::secret_binary",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-secretsmanager/1.129.0/source/src/operation/create_secret/_create_secret_input.rs#97"
+            },
+            {
+              "crate": "aws-sdk-kms",
+              "item": "DecapsulateInput::shared_secret_ciphertext_blob",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/operation/decapsulate/_decapsulate_input.rs#51"
+            }
+          ]
+        }
+      },
+      "Option<&SigningRegionSet>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "SigningRegionSet",
+            "text": "Generally, user code will not need to interact with `SigningRegionSet`. See `Region`.",
+            "from": "aws-types 1.7.0",
+            "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/region.rs#94"
+          }
+        ],
+        "held": {
+          "text": "3 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-types implements AsRef<str> for SigningRegionSet.",
+          "examples": [
+            {
+              "crate": "aws-types",
+              "item": "SdkConfig::sigv4a_signing_region_set",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/sdk_config.rs#1061"
+            },
+            {
+              "crate": "aws-sdk-sts",
+              "item": "Config::sigv4a_signing_region_set",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/config.rs#157"
+            },
+            {
+              "crate": "aws-sdk-s3",
+              "item": "Config::sigv4a_signing_region_set",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/config.rs#167"
+            }
+          ]
+        }
+      },
+      "Option<&[u8]>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "[ ]",
+            "text": "Several values in a row, like part of a list.",
+            "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+          },
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "5 of the 100 most-downloaded crates, 3 of the 26 AWS SDK crates and 6 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "regex-syntax",
+              "item": "Seq::longest_common_prefix",
+              "pos": "return",
+              "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/literal.rs#1624"
+            },
+            {
+              "crate": "socket2",
+              "item": "SockAddr::as_abstract_namespace",
+              "pos": "return",
+              "url": "https://docs.rs/crate/socket2/0.6.5/source/src/sys/unix.rs#925"
+            },
+            {
+              "crate": "rustix",
+              "item": "SocketAddrUnix::path_bytes",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rustix/1.1.6/source/src/backend/libc/net/addr.rs#174"
+            }
+          ]
+        }
+      },
+      "Option<&str>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "&",
+            "text": "Borrowed. You can read it, but something else owns it.",
+            "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ],
+        "held": {
+          "text": "13 of the 100 most-downloaded crates, 17 of the 26 AWS SDK crates and 4 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "serde",
+              "item": "content_as_str",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/private/de.rs#222"
+            },
+            {
+              "crate": "serde_derive",
+              "item": "Container::expecting",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde_derive/1.0.229/source/src/internals/attr.rs#613"
+            },
+            {
+              "crate": "serde_json",
+              "item": "Value::as_str",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/value/mod.rs#492"
+            }
+          ]
+        }
+      },
+      "Option<Blob>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "Blob",
+            "text": "Binary Blob Type. Blobs represent protocol-agnostic binary content.",
+            "from": "aws-smithy-types 1.9.5",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#18"
+          }
+        ],
+        "held": {
+          "text": "4 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-smithy-types implements AsRef<[u8]> for Blob.",
+          "examples": [
+            {
+              "crate": "aws-smithy-json",
+              "item": "expect_blob_or_null",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-json/0.65.1/source/src/deserialize/token.rs#245"
+            },
+            {
+              "crate": "aws-sdk-s3",
+              "item": "RecordsEvent.payload",
+              "pos": "field",
+              "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/types/_records_event.rs#8"
+            },
+            {
+              "crate": "aws-sdk-secretsmanager",
+              "item": "CreateSecretInput.secret_binary",
+              "pos": "field",
+              "url": "https://docs.rs/crate/aws-sdk-secretsmanager/1.129.0/source/src/operation/create_secret/_create_secret_input.rs#36"
+            }
+          ]
+        }
+      },
+      "Option<Cow<str>>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "Cow",
+            "text": "Either borrows a value or owns it. It copies the value only if you change it.",
+            "url": "https://doc.rust-lang.org/std/borrow/enum.Cow.html"
+          },
+          {
+            "name": "str",
+            "text": "Text. You usually borrow it, as &str.",
+            "url": "https://doc.rust-lang.org/std/primitive.str.html"
+          }
+        ],
+        "held": {
+          "text": "2 of the 100 most-downloaded crates and 2 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "log",
+              "item": "Value::to_cow_str",
+              "pos": "return",
+              "url": "https://docs.rs/crate/log/0.4.35/source/src/kv/value.rs#468"
+            },
+            {
+              "crate": "regex",
+              "item": "Replacer::no_expansion",
+              "pos": "return",
+              "url": "https://docs.rs/crate/regex/1.13.2/source/src/regex/string.rs#2518"
+            },
+            {
+              "crate": "aws-smithy-runtime-api",
+              "item": "ConnectorMetadata::version",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-runtime-api/1.22.1/source/src/client/connector_metadata.rs#36"
+            }
+          ]
+        }
+      },
+      "Option<String>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "5 of the 100 most-downloaded crates, 12 of the 26 AWS SDK crates and 2 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "proc-macro2",
+              "item": "Span::source_text",
+              "pos": "return",
+              "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/lib.rs#564"
+            },
+            {
+              "crate": "serde_json",
+              "item": "OwnedRawDeserializer.raw_value",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/raw.rs#532"
+            },
+            {
+              "crate": "tokio",
+              "item": "Lines::next_line",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tokio/1.54.1/source/src/io/util/lines.rs#65"
+            }
+          ]
+        }
+      },
+      "Option<Vec<String>>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "Vec",
+            "text": "A list that can grow. It owns its items.",
+            "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "1 of the 100 most-downloaded crates and 6 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "shlex",
+              "item": "split",
+              "pos": "return",
+              "url": "https://docs.rs/crate/shlex/2.0.1/source/src/lib.rs#100"
+            },
+            {
+              "crate": "aws-sdk-sts",
+              "item": "AssumeRoleInput.transitive_tag_keys",
+              "pos": "field",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/operation/assume_role/_assume_role_input.rs#37"
+            },
+            {
+              "crate": "aws-sdk-ssooidc",
+              "item": "CreateTokenInput.scope",
+              "pos": "field",
+              "url": "https://docs.rs/crate/aws-sdk-ssooidc/1.124.0/source/src/operation/create_token/_create_token_input.rs#23"
+            }
+          ]
+        }
+      },
+      "Option<Vec<u8>>": {
+        "parts": [
+          {
+            "name": "Option",
+            "text": "A value, or nothing.",
+            "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+          },
+          {
+            "name": "Vec",
+            "text": "A list that can grow. It owns its items.",
+            "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+          },
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "4 of the 100 most-downloaded crates and 5 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "regex-syntax",
+              "item": "Class::literal",
+              "pos": "return",
+              "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/mod.rs#1020"
+            },
+            {
+              "crate": "socket2",
+              "item": "Socket::device",
+              "pos": "return",
+              "url": "https://docs.rs/crate/socket2/0.6.5/source/src/sys/unix.rs#1936"
+            },
+            {
+              "crate": "tokio",
+              "item": "Split::next_segment",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tokio/1.54.1/source/src/io/util/split.rs#61"
+            }
+          ]
+        }
+      },
+      "PathBuf": {
+        "parts": [
+          {
+            "name": "PathBuf",
+            "text": "A file path that you own.",
+            "url": "https://doc.rust-lang.org/std/path/struct.PathBuf.html"
+          }
+        ],
+        "held": {
+          "text": "4 of the 100 most-downloaded crates, 1 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "cc",
+              "item": "Build::create_archive",
+              "pos": "return",
+              "url": "https://docs.rs/crate/cc/1.11.3/source/src/lib.rs#2504"
+            },
+            {
+              "crate": "tokio",
+              "item": "canonicalize",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tokio/1.54.1/source/src/fs/canonicalize.rs#46"
+            },
+            {
+              "crate": "url",
+              "item": "Url::to_file_path",
+              "pos": "return",
+              "url": "https://docs.rs/crate/url/2.5.9/source/src/lib.rs#2725"
+            }
+          ]
+        }
+      },
+      "SdkBody": {
+        "parts": [
+          {
+            "name": "SdkBody",
+            "text": "SdkBody type. This is the Body used for dispatching all HTTP Requests. For handling responses, the type of the body will be controlled by the HTTP stack.",
+            "from": "aws-smithy-types 1.9.5",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/body.rs#73"
+          }
+        ],
+        "held": {
+          "text": "6 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": "aws-smithy-types implements From<&[u8]> for SdkBody, but nothing that lends its bytes, so it is a stream.",
+          "examples": [
+            {
+              "crate": "aws-smithy-http",
+              "item": "FuturesStreamCompatByteStream::into_inner",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-http/0.64.3/source/src/futures_stream_adapter.rs#30"
+            },
+            {
+              "crate": "aws-smithy-types",
+              "item": "SdkBody::map",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/body.rs#437"
+            },
+            {
+              "crate": "aws-sdk-sts",
+              "item": "ser_assume_role_input_input_input",
+              "pos": "return",
+              "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/protocol_serde/shape_assume_role_input.rs#2"
+            }
+          ]
+        }
+      },
+      "SdkConfig": {
+        "parts": [
+          {
+            "name": "SdkConfig",
+            "text": "AWS Shared Configuration",
+            "from": "aws-types 1.7.0",
+            "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/sdk_config.rs#117"
+          }
+        ]
+      },
+      "String": {
+        "parts": [
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "21 of the 100 most-downloaded crates, 15 of the 26 AWS SDK crates and 13 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "LitStr::value",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#152"
+            },
+            {
+              "crate": "rand",
+              "item": "SampleString::sample_string",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rand/0.10.4/source/src/distr/distribution.rs#200"
+            },
+            {
+              "crate": "base64",
+              "item": "SinkTestHelper::encode_to_string",
+              "pos": "return",
+              "url": "https://docs.rs/crate/base64/0.23.1/source/src/chunked_encoder.rs#154"
+            }
+          ]
+        }
+      },
+      "TcpStream": {
+        "parts": [
+          {
+            "name": "TcpStream",
+            "text": "An open network connection.",
+            "url": "https://doc.rust-lang.org/std/net/struct.TcpStream.html"
+          }
+        ],
+        "held": {
+          "text": "2 of the 100 most-downloaded crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "mio",
+              "item": "TcpStream::connect",
+              "pos": "return",
+              "url": "https://docs.rs/crate/mio/1.2.5/source/src/net/tcp/stream.rs#91"
+            },
+            {
+              "crate": "tokio",
+              "item": "TcpSocket::connect",
+              "pos": "return",
+              "url": "https://docs.rs/crate/tokio/1.54.1/source/src/net/tcp/socket.rs#841"
+            },
+            {
+              "crate": "openssl",
+              "item": "Server::connect_tcp",
+              "pos": "return",
+              "url": "https://docs.rs/crate/openssl/0.10.82/source/src/ssl/test/server.rs#42"
+            }
+          ]
+        }
+      },
+      "Vec<String>": {
+        "parts": [
+          {
+            "name": "Vec",
+            "text": "A list that can grow. It owns its items.",
+            "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "1 of the 100 most-downloaded crates, 4 of the 26 AWS SDK crates and 3 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "rustls",
+              "item": "CertificateError::NotValidForNameContext",
+              "pos": "field",
+              "url": "https://docs.rs/crate/rustls/0.23.46/source/src/error.rs#469"
+            },
+            {
+              "crate": "rustls-webpki",
+              "item": "InvalidNameContext.presented",
+              "pos": "field",
+              "url": "https://docs.rs/crate/rustls-webpki/0.103.17/source/src/error.rs#406"
+            },
+            {
+              "crate": "security-framework",
+              "item": "SecCertificate::email_addresses",
+              "pos": "return",
+              "url": "https://docs.rs/crate/security-framework/3.7.0/source/src/certificate.rs#90"
+            }
+          ]
+        }
+      },
+      "Vec<u8>": {
+        "parts": [
+          {
+            "name": "Vec",
+            "text": "A list that can grow. It owns its items.",
+            "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+          },
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "15 of the 100 most-downloaded crates, 6 of the 26 AWS SDK crates and 17 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "LitByteStr::value",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#295"
+            },
+            {
+              "crate": "base64",
+              "item": "decode",
+              "pos": "return",
+              "url": "https://docs.rs/crate/base64/0.23.1/source/src/decode.rs#128"
+            },
+            {
+              "crate": "proc-macro2",
+              "item": "Literal::cstr_value",
+              "pos": "return",
+              "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/lib.rs#1345"
+            }
+          ]
+        }
+      },
+      "Zeroizing<String>": {
+        "parts": [
+          {
+            "name": "Zeroizing",
+            "text": "`Zeroizing` is a wrapper for any `Z: Zeroize` type which implements a `Drop` handler which zeroizes dropped values.",
+            "from": "zeroize 1.9.2",
+            "url": "https://docs.rs/crate/zeroize/1.9.2/source/src/lib.rs#584"
+          },
+          {
+            "name": "String",
+            "text": "Text that you own and can change.",
+            "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+          }
+        ],
+        "held": {
+          "text": "4 of the 50 crypto crates return one or have one as a public field.",
+          "why": "zeroize implements Deref for Zeroizing, so a Zeroizing reads as the value inside it.",
+          "examples": [
+            {
+              "crate": "der",
+              "item": "SecretDocument::to_pem",
+              "pos": "return",
+              "url": "https://docs.rs/crate/der/0.8.3/source/src/document.rs#289"
+            },
+            {
+              "crate": "pkcs8",
+              "item": "EncodePrivateKey::to_pkcs8_pem",
+              "pos": "return",
+              "url": "https://docs.rs/crate/pkcs8/0.11.0/source/src/traits.rs#144"
+            },
+            {
+              "crate": "elliptic-curve",
+              "item": "SecretKey::to_sec1_pem",
+              "pos": "return",
+              "url": "https://docs.rs/crate/elliptic-curve/0.14.3/source/src/secret_key.rs#344"
+            }
+          ]
+        }
+      },
+      "[u8; 32]": {
+        "parts": [
+          {
+            "name": "[ ; 32]",
+            "text": "Exactly 32 values in a row.",
+            "url": "https://doc.rust-lang.org/std/primitive.array.html"
+          },
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "2 of the 100 most-downloaded crates and 6 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "windows-sys",
+              "item": "NDIS_802_11_SSID.Ssid",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/NetworkManagement/Ndis/mod.rs#610"
+            },
+            {
+              "crate": "rand_chacha",
+              "item": "ChaCha::get_seed",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rand_chacha/0.10.0/source/src/guts.rs#105"
+            },
+            {
+              "crate": "rustls-webpki",
+              "item": "LogIdAndTimestamp.log_id",
+              "pos": "field",
+              "url": "https://docs.rs/crate/rustls-webpki/0.103.17/source/src/sct.rs#92"
+            }
+          ]
+        }
+      },
+      "char": {
+        "parts": [
+          {
+            "name": "char",
+            "text": "One character, like 'a'. Not a whole string.",
+            "url": "https://doc.rust-lang.org/std/primitive.char.html"
+          }
+        ],
+        "held": {
+          "text": "9 of the 100 most-downloaded crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "LitChar::value",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#400"
+            },
+            {
+              "crate": "base64",
+              "item": "Symbol::as_char",
+              "pos": "return",
+              "url": "https://docs.rs/crate/base64/0.23.1/source/src/alphabet.rs#189"
+            },
+            {
+              "crate": "proc-macro2",
+              "item": "Punct::as_char",
+              "pos": "return",
+              "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/lib.rs#861"
+            }
+          ]
+        }
+      },
+      "i16": {
+        "parts": [
+          {
+            "name": "i16",
+            "text": "A whole number from -32,768 to 32,767.",
+            "url": "https://doc.rust-lang.org/std/primitive.i16.html"
+          }
+        ],
+        "held": {
+          "text": "7 of the 100 most-downloaded crates, 2 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "windows-sys",
+              "item": "DEVICE_OBJECT.Type",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#47"
+            },
+            {
+              "crate": "serde",
+              "item": "Content::I16",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#19"
+            },
+            {
+              "crate": "bytes",
+              "item": "Buf::get_i16",
+              "pos": "return",
+              "url": "https://docs.rs/crate/bytes/1.12.2/source/src/buf/buf_impl.rs#440"
+            }
+          ]
+        }
+      },
+      "i32": {
+        "parts": [
+          {
+            "name": "i32",
+            "text": "A whole number from -2,147,483,648 to 2,147,483,647.",
+            "url": "https://doc.rust-lang.org/std/primitive.i32.html"
+          }
+        ],
+        "held": {
+          "text": "13 of the 100 most-downloaded crates, 5 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "windows-sys",
+              "item": "DEVICE_OBJECT.ReferenceCount",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#49"
+            },
+            {
+              "crate": "serde",
+              "item": "Content::I32",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#20"
+            },
+            {
+              "crate": "serde_json",
+              "item": "Float::mantissa_limit",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/lexical/num.rs#240"
+            }
+          ]
+        }
+      },
+      "i64": {
+        "parts": [
+          {
+            "name": "i64",
+            "text": "A whole number from -2^63 to 2^63 - 1.",
+            "url": "https://doc.rust-lang.org/std/primitive.i64.html"
+          }
+        ],
+        "held": {
+          "text": "10 of the 100 most-downloaded crates, 7 of the 26 AWS SDK crates and 3 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "windows-sys",
+              "item": "FILE_OBJECT.CurrentByteOffset",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#600"
+            },
+            {
+              "crate": "serde",
+              "item": "Unexpected::Signed",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/de/mod.rs#348"
+            },
+            {
+              "crate": "log",
+              "item": "Inner::I64",
+              "pos": "field",
+              "url": "https://docs.rs/crate/log/0.4.35/source/src/kv/value.rs#774"
+            }
+          ]
+        }
+      },
+      "i8": {
+        "parts": [
+          {
+            "name": "i8",
+            "text": "A whole number from -128 to 127.",
+            "url": "https://doc.rust-lang.org/std/primitive.i8.html"
+          }
+        ],
+        "held": {
+          "text": "6 of the 100 most-downloaded crates and 2 of the 26 AWS SDK crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "windows-sys",
+              "item": "DEVICE_OBJECT.StackSize",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#60"
+            },
+            {
+              "crate": "serde",
+              "item": "Content::I8",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#18"
+            },
+            {
+              "crate": "bytes",
+              "item": "Buf::get_i8",
+              "pos": "return",
+              "url": "https://docs.rs/crate/bytes/1.12.2/source/src/buf/buf_impl.rs#349"
+            }
+          ]
+        }
+      },
+      "kms::Client": {
+        "parts": [
+          {
+            "name": "kms::Client",
+            "text": "Client for AWS Key Management Service. Client for invoking operations on AWS Key Management Service. Each operation on AWS Key Management Service is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+            "from": "aws-sdk-kms 1.133.0",
+            "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/client.rs#78"
+          }
+        ]
+      },
+      "kms::Config": {
+        "parts": [
+          {
+            "name": "kms::Config",
+            "text": "Configuration for a aws_sdk_kms service client. Service configuration allows for customization of endpoints, region, credentials providers, and retry configuration. Generally, it is constructed automatically for you from a shared configuration loaded by the `aws-config` crate. For example:",
+            "from": "aws-sdk-kms 1.133.0",
+            "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/config.rs#19"
+          }
+        ]
+      },
+      "u16": {
+        "parts": [
+          {
+            "name": "u16",
+            "text": "A whole number from 0 to 65,535.",
+            "url": "https://doc.rust-lang.org/std/primitive.u16.html"
+          }
+        ],
+        "held": {
+          "text": "14 of the 100 most-downloaded crates, 3 of the 26 AWS SDK crates and 2 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "windows-sys",
+              "item": "VHF_CONFIG.VendorID",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Devices/HumanInterfaceDevice/mod.rs#28"
+            },
+            {
+              "crate": "serde",
+              "item": "Content::U16",
+              "pos": "field",
+              "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#14"
+            },
+            {
+              "crate": "serde_json",
+              "item": "Read::decode_hex_escape",
+              "pos": "return",
+              "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/read.rs#89"
+            }
+          ]
+        }
+      },
+      "u32": {
+        "parts": [
+          {
+            "name": "u32",
+            "text": "A whole number from 0 to 4,294,967,295.",
+            "url": "https://doc.rust-lang.org/std/primitive.u32.html"
+          }
+        ],
+        "held": {
+          "text": "24 of the 100 most-downloaded crates, 4 of the 26 AWS SDK crates and 6 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "getrandom",
+              "item": "inner_u32",
+              "pos": "return",
+              "url": "https://docs.rs/crate/getrandom/0.4.3/source/src/backends/hermit.rs#16"
+            },
+            {
+              "crate": "rand_core",
+              "item": "Rng::next_u32",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rand_core/0.10.1/source/src/lib.rs#51"
+            },
+            {
+              "crate": "libc",
+              "item": "siginfo_t::si_pkey",
+              "pos": "return",
+              "url": "https://docs.rs/crate/libc/0.2.191/source/src/new/glibc/sysdeps/unix/linux/bits/types/siginfo_t.rs#218"
+            }
+          ]
+        }
+      },
+      "u64": {
+        "parts": [
+          {
+            "name": "u64",
+            "text": "A whole number from 0 to 2^64 - 1.",
+            "url": "https://doc.rust-lang.org/std/primitive.u64.html"
+          }
+        ],
+        "held": {
+          "text": "25 of the 100 most-downloaded crates, 4 of the 26 AWS SDK crates and 7 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "getrandom",
+              "item": "inner_u64",
+              "pos": "return",
+              "url": "https://docs.rs/crate/getrandom/0.4.3/source/src/backends/hermit.rs#27"
+            },
+            {
+              "crate": "rand_core",
+              "item": "BlockRng::next_u64_from_u32",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rand_core/0.10.1/source/src/block.rs#248"
+            },
+            {
+              "crate": "windows-sys",
+              "item": "OBJECT_ATTRIBUTES64.RootDirectory",
+              "pos": "field",
+              "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#1644"
+            }
+          ]
+        }
+      },
+      "u8": {
+        "parts": [
+          {
+            "name": "u8",
+            "text": "A whole number from 0 to 255. One byte.",
+            "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+          }
+        ],
+        "held": {
+          "text": "18 of the 100 most-downloaded crates and 7 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "syn",
+              "item": "LitByte::value",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#365"
+            },
+            {
+              "crate": "base64",
+              "item": "Symbol::as_u8",
+              "pos": "return",
+              "url": "https://docs.rs/crate/base64/0.23.1/source/src/alphabet.rs#184"
+            },
+            {
+              "crate": "proc-macro2",
+              "item": "unescape_byte",
+              "pos": "return",
+              "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/rustc_literal_escaper.rs#211"
+            }
+          ]
+        }
+      },
+      "usize": {
+        "parts": [
+          {
+            "name": "usize",
+            "text": "A whole number from 0 up, as big as a memory address: 2^64 - 1 on most machines.",
+            "url": "https://doc.rust-lang.org/std/primitive.usize.html"
+          }
+        ],
+        "held": {
+          "text": "50 of the 100 most-downloaded crates, 7 of the 26 AWS SDK crates and 22 of the 50 crypto crates return one or have one as a public field.",
+          "why": null,
+          "examples": [
+            {
+              "crate": "hashbrown",
+              "item": "HashMap::capacity",
+              "pos": "return",
+              "url": "https://docs.rs/crate/hashbrown/0.17.2/source/src/map.rs#597"
+            },
+            {
+              "crate": "syn",
+              "item": "Fields::len",
+              "pos": "return",
+              "url": "https://docs.rs/crate/syn/3.0.10/source/src/data.rs#94"
+            },
+            {
+              "crate": "rand_core",
+              "item": "BlockRng::word_offset",
+              "pos": "return",
+              "url": "https://docs.rs/crate/rand_core/0.10.1/source/src/block.rs#211"
+            }
+          ]
+        }
+      }
+    },
+    "java": {
+      "byte[]": {
+        "parts": [
+          {
+            "name": "byte[]",
+            "text": "An array of bytes.",
+            "url": "https://docs.oracle.com/javase/specs/jls/se17/html/jls-10.html"
+          }
+        ]
+      },
+      "ByteBuffer": {
+        "parts": [
+          {
+            "name": "ByteBuffer",
+            "text": "Bytes in a buffer that keeps track of where you are reading.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/ByteBuffer.html"
+          }
+        ]
+      },
+      "String": {
+        "parts": [
+          {
+            "name": "String",
+            "text": "Text. It can't be changed.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html"
+          }
+        ]
+      },
+      "String (base64)": {
+        "parts": [
+          {
+            "name": "String (base64)",
+            "text": "Text that holds bytes written as base64, like a stored ciphertext.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Base64.html"
+          }
+        ]
+      },
+      "Path": {
+        "parts": [
+          {
+            "name": "Path",
+            "text": "A file path.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/Path.html"
+          }
+        ]
+      },
+      "InputStream": {
+        "parts": [
+          {
+            "name": "InputStream",
+            "text": "Bytes you read one piece at a time, like an open file.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/io/InputStream.html"
+          }
+        ]
+      },
+      "Map<String, String>": {
+        "parts": [
+          {
+            "name": "Map<String, String>",
+            "text": "A lookup table from text keys to text values.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Map.html"
+          }
+        ]
+      },
+      "(String, String)": {
+        "parts": [
+          {
+            "name": "(String, String)",
+            "text": "Two strings, like one key and one value. Java has no pair type, so they are two variables.",
+            "url": null
+          }
+        ]
+      },
+      "List<String>": {
+        "parts": [
+          {
+            "name": "List<String>",
+            "text": "A list of strings.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/List.html"
+          }
+        ]
+      },
+      "String[]": {
+        "parts": [
+          {
+            "name": "String[]",
+            "text": "An array of strings.",
+            "url": "https://docs.oracle.com/javase/specs/jls/se17/html/jls-10.html"
+          }
+        ]
+      },
+      "int": {
+        "parts": [
+          {
+            "name": "int",
+            "text": "A whole number from -2^31 to 2^31 - 1.",
+            "url": "https://docs.oracle.com/javase/specs/jls/se17/html/jls-4.html#jls-4.2.1"
+          }
+        ]
+      },
+      "long": {
+        "parts": [
+          {
+            "name": "long",
+            "text": "A whole number from -2^63 to 2^63 - 1.",
+            "url": "https://docs.oracle.com/javase/specs/jls/se17/html/jls-4.html#jls-4.2.1"
+          }
+        ]
+      },
+      "Duration": {
+        "parts": [
+          {
+            "name": "Duration",
+            "text": "A span of time, like 5 seconds.",
+            "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html"
+          }
+        ]
+      },
+      "KmsClient": {
+        "parts": [
+          {
+            "name": "KmsClient",
+            "text": "The AWS SDK for Java client for AWS KMS.",
+            "url": "https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/services/kms/KmsClient.html"
+          }
+        ]
+      },
+      "Region": {
+        "parts": [
+          {
+            "name": "Region",
+            "text": "An AWS Region, like us-west-2.",
+            "url": "https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/regions/Region.html"
+          }
+        ]
+      }
+    },
+    "python": {
+      "bytes": {
+        "parts": [
+          {
+            "name": "bytes",
+            "text": "Bytes. They can't be changed.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#bytes"
+          }
+        ]
+      },
+      "bytearray": {
+        "parts": [
+          {
+            "name": "bytearray",
+            "text": "Bytes that can be changed.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#bytearray"
+          }
+        ]
+      },
+      "str": {
+        "parts": [
+          {
+            "name": "str",
+            "text": "Text.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#text-sequence-type-str"
+          }
+        ]
+      },
+      "str (base64)": {
+        "parts": [
+          {
+            "name": "str (base64)",
+            "text": "Text that holds bytes written as base64, like a stored ciphertext.",
+            "url": "https://docs.python.org/3/library/base64.html"
+          }
+        ]
+      },
+      "pathlib.Path": {
+        "parts": [
+          {
+            "name": "pathlib.Path",
+            "text": "A file path.",
+            "url": "https://docs.python.org/3/library/pathlib.html"
+          }
+        ]
+      },
+      "BinaryIO": {
+        "parts": [
+          {
+            "name": "BinaryIO",
+            "text": "An open file, or another stream of bytes.",
+            "url": "https://docs.python.org/3/library/typing.html#typing.BinaryIO"
+          }
+        ]
+      },
+      "dict": {
+        "parts": [
+          {
+            "name": "dict",
+            "text": "A lookup table from keys to values.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#dict"
+          }
+        ]
+      },
+      "(str, str)": {
+        "parts": [
+          {
+            "name": "(str, str)",
+            "text": "Two strings, like one key and one value.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#tuple"
+          }
+        ]
+      },
+      "list[str]": {
+        "parts": [
+          {
+            "name": "list[str]",
+            "text": "A list of strings.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#list"
+          }
+        ]
+      },
+      "tuple[str, ...]": {
+        "parts": [
+          {
+            "name": "tuple[str, ...]",
+            "text": "Strings in a row that can't be changed.",
+            "url": "https://docs.python.org/3/library/stdtypes.html#tuple"
+          }
+        ]
+      },
+      "int": {
+        "parts": [
+          {
+            "name": "int",
+            "text": "A whole number of any size.",
+            "url": "https://docs.python.org/3/library/functions.html#int"
+          }
+        ]
+      },
+      "timedelta": {
+        "parts": [
+          {
+            "name": "timedelta",
+            "text": "A span of time, like 5 seconds.",
+            "url": "https://docs.python.org/3/library/datetime.html#timedelta-objects"
+          }
+        ]
+      },
+      "BaseClient": {
+        "parts": [
+          {
+            "name": "BaseClient",
+            "text": "A boto3 client, like boto3.client(\"kms\").",
+            "url": "https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/kms.html"
+          }
+        ]
+      },
+      "boto3.Session": {
+        "parts": [
+          {
+            "name": "boto3.Session",
+            "text": "AWS settings and credentials that make clients.",
+            "url": "https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html"
+          }
+        ]
+      }
+    },
+    "dotnet": {
+      "byte[]": {
+        "parts": [
+          {
+            "name": "byte[]",
+            "text": "An array of bytes.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/arrays"
+          }
+        ]
+      },
+      "MemoryStream": {
+        "parts": [
+          {
+            "name": "MemoryStream",
+            "text": "Bytes in memory that you read like a stream.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.io.memorystream"
+          }
+        ]
+      },
+      "string": {
+        "parts": [
+          {
+            "name": "string",
+            "text": "Text. It can't be changed.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.string"
+          }
+        ]
+      },
+      "string (base64)": {
+        "parts": [
+          {
+            "name": "string (base64)",
+            "text": "Text that holds bytes written as base64, like a stored ciphertext.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.convert.frombase64string"
+          }
+        ]
+      },
+      "FileInfo": {
+        "parts": [
+          {
+            "name": "FileInfo",
+            "text": "A file on disk.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.io.fileinfo"
+          }
+        ]
+      },
+      "Stream": {
+        "parts": [
+          {
+            "name": "Stream",
+            "text": "Bytes you read one piece at a time, like an open file.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.io.stream"
+          }
+        ]
+      },
+      "Dictionary<string, string>": {
+        "parts": [
+          {
+            "name": "Dictionary<string, string>",
+            "text": "A lookup table from text keys to text values.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.dictionary-2"
+          }
+        ]
+      },
+      "(string, string)": {
+        "parts": [
+          {
+            "name": "(string, string)",
+            "text": "Two strings, like one key and one value.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/value-tuples"
+          }
+        ]
+      },
+      "List<string>": {
+        "parts": [
+          {
+            "name": "List<string>",
+            "text": "A list of strings.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.list-1"
+          }
+        ]
+      },
+      "string[]": {
+        "parts": [
+          {
+            "name": "string[]",
+            "text": "An array of strings.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/arrays"
+          }
+        ]
+      },
+      "int": {
+        "parts": [
+          {
+            "name": "int",
+            "text": "A whole number from -2^31 to 2^31 - 1.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.int32"
+          }
+        ]
+      },
+      "long": {
+        "parts": [
+          {
+            "name": "long",
+            "text": "A whole number from -2^63 to 2^63 - 1.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.int64"
+          }
+        ]
+      },
+      "TimeSpan": {
+        "parts": [
+          {
+            "name": "TimeSpan",
+            "text": "A span of time, like 5 seconds.",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/system.timespan"
+          }
+        ]
+      },
+      "AmazonKeyManagementServiceClient": {
+        "parts": [
+          {
+            "name": "AmazonKeyManagementServiceClient",
+            "text": "The AWS SDK for .NET client for AWS KMS.",
+            "url": "https://docs.aws.amazon.com/sdkfornet/v3/apidocs/items/KeyManagementService/TKeyManagementServiceClient.html"
+          }
+        ]
+      },
+      "AmazonKeyManagementServiceConfig": {
+        "parts": [
+          {
+            "name": "AmazonKeyManagementServiceConfig",
+            "text": "Settings that build a KMS client, like the Region.",
+            "url": "https://docs.aws.amazon.com/sdkfornet/v3/apidocs/items/KeyManagementService/TKeyManagementServiceConfig.html"
+          }
+        ]
+      }
+    },
+    "go": {
+      "[]byte": {
+        "parts": [
+          {
+            "name": "[]byte",
+            "text": "A slice of bytes.",
+            "url": "https://go.dev/ref/spec#Slice_types"
+          }
+        ]
+      },
+      "string": {
+        "parts": [
+          {
+            "name": "string",
+            "text": "Text. It can't be changed.",
+            "url": "https://go.dev/ref/spec#String_types"
+          }
+        ]
+      },
+      "string (base64)": {
+        "parts": [
+          {
+            "name": "string (base64)",
+            "text": "Text that holds bytes written as base64, like a stored ciphertext.",
+            "url": "https://pkg.go.dev/encoding/base64"
+          }
+        ]
+      },
+      "string (path)": {
+        "parts": [
+          {
+            "name": "string (path)",
+            "text": "Text that holds a file path.",
+            "url": "https://pkg.go.dev/os#ReadFile"
+          }
+        ]
+      },
+      "io.Reader": {
+        "parts": [
+          {
+            "name": "io.Reader",
+            "text": "Bytes you read one piece at a time, like an open file.",
+            "url": "https://pkg.go.dev/io#Reader"
+          }
+        ]
+      },
+      "map[string]string": {
+        "parts": [
+          {
+            "name": "map[string]string",
+            "text": "A lookup table from text keys to text values.",
+            "url": "https://go.dev/ref/spec#Map_types"
+          }
+        ]
+      },
+      "(string, string)": {
+        "parts": [
+          {
+            "name": "(string, string)",
+            "text": "Two strings, like one key and one value. Go has no pair type, so they are two variables.",
+            "url": null
+          }
+        ]
+      },
+      "[]string": {
+        "parts": [
+          {
+            "name": "[]string",
+            "text": "A slice of strings.",
+            "url": "https://go.dev/ref/spec#Slice_types"
+          }
+        ]
+      },
+      "int": {
+        "parts": [
+          {
+            "name": "int",
+            "text": "A whole number, 64 bits on most machines.",
+            "url": "https://go.dev/ref/spec#Numeric_types"
+          }
+        ]
+      },
+      "int64": {
+        "parts": [
+          {
+            "name": "int64",
+            "text": "A whole number from -2^63 to 2^63 - 1.",
+            "url": "https://go.dev/ref/spec#Numeric_types"
+          }
+        ]
+      },
+      "time.Duration": {
+        "parts": [
+          {
+            "name": "time.Duration",
+            "text": "A span of time, like 5 seconds.",
+            "url": "https://pkg.go.dev/time#Duration"
+          }
+        ]
+      },
+      "*kms.Client": {
+        "parts": [
+          {
+            "name": "*kms.Client",
+            "text": "The AWS SDK for Go client for AWS KMS.",
+            "url": "https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/kms#Client"
+          }
+        ]
+      },
+      "aws.Config": {
+        "parts": [
+          {
+            "name": "aws.Config",
+            "text": "AWS settings that build clients, like the Region and credentials.",
+            "url": "https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/aws#Config"
+          }
+        ]
+      }
+    },
+    "javascript": {
+      "Uint8Array": {
+        "parts": [
+          {
+            "name": "Uint8Array",
+            "text": "An array of bytes.",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array"
+          }
+        ]
+      },
+      "Buffer": {
+        "parts": [
+          {
+            "name": "Buffer",
+            "text": "Node.js bytes. A Buffer is also a Uint8Array.",
+            "url": "https://nodejs.org/api/buffer.html"
+          }
+        ]
+      },
+      "string": {
+        "parts": [
+          {
+            "name": "string",
+            "text": "Text.",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String"
+          }
+        ]
+      },
+      "string (base64)": {
+        "parts": [
+          {
+            "name": "string (base64)",
+            "text": "Text that holds bytes written as base64, like a stored ciphertext.",
+            "url": "https://nodejs.org/api/buffer.html#buffers-and-character-encodings"
+          }
+        ]
+      },
+      "string (path)": {
+        "parts": [
+          {
+            "name": "string (path)",
+            "text": "Text that holds a file path.",
+            "url": "https://nodejs.org/api/fs.html"
+          }
+        ]
+      },
+      "Readable": {
+        "parts": [
+          {
+            "name": "Readable",
+            "text": "A Node.js stream of bytes you read piece by piece, like an open file.",
+            "url": "https://nodejs.org/api/stream.html#readable-streams"
+          }
+        ]
+      },
+      "Record<string, string>": {
+        "parts": [
+          {
+            "name": "Record<string, string>",
+            "text": "An object from text keys to text values.",
+            "url": "https://www.typescriptlang.org/docs/handbook/utility-types.html#recordkeys-type"
+          }
+        ]
+      },
+      "[string, string]": {
+        "parts": [
+          {
+            "name": "[string, string]",
+            "text": "Two strings, like one key and one value.",
+            "url": "https://www.typescriptlang.org/docs/handbook/2/objects.html#tuple-types"
+          }
+        ]
+      },
+      "string[]": {
+        "parts": [
+          {
+            "name": "string[]",
+            "text": "An array of strings.",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array"
+          }
+        ]
+      },
+      "number": {
+        "parts": [
+          {
+            "name": "number",
+            "text": "A number. Whole numbers are exact up to 2^53 - 1.",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number"
+          }
+        ]
+      },
+      "KMSClient": {
+        "parts": [
+          {
+            "name": "KMSClient",
+            "text": "The AWS SDK for JavaScript client for AWS KMS.",
+            "url": "https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kms/"
+          }
+        ]
+      },
+      "KMSClientConfig": {
+        "parts": [
+          {
+            "name": "KMSClientConfig",
+            "text": "Settings that build a KMS client, like the Region.",
+            "url": "https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kms/"
+          }
+        ]
+      }
+    }
+  }
 }

@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 
 import calls
+import rust_about
 import rust_runs
 import rust_types
 
@@ -204,7 +205,7 @@ def named_types(path):
     short = crate_ident.removeprefix("aws_sdk_")
     lock = json.loads(rust_types.LOCK.read_text())
     scanner = rust_types.build_scanner()
-    defines, ctors = {}, []
+    defines, ctors, docs = {}, [], {}
     for crate in lock["crates"]:
         if "ours" not in crate["groups"]:
             continue
@@ -212,6 +213,9 @@ def named_types(path):
         for row in rust_types.scan(scanner, crate):
             if "defines" in row:
                 defines.setdefault(row["defines"], set()).update({f"{ident}::{row['defines']}", row["path"]})
+                docs.setdefault(row["defines"], []).append(
+                    {"crate": crate["name"], "version": crate["version"], "path": row["path"],
+                     "doc": rust_types.summary(row.get("doc", "")), "file": row["file"], "line": row["line"]})
             elif ident == crate_ident and row.get("ctor") == name:
                 ctors.append((row["fn"], row["param"]))
     label = f"{short}::{name}"
@@ -231,11 +235,12 @@ def named_types(path):
         held.append((shown, ty, "ctor", with_costs(as_is + [build])))
         if param.startswith("&"):
             held.append(("&" + shown, "&" + ty, "ctor", with_costs(as_is[:1] + [(f"{path}::{fn}(x)", "base")])))
-    return held, defines
+    return held, defines, docs
 
 
 def prepare(rust_repo, extra_code=""):
-    """Held types for each option as (label, Rust type, kind, fixes), and a scratch crate that can name them.
+    """Held types for each option as (label, Rust type, kind, fixes), a scratch crate that can name them, and
+    where each name in them is defined, with its doc comment.
 
     Types whose names have no working path are left out. Crates that `extra_code` names become
     dependencies of the scratch crate too.
@@ -243,6 +248,7 @@ def prepare(rust_repo, extra_code=""):
     data = json.loads(rust_types.OUT.read_text())
     kept = {kind: [r["type"] for r in rows if r["kept"]] for kind, rows in data["kinds"].items()}
     paths = {name: list(found) for name, found in data["paths"].items()}
+    docs = {name: list(found) for name, found in data.get("docs", {}).items()}
     in_lock = locked_crates(rust_repo)
 
     # Held types per option: (label, type, kind, fixes).
@@ -251,8 +257,10 @@ def prepare(rust_repo, extra_code=""):
         held = []
         for kind in kinds:
             if kind.startswith("named "):
-                found, defines = named_types(kind.split(" ", 1)[1])
+                found, defines, named_docs = named_types(kind.split(" ", 1)[1])
                 held += found
+                for name, entries in named_docs.items():
+                    docs.setdefault(name, []).extend(e for e in entries if e not in docs[name])
                 for name, candidates in defines.items():
                     merged = set(paths.get(name, ())) | candidates
                     paths[name] = sorted(merged, key=lambda p: (p.count("::"), p))
@@ -284,7 +292,7 @@ def prepare(rust_repo, extra_code=""):
 
     held = {key: [(label, code(ty), kind, fixes) for label, ty, kind, fixes in found if code(ty)]
             for key, found in per_option.items()}
-    return held, scratch
+    return held, scratch, docs
 
 
 def trial(n, params, expr, how, glue, call, note=""):
@@ -375,7 +383,7 @@ def main():
     args = parser.parse_args()
     rust_repo = str(Path(args.rust_repo).resolve())
     data = json.loads(rust_types.OUT.read_text())
-    held, scratch = prepare(rust_repo, RUNS_SUPPORT.read_text() + "\n".join(rust_runs.OWNED.values()))
+    held, scratch, docs = prepare(rust_repo, RUNS_SUPPORT.read_text() + "\n".join(rust_runs.OWNED.values()))
     trials, lines = setter_trials(held)
     failed = scratch.errors(lines)
     TRIALS.write_text(trials_text(lines))
@@ -385,6 +393,9 @@ def main():
 
     page = json.loads(PAGE.read_text())
     page["rust"] = rows
+    lock = json.loads(rust_types.LOCK.read_text())
+    sizes = {name: sum(group in c["groups"] for c in lock["crates"]) for name, (group, _, _) in rust_types.LISTS.items()}
+    page.setdefault("about", {})["rust"] = rust_about.about(held, data, docs, sizes)
     commit = subprocess.run(["git", "-C", rust_repo, "rev-parse", "HEAD"], capture_output=True,
                             text=True, check=True).stdout.strip()
     page["rust_commit"] = commit

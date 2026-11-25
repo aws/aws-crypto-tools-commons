@@ -1,71 +1,118 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>What each option takes</title>
+<title>Types</title>
 <style>
-  body { font-family: system-ui, sans-serif; font-size: 13px; color: #1f2328; margin: 16px 20px; }
-  h1 { font-size: 18px; margin: 0 0 10px; }
-  h2 { font-size: 14px; margin: 14px 0 6px; }
-  a { color: #0969da; }
-  .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
-  .bar button { border: 1px solid #d0d7de; background: #fff; border-radius: 14px; padding: 3px 10px; cursor: pointer; font-size: 12px; color: #1f2328; }
-  .bar button.on { background: #0969da; border-color: #0969da; color: #fff; }
-  .bar .gap { width: 12px; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
-  th, td { border: 1px solid #e1e4e8; padding: 5px 6px; vertical-align: top; text-align: left; }
-  th { background: #f6f8fa; font-size: 12px; }
-  td.opt { white-space: nowrap; width: 1%; }
-  td.opt b { font-family: ui-monospace, monospace; font-size: 12px; }
-  td.opt div { color: #57606a; font-family: ui-monospace, monospace; font-size: 11px; }
-  td.none { color: #8c959f; font-style: italic; }
-  .chip { display: inline-block; margin: 2px; padding: 1px 7px; border-radius: 10px; font-family: ui-monospace, monospace; font-size: 11px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
-  .b0 { background: #dafbe1; color: #116329; }
-  .b1 { background: #fff8c5; color: #7d4e00; }
-  .b2 { background: #ffe8d6; color: #953800; }
-  .bx { background: #f6f8fa; color: #57606a; border-color: #d0d7de; }
-  .warn { border-color: #cf222e; color: #a40e26; }
-  .failed { text-decoration: line-through; }
-  .sel { outline: 2px solid #0969da; }
-  td.ck { text-align: center; cursor: pointer; }
-  td.ck small { display: block; color: #57606a; font-family: ui-monospace, monospace; font-size: 10px; }
-  td.kind { cursor: pointer; white-space: nowrap; }
-  tr.detail td { background: #fbfcfd; text-align: left; vertical-align: top; }
-  tr.detail .lang { font-weight: 600; font-size: 11px; color: #57606a; margin-bottom: 2px; }
-  .ev { font-size: 11px; color: #57606a; }
-  .panel { border: 1px solid #d0d7de; border-radius: 6px; padding: 8px 10px; margin-top: 4px; }
-  .panel pre { background: #0d1117; color: #e6edf3; padding: 8px 10px; border-radius: 6px; margin: 4px 0; font-size: 12px; white-space: pre-wrap; }
-  .panel ul { margin: 4px 0; padding-left: 18px; }
-  .panel li { margin: 2px 0; }
-  .title { font-weight: 600; }
-  .foot { color: #57606a; font-size: 11px; margin-top: 6px; }
-  .prop { margin-top: 4px; border: 1px solid #8250df; background: #fff; color: #8250df; border-radius: 10px; padding: 1px 8px; font-size: 11px; cursor: pointer; }
-  .prop.on { background: #8250df; color: #fff; }
-  .propsig { margin-top: 3px; color: #8250df; font-family: ui-monospace, monospace; font-size: 11px; white-space: normal; max-width: 260px; }
-  .why { margin-top: 2px; color: #57606a; font-size: 11px; white-space: normal; max-width: 260px; }
-  .breaks { margin-top: 2px; color: #cf222e; font-family: ui-monospace, monospace; font-size: 11px; white-space: normal; max-width: 260px; }
-  .load { border: 1px dashed #8250df; color: #8250df; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
-  details { margin: 3px 0; }
-  details summary { cursor: pointer; }
-  .hits { margin: 4px 0 6px 16px; }
-  .hits code { font-size: 11px; background: #f6f8fa; padding: 0 3px; border-radius: 3px; }
-  .hits .where { font-size: 11px; }
-  .hits .source { margin-bottom: 6px; }
-  .tag { font-size: 10px; border: 1px solid #d0d7de; border-radius: 8px; padding: 0 5px; color: #57606a; }
+  /* The same colors and layout as the other dashboard pages, like test-servers/index.html. */
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --more:#db6d28; --fail:#da3633; --none:#3a3f4b; --sel:#388bfd; --prop:#a371f7; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+  a { color:var(--sel); }
+  code, pre { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  header { display:flex; gap:12px 16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; flex:none; }
+  header h1 { font-size:16px; margin:0 4px 0 0; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; }
+  .tabs button, .tool { background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:4px 12px; cursor:pointer; font:inherit; font-size:13px; }
+  .tabs button:hover, .tool:hover { color:var(--text); }
+  .tabs button.on, .tool.on { color:var(--text); border-color:var(--sel); }
+  .tool:disabled { opacity:.5; cursor:default; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr); }
+  main.open { grid-template-columns:minmax(0,var(--left,1.4fr)) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
+  section { overflow:auto; padding:16px 20px; }
+  #detail { background:var(--panel); }
+  #detail .close { position:sticky; top:0; float:right; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; font-size:14px; }
+  #detail .close:hover { color:var(--text); border-color:var(--sel); }
+  #detail h2 { margin:0 0 4px; font-size:16px; font-family:ui-monospace, monospace; }
+  #detail h3 { font-size:13px; margin:16px 0 6px; }
+  #detail ul { margin:4px 0; padding-left:18px; }
+  #detail li { margin:3px 0; }
+  #detail pre { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:4px 0; font-size:12px; white-space:pre-wrap; }
+  #detail .quote { color:var(--text); }
+  #divider { cursor:col-resize; background:var(--line); }
+  #divider:hover, #divider.drag { background:var(--sel); }
+  body.resizing { user-select:none; cursor:col-resize; }
+  .sub { color:var(--dim); font-size:12px; margin:0 0 10px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:8px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  table { border-collapse:collapse; width:100%; margin-bottom:14px; }
+  th, td { border:1px solid var(--line); padding:6px 8px; vertical-align:top; text-align:left; }
+  thead th, tr.head th { font-weight:600; font-size:12px; position:sticky; top:-16px; background:var(--bg); z-index:1; }
+  td.opt { white-space:nowrap; width:1%; }
+  td.opt b { font-family:ui-monospace, monospace; font-size:13px; }
+  td.opt div { color:var(--dim); font-family:ui-monospace, monospace; font-size:11px; }
+  td.none { color:var(--dim); font-style:italic; }
+  /* A chip is one type. Its color is the number of calls the type needs. */
+  .chip { display:inline-block; margin:2px; padding:1px 8px; border-radius:8px; font-family:ui-monospace, monospace; font-size:12px; cursor:pointer; border:1px solid var(--line); background:var(--bg); white-space:nowrap; }
+  .chip:hover { border-color:var(--sel); }
+  .chip.sel { outline:2px solid #fff; outline-offset:-1px; }
+  .b0 { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .b1 { background:color-mix(in srgb,var(--part) 35%,transparent); }
+  .b2 { background:color-mix(in srgb,var(--more) 40%,transparent); }
+  .bx { color:var(--dim); border-style:dashed; }
+  .warn { border-color:var(--fail); color:#ffa198; }
+  .failed { text-decoration:line-through; }
+  td.ck { text-align:center; cursor:pointer; }
+  td.ck small { display:block; color:var(--dim); font-family:ui-monospace, monospace; font-size:10px; }
+  td.kind { cursor:pointer; white-space:nowrap; }
+  td.kind:hover { color:var(--sel); }
+  tr.detail td { background:var(--panel); }
+  tr.detail .lang { font-weight:600; font-size:11px; color:var(--dim); margin-bottom:2px; }
+  .ev { font-size:11px; color:var(--dim); }
+  .prop { margin-top:4px; border:1px solid var(--prop); background:transparent; color:var(--prop); border-radius:8px; padding:1px 8px; font-size:11px; cursor:pointer; font:inherit; font-size:11px; }
+  .prop.on { background:color-mix(in srgb,var(--prop) 35%,transparent); color:var(--text); }
+  .propsig { margin-top:3px; color:var(--prop); font-family:ui-monospace, monospace; font-size:11px; white-space:normal; max-width:260px; }
+  .why { margin-top:2px; color:var(--dim); font-size:11px; white-space:normal; max-width:260px; }
+  .breaks { margin-top:2px; color:#ffa198; font-family:ui-monospace, monospace; font-size:11px; white-space:normal; max-width:260px; }
+  label.tool input { display:none; }
+  details { margin:2px 0; }
+  details > summary { cursor:pointer; padding:3px 6px; border-radius:4px; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary::before { content:"▸ "; color:var(--dim); }
+  details[open] > summary::before { content:"▾ "; }
+  details > summary:hover { background:var(--panel); }
+  .hits { margin:4px 0 8px 18px; }
+  .hits code { font-size:11px; background:var(--panel); border:1px solid var(--line); padding:0 4px; border-radius:4px; }
+  .hits .where { font-size:11px; }
+  .hits .source { margin-bottom:8px; }
+  .tag { font-size:10px; border:1px solid var(--line); border-radius:8px; padding:0 6px; color:var(--dim); }
 </style>
 </head>
 <body>
-<h1>What each option takes</h1>
-<div class="bar" id="apis"></div>
-<div class="bar" id="langs"></div>
-<div class="bar"><span class="chip b0">as is</span><span class="chip b1">one call</span><span class="chip b2">&gt;1 call</span><span class="chip bx">no fix found</span><span class="chip warn">⚠ risky, or breaks a rule</span><span class="chip failed">✗ compiles, but the run fails</span><span class="chip bx">▲ ▼ moved by a proposal</span></div>
-<div id="view"></div>
-<div id="panel" class="panel">Click any type to see its code and checks.</div>
-<div class="foot" id="foot"></div>
+<header>
+  <h1>Types</h1>
+  <div class="tabs" id="apis"></div>
+  <div class="tabs" id="langs"></div>
+  <span class="run" id="run"></span>
+</header>
+<main id="main">
+  <section id="left">
+    <div class="legend">
+      <span><i class="sw b0"></i>as is</span>
+      <span><i class="sw b1"></i>one call</span>
+      <span><i class="sw b2"></i>&gt;1 call</span>
+      <span><i class="sw bx" style="border:1px dashed var(--line)"></i>no fix found</span>
+      <span><i class="sw" style="border:1px solid var(--fail)"></i>⚠ risky, or breaks a rule</span>
+      <span>✗ compiles, but the run fails</span>
+      <span style="color:var(--prop)">▲ ▼ moved by a proposal</span>
+    </div>
+    <p class="sub">Each row is one option. Each chip is a type a customer may hold, under the number of calls it takes to pass. Hover a chip for what it is, or click it for its code and checks.</p>
+    <div id="view"></div>
+    <p class="sub" id="foot"></p>
+  </section>
+  <div id="divider" title="Drag to resize. Double-click to reset."></div>
+  <section id="detail"></section>
+</main>
 <script>
 // The page draws four files from this folder:
 //   types.json        Rust rows from compile_rust_types.py, which compiles each held type on each option and runs the
-//                     call that compiled. Other languages' rows from other_languages.py, not compiled.
+//                     call that compiled. Other languages' rows from other_languages.py, not compiled. "about" says
+//                     what each type is, and, for Rust, where a customer gets one.
 //   usage.json        how public customer code calls each option, from api-examples/usage_search.py.
 //   expectations.json rules a person wrote for what an option should not take as is.
 //   proposals.json    proposed signatures, when the api-signature-proposals skill ran here. Optional.
@@ -94,10 +141,13 @@ const opened = new Set();     // option|kind rows that are open in the compariso
 const openDetails = new Set(); // customer lists that are open
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Doc text keeps its `code` spans.
+const docHtml = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
 const level = calls => calls === null || calls === undefined ? "x" : Math.min(calls, 2);
 const option = key => key.split(".")[1];
 const blob = (file, line) => `${COMMONS}/blob/${REF.split("/").map(encodeURIComponent).join("/")}/${file}#L${line}`;
 const ciLink = () => `${COMMONS}/actions/workflows/api-examples-types.yml?query=${encodeURIComponent("branch:" + REF)}`;
+const langName = l => LANGS.find(x => x[1] === l)[0];
 
 const proposalOf = key => ((proposals || {}).options || {})[key];
 const proposalFor = (key, l) => ((proposalOf(key) || {}).languages || {})[l];
@@ -106,6 +156,7 @@ const rawRows = (key, l) => (l === "rust" ? data.rust[key] : ((data.others || {}
 const rowsOf = (key, l) => (proposed.has(key) && proposalFor(key, l) ? proposalFor(key, l).rows : rawRows(key, l));
 const kindOf = (row, l) => l === "rust" ? RUST_KIND[row.kind] : row.kind;
 const takesOf = (key, l) => l === "rust" ? data.takes[key] : ((data.shipped[key] || {})[l] || []).join(", ");
+const aboutOf = (l, type) => ((data.about || {})[l] || {})[type];
 
 // A rule from expectations.json, checked against one row: ok is false when the row takes a refused kind as is.
 function expected(key, row) {
@@ -130,13 +181,21 @@ function moved(row) {
   return row.today === null || (row.calls !== null && row.calls < row.today) ? " ▲" : " ▼";
 }
 
+// A chip's hover text: what each part of its type is, and what it took before a proposal.
+function hoverText(l, row) {
+  const about = aboutOf(l, row.type);
+  const lines = about ? about.parts.filter(p => p.text).map(p => `${p.name}: ${p.text}`) : [];
+  if ("today" in row) lines.push(`Was ${LEVEL[level(row.today)]}.`);
+  return lines.join("\n");
+}
+
 function chip(key, l, row, text) {
   const rule = expected(key, row);
   const warn = (rule && !rule.ok) || risk(row);
   const failed = runFailed(row);
-  const was = "today" in row ? ` title="was ${esc(LEVEL[level(row.today)])}"` : "";
-  return `<span class="chip b${level(row.calls)}${warn ? " warn" : ""}${failed ? " failed" : ""}"${was} data-key="${esc(key)}" `
-    + `data-lang="${l}" data-type="${esc(row.type)}">${esc(text)}${warn ? " ⚠" : ""}${failed ? " ✗" : ""}${moved(row)}</span>`;
+  const hover = hoverText(l, row);
+  return `<span class="chip b${level(row.calls)}${warn ? " warn" : ""}${failed ? " failed" : ""}"${hover ? ` title="${esc(hover)}"` : ""} `
+    + `data-key="${esc(key)}" data-lang="${l}" data-type="${esc(row.type)}">${esc(text)}${warn ? " ⚠" : ""}${failed ? " ✗" : ""}${moved(row)}</span>`;
 }
 
 function propButton(key) {
@@ -161,7 +220,7 @@ function optionCell(key, takes) {
 
 function mapView() {
   const levels = [0, 1, 2, "x"];
-  let html = "<table><tr><th>Option · takes</th>" + levels.map(l => `<th>${esc(LEVEL[l][0].toUpperCase() + LEVEL[l].slice(1))}</th>`).join("") + "</tr>";
+  let html = "<table><thead><tr><th>Option · takes</th>" + levels.map(l => `<th>${esc(LEVEL[l][0].toUpperCase() + LEVEL[l].slice(1))}</th>`).join("") + "</tr></thead><tbody>";
   for (const key of data.apis[api].options) {
     const takes = takesOf(key, lang);
     html += "<tr>" + optionCell(key, takes);
@@ -173,7 +232,7 @@ function mapView() {
     for (const row of rowsOf(key, lang)) cells[level(row.calls)] += chip(key, lang, row, row.type);
     html += levels.map(l => `<td>${cells[l]}</td>`).join("") + "</tr>";
   }
-  return html + "</table>";
+  return html + "</tbody></table>";
 }
 
 // The cheaper of two rows. A row with no fix found loses.
@@ -203,7 +262,7 @@ function compareView() {
     const on = proposed.has(key);
     const button = hasProposal(key) ? " " + propButton(key) : "";
     const sig = on && proposalFor(key, "rust") ? `<div class="propsig">${esc(proposalFor(key, "rust").signature)}</div>` : "";
-    html += `<table><tr><th>${esc(option(key))}${button}${sig}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("")
+    html += `<table><tr class="head"><th>${esc(option(key))}${button}${sig}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("")
       + "<th>What customers convert</th></tr>";
     for (const kind of KINDS.filter(k => all[k] || convs.some(c => c.kind === k))) {
       const id = `${key}|${kind}`;
@@ -237,8 +296,8 @@ function detailRow(key, kind, byLang, convs) {
 
 // Every customer call for one option, grouped by conversion and then by source. Copies of AWS code come last.
 function customerList(key, convs) {
-  if (!usage) return `<div class="ev">usage.json didn't load, so customer calls are hidden.</div>`;
-  if (!convs.length) return `<div class="ev">The customer search found no calls that set ${esc(option(key))}.</div>`;
+  if (!usage) return `<p class="sub">usage.json didn't load, so customer calls are hidden.</p>`;
+  if (!convs.length) return `<p class="sub">The customer search found no calls that set ${esc(option(key))}.</p>`;
   let html = `<details data-id="${esc(key)}|customers"${openDetails.has(key + "|customers") ? " open" : ""}>`
     + `<summary><b>How customers call ${esc(option(key))}</b> <span class="ev">${convs.reduce((n, c) => n + c.count, 0)} hits</span></summary>`;
   for (const c of convs.slice().sort((a, b) => b.sources - a.sources)) {
@@ -291,9 +350,29 @@ function runText(run) {
   return text + ".";
 }
 
+// What a type is, part by part, and for Rust, where a customer gets one.
+function aboutHtml(l, type) {
+  const about = aboutOf(l, type);
+  if (!about) return "";
+  let html = "<h3>What it is</h3><ul>" + about.parts.map(p => {
+    const text = p.text ? (p.from ? `<span class="quote">“${docHtml(p.text)}”</span>` : esc(p.text)) : `<span class="ev">No doc comment.</span>`;
+    const link = p.url ? ` <a href="${esc(p.url)}" target="_blank">${p.from ? `${esc(p.from)} source ↗` : "docs ↗"}</a>` : "";
+    return `<li><code>${esc(p.name)}</code> ${text}${link}</li>`;
+  }).join("") + "</ul>";
+  const held = about.held;
+  if (held) {
+    html += `<h3>Where a customer gets one</h3><p class="sub">${esc(held.text)} Some of them:</p><ul>`
+      + held.examples.map(e => `<li>${esc(e.crate)}: <a href="${esc(e.url)}" target="_blank"><code>${esc(e.item)}${e.pos === "return" ? "()" : ""}</code></a> `
+        + `${e.pos === "return" ? "returns one" : "is one"}</li>`).join("") + "</ul>";
+    if (held.why) html += `<p class="sub">It counts as this kind because ${docHtml(held.why.charAt(0).toLowerCase() + held.why.slice(1))}</p>`;
+  } else if (l !== "rust") {
+    html += `<p class="sub">Picked by hand for this page.</p>`;
+  }
+  return html;
+}
+
 function show(key, l, type) {
   const row = rowsOf(key, l).find(r => r.type === type);
-  const name = LANGS.find(x => x[1] === l)[0];
   // A pair row stands for two values: x and y in Rust, k and v in the other languages.
   const pair = row.kind === "pair" || row.kind === "pairs";
   const held = pair ? `${l === "rust" ? "x, y" : "k, v"}: ${type.slice(1, -1).split(", ")[0]}` : `x: ${type}`;
@@ -319,23 +398,28 @@ function show(key, l, type) {
   const rule = expected(key, row);
   if (rule) checks.push(`${rule.ok ? "✅" : "⚠"} Rule: ${esc(rule.text)}`);
   if (risk(row)) checks.push(`⚠ ${esc(risk(row))}`);
-  $("panel").innerHTML = `<div class="title">${esc(name)}, ${esc(held)}</div><pre>${esc(code)}</pre><ul>${checks.map(c => `<li>${c}</li>`).join("")}</ul>`;
+  $("detail").innerHTML = `<button class="close" data-close title="Close">×</button><h2>${esc(type)}</h2>`
+    + `<div class="sub">${esc(langName(l))} · ${esc(option(key))} · ${esc(held)}</div>`
+    + aboutHtml(l, type)
+    + `<h3>Code</h3><pre>${esc(code)}</pre><h3>Checks</h3><ul>${checks.map(c => `<li>${c}</li>`).join("")}</ul>`;
+  $("main").classList.add("open");
 }
 
 function draw() {
   $("apis").innerHTML = data.apis.map((a, i) => `<button data-api="${i}" class="${i === api ? "on" : ""}">${esc(a.name)}</button>`).join("");
   const options = data.apis[api].options.filter(hasProposal);
   const allOn = options.length > 0 && options.every(k => proposed.has(k));
-  const toggle = proposals ? `<span class="gap"></span><button data-all-proposals class="${allOn ? "on" : ""}"${options.length ? "" : " disabled"}>`
+  const toggle = proposals ? `<button class="tool${allOn ? " on" : ""}" data-all-proposals${options.length ? "" : " disabled"}>`
     + `${allOn ? "Hide" : "Show"} proposed signatures</button>` : "";
   $("langs").innerHTML = LANGS.map(([n, l]) => `<button data-lang="${l}" class="${l === lang ? "on" : ""}">${n}</button>`).join("")
-    + `<span class="gap"></span><button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`
-    + toggle + `<span class="gap"></span><label class="load">Load proposals… <input type="file" id="load" accept=".json" hidden></label>`;
+    + `<button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`
+    + toggle + `<label class="tool">Load proposals… <input type="file" id="load" accept=".json"></label>`;
   $("view").innerHTML = lang === "compare" ? compareView() : mapView();
 }
 
 function reset() {
-  $("panel").textContent = "Click any type to see its code and checks.";
+  $("detail").innerHTML = "";
+  $("main").classList.remove("open");
 }
 
 function foot() {
@@ -344,6 +428,7 @@ function foot() {
     + `Skipped: ${usage.search ? usage.search.skipped.join("; ") : "AWS repos and forks"}. ${usage.search ? usage.search.sources : ""}`);
   if (proposals) parts.push(proposals.checked);
   $("foot").textContent = parts.filter(Boolean).join(" ");
+  $("run").textContent = data.rust_commit ? `Rust ${data.rust_commit.slice(0, 7)} · rustc ${data.rustc}` : "";
 }
 
 $("apis").addEventListener("click", e => {
@@ -372,6 +457,12 @@ $("langs").addEventListener("change", e => {
   const file = e.target.files && e.target.files[0];
   if (file) file.text().then(text => useProposals(JSON.parse(text)));
 });
+$("detail").addEventListener("click", e => {
+  if (e.target.closest("[data-close]")) {
+    for (const s of document.querySelectorAll(".chip.sel")) s.classList.remove("sel");
+    reset();
+  }
+});
 $("view").addEventListener("click", e => {
   const prop = e.target.closest(".prop");
   if (prop) {
@@ -399,6 +490,24 @@ $("view").addEventListener("toggle", e => {
   const id = e.target.dataset && e.target.dataset.id;
   if (id) e.target.open ? openDetails.add(id) : openDetails.delete(id);
 }, true);
+
+// Drag the divider to resize the two panes, the same way the test server page does. Double-click resets it.
+(() => {
+  const main = $("main"), div = $("divider");
+  const set = px => main.style.setProperty("--left", px ? px + "px" : "1.4fr");
+  set(+localStorage.getItem("typesLeftPane") || 0);
+  div.addEventListener("mousedown", e => {
+    e.preventDefault(); div.classList.add("drag"); document.body.classList.add("resizing");
+    const move = ev => {
+      const px = Math.min(Math.max(ev.clientX - main.getBoundingClientRect().left, 320), main.clientWidth - 280);
+      set(px); localStorage.setItem("typesLeftPane", Math.round(px));
+    };
+    const up = () => { div.classList.remove("drag"); document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  });
+  div.addEventListener("dblclick", () => { localStorage.removeItem("typesLeftPane"); set(0); });
+})();
 
 function useProposals(found) {
   proposals = found;

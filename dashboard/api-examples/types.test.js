@@ -90,11 +90,13 @@ async function open(files = {}, search = "") {
   const all = { "types.json": TYPES, "usage.json": USAGE, "expectations.json": RULES, "proposals.json": null, ...files };
   const els = {};
   const document = {
-    getElementById: id => els[id] || (els[id] = { innerHTML: "", textContent: "", on: {}, addEventListener(type, f) { this.on[type] = f; } }),
+    getElementById: id => els[id] || (els[id] = { innerHTML: "", textContent: "", on: {}, classList: { add() {}, remove() {} },
+      style: { setProperty() {} }, addEventListener(type, f) { this.on[type] = f; } }),
     querySelectorAll: () => [],
   };
   const fetch = async name => ({ ok: all[name] !== null, json: async () => structuredClone(all[name]) });
-  new Function("document", "fetch", "location", SCRIPT)(document, fetch, { search });
+  const localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  new Function("document", "fetch", "location", "localStorage", SCRIPT)(document, fetch, { search }, localStorage);
   await new Promise(resolve => setTimeout(resolve, 20));
   // A click on an element in #id that matches each selector in `matches`, with that selector's dataset.
   const click = (id, matches) => els[id].on.click({ target: { closest: s => (s in matches ? { dataset: matches[s], classList: { add() {} } } : null) } });
@@ -105,7 +107,7 @@ async function open(files = {}, search = "") {
     pickLang: lang => click("langs", { button: { lang } }),
     chip: (key, lang, type) => {
       click("view", { ".chip": { key, lang, type } });
-      return els.panel.innerHTML;
+      return els.detail.innerHTML;
     },
     openRow: id => click("view", { "tr[data-open]": { open: id } }),
     propose: key => click("view", { ".prop": { prop: key } }),
@@ -268,7 +270,7 @@ test("every chip on the committed page opens its panel", async () => {
     for (const lang of ["rust", "java", "python", "dotnet", "go", "javascript", "compare"]) {
       page.pickLang(lang);
       for (const m of page.els.view.innerHTML.matchAll(/data-key="([^"]*)" data-lang="([^"]*)" data-type="([^"]*)"/g)) {
-        assert.match(page.chip(unesc(m[1]), m[2], unesc(m[3])), /^<div class="title">/);
+        assert.match(page.chip(unesc(m[1]), m[2], unesc(m[3])), /<h2>/);
         opened++;
       }
     }

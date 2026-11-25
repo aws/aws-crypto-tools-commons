@@ -88,7 +88,7 @@ def main():
     if unknown:
         raise SystemExit(f"unknown options: {sorted(unknown)}")
     rust_specs = {key: spec["rust"] for key, spec in options.items() if spec.get("rust")}
-    held, scratch = crt.prepare(rust_repo, "\n".join(s.get("code", "") for s in rust_specs.values()))
+    held, scratch, _ = crt.prepare(rust_repo, "\n".join(s.get("code", "") for s in rust_specs.values()))
     # Proposals are compiled but not run, because their code only models the API, with todo!() bodies.
 
     # Today's setters first, then one module per proposal with its types and setters.

@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-proc-macro2 = "1"
+# span-locations gives each item's line number, so the page can link to it.
+proc-macro2 = { version = "1", features = ["span-locations"] }
 serde_json = "1"
 syn = { version = "2", features = ["full"] }
