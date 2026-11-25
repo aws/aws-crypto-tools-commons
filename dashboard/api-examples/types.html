@@ -30,13 +30,17 @@
   .ev { font-size: 11px; color: #57606a; }
   pre { background: #0d1117; color: #e6edf3; padding: 8px 10px; border-radius: 6px; margin: 4px 0 0; font-size: 12px; white-space: pre-wrap; }
   .foot { color: #57606a; font-size: 11px; margin-top: 6px; }
+  .prop { margin-top: 4px; border: 1px solid #8250df; background: #fff; color: #8250df; border-radius: 10px; padding: 1px 8px; font-size: 11px; cursor: pointer; }
+  .prop.on { background: #8250df; color: #fff; }
+  .propsig { margin-top: 3px; color: #8250df; font-family: ui-monospace, monospace; font-size: 11px; white-space: normal; max-width: 260px; }
+  .why { margin-top: 2px; color: #57606a; font-size: 11px; white-space: normal; max-width: 260px; }
 </style>
 </head>
 <body>
 <h1>What each option takes</h1>
 <div class="bar" id="apis"></div>
 <div class="bar" id="langs"></div>
-<div class="bar"><span class="chip b0">as is</span><span class="chip b1">+ &amp; or Some</span><span class="chip b2">one call</span><span class="chip b4">real work</span><span class="chip bx">no fix found</span><span class="chip warn">⚠ works, risky</span></div>
+<div class="bar"><span class="chip b0">as is</span><span class="chip b1">+ &amp; or Some</span><span class="chip b2">one call</span><span class="chip b4">real work</span><span class="chip bx">no fix found</span><span class="chip warn">⚠ works, risky</span><span class="chip bx">▲ ▼ moved by a proposal</span></div>
 <div id="view"></div>
 <pre id="code">Click any type to see its code.</pre>
 <div class="foot" id="foot"></div>
@@ -59,7 +63,113 @@ const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(
 // Cost 0 passes the value as is, 1 adds & or Some, 2 or 3 adds one call, 4 or more is real work.
 const level = cost => cost === null ? "x" : cost === 0 ? 0 : cost === 1 ? 1 : cost <= 3 ? 2 : 4;
 
-const rowsOf = (key, l) => (l === "rust" ? data.rust[key] : ((data.others || {})[key] || {})[l]) || [];
+// Proposed signatures, written by hand and not compiled.
+// For Rust, `rust(row)` gives a row's new [cost, call] under the proposal, or nothing to leave the row as it is.
+// For the other languages, the kinds in `asIs` pass as is, except paths, which stay explicit.
+const PATH_LIKE = /Path|path|FileInfo/;
+const PROPOSALS = {
+  "esdk/encrypt.plaintext": {
+    sig: "plaintext(impl Into<Plaintext>)",
+    why: "One Plaintext type with From for bytes, text and readers. Opening a path stays one explicit call.",
+    rust: r => ["bytes", "text", "reader", "stream"].includes(r[3]) ? [0, ".plaintext(x)"]
+      : r[3] === "path" ? [2, ".plaintext(std::fs::File::open(x)?)"] : null,
+    asIs: { java: ["bytes", "text", "file / stream"], dotnet: ["bytes", "text", "file / stream"], go: ["bytes", "file / stream"] },
+    rename: { go: ["Plaintext:", "PlaintextReader:", "file / stream"] },
+    sigs: { java: "plaintext overloads: byte[], ByteBuffer, String, InputStream", dotnet: "Plaintext from byte[], string or Stream",
+      go: "Plaintext []byte, plus PlaintextReader io.Reader" },
+  },
+  "esdk/decrypt.ciphertext": {
+    sig: "ciphertext(impl Into<Ciphertext>)",
+    why: "Ciphertext from bytes or a reader. Text stays explicit, because it may be base64.",
+    rust: r => ["bytes", "reader", "stream"].includes(r[3]) ? [0, ".ciphertext(x)"]
+      : r[3] === "path" ? [2, ".ciphertext(std::fs::File::open(x)?)"] : null,
+    asIs: { java: ["bytes", "file / stream"], dotnet: ["bytes", "file / stream"], go: ["bytes", "file / stream"] },
+    rename: { go: ["Ciphertext:", "CiphertextReader:", "file / stream"] },
+    sigs: { java: "ciphertext overloads: byte[], ByteBuffer, InputStream", dotnet: "Ciphertext from byte[] or Stream",
+      go: "Ciphertext []byte, plus CiphertextReader io.Reader" },
+  },
+  "mpl/RawAesKeyring.wrapping_key": {
+    sig: "wrapping_key(impl Into<WrappingKey>)",
+    why: "Takes key bytes as is, and stops taking text, so a password can't become a key by accident.",
+    rust: r => r[3] === "bytes" ? [0, ".wrapping_key(x)"] : r[3] === "text" ? [2, ".wrapping_key(x.as_bytes())"] : null,
+    asIs: { java: ["bytes"], dotnet: ["bytes"] },
+    sigs: { java: "wrappingKey overloads: byte[], ByteBuffer", dotnet: "WrappingKey from byte[] or MemoryStream" },
+  },
+  "mpl/AwsKmsKeyring.kms_client": {
+    sig: "kms_client(impl Into<KmsClient>), with From for &Client, Arc<Client>, &SdkConfig and kms::Config",
+    why: "Takes a client, a borrowed or shared client, or the config that builds one.",
+    rust: r => ["named", "ctor"].includes(r[3]) ? [0, ".kms_client(x)"] : null,
+    asIs: { java: ["what builds it"], python: ["what builds it"], dotnet: ["what builds it"], go: ["what builds it"],
+      javascript: ["the type itself", "what builds it"] },
+    sigs: { java: "kmsClient overloads: KmsClient, Region", python: "kms_client: BaseClient | Session",
+      dotnet: "KmsClient from a client or its config", go: "KmsClient *kms.Client, plus Config aws.Config",
+      javascript: "client: KMSClient | KMSClientConfig, beside clientProvider" },
+  },
+  "mpl/AwsKmsKeyring.grant_tokens": {
+    sig: "grant_tokens(impl IntoIterator<Item = impl Into<String>>), plus grant_token(impl Into<String>)",
+    why: "Takes a whole list as is, and one token with grant_token.",
+    rust: r => r[3] === "list" ? [0, ".grant_tokens(x)"] : r[3] === "text" && r[1] === 0 ? [0, ".grant_token(x)"] : null,
+    asIs: { java: ["text"], python: ["text"], dotnet: ["text"], go: ["text"], javascript: ["text"] },
+    rename: { java: [".grantTokens(", ".grantToken("] },
+    sigs: { java: "grantTokens(List<String>), plus grantToken(String)", python: "grant_tokens: list[str] | str",
+      dotnet: "GrantTokens, plus a GrantToken(string) helper", go: "GrantTokens []string, plus a GrantToken(string) option",
+      javascript: "grantTokens: string[] | string" },
+  },
+  "esdk/encrypt.encryption_context": {
+    sig: "encryption_context(impl Into<EncryptionContext>), plus encryption_context_entry(key, value)",
+    why: "Takes a whole map as is, and one pair with encryption_context_entry.",
+    rust: r => r[3] === "map" ? [0, ".encryption_context(x)"] : r[3] === "pair" && r[1] === 0 ? [0, ".encryption_context_entry(x, y)"] : null,
+  },
+  "esdk/encrypt.frame_length": {
+    sig: "frame_length(impl Into<u32>)",
+    why: "Smaller unsigned numbers fit, so they pass as is. Others still convert, so an overflow stays visible.",
+    rust: r => ["u8", "u16"].includes(r[0]) ? [0, ".frame_length(x)"] : null,
+  },
+  "esdk/Client.max_encrypted_data_keys": {
+    sig: "max_encrypted_data_keys(impl Into<usize>)",
+    why: "Smaller unsigned numbers fit, so they pass as is. Others still convert, so an overflow stays visible.",
+    rust: r => ["u8", "u16"].includes(r[0]) ? [0, ".max_encrypted_data_keys(x)"] : null,
+  },
+};
+// Options with no proposal say why.
+const NO_CHANGE = {
+  "mpl/RawAesKeyring.key_name": "Already takes every text type as is.",
+  "mpl/AwsKmsKeyring.kms_key_id": "Already takes every text type as is.",
+  "mpl/HierarchicalKeyring.branch_key_id": "Already takes every text type as is.",
+  "mpl/HierarchicalKeyring.ttl": "Numbers need a unit. Duration::from_secs(x) says which, so it stays.",
+};
+const proposed = new Set();
+
+const rawRows = (key, l) => (l === "rust" ? data.rust[key] : ((data.others || {})[key] || {})[l]) || [];
+
+// A changed row is [type, new cost, code, kind, old cost].
+function proposedRows(key, l) {
+  const p = PROPOSALS[key];
+  const rows = rawRows(key, l);
+  if (!p || !proposed.has(key)) return rows;
+  if (l === "rust") {
+    // The part of the call before the option, like ".encrypt()" in ".encrypt().plaintext(x)".
+    const setter = "." + key.split(".")[1] + "(";
+    const sample = rows.find(r => r[2].includes(setter));
+    const before = sample ? sample[2].slice(0, sample[2].indexOf(setter)) : "";
+    return rows.map(r => {
+      const change = p.rust(r);
+      return change ? [r[0], change[0], before + change[1], r[3], r[1]] : r;
+    });
+  }
+  const kinds = (p.asIs || {})[l] || [];
+  // A proposed overload is called like the type the language takes as is today, with x in place.
+  const asIsNow = rows.find(r => r[1] === 0 && r[3] === "bytes") || rows.find(r => r[1] === 0);
+  if (!asIsNow) return rows;
+  const [from, to, onlyKind] = (p.rename || {})[l] || [];
+  return rows.map(r => {
+    if (!kinds.includes(r[3]) || r[1] === 0 || PATH_LIKE.test(r[0])) return r;
+    const code = from && (!onlyKind || r[3] === onlyKind) ? asIsNow[2].replace(from, to) : asIsNow[2];
+    return [r[0], 0, code, r[3], r[1]];
+  });
+}
+
+const rowsOf = proposedRows;
 const kindOf = (row, l) => l === "rust" ? RUST_KIND[row[3]] : row[3];
 const takesOf = (key, l) => l === "rust" ? data.takes[key] : ((data.shipped[key] || {})[l] || []).join(", ");
 
@@ -71,10 +181,31 @@ function risk(key, row) {
   return "";
 }
 
+// ▲ marks a row the proposal makes cheaper, and ▼ one it makes dearer.
+function moved(row) {
+  if (row.length < 5 || level(row[1]) === level(row[4])) return "";
+  return row[4] === null || (row[1] !== null && row[1] < row[4]) ? " ▲" : " ▼";
+}
+
 function chip(key, l, row, text) {
   const warn = risk(key, row);
   const id = [key, l, row[0]].join("|");
-  return `<span class="chip b${level(row[1])}${warn ? " warn" : ""}${picked === id ? " sel" : ""}" data-key="${esc(key)}" data-lang="${l}" data-type="${esc(row[0])}">${esc(text)}${warn ? " ⚠" : ""}</span>`;
+  const was = row.length > 4 ? ` title="was ${LEVEL[level(row[4])]}"` : "";
+  return `<span class="chip b${level(row[1])}${warn ? " warn" : ""}${picked === id ? " sel" : ""}"${was} data-key="${esc(key)}" data-lang="${l}" data-type="${esc(row[0])}">${esc(text)}${warn ? " ⚠" : ""}${moved(row)}</span>`;
+}
+
+// The option cell: its name, what it takes, and the proposal button and text.
+function optionCell(key, takes) {
+  const p = PROPOSALS[key];
+  let html = `<td class="opt"><b>${esc(key.split(".")[1])}</b><div>${esc(takes || "not offered")}</div>`;
+  if (!p) return html + (NO_CHANGE[key] && lang === "rust" ? `<div class="why">No proposal. ${esc(NO_CHANGE[key])}</div>` : "") + "</td>";
+  const on = proposed.has(key);
+  html += `<button class="prop${on ? " on" : ""}" data-prop="${esc(key)}">${on ? "Proposed ▾" : "Proposed ▸"}</button>`;
+  if (on) {
+    const sig = lang === "rust" ? p.sig : (p.sigs || {})[lang] || "no change";
+    html += `<div class="propsig">${esc(sig)}</div>` + (lang === "rust" ? `<div class="why">${esc(p.why)}</div>` : "");
+  }
+  return html + "</td>";
 }
 
 function mapView() {
@@ -82,7 +213,7 @@ function mapView() {
   let html = "<table><tr><th>Option · takes</th>" + levels.map(l => `<th>${esc(LEVEL[l][0].toUpperCase() + LEVEL[l].slice(1))}</th>`).join("") + "</tr>";
   for (const key of data.apis[api].options) {
     const takes = takesOf(key, lang);
-    html += `<tr><td class="opt"><b>${esc(key.split(".")[1])}</b><div>${esc(takes || "not offered")}</div></td>`;
+    html += "<tr>" + optionCell(key, takes);
     if (!takes) {
       html += `<td class="none" colspan="${levels.length}">Not offered</td></tr>`;
       continue;
@@ -110,7 +241,10 @@ function compareView() {
       }
     }
     const customers = data.customers[key] || {};
-    html += `<table><tr><th>${esc(key.split(".")[1])}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("") + "<th>Customers convert</th></tr>";
+    const on = proposed.has(key);
+    const button = PROPOSALS[key] ? ` <button class="prop${on ? " on" : ""}" data-prop="${esc(key)}">${on ? "Proposed ▾" : "Proposed ▸"}</button>` : "";
+    const sig = on ? `<div class="propsig">${esc(PROPOSALS[key].sig)}</div>` : "";
+    html += `<table><tr><th>${esc(key.split(".")[1])}${button}${sig}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("") + "<th>Customers convert</th></tr>";
     for (const kind of KINDS.filter(k => best[k] || customers[k])) {
       html += `<tr><td>${esc(kind)}</td>`;
       for (const [, l] of LANGS) {
@@ -137,14 +271,23 @@ function show(key, l, type) {
   }
   const warn = risk(key, row);
   const code = l === "rust" ? data.apis[api].call + row[2] : row[2];
-  const proof = l === "rust" ? "// ✅ compiled" : "// ⚙ written from the release's signature, not compiled";
+  const p = PROPOSALS[key];
+  let proof = l === "rust" ? "// ✅ compiled" : "// ⚙ written from the release's signature, not compiled";
+  if (row.length > 4) {
+    const sig = l === "rust" ? p.sig : (p.sigs || {})[l];
+    proof = `// ✏️ proposed: ${sig}. Not compiled. Today: ${LEVEL[level(row[4])]}.`;
+  }
   $("code").textContent = `// ${name}, ${held}\n${code}\n${proof}` + (warn ? `\n// ⚠ ${warn}` : "");
 }
 
 function draw() {
   $("apis").innerHTML = data.apis.map((a, i) => `<button data-api="${i}" class="${i === api ? "on" : ""}">${esc(a.name)}</button>`).join("");
+  const options = data.apis[api].options.filter(k => PROPOSALS[k]);
+  const allOn = options.length > 0 && options.every(k => proposed.has(k));
   $("langs").innerHTML = LANGS.map(([n, l]) => `<button data-lang="${l}" class="${l === lang ? "on" : ""}">${n}</button>`).join("")
-    + `<span class="gap"></span><button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`;
+    + `<span class="gap"></span><button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`
+    + `<span class="gap"></span><button data-all-proposals class="${allOn ? "on" : ""}"${options.length ? "" : " disabled"}>`
+    + `${allOn ? "Hide" : "Show"} proposed signatures</button>`;
   $("view").innerHTML = lang === "compare" ? compareView() : mapView();
 }
 
@@ -163,11 +306,26 @@ $("apis").addEventListener("click", e => {
 $("langs").addEventListener("click", e => {
   const button = e.target.closest("button");
   if (!button) return;
+  if ("allProposals" in button.dataset) {
+    const options = data.apis[api].options.filter(k => PROPOSALS[k]);
+    const allOn = options.every(k => proposed.has(k));
+    for (const k of options) allOn ? proposed.delete(k) : proposed.add(k);
+    reset();
+    draw();
+    return;
+  }
   lang = button.dataset.lang;
   reset();
   draw();
 });
 $("view").addEventListener("click", e => {
+  const prop = e.target.closest(".prop");
+  if (prop) {
+    proposed.has(prop.dataset.prop) ? proposed.delete(prop.dataset.prop) : proposed.add(prop.dataset.prop);
+    reset();
+    draw();
+    return;
+  }
   const c = e.target.closest(".chip");
   if (!c || !c.dataset.key) return;
   picked = [c.dataset.key, c.dataset.lang, c.dataset.type].join("|");
