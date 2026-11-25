@@ -76,26 +76,28 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
     // Initialization
     // -----------------------------------------------------------------------
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] construction without a key id fails {0}")
-    void constructionWithoutKeyIdFails(Mpl mpl, MockKms mockKms) {
+    @KeyringTest(feature = "aws-kms", name = "the KMS key ID must be provided {0}")
+    void kmsKeyIdMustBeProvided(Mpl mpl, MockKms mockKms) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# - MUST provide an AWS KMS key identifier
-        // Accepts an AWS KMS key identifier
+
+        // AWS KMS key identifier provided: succeeds
         mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create()
             .assertEncryptsAndDecrypts();
-        // Rejects a missing AWS KMS key identifier
+
+        // AWS KMS key identifier not provided: fails
         mpl.awsKmsKeyring()
             .kmsClient(realKms(REGION))
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] construction without a KMS client fails {0}")
-    void constructionWithoutKmsClientFails(Mpl mpl, MockKms mockKms) {
+    @KeyringTest(feature = "aws-kms", name = "the KMS client must be provided {0}")
+    void kmsClientMustBeProvided(Mpl mpl, MockKms mockKms) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# - MUST provide an AWS KMS SDK client
@@ -103,14 +105,16 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS SDK client MUST NOT be null.
-        // Accepts an AWS KMS client
+
+        // AWS KMS SDK client provided: succeeds
         mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create()
             .assertEncryptsAndDecrypts();
-        // Rejects a missing AWS KMS client
+
+        // AWS KMS SDK client not provided: fails
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .createFailsWith(INVALID_CONFIGURATION_ERROR)
@@ -123,12 +127,14 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] construction accepts {0} {1}",
+        name = "grant tokens may be provided {0} {1}",
         inputs = "validGrantTokenLists")
-    void constructionAcceptsGrantTokens(Example<List<String>> grantTokens, Mpl mpl, MockKms mockKms) {
+    void grantTokensMayBeProvided(Example<List<String>> grantTokens, Mpl mpl, MockKms mockKms) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# - MAY provide a list of Grant Tokens
+
+        // a list of Grant Tokens provided: succeeds
         mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -144,10 +150,10 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] construction rejects {0} {1}",
+        name = "grant tokens must be valid {0} {1}",
         inputs = "invalidGrantTokenLists")
-    void constructionRejectsInvalidGrantTokens(Example<List<String>> grantTokens, Mpl mpl, MockKms mockKms) {
-        // Accepts valid grant tokens
+    void grantTokensMustBeValid(Example<List<String>> grantTokens, Mpl mpl, MockKms mockKms) {
+        // valid Grant Tokens: succeeds
         mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -155,7 +161,8 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
             .grantTokens(GRANT_TOKENS)
             .create()
             .assertEncryptsAndDecrypts();
-        // Rejects invalid grant tokens
+
+        // invalid Grant Tokens: fails
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(realKms(REGION))
@@ -163,19 +170,21 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
             .createFailsWith(INVALID_CONFIGURATION_ERROR);
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] construction rejects an empty key id {0}")
-    void constructionRejectsEmptyKeyId(Mpl mpl, MockKms mockKms) {
+    @KeyringTest(feature = "aws-kms", name = "the KMS key ID must not be empty {0}")
+    void kmsKeyIdMustNotBeEmpty(Mpl mpl, MockKms mockKms) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST NOT be null or empty.
-        // Accepts non-empty AWS KMS key identifier
+
+        // not empty: succeeds
         mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create()
             .assertEncryptsAndDecrypts();
-        // Rejects empty AWS KMS key identifier
+
+        // empty: fails
         mpl.awsKmsKeyring()
             .kmsKeyId("")
             .kmsClient(realKms(REGION))
@@ -188,20 +197,22 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] construction rejects a key id with {0} {1}",
+        name = "the KMS key ID must be a valid identifier, not {0} {1}",
         inputs = "invalidKmsIdentifiers")
-    void constructionRejectsMalformedKeyId(Example<String> malformed, Mpl mpl, MockKms mockKms) {
+    void kmsKeyIdMustBeValidIdentifier(Example<String> malformed, Mpl mpl, MockKms mockKms) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
-        // Accepts valid AWS KMS key identifier
+
+        // a valid identifier: succeeds
         mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
         mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create()
             .assertEncryptsAndDecrypts();
-        // Rejects malformed AWS KMS key identifier
+
+        // not a valid identifier: fails
         mpl.awsKmsKeyring()
             .kmsKeyId(malformed.value())
             .kmsClient(realKms(REGION))
@@ -210,13 +221,14 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] construction accepts key ARN, alias ARN, raw key id, raw alias {0}")
-    void constructionAcceptsEveryIdentifierForm(Mpl mpl) {
+        name = "the KMS key ID may be any valid identifier {0}")
+    void kmsKeyIdMayBeAnyValidIdentifier(Mpl mpl) {
         //= spec/framework/aws-kms/aws-kms-keyring.md#initialization
         //= type=test
         //# The AWS KMS key identifier MUST be [a valid identifier](aws-kms-key-arn.md#a-valid-aws-kms-identifier).
+
+        // a valid identifier: succeeds
         for (Example<String> kmsKeyId : KmsFixtures.validKmsIdentifiers(KMS_KEY_ARN)) {
-            // A new MockKms for each keyring, so each one gets its own replies.
             try (MockKms mockKms = new MockKms()) {
                 mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
                 Keyring keyring = mpl.awsKmsKeyring()
@@ -240,8 +252,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
     /** MockKms replies with a different key than the keyring's own, and the EDK must record the key from the reply. */
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt builds the data key and EDK from GenerateDataKey {0}")
-    void onEncryptBuildsDataKeyAndEdkFromGenerateDataKey(Mpl mpl, MockKms mockKms) {
+        name = "OnEncrypt without a data key calls GenerateDataKey {0}")
+    void onEncryptWithoutDataKeyCallsGenerateDataKey(Mpl mpl, MockKms mockKms) {
+        // materials do not contain a plaintext data key: succeeds
         byte[] plaintext = bytes(DATA_KEY_LENGTH, 1);
         byte[] ciphertext = bytes(64, 2);
 
@@ -307,9 +320,10 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] GenerateDataKey request for {0} {1}",
+        name = "GenerateDataKey request {0} {1}",
         inputs = "requestCases")
     void generateDataKeyRequest(RequestCase requestCase, Mpl mpl, MockKms mockKms) {
+        // request: sent
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(requestCase.kmsKeyId())
             .kmsClient(mockKms.client())
@@ -348,7 +362,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         assertEquals(GRANT_TOKENS, request.stringList("GrantTokens"));
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] OnEncrypt fails when GenerateDataKey fails {0}")
+    @KeyringTest(feature = "aws-kms", name = "OnEncrypt fails when GenerateDataKey fails {0}")
     void onEncryptFailsWhenGenerateDataKeyFails(Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -359,10 +373,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= type=test
         //# If the call to [AWS KMS GenerateDataKey](https://docs.aws.amazon.com/kms/latest/APIReference/API_GenerateDataKey.html) does not succeed,
         //# OnEncrypt MUST NOT modify the [encryption materials](../structures.md#encryption-materials) and MUST fail.
-        // Accepts a successful GenerateDataKey call
+
+        // the call succeeds
         mockKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onEncrypt(mpl.newEncryptionMaterials());
-        // Rejects a failed GenerateDataKey call
+
+        // the call does not succeed: fails
         mockKms.nextGenerateDataKeyFailsWith(KMS_ERROR_CODE);
         keyring.onEncryptFailsWith(mpl.newEncryptionMaterials(), KMS_CALL_FAILED_ERROR);
     }
@@ -373,9 +389,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt rejects a {0}-byte GenerateDataKey plaintext {1}",
+        name = "the GenerateDataKey plaintext length must match the suite, not {0} bytes {1}",
         inputs = "wrongPlaintextLengths")
-    void onEncryptRejectsGeneratedPlaintextOfWrongLength(Example<Integer> length, Mpl mpl, MockKms mockKms) {
+    void generateDataKeyPlaintextLengthMustMatchSuite(Example<Integer> length, Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -385,10 +401,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= type=test
         //# If the Generate Data Key call succeeds, OnEncrypt MUST verify that the response `Plaintext` length matches
         //# the specification of the [algorithm suite](../algorithm-suites.md)'s Key Derivation Input Length field.
-        // Accepts a GenerateDataKey plaintext of the suite's length
+
+        // `Plaintext` length matches: succeeds
         mockKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onEncrypt(mpl.newEncryptionMaterials());
-        // Rejects a GenerateDataKey plaintext one byte short or long
+
+        // `Plaintext` length does not match: fails
         mockKms.nextGenerateDataKeyReturns(KMS_KEY_ARN, dataKeyOfLength(length.value()));
         keyring.onEncryptFailsWith(mpl.newEncryptionMaterials(), REJECTED_KMS_REPLY_ERROR);
     }
@@ -405,9 +423,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt rejects GenerateDataKey reply KeyId {0} {1}",
+        name = "the GenerateDataKey reply KeyId must be a key ARN, not {0} {1}",
         inputs = "garbageReplyKeyIds")
-    void onEncryptRejectsGarbageGenerateDataKeyKeyId(Example<String> keyId, Mpl mpl, MockKms mockKms) {
+    void generateDataKeyReplyKeyIdMustBeKeyArn(Example<String> keyId, Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -416,19 +434,21 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# The Generate Data Key response’s `KeyId` MUST be [a valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
-        // Accepts a GenerateDataKey reply KeyId that is a key ARN
+
+        // `KeyId` is a valid AWS KMS key ARN: succeeds
         mockKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onEncrypt(mpl.newEncryptionMaterials());
-        // Rejects a GenerateDataKey reply KeyId that is not a KMS identifier
+
+        // `KeyId` is not a valid AWS KMS key ARN: fails
         mockKms.nextGenerateDataKeyReturnsDataKeyFor(keyId.value());
         keyring.onEncryptFailsWith(mpl.newEncryptionMaterials(), REJECTED_KMS_REPLY_ERROR);
     }
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt rejects GenerateDataKey reply KeyId {0} {1}",
+        name = "the GenerateDataKey reply KeyId must be a key ARN, not {0} {1}",
         inputs = "nonArnReplyKeyIds")
-    void onEncryptRejectsNonArnGenerateDataKeyKeyId(Example<String> keyId, Mpl mpl, MockKms mockKms) {
+    void generateDataKeyReplyKeyIdMustBeKeyArnNotOtherIdentifier(Example<String> keyId, Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -438,10 +458,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# The Generate Data Key response’s `KeyId` MUST be [a valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
-        // Accepts a GenerateDataKey reply KeyId that is a key ARN
+
+        // `KeyId` is a valid AWS KMS key ARN: succeeds
         mockKms.nextGenerateDataKeyReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onEncrypt(mpl.newEncryptionMaterials());
-        // Rejects a GenerateDataKey reply KeyId that is a raw key id or an alias ARN
+
+        // `KeyId` is not a valid AWS KMS key ARN: fails
         mockKms.nextGenerateDataKeyReturnsDataKeyFor(keyId.value());
         keyring.onEncryptFailsWith(materials, REJECTED_KMS_REPLY_ERROR)
             .unlessKnownBug("aws-kms-keyring-accepts-reply-key-id-that-is-not-a-key-arn");
@@ -460,9 +482,10 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
     /** MockKms replies with a different key than the keyring's own, and the EDK must record the key from the reply. */
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt encrypts the existing data key with {0} {1}",
+        name = "OnEncrypt with a data key calls Encrypt {0} {1}",
         inputs = "kmsKeyIdForms")
-    void onEncryptEncryptsExistingDataKey(String kmsKeyId, Mpl mpl, MockKms mockKms) {
+    void onEncryptWithDataKeyCallsEncrypt(String kmsKeyId, Mpl mpl, MockKms mockKms) {
+        // materials do contain a plaintext data key: succeeds
         byte[] dataKey = bytes(DATA_KEY_LENGTH, 3);
         byte[] ciphertext = bytes(64, 4);
 
@@ -531,7 +554,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         assertArrayEquals(OTHER_KEY_ARN.getBytes(StandardCharsets.UTF_8), bytes(edk.getKeyProviderInfo()));
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] OnEncrypt fails when Encrypt fails {0}")
+    @KeyringTest(feature = "aws-kms", name = "OnEncrypt fails when Encrypt fails {0}")
     void onEncryptFailsWhenEncryptFails(Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -541,10 +564,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# If the call to [AWS KMS Encrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Encrypt.html) does not succeed, OnEncrypt MUST fail.
-        // Accepts a successful Encrypt call
+
+        // the call succeeds
         mockKms.nextEncryptReturnsCiphertextFor(KMS_KEY_ARN);
         keyring.onEncrypt(materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)));
-        // Rejects a failed Encrypt call
+
+        // the call does not succeed: fails
         mockKms.nextEncryptFailsWith(KMS_ERROR_CODE);
         keyring.onEncryptFailsWith(
             materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)),
@@ -553,9 +578,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt rejects Encrypt reply KeyId {0} {1}",
+        name = "the Encrypt reply KeyId must be a key ARN, not {0} {1}",
         inputs = "garbageReplyKeyIds")
-    void onEncryptRejectsGarbageEncryptKeyId(Example<String> keyId, Mpl mpl, MockKms mockKms) {
+    void encryptReplyKeyIdMustBeKeyArn(Example<String> keyId, Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -564,10 +589,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# If the Encrypt call succeeds the response’s `KeyId` MUST be [A valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
-        // Accepts an Encrypt reply KeyId that is a key ARN
+
+        // `KeyId` is a valid AWS KMS key ARN: succeeds
         mockKms.nextEncryptReturnsCiphertextFor(KMS_KEY_ARN);
         keyring.onEncrypt(materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)));
-        // Rejects an Encrypt reply KeyId that is not a KMS identifier
+
+        // `KeyId` is not a valid AWS KMS key ARN: fails
         mockKms.nextEncryptReturnsCiphertextFor(keyId.value());
         keyring.onEncryptFailsWith(
             materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)),
@@ -576,9 +603,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnEncrypt rejects Encrypt reply KeyId {0} {1}",
+        name = "the Encrypt reply KeyId must be a key ARN, not {0} {1}",
         inputs = "nonArnReplyKeyIds")
-    void onEncryptRejectsNonArnEncryptKeyId(Example<String> keyId, Mpl mpl, MockKms mockKms) {
+    void encryptReplyKeyIdMustBeKeyArnNotOtherIdentifier(Example<String> keyId, Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -589,10 +616,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# If the Encrypt call succeeds the response’s `KeyId` MUST be [A valid AWS KMS key ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn).
-        // Accepts an Encrypt reply KeyId that is a key ARN
+
+        // `KeyId` is a valid AWS KMS key ARN: succeeds
         mockKms.nextEncryptReturnsCiphertextFor(KMS_KEY_ARN);
         keyring.onEncrypt(materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)));
-        // Rejects an Encrypt reply KeyId that is a raw key id or an alias ARN
+
+        // `KeyId` is not a valid AWS KMS key ARN: fails
         mockKms.nextEncryptReturnsCiphertextFor(keyId.value());
         keyring.onEncryptFailsWith(materials, REJECTED_KMS_REPLY_ERROR)
             .unlessKnownBug("aws-kms-keyring-accepts-reply-key-id-that-is-not-a-key-arn");
@@ -609,7 +638,7 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] GenerateDataKey goes through the configured client {0}")
+        name = "GenerateDataKey uses the configured client {0}")
     void generateDataKeyUsesConfiguredClient(Mpl mpl) {
         Keyring usWest2Keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -623,13 +652,15 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# If the keyring calls AWS KMS GenerateDataKeys, it MUST use the configured AWS KMS client to make the call.
-        // Accepts a call through the us-west-2 client
+
+        // configured AWS KMS client can use the key: succeeds
         usWest2Keyring.onEncrypt(mpl.newEncryptionMaterials());
-        // Rejects a call through the us-east-2 client
+
+        // configured AWS KMS client cannot use the key: fails
         usEast2Keyring.onEncryptFailsWith(mpl.newEncryptionMaterials(), WRONG_REGION_KMS_ERROR);
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] Encrypt goes through the configured client {0}")
+    @KeyringTest(feature = "aws-kms", name = "Encrypt uses the configured client {0}")
     void encryptUsesConfiguredClient(Mpl mpl) {
         Keyring usWest2Keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -643,16 +674,18 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#onencrypt
         //= type=test
         //# The keyring MUST call [AWS KMS Encrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Encrypt.html) using the configured AWS KMS client.
-        // Accepts a call through the us-west-2 client
+
+        // configured AWS KMS client can use the key: succeeds
         usWest2Keyring.onEncrypt(
             materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)));
-        // Rejects a call through the us-east-2 client
+
+        // configured AWS KMS client cannot use the key: fails
         usEast2Keyring.onEncryptFailsWith(
             materialsWithDataKey(mpl.newEncryptionMaterials(), bytes(DATA_KEY_LENGTH, 3)),
             WRONG_REGION_KMS_ERROR);
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] Decrypt goes through the configured client {0}")
+    @KeyringTest(feature = "aws-kms", name = "Decrypt uses the configured client {0}")
     void decryptUsesConfiguredClient(Mpl mpl) {
         Keyring usWest2Keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -669,15 +702,17 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= type=test
         //# To attempt to decrypt a particular [encrypted data key](../structures.md#encrypted-data-key),
         //# OnDecrypt MUST call [AWS KMS Decrypt](https://docs.aws.amazon.com/kms/latest/APIReference/API_Decrypt.html) with the configured AWS KMS client.
-        // Accepts a call through the us-west-2 client
+
+        // configured AWS KMS client can use the key: succeeds
         usWest2Keyring.onDecrypt(mpl.newDecryptionMaterials(), edks);
-        // Rejects a call through the us-east-2 client
+
+        // configured AWS KMS client cannot use the key: fails
         usEast2Keyring.onDecryptFailsWith(mpl.newDecryptionMaterials(), edks, WRONG_REGION_KMS_ERROR);
     }
 
-    /** One language's MPL encrypts and another language's MPL decrypts, both with real KMS. */
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] OnEncrypt/OnDecrypt with real KMS {0}", pairs = true)
+    @KeyringTest(feature = "aws-kms", name = "one language encrypts and another decrypts with real KMS {0}", pairs = true)
     void roundTripWithRealKms(Mpl encryptingMpl, Mpl decryptingMpl) {
+        // one language encrypts, another language decrypts: succeeds
         Keyring encryptingKeyring =
             encryptingMpl.awsKmsKeyring()
                 .kmsKeyId(KMS_KEY_ARN)
@@ -789,9 +824,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
      */
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnDecrypt never sends an EDK with provider id {0} {1}",
+        name = "the provider ID must match aws-kms, not {0} {1}",
         inputs = "otherProviderIds")
-    void onDecryptSkipsOtherProviderId(Example<String> providerId, Mpl mpl, MockKms mockKms) {
+    void providerIdMustMatchAwsKms(Example<String> providerId, Mpl mpl, MockKms mockKms) {
         EncryptedDataKey other = edk(1).toBuilder().keyProviderId(providerId.value()).build();
 
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
@@ -801,6 +836,8 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
         //# - Its provider ID MUST exactly match the value “aws-kms”.
+
+        // first provider ID does not match "aws-kms", second does: succeeds
         assertOnlyMatchingEdkSentToKms(mpl, mockKms, other);
     }
 
@@ -810,9 +847,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnDecrypt never sends an EDK for key {0} {1}",
+        name = "the provider info must match the KMS key ID, not {0} {1}",
         inputs = "otherProviderInfos")
-    void onDecryptSkipsOtherKeyArn(Example<String> providerInfo, Mpl mpl, MockKms mockKms) {
+    void providerInfoMustMatchKmsKeyId(Example<String> providerInfo, Mpl mpl, MockKms mockKms) {
         EncryptedDataKey other = withProviderInfo(
             edk(1), providerInfo.value().getBytes(StandardCharsets.UTF_8));
 
@@ -823,6 +860,8 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
         //# - The provider info MUST match the configured AWS KMS key identifier.
+
+        // first provider info does not match, second does: succeeds
         assertOnlyMatchingEdkSentToKms(mpl, mockKms, other);
     }
 
@@ -832,9 +871,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnDecrypt fails on provider info {0} {1}",
+        name = "the provider info must be a key ARN, not {0} {1}",
         inputs = "nonArnProviderInfos")
-    void onDecryptFailsOnProviderInfoThatIsNotAnArn(Example<byte[]> info, Mpl mpl, MockKms mockKms) {
+    void providerInfoMustBeKeyArn(Example<byte[]> info, Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -843,18 +882,20 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
         //# - The provider info MUST be a [valid AWS KMS ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn) with a resource type of `key` or OnDecrypt MUST fail.
-        // Accepts provider info that is a key ARN
+
+        // provider info is a valid AWS KMS ARN with a resource type of `key`: succeeds
         mockKms.nextDecryptReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onDecrypt(mpl.newDecryptionMaterials(), List.of(edk(1)));
-        // Rejects provider info that is not an ARN
+
+        // provider info is not a valid AWS KMS ARN: fails
         // This reply lets a keyring that skips the bad EDK decrypt EDK 2, so the test catches it.
         mockKms.nextDecryptReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onDecryptFailsWith(mpl.newDecryptionMaterials(),
             List.of(withProviderInfo(edk(1), info.value()), edk(2)), INVALID_PROVIDER_INFO_ERROR);
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] OnDecrypt fails on an alias ARN provider info {0}")
-    void onDecryptFailsOnAliasArnProviderInfo(Mpl mpl, MockKms mockKms) {
+    @KeyringTest(feature = "aws-kms", name = "the provider info must not be an alias ARN {0}")
+    void providerInfoMustNotBeAliasArn(Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -865,10 +906,12 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
         //# - The provider info MUST be a [valid AWS KMS ARN](aws-kms-key-arn.md#a-valid-aws-kms-arn) with a resource type of `key` or OnDecrypt MUST fail.
-        // Accepts provider info that is a key ARN
+
+        // provider info is a valid AWS KMS ARN with a resource type of `key`: succeeds
         mockKms.nextDecryptReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onDecrypt(mpl.newDecryptionMaterials(), List.of(edk(1)));
-        // Rejects provider info that is an alias ARN
+
+        // provider info resource type is not `key`: fails
         // This reply lets a keyring that skips the alias EDK decrypt EDK 2, so the test catches it.
         mockKms.nextDecryptReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onDecryptFailsWith(mpl.newDecryptionMaterials(), edks, INVALID_PROVIDER_INFO_ERROR)
@@ -877,14 +920,16 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnDecrypt tries the next EDK after a failed Decrypt {0}")
-    void onDecryptTriesNextEdkAfterFailedDecrypt(Mpl mpl, MockKms mockKms) {
+        name = "OnDecrypt attempts each EDK one at a time {0}")
+    void onDecryptAttemptsEachEdkOneAtATime(Mpl mpl, MockKms mockKms) {
         byte[] plaintext = bytes(DATA_KEY_LENGTH, 1);
 
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create();
+
+        // first fails, second succeeds: succeeds
         mockKms.nextDecryptFailsWith(KMS_ERROR_CODE);
         mockKms.nextDecryptReturns(KMS_KEY_ARN, plaintext);
         DecryptionMaterials decrypted = keyring.onDecrypt(
@@ -894,22 +939,22 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
         //# For each encrypted data key in the filtered set, one at a time, the OnDecrypt MUST attempt to decrypt the data key.
-        // The Decrypt call for EDK 1 fails, so MockKms then gets one for EDK 2.
         assertDecryptCiphertexts(mockKms, edk(1), edk(2));
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] OnDecrypt collects one error per EDK it tried {0}")
-    void onDecryptCollectsOneErrorPerEdk(Mpl mpl, MockKms mockKms) {
+    @KeyringTest(feature = "aws-kms", name = "OnDecrypt yields all the collected errors {0}")
+    void onDecryptYieldsAllCollectedErrors(Mpl mpl, MockKms mockKms) {
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create();
         DecryptionMaterials materials = mpl.newDecryptionMaterials();
 
-        // Accepts an EDK that KMS decrypts
+        // decrypt an encrypted data key: succeeds
         mockKms.nextDecryptReturnsDataKeyFor(KMS_KEY_ARN);
         keyring.onDecrypt(mpl.newDecryptionMaterials(), List.of(edk(1)));
-        // Rejects EDKs that KMS fails to decrypt
+
+        // fails to successfully decrypt any encrypted data key: fails
         mockKms.nextDecryptFailsWith(KMS_ERROR_CODE);
         mockKms.nextDecryptFailsWith(KMS_ERROR_CODE);
         mockKms.nextDecryptFailsWith(KMS_ERROR_CODE);
@@ -928,8 +973,9 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         assertEquals(3, error.getCollectedErrors().size(), "one collected error per EDK tried");
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] Decrypt request {0}")
+    @KeyringTest(feature = "aws-kms", name = "Decrypt request {0}")
     void decryptRequest(Mpl mpl, MockKms mockKms) {
+        // request: sent
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
@@ -962,8 +1008,8 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         assertEquals(GRANT_TOKENS, request.stringList("GrantTokens"));
     }
 
-    @KeyringTest(feature = "aws-kms", name = "[aws-kms] OnDecrypt skips a Decrypt reply for another key {0}")
-    void onDecryptSkipsReplyForAnotherKey(Mpl mpl, MockKms mockKms) {
+    @KeyringTest(feature = "aws-kms", name = "the Decrypt reply KeyId must equal the KMS key ID {0}")
+    void decryptReplyKeyIdMustEqualKmsKeyId(Mpl mpl, MockKms mockKms) {
         byte[] plaintext = bytes(DATA_KEY_LENGTH, 2);
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
@@ -978,22 +1024,24 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= type=test
         //# If the response does not satisfies these requirements then an error MUST be collected
         //# and the next encrypted data key in the filtered set MUST be attempted.
-        // Accepts a good Decrypt reply for the EDK after the one for another key
+
+        // first `KeyId` does not equal, second does: succeeds
         mockKms.nextDecryptReturnsDataKeyFor(OTHER_KEY_ARN);
         mockKms.nextDecryptReturns(KMS_KEY_ARN, plaintext);
         DecryptionMaterials decrypted = keyring.onDecrypt(
             mpl.newDecryptionMaterials(), List.of(edk(1), edk(2)));
         assertArrayEquals(plaintext, bytes(decrypted.getPlaintextDataKey()));
         assertDecryptCiphertexts(mockKms, edk(1), edk(2));
-        // Rejects a Decrypt reply for another key for the only EDK
+
+        // `KeyId` does not equal: fails
         mockKms.nextDecryptReturnsDataKeyFor(OTHER_KEY_ARN);
         keyring.onDecryptFailsWith(mpl.newDecryptionMaterials(), List.of(edk(1)), REJECTED_KMS_REPLY_ERROR);
     }
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnDecrypt skips a Decrypt reply plaintext of the wrong length {0}")
-    void onDecryptSkipsPlaintextOfWrongLength(Mpl mpl, MockKms mockKms) {
+        name = "the Decrypt reply plaintext length must match the suite {0}")
+    void decryptReplyPlaintextLengthMustMatchSuite(Mpl mpl, MockKms mockKms) {
         byte[] plaintext = bytes(DATA_KEY_LENGTH, 2);
         byte[] halfLengthPlaintext = dataKeyOfLength(DATA_KEY_LENGTH / 2);
         Keyring keyring = mpl.awsKmsKeyring()
@@ -1010,28 +1058,32 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= type=test
         //# If the response does not satisfies these requirements then an error MUST be collected
         //# and the next encrypted data key in the filtered set MUST be attempted.
-        // Accepts a good Decrypt reply for the EDK after the one with a half-length plaintext
+
+        // first `Plaintext` length does not equal, second does: succeeds
         mockKms.nextDecryptReturns(KMS_KEY_ARN, halfLengthPlaintext);
         mockKms.nextDecryptReturns(KMS_KEY_ARN, plaintext);
         DecryptionMaterials decrypted = keyring.onDecrypt(
             mpl.newDecryptionMaterials(), List.of(edk(1), edk(2)));
         assertArrayEquals(plaintext, bytes(decrypted.getPlaintextDataKey()));
         assertDecryptCiphertexts(mockKms, edk(1), edk(2));
-        // Rejects a Decrypt reply with a half-length plaintext for the only EDK
+
+        // `Plaintext` length does not equal: fails
         mockKms.nextDecryptReturns(KMS_KEY_ARN, halfLengthPlaintext);
         keyring.onDecryptFailsWith(mpl.newDecryptionMaterials(), List.of(edk(1)), REJECTED_KMS_REPLY_ERROR);
     }
 
     @KeyringTest(
         feature = "aws-kms",
-        name = "[aws-kms] OnDecrypt returns the first data key KMS decrypts {0}")
-    void onDecryptReturnsFirstDecryptedDataKey(Mpl mpl, MockKms mockKms) {
+        name = "OnDecrypt returns immediately after the first data key decrypts {0}")
+    void onDecryptReturnsImmediately(Mpl mpl, MockKms mockKms) {
         byte[] plaintext = bytes(DATA_KEY_LENGTH, 1);
 
         Keyring keyring = mpl.awsKmsKeyring()
             .kmsKeyId(KMS_KEY_ARN)
             .kmsClient(mockKms.client())
             .create();
+
+        // first encrypted data key decrypts: succeeds
         mockKms.nextDecryptReturns(KMS_KEY_ARN, plaintext);
         DecryptionMaterials decrypted = keyring.onDecrypt(
             mpl.newDecryptionMaterials(), List.of(edk(1), edk(2)));
@@ -1043,7 +1095,6 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
         //= spec/framework/aws-kms/aws-kms-keyring.md#ondecrypt
         //= type=test
         //# - MUST immediately return the modified [decryption materials](../structures.md#decryption-materials).
-        // Both EDKs match, but MockKms gets only the Decrypt call for EDK 1.
         assertDecryptCiphertexts(mockKms, edk(1));
     }
 
