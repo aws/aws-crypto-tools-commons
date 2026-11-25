@@ -54,6 +54,12 @@ final class MockKms implements AutoCloseable {
     private static final byte[] DATA_KEY = filled(32, 9);
     /** The ciphertext in a reply whose ciphertext the test does not choose. */
     private static final byte[] CIPHERTEXT = filled(64, 9);
+    /**
+     * The KeyMaterialId in every GenerateDataKey and Decrypt reply. Real KMS sends this field
+     * to name the key material that did the work, and MockKmsMatchesRealKmsTest checks that
+     * MockKms sends the same fields. Real KMS IDs are 64 hex characters.
+     */
+    private static final String KEY_MATERIAL_ID = "9".repeat(64);
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String TARGET_PREFIX = "TrentService.";
@@ -132,7 +138,8 @@ final class MockKms implements AutoCloseable {
     void nextGenerateDataKeyReturns(String keyId, byte[] plaintext, byte[] ciphertext) {
         add(GENERATE_DATA_KEY, Reply.success(keyId, Map.of(
             "Plaintext", base64(plaintext),
-            "CiphertextBlob", base64(ciphertext))));
+            "CiphertextBlob", base64(ciphertext),
+            "KeyMaterialId", KEY_MATERIAL_ID)));
     }
 
     /** The next GenerateDataKey call fails with the KMS error {@code errorCode}, such as NotFoundException. */
@@ -166,7 +173,8 @@ final class MockKms implements AutoCloseable {
     void nextDecryptReturns(String keyId, byte[] plaintext) {
         add(DECRYPT, Reply.success(keyId, Map.of(
             "Plaintext", base64(plaintext),
-            "EncryptionAlgorithm", "SYMMETRIC_DEFAULT")));
+            "EncryptionAlgorithm", "SYMMETRIC_DEFAULT",
+            "KeyMaterialId", KEY_MATERIAL_ID)));
     }
 
     /** The next Decrypt call fails with the KMS error {@code errorCode}. */
