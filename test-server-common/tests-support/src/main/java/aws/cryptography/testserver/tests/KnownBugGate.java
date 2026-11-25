@@ -57,13 +57,45 @@ public final class KnownBugGate {
             run(assertion);
             return;
         }
+        AssertionError checkFailure = null;
         try {
             assertion.execute();
         } catch (AssertionError predicted) {
-            throw new TestAbortedException(
-                "KNOWN BUG " + bugId + " — declared for " + actingTarget.label(), predicted);
+            checkFailure = predicted;
         } catch (Throwable other) {
             throw sneakyThrow(other);
+        }
+        gateDeclaredOutcome(bugId, actingTarget, checkFailure, declarations);
+    }
+
+    /**
+     * The same gate as {@link #gateDeclared(String, LanguageServerTarget, Executable)},
+     * for a check that already ran.
+     * {@code checkFailure} is the AssertionError that the check threw, or null when the check passed.
+     * When {@code actingTarget} does not declare the bug, a failed check throws {@code checkFailure} itself.
+     *
+     * @throws AssertionError if the declared bug did not reproduce, or {@code checkFailure}
+     *     for a target that does not declare the bug
+     * @throws TestAbortedException visible skip when the declared bug reproduces
+     */
+    public static void gateDeclaredOutcome(String bugId, LanguageServerTarget actingTarget,
+            AssertionError checkFailure) {
+        gateDeclaredOutcome(bugId, actingTarget, checkFailure, KnownBugDeclarations.shared());
+    }
+
+    /** The outcome gate against an explicit registry; package-private for unit tests. */
+    static void gateDeclaredOutcome(String bugId, LanguageServerTarget actingTarget,
+            AssertionError checkFailure, KnownBugDeclarations declarations) {
+        if (!declarations.exhibits(actingTarget.language(), actingTarget.majorVersion(),
+                actingTarget.repo(), bugId)) {
+            if (checkFailure != null) {
+                throw checkFailure;
+            }
+            return;
+        }
+        if (checkFailure != null) {
+            throw new TestAbortedException(
+                "KNOWN BUG " + bugId + " — declared for " + actingTarget.label(), checkFailure);
         }
         throw new AssertionError(
             "declared known bug did not reproduce — remove '" + bugId + "' for "

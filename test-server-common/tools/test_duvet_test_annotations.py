@@ -121,6 +121,16 @@ class PickerTest(unittest.TestCase):
         self.assertIn("//# The thing MUST be blue.", out)
         self.assertNotIn("The lid MUST be green.", out)
 
+    def test_reads_a_known_bug_named_after_the_check(self):
+        tests = TESTS.replace('KnownBugGate.gateDeclared(\n            "lid-is-grey", target, () -> {});',
+                              'keyring.onDecryptFailsWith(materials, edks, ERROR)\n'
+                              '            .unlessKnownBug("lid-is-grey");', 1)
+        self.assertIn("unlessKnownBug", tests)
+        code, out = self.run_picker(tests)
+        self.assertEqual(0, code)
+        self.assertIn("//# The thing MUST be blue.", out)
+        self.assertNotIn("The lid MUST be green.", out)
+
     def test_refuses_an_implementation_annotation(self):
         tests = TESTS.replace("//= type=test\n        //# The thing MUST be blue.",
                               "//# The thing MUST be blue.", 1)

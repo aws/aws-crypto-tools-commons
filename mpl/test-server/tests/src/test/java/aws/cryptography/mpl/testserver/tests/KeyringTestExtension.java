@@ -35,7 +35,8 @@ import org.junit.platform.commons.support.ReflectionSupport;
  *       In a dry run, building the client stops the run and logs it as one that would run.</li>
  *   <li>{@link Run#resolveParameter} gives the test its {@link Mpl} and its input.
  *       It also gives a new {@link FakeKms} for each {@code FakeKms} parameter.</li>
- *   <li>After the test body, {@link Run#afterEach} stops each FakeKms.</li>
+ *   <li>After the test body, {@link Run#afterEach} stops each FakeKms.
+ *       Then it fails the test if a {@link FailureCheck} failed and the test did not mark it with a known bug.</li>
  * </ol>
  */
 final class KeyringTestExtension implements TestTemplateInvocationContextProvider {
@@ -193,6 +194,11 @@ final class KeyringTestExtension implements TestTemplateInvocationContextProvide
                 fakeKms.close();
             }
             fakeKmses.clear();
+            if (mpls != null) {
+                for (Mpl mpl : mpls) {
+                    mpl.throwUnresolvedFailure();
+                }
+            }
         }
 
         /** How many {@code Mpl} parameters come before parameter {@code index}. */
