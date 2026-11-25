@@ -142,6 +142,14 @@ public class AwsKmsKeyringTest implements KeyringTestDefaults, KeyringContract {
             .grantTokens(grantTokens.value())
             .create()
             .assertEncryptsAndDecrypts();
+
+        // no Grant Tokens: succeeds
+        mockKms.allowOneEncryptAndDecrypt(KMS_KEY_ARN);
+        mpl.awsKmsKeyring()
+            .kmsKeyId(KMS_KEY_ARN)
+            .kmsClient(mockKms.client())
+            .create()
+            .assertEncryptsAndDecrypts();
     }
 
     static List<Example<List<String>>> invalidGrantTokenLists() {
