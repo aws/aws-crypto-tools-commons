@@ -1,0 +1,40 @@
+# Unit tests for the scripts that make the types page's data, and for the types page's logic.
+
+name: API examples builder
+
+on:
+  pull_request:
+    paths:
+      - "api-examples/**"
+      - "dashboard/api-examples/**"
+      - ".github/workflows/api-examples-builder.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "api-examples/**"
+      - "dashboard/api-examples/**"
+      - ".github/workflows/api-examples-builder.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: builder unit tests
+    runs-on: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s api-examples -v
+
+      - name: Types page tool tests
+        run: python3 -m unittest discover -s api-examples/types -v
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Types page tests
+        run: node --test dashboard/api-examples/types.test.js

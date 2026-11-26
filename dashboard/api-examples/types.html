@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Types</title>
+<style>
+  /* The same colors and layout as the other dashboard pages, like test-servers/index.html. */
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --more:#db6d28; --fail:#da3633; --none:#3a3f4b; --sel:#388bfd; --prop:#a371f7; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+  a { color:var(--sel); }
+  code, pre { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  header { display:flex; gap:12px 16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; flex:none; }
+  header h1 { font-size:16px; margin:0 4px 0 0; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; }
+  .tabs button, .tool { background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:4px 12px; cursor:pointer; font:inherit; font-size:13px; }
+  .tabs button:hover, .tool:hover { color:var(--text); }
+  .tabs button.on, .tool.on { color:var(--text); border-color:var(--sel); }
+  .tool:disabled { opacity:.5; cursor:default; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr); }
+  main.open { grid-template-columns:minmax(0,var(--left,1.4fr)) 6px minmax(0,1fr); }
+  main:not(.open) #divider, main:not(.open) #detail { display:none; }
+  section { overflow:auto; padding:16px 20px; }
+  #detail { background:var(--panel); }
+  #detail .close { position:sticky; top:0; float:right; background:var(--bg); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:2px 9px; cursor:pointer; font-size:14px; }
+  #detail .close:hover { color:var(--text); border-color:var(--sel); }
+  #detail h2 { margin:0 0 4px; font-size:16px; font-family:ui-monospace, monospace; }
+  #detail h3 { font-size:13px; margin:16px 0 6px; }
+  #detail ul { margin:4px 0; padding-left:18px; }
+  #detail li { margin:3px 0; }
+  #detail pre { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:4px 0; font-size:12px; white-space:pre-wrap; }
+  #detail .quote { color:var(--text); }
+  #divider { cursor:col-resize; background:var(--line); }
+  #divider:hover, #divider.drag { background:var(--sel); }
+  body.resizing { user-select:none; cursor:col-resize; }
+  .sub { color:var(--dim); font-size:12px; margin:0 0 10px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--dim); margin-bottom:8px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  table { border-collapse:collapse; width:100%; margin-bottom:14px; }
+  th, td { border:1px solid var(--line); padding:6px 8px; vertical-align:top; text-align:left; }
+  thead th, tr.head th { font-weight:600; font-size:12px; position:sticky; top:-16px; background:var(--bg); z-index:1; }
+  td.opt { white-space:nowrap; width:1%; }
+  td.opt b { font-family:ui-monospace, monospace; font-size:13px; }
+  td.opt div { color:var(--dim); font-family:ui-monospace, monospace; font-size:11px; }
+  td.none { color:var(--dim); font-style:italic; }
+  /* A chip is one type. Its color is the number of calls the type needs. */
+  .chip { display:inline-block; margin:2px; padding:1px 8px; border-radius:8px; font-family:ui-monospace, monospace; font-size:12px; cursor:pointer; border:1px solid var(--line); background:var(--bg); white-space:nowrap; }
+  .chip:hover { border-color:var(--sel); }
+  .chip.sel { outline:2px solid #fff; outline-offset:-1px; }
+  .b0 { background:color-mix(in srgb,var(--pass) 35%,transparent); }
+  .b1 { background:color-mix(in srgb,var(--part) 35%,transparent); }
+  .b2 { background:color-mix(in srgb,var(--more) 40%,transparent); }
+  .bx { color:var(--dim); border-style:dashed; }
+  .warn { border-color:var(--fail); color:#ffa198; }
+  .failed { text-decoration:line-through; }
+  td.ck { text-align:center; cursor:pointer; }
+  td.ck small { display:block; color:var(--dim); font-family:ui-monospace, monospace; font-size:10px; }
+  td.kind { cursor:pointer; white-space:nowrap; }
+  td.kind:hover { color:var(--sel); }
+  tr.detail td { background:var(--panel); }
+  tr.detail .lang { font-weight:600; font-size:11px; color:var(--dim); margin-bottom:2px; }
+  .ev { font-size:11px; color:var(--dim); }
+  .prop { margin-top:4px; border:1px solid var(--prop); background:transparent; color:var(--prop); border-radius:8px; padding:1px 8px; font-size:11px; cursor:pointer; font:inherit; font-size:11px; }
+  .prop.on { background:color-mix(in srgb,var(--prop) 35%,transparent); color:var(--text); }
+  .propsig { margin-top:3px; color:var(--prop); font-family:ui-monospace, monospace; font-size:11px; white-space:normal; max-width:260px; }
+  .why { margin-top:2px; color:var(--dim); font-size:11px; white-space:normal; max-width:260px; }
+  .breaks { margin-top:2px; color:#ffa198; font-family:ui-monospace, monospace; font-size:11px; white-space:normal; max-width:260px; }
+  label.tool input { display:none; }
+  details { margin:2px 0; }
+  details > summary { cursor:pointer; padding:3px 6px; border-radius:4px; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary::before { content:"▸ "; color:var(--dim); }
+  details[open] > summary::before { content:"▾ "; }
+  details > summary:hover { background:var(--panel); }
+  .hits { margin:4px 0 8px 18px; }
+  .hits code { font-size:11px; background:var(--panel); border:1px solid var(--line); padding:0 4px; border-radius:4px; }
+  .hits .where { font-size:11px; }
+  .hits .source { margin-bottom:8px; }
+  .tag { font-size:10px; border:1px solid var(--line); border-radius:8px; padding:0 6px; color:var(--dim); }
+  .grp { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 2px 0 10px; align-self:center; }
+  .grp:first-child { margin-left:0; }
+  .cust { display:inline-block; padding:1px 8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:12px; cursor:pointer; white-space:nowrap; }
+  .cust:hover { border-color:var(--sel); }
+  .cust.sel { outline:2px solid #fff; outline-offset:-1px; }
+  th .cust { margin-top:4px; font-weight:400; }
+  #detail ol { margin:4px 0; padding-left:20px; } #detail ol li { margin:6px 0; }
+  #detail .back { float:right; margin-right:6px; }
+  a.go { cursor:pointer; text-decoration:underline dotted; }
+  #run a { color:var(--dim); }
+  .crumbs { margin-bottom:10px; font-size:12px; color:var(--dim); }
+  .graph { display:flex; align-items:center; gap:12px; margin:8px 0 12px; flex-wrap:wrap; }
+  .graph .col { display:flex; flex-direction:column; gap:6px; }
+  .graph .arrow { color:var(--dim); font-size:18px; }
+  .node { display:block; border:1px solid var(--line); border-radius:8px; padding:5px 10px; background:var(--panel); color:var(--text); text-decoration:none; font-size:13px; }
+  .node.me { border-color:var(--sel); font-family:ui-monospace, monospace; font-weight:600; }
+  .node.grp { border-style:dashed; }
+  a.node:hover { border-color:var(--sel); }
+  .node small { color:var(--dim); font-family:ui-monospace, monospace; }
+  .level { margin:6px 0; }
+  ul.about, ul.checks { padding-left:18px; font-size:12px; }
+  ul.checks details { display:inline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Types</h1>
+  <div class="tabs" id="libs"></div>
+  <div class="tabs" id="apis"></div>
+  <div class="tabs" id="langs"></div>
+  <span class="run" id="run"></span>
+  <button class="tool" id="explore">Type explorer</button>
+  <button class="tool" id="how">How it's made</button>
+</header>
+<main id="main">
+  <section id="left">
+    <div class="legend">
+      <span><i class="sw b0"></i>as is: no calls, and <code>&amp;x</code> or <code>Some(x)</code> don't count</span>
+      <span><i class="sw b1"></i>one call</span>
+      <span><i class="sw b2"></i>&gt;1 call</span>
+      <span><i class="sw bx" style="border:1px dashed var(--line)"></i>no fix found</span>
+      <span><i class="sw" style="border:1px solid var(--fail)"></i>⚠ risky, or breaks a rule</span>
+      <span>✗ compiles, but the run fails</span>
+      <span style="color:var(--prop)">▲ ▼ moved by a proposal</span>
+    </div>
+    <p class="sub">Each row is one option. Each chip is a type a customer may hold, under the number of calls it takes to pass. Hover a chip for what it is. Click it for its code and checks, and to explore the type.</p>
+    <div id="view"></div>
+    <p class="sub" id="foot"></p>
+  </section>
+  <div id="divider" title="Drag to resize. Double-click to reset."></div>
+  <section id="detail"></section>
+</main>
+<script>
+// The page loads three parts, each from the newest successful run of a commons workflow on the branch that ?ref=
+// names (main by default), so it updates by itself every day. Without a GitHub token in the dashboard's Settings,
+// or when no run has the part, it uses the copy committed next to this page instead.
+//   types-rust.json    api-examples-types.yml: every Rust API and option, and what each held type needs. Rust's
+//                      rows are compiled, and some are run.
+//   types-others.json  api-examples-shipped.yml: the same for the released Java, Python, .NET, Go and JS
+//                      libraries, written from their signatures and not compiled.
+//   usage.json         api-examples-usage.yml: how public customer code calls each option.
+// It also reads expectations.json, the rules a person wrote, and proposals.json when the
+// api-signature-proposals skill ran in this checkout.
+// An option's key is the same in every language: library, API and Smithy member, like mpl|raw-aes-keyring|wrappingKey.
+// A row is {type, calls, code, kind}. calls counts the calls in the code, or is null when no fix was found.
+// A Rust row also has trial (its line in rust_trials.rs), test (its line in rust_runs.rs) and run (what the test found).
+const PARTS = {
+  // The PR review page starts runs that read a pull request's commit. Their names say so, and they are skipped
+  // here, unless the page is opened with ?run=<that run's id>.
+  rust: { file: "types-rust.json", workflow: "api-examples-types.yml", artifact: "api-types-rust", title: "API types for Rust main" },
+  others: { file: "types-others.json", workflow: "api-examples-shipped.yml", artifact: "api-types-others" },
+  // A pull request runs the customer search with one page per search, so only full runs count.
+  usage: { file: "usage.json", workflow: "api-examples-usage.yml", artifact: "api-examples-usage", events: ["schedule", "workflow_dispatch"] },
+};
+const LIBS = [["ESDK", "esdk"], ["MPL", "mpl"], ["DB-ESDK", "dbesdk"]];
+const GROUPS = ["Keyrings", "CMMs", "Key stores", "Caches", "Branch key ID suppliers", "Client"];
+const LANGS = [["Rust", "rust"], ["Java", "java"], ["Python", "python"], [".NET", "dotnet"], ["Go", "go"], ["JS", "javascript"]];
+const KINDS = ["bytes", "text", "pairs", "base64 text", "hex text", "file / stream", "map", "list", "number", "Duration",
+  "the type itself", "what builds it", "your config", "other"];
+// Rust kinds under the comparison's rows. Optional values have no row, because the other languages take null instead.
+const RUST_KIND = { bytes: "bytes", text: "text", pair: "pairs", path: "file / stream", reader: "file / stream",
+  stream: "file / stream", number: "number", duration: "Duration", list: "list", map: "map",
+  named: "the type itself", component: "the type itself", ctor: "what builds it" };
+// What a customer had before a conversion, as usage.json says it, and the row it goes under.
+const FROM_KIND = { "a string": "text", "a &str": "text", "a file": "file / stream", "a file or stream": "file / stream",
+  "base64 text": "base64 text", "hex text": "hex text", "your config": "your config", "a byte array": "bytes",
+  "a byte slice": "bytes", "separate values": "list", "key/value pairs": "pairs",
+  "a value that is not a string": "other", "a value that converts with into()": "other" };
+const LEVEL = { 0: "as is", 1: "one call", 2: ">1 call", x: "no fix found" };
+const COMMONS_REPO = "aws/aws-crypto-tools-commons";
+const COMMONS = "https://github.com/" + COMMONS_REPO;
+// CI runs and links come from this branch of commons. Open the page with ?ref=<branch> to use a branch other than main.
+const QUERY = new URLSearchParams(location.search);
+const REF = QUERY.get("ref") || "main";
+// ?run=<run id> shows the Rust API from that run, like one the PR review page started. ?api=mpl|aws-kms-keyring opens one API.
+const RUN = QUERY.get("run"), OPEN_API = QUERY.get("api");
+let rust = null, others = null, usage = null, expectations = { rules: {} }, proposals = null;
+const sources = {}, files = {};  // each part's CI run, and the files in its artifact
+let catalog = {}, optionIndex = {};  // library -> APIs, and option key -> {api, option}
+let lib = "mpl", api = 0, lang = "rust";
+const proposed = new Set();
+const opened = new Set();      // option|kind rows that are open in the comparison
+const openDetails = new Set(); // customer lists that are open
+let pane = [];                 // what the side pane showed, newest last, for its back button
+let mode = "options";          // the main view: "options", or "explorer" for the type explorer
+let explorer = [];             // what the type explorer showed, newest last, for its back button
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Doc text keeps its `code` spans.
+const docHtml = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const level = calls => calls === null || calls === undefined ? "x" : Math.min(calls, 2);
+const blob = (file, line) => `${COMMONS}/blob/${REF.split("/").map(encodeURIComponent).join("/")}/${file}#L${line}`;
+const workflowLink = file => `${COMMONS}/actions/workflows/${file}?query=${encodeURIComponent("branch:" + REF)}`;
+const langName = l => LANGS.find(x => x[1] === l)[0];
+const ago = when => {
+  const hours = Math.round((Date.now() - Date.parse(when)) / 3600000);
+  return hours < 1 ? "under an hour ago" : hours < 48 ? `${hours}h ago` : `${Math.round(hours / 24)} days ago`;
+};
+
+// ---------- GitHub ----------
+// The same token and calls as the Test Server Results page.
+const token = () => localStorage.getItem("github-dashboard-token") || "";
+async function gh(path) {
+  const res = await fetch("https://api.github.com/" + path, {
+    headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + token() } });
+  if (!res.ok) throw new Error(`GitHub ${res.status} for ${path}`);
+  return res;
+}
+
+// A zip's entries, from its central directory. Artifacts are far below 4 GB, so zip64 is not handled.
+function zipEntries(buf) {
+  const v = new DataView(buf);
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--)
+    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("not a zip file");
+  const count = v.getUint16(eocd + 10, true);
+  let p = v.getUint32(eocd + 16, true);
+  const dec = new TextDecoder(), out = [];
+  for (let i = 0; i < count; i++) {
+    const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+    const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+    out.push({ name: dec.decode(new Uint8Array(buf, p + 46, nlen)), method, csize, local: v.getUint32(p + 42, true) });
+    p += 46 + nlen + xlen + clen;
+  }
+  return out;
+}
+async function entryText(buf, e) {
+  const v = new DataView(buf);
+  const start = e.local + 30 + v.getUint16(e.local + 26, true) + v.getUint16(e.local + 28, true);
+  let s = new Blob([new Uint8Array(buf, start, e.csize)]).stream();
+  if (e.method === 8) s = s.pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Response(s).text();
+}
+
+// The files in the newest successful run's artifact, and the run, or null.
+async function fromCi(part) {
+  const runs = part === PARTS.rust && RUN
+    ? [await (await gh(`repos/${COMMONS_REPO}/actions/runs/${encodeURIComponent(RUN)}`)).json()]
+    : (await (await gh(`repos/${COMMONS_REPO}/actions/workflows/${part.workflow}/runs?branch=`
+      + `${encodeURIComponent(REF)}&status=success&per_page=30`)).json()).workflow_runs
+      .filter(r => (!part.events || part.events.includes(r.event))
+        && (!part.title || r.event !== "workflow_dispatch" || r.display_title === part.title));
+  for (const run of runs) {
+    const arts = (await (await gh(`repos/${COMMONS_REPO}/actions/runs/${run.id}/artifacts?per_page=100`)).json()).artifacts;
+    const art = arts.find(a => a.name === part.artifact && !a.expired);
+    if (!art) continue;
+    const zip = await (await gh(`repos/${COMMONS_REPO}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+    const entries = {};
+    for (const e of zipEntries(zip)) entries[e.name.split("/").pop()] = await entryText(zip, e);
+    return { run, entries };
+  }
+  return null;
+}
+
+const json = name => fetch(name).then(r => (r.ok ? r.json() : null)).catch(() => null);
+
+async function loadPart(name) {
+  const part = PARTS[name];
+  if (token()) {
+    try {
+      const found = await fromCi(part);
+      if (found && found.entries[part.file]) {
+        sources[name] = { url: found.run.html_url, at: found.run.created_at, number: found.run.run_number };
+        files[name] = found.entries;
+        return JSON.parse(found.entries[part.file]);
+      }
+    } catch (err) {
+      console.warn(`${part.workflow}: ${err.message}`);
+    }
+  }
+  sources[name] = null;
+  return json(part.file);
+}
+
+// ---------- the catalog ----------
+// Every library's APIs, from Rust and from the released libraries, and each API's options in every language.
+function buildCatalog() {
+  catalog = {};
+  optionIndex = {};
+  const apiOf = a => {
+    const list = (catalog[a.lib] = catalog[a.lib] || []);
+    let entry = list.find(x => x.id === a.id);
+    if (!entry) list.push(entry = { lib: a.lib, id: a.id, name: a.name, group: a.group || "", calls: {}, options: [] });
+    return entry;
+  };
+  const optionOf = (entry, key, name) => {
+    let o = entry.options.find(x => x.key === key);
+    if (!o) {
+      entry.options.push(o = { key, name, names: {}, takes: {}, rustKey: null, doc: "" });
+      optionIndex[key] = { api: entry, option: o };
+    }
+    return o;
+  };
+  for (const a of (rust && rust.apis) || []) {
+    const entry = apiOf(a);
+    entry.calls.rust = a.call;
+    for (const o of a.options) {
+      Object.assign(optionOf(entry, o.key, o.key.split("|")[2]), { rustKey: o.rust_key, doc: o.doc || "" });
+      optionIndex[o.key].option.names.rust = o.name;
+      optionIndex[o.key].option.takes.rust = o.takes;
+    }
+  }
+  for (const a of (others && others.apis) || []) {
+    const entry = apiOf(a);
+    for (const o of a.options) {
+      const opt = optionOf(entry, o.key, o.name);
+      Object.assign(opt.names, o.names);
+      Object.assign(opt.takes, o.takes);
+    }
+  }
+  const rank = g => (GROUPS.includes(g) ? GROUPS.indexOf(g) : GROUPS.length);
+  for (const [l, list] of Object.entries(catalog)) {
+    catalog[l] = list.filter(a => a.options.length).sort((x, y) => rank(x.group) - rank(y.group) || x.name.localeCompare(y.name));
+  }
+}
+
+const currentApis = () => catalog[lib] || [];
+const optionName = (key, l) => { const o = optionIndex[key].option; return (l && o.names[l]) || o.name; };
+const proposalOf = key => ((proposals || {}).options || {})[(optionIndex[key] || { option: {} }).option.rustKey];
+const proposalFor = (key, l) => ((proposalOf(key) || {}).languages || {})[l];
+const hasProposal = key => Object.keys((proposalOf(key) || {}).languages || {}).length > 0;
+const rawRows = (key, l) => (l === "rust" ? ((rust || {}).rows || {})[key] : (((others || {}).rows || {})[key] || {})[l]) || [];
+const rowsOf = (key, l) => (proposed.has(key) && proposalFor(key, l) ? proposalFor(key, l).rows : rawRows(key, l));
+const kindOf = (row, l) => l === "rust" ? RUST_KIND[row.kind] : row.kind;
+const takesOf = (key, l) => optionIndex[key].option.takes[l];
+const aboutOf = (l, type) => ((l === "rust" ? (rust || {}).about : ((others || {}).about || {})[l]) || {})[type];
+
+// A rule from expectations.json, checked against one row: ok is false when the row takes a refused kind as is.
+function expected(key, row) {
+  const rule = (expectations.rules || {})[key];
+  if (!rule || !rule.refuse.includes(row.kind) || row.calls === null || row.calls === undefined) return null;
+  return row.calls === 0
+    ? { ok: false, text: `Takes ${row.kind} as is, which the rule refuses. ${rule.why}` }
+    : { ok: true, text: `Needs a conversion, as the rule asks. ${rule.why}` };
+}
+
+// Calls that compile but are likely mistakes.
+function risk(row) {
+  return row.type === "char" && row.calls === 0 ? "A single char compiles." : "";
+}
+
+// Whether a Rust row's run failed: the build or call returned an error, or the result differs from the reference.
+const runFailed = row => !!(row.run && !row.run.skipped && (row.run.builds === false || row.run.same === false));
+
+// ▲ marks a row the proposal makes cheaper, and ▼ one it makes dearer.
+function moved(row) {
+  if (!("today" in row) || level(row.calls) === level(row.today)) return "";
+  return row.today === null || (row.calls !== null && row.calls < row.today) ? " ▲" : " ▼";
+}
+
+// A chip's hover text: what each part of its type is, and what it took before a proposal.
+function hoverText(l, row) {
+  const about = aboutOf(l, row.type);
+  const lines = about ? about.parts.filter(p => p.text).map(p => `${p.name}: ${p.text}`) : [];
+  if ("today" in row) lines.push(`Was ${LEVEL[level(row.today)]}.`);
+  return lines.join("\n");
+}
+
+function chip(key, l, row, text) {
+  const rule = expected(key, row);
+  const warn = (rule && !rule.ok) || risk(row);
+  const failed = runFailed(row);
+  const hover = hoverText(l, row);
+  return `<span class="chip b${level(row.calls)}${warn ? " warn" : ""}${failed ? " failed" : ""}"${hover ? ` title="${esc(hover)}"` : ""} `
+    + `data-key="${esc(key)}" data-lang="${l}" data-type="${esc(row.type)}">${esc(text)}${warn ? " ⚠" : ""}${failed ? " ✗" : ""}${moved(row)}</span>`;
+}
+
+function propButton(key) {
+  const on = proposed.has(key);
+  return `<button class="prop${on ? " on" : ""}" data-prop="${esc(key)}">${on ? "Proposed ▾" : "Proposed ▸"}</button>`;
+}
+
+// The option cell: its name, what it takes, and the proposal button and text.
+function optionCell(key, takes) {
+  const p = proposalOf(key);
+  let html = `<td class="opt"><b>${esc(optionName(key, lang))}</b><div>${esc(takes || "not offered")}</div>`;
+  if (!p) return html + "</td>";
+  if (!hasProposal(key)) return html + `<div class="why">No proposal. ${esc(p.why)}</div></td>`;
+  html += propButton(key);
+  if (proposed.has(key)) {
+    const mine = proposalFor(key, lang);
+    html += `<div class="propsig">${esc(mine ? mine.signature : "no change")}</div><div class="why">${esc(p.why)}</div>`;
+    for (const b of (mine && mine.breaks) || []) html += `<div class="breaks">Breaks ${esc(b)}</div>`;
+  }
+  return html + "</td>";
+}
+
+// ---------- customers ----------
+// usage.json's conversions for one option, each with the row it goes under.
+function conversions(key) {
+  const [l, apiId, member] = key.split("|");
+  const list = ((((usage || {}).apis || {})[`${l}|${apiId}`]) || {})[member] || [];
+  return list.map(c => ({ ...c, kind: c.from === null ? "passed as is" : FROM_KIND[c.from] || "other" }));
+}
+
+// The conversions, with a kind that has no row in the table moved under other.
+function customerKinds(key, rows) {
+  return conversions(key).map(c => c.kind === "passed as is" || !rows || rows[c.kind] ? c : { ...c, kind: "other" });
+}
+
+// The sources of an option's customer calls, of one kind of value, in one language, or both.
+function customerSources(convs, filter) {
+  const seen = new Set();
+  for (const c of convs) {
+    if (filter.kind && c.kind !== filter.kind) continue;
+    for (const h of c.hits || []) if (!h.aws_copy && (!filter.lang || h.language === filter.lang)) seen.add(`${c.conversion}#${h.source}`);
+  }
+  return seen.size;
+}
+
+// A customer cell: how many sources had this kind of value, or are in this language. A click opens them.
+function custCell(key, convs, filter, words) {
+  const n = customerSources(convs, filter);
+  if (!n) return "";
+  return `<span class="cust" data-cust="${esc(key)}" data-kind="${esc(filter.kind || "")}" data-lang="${esc(filter.lang || "")}" `
+    + `title="Click to see each call and where it is">${n} ${n === 1 ? "source" : "sources"}${words}</span>`;
+}
+
+function customersHtml(view) {
+  const filter = { kind: view.kind, lang: view.lang };
+  // The same rows as the comparison table, so a conversion that table puts under other is under other here too.
+  const present = {};
+  for (const [, l] of LANGS) for (const r of rowsOf(view.key, l)) if (kindOf(r, l)) present[kindOf(r, l)] = true;
+  const convs = customerKinds(view.key, present)
+    .filter(c => (!filter.kind || c.kind === filter.kind) && customerSources([c], filter))
+    .sort((a, b) => customerSources([b], filter) - customerSources([a], filter));
+  const who = [filter.kind === "passed as is" ? "pass the value as is" : filter.kind ? `have ${filter.kind}, and convert it before the call` : "",
+    filter.lang ? `write ${langName(filter.lang)}` : ""].filter(Boolean).join(" and ");
+  let html = `<h2>${esc(optionName(view.key, view.lang))}</h2>`
+    + `<div class="sub">Customers who ${esc(who)} · ${customerSources(convs, filter)} sources</div>`
+    + `<p class="sub">${esc(((usage || {}).search || {}).sources || "")} Copies of AWS code are listed, but not counted.</p><h3>What they call</h3>`;
+  for (const c of convs) {
+    const id = `${view.key}|${c.conversion}|${filter.lang}`;
+    const hits = (c.hits || []).filter(h => !filter.lang || h.language === filter.lang);
+    const langs = Object.entries(c.languages).filter(([l]) => !filter.lang || l === filter.lang).map(([l, n]) => `${l} ${n}`).join(", ");
+    html += `<details data-id="${esc(id)}"${openDetails.has(id) ? " open" : ""}><summary><code>${esc(c.conversion)}</code>`
+      + ` <span class="ev">from ${esc(c.from || "the same type")} · ${customerSources([c], filter)} sources · ${hits.filter(h => !h.aws_copy).length} hits (${esc(langs)})</span></summary>`
+      + `<div class="hits">${hitList(hits)}</div></details>`;
+  }
+  return html;
+}
+
+const hitLink = h => `<a href="${esc(h.url)}" target="_blank">${esc(h.repo)}/${esc(h.path)}#L${h.line}</a>`;
+
+// Every hit, grouped by source. Each line of code shows once, above every place it appears.
+function hitList(hits) {
+  const groups = {};
+  for (const h of hits.filter(h => !h.aws_copy)) (groups[h.source] = groups[h.source] || []).push(h);
+  let html = Object.values(groups).map(group => {
+    const files = new Set(group.map(h => `${h.repo}/${h.path}`)).size;
+    const tag = files > 1 ? `${files} copies` : group.length > 1 ? `${group.length} calls in one file` : "";
+    const lines = {};
+    for (const h of group) {
+      const id = `${h.code}\n${h.assignment}`;
+      (lines[id] = lines[id] || []).push(h);
+    }
+    const body = Object.values(lines).map(same => {
+      const via = same[0].assignment ? `<br><code>${esc(same[0].assignment)}</code>` : "";
+      return `<div><code>${esc(same[0].code || "")}</code>${via}<div class="where">${same.map(hitLink).join("<br>")}</div></div>`;
+    }).join("");
+    return `<div class="source">${tag ? `<span class="tag">${tag}</span>` : ""}${body}</div>`;
+  }).join("");
+  const aws = hits.filter(h => h.aws_copy);
+  if (aws.length) {
+    html += `<div class="ev">Copies of AWS code, not counted:</div><div class="where">${aws.map(hitLink).join("<br>")}</div>`;
+  }
+  return html;
+}
+
+// ---------- the main views ----------
+function mapView() {
+  const a = currentApis()[api];
+  if (!a) return `<p class="sub">No ${esc(LIBS.find(x => x[1] === lib)[0])} data yet. The readers cover the ESDK and the MPL so far.</p>`;
+  if (!a.options.some(o => o.takes[lang])) return `<p class="sub">${esc(langName(lang))} doesn't have the ${esc(a.name)} yet.</p>`;
+  const levels = [0, 1, 2, "x"];
+  let html = "<table><thead><tr><th>Option · takes</th>" + levels.map(l => `<th>${esc(LEVEL[l][0].toUpperCase() + LEVEL[l].slice(1))}</th>`).join("")
+    + `<th title="Public ${esc(langName(lang))} code on GitHub that sets this option">Customers</th></tr></thead><tbody>`;
+  for (const o of a.options) {
+    const takes = takesOf(o.key, lang);
+    html += "<tr>" + optionCell(o.key, takes);
+    if (!takes) {
+      html += `<td class="none" colspan="${levels.length + 1}">Not offered</td></tr>`;
+      continue;
+    }
+    const cells = { 0: "", 1: "", 2: "", x: "" };
+    for (const row of rowsOf(o.key, lang)) cells[level(row.calls)] += chip(o.key, lang, row, row.type);
+    html += levels.map(l => `<td>${cells[l]}</td>`).join("") + `<td>${custCell(o.key, conversions(o.key), { lang }, "")}</td></tr>`;
+  }
+  return html + "</tbody></table>" + (usage ? "" : `<p class="sub">usage.json didn't load, so customer counts are hidden.</p>`);
+}
+
+// The cheaper of two rows. A row with no fix found loses.
+const cheaper = (a, b) => !b || (a.calls !== null && (b.calls === null || a.calls < b.calls));
+
+function compareView() {
+  const a = currentApis()[api];
+  if (!a) return mapView();
+  let html = "";
+  for (const o of a.options) {
+    const key = o.key, all = {}, best = {};
+    for (const [, l] of LANGS) {
+      for (const row of rowsOf(key, l)) {
+        const kind = kindOf(row, l);
+        if (!kind) continue;
+        ((all[kind] = all[kind] || {})[l] = all[kind][l] || []).push(row);
+        best[kind] = best[kind] || {};
+        if (cheaper(row, best[kind][l])) best[kind][l] = row;
+      }
+    }
+    const convs = customerKinds(key, all);
+    const button = hasProposal(key) ? " " + propButton(key) : "";
+    const sig = proposed.has(key) && proposalFor(key, "rust") ? `<div class="propsig">${esc(proposalFor(key, "rust").signature)}</div>` : "";
+    const asIs = custCell(key, convs, { kind: "passed as is" }, " pass it as is");
+    html += `<table><tr class="head"><th>${esc(o.name)}${button}${sig}${asIs ? `<div>${asIs}</div>` : ""}</th>`
+      + LANGS.map(l => `<th>${l[0]}</th>`).join("") + `<th title="Public GitHub code that has this kind of value and converts it before the call">Customers</th></tr>`;
+    for (const kind of KINDS.filter(k => all[k] || (k === "other" && convs.some(c => c.kind === "other")))) {
+      const id = `${key}|${kind}`;
+      const isOpen = opened.has(id);
+      html += `<tr data-open="${esc(id)}"><td class="kind">${isOpen ? "▾" : "▸"} ${esc(kind)}</td>`;
+      for (const [, l] of LANGS) {
+        const row = (best[kind] || {})[l];
+        const n = ((all[kind] || {})[l] || []).length;
+        const more = n > 1 ? ` +${n - 1}` : "";
+        html += `<td class="ck">${row ? chip(key, l, row, LEVEL[level(row.calls)]) + `<small>${esc(row.type)}${more}</small>` : `<small>${takesOf(key, l) ? "" : "not offered"}</small>`}</td>`;
+      }
+      html += `<td>${custCell(key, convs, { kind }, "")}</td></tr>`;
+      if (isOpen) html += detailRow(key, all[kind] || {});
+    }
+    html += "</table>";
+  }
+  if (!usage) html += `<p class="sub">usage.json didn't load, so customer counts are hidden.</p>`;
+  return html;
+}
+
+// Every type of one kind in each language.
+function detailRow(key, byLang) {
+  let html = `<tr class="detail"><td></td>`;
+  for (const [name, l] of LANGS) {
+    const rows = (byLang[l] || []).slice().sort((a, b) => (a.calls === null) - (b.calls === null) || (a.calls || 0) - (b.calls || 0));
+    html += `<td><div class="lang">${name}</div>${rows.map(r => chip(key, l, r, r.type)).join("<br>") || "<span class=\"ev\">none</span>"}</td>`;
+  }
+  return html + "<td></td></tr>";
+}
+
+// ---------- the side pane ----------
+// What the run test found, in words.
+function runText(run) {
+  if (run.skipped) return `⏭ Not run: ${run.skipped}.`;
+  if (!run.builds) return `❌ Ran: it failed with ${run.error || "an error"}.`;
+  let text = "✅ Ran: it works";
+  if (run.same === true) text += ", and gives the same result as the reference value";
+  if (run.same === false) text = "❌ Ran: it works, but the result differs from the reference value";
+  if (run.copies === true) text += ". Passing the value copies it";
+  if (run.copies === false) text += ". Passing the value doesn't copy it";
+  return text + ".";
+}
+
+// A link that opens a type, or a group of types, in the type explorer, which takes over the main view.
+const typeLink = (l, type, text) => `<a class="go" data-x="type" data-lang="${l}" data-type="${esc(type)}">${esc(text || type)}</a>`;
+const groupLink = (handle, text) => `<a class="go" data-x="group" data-handle="${esc(handle)}">${esc(text)}</a>`;
+// A type without & and Arc<>, like RawAesKeyring for &RawAesKeyring.
+const baseType = type => type.replace(/^&/, "").replace(/^Arc<(.*)>$/, "$1");
+const handleOf = type => Object.entries((rust || {}).handles || {}).find(([h, info]) => h === type || info.members.includes(type));
+
+// What a type is, one line for each part of it.
+function aboutHtml(l, type) {
+  const about = aboutOf(l, type);
+  if (!about) return "";
+  return `<ul class="about">` + about.parts.map(p => {
+    const text = p.text ? docHtml(p.text.split(/(?<=\.)\s/)[0]) : `<span class="ev">No doc comment.</span>`;
+    const link = p.url ? ` <a href="${esc(p.url)}" target="_blank">docs ↗</a>` : "";
+    return `<li><code>${esc(p.name)}</code> ${text}${link}</li>`;
+  }).join("") + "</ul>";
+}
+
+// The calls in a fix, like as_bytes and unwrap in x.as_bytes().unwrap(). & and Some(...) are not calls.
+const callNames = fix => [...(fix || "").matchAll(/(?<!new )\b([A-Za-z_]\w*)\s*\(/g)].map(m => m[1]).filter(n => n !== "Some")
+  .concat((fix || "").match(/\bawait\b/g) || []).concat([...(fix || "").matchAll(/\bnew\s+([A-Za-z_][\w.]*)/g)].map(m => "new " + m[1]));
+
+// Why a type sits where it does, in words.
+function levelText(row, l) {
+  if (row.calls === null || row.calls === undefined) {
+    return l === "rust" ? "No fix found: none of the fixes the page tries compiles." : "No fix found: no conversion in the list reaches a type it takes.";
+  }
+  const fix = row.fix || "";
+  if (row.calls === 0) {
+    if (/&x\b|&\{/.test(fix)) return "As is: <code>&amp;x</code> only lends it, so it is not a call.";
+    if (/^Some\(/.test(fix)) return "As is: <code>Some(x)</code> only wraps it, so it is not a call.";
+    return "As is: you pass it without a call.";
+  }
+  const names = callNames(fix);
+  const list = names.length ? names.map(n => `<code>${esc(n)}${n.startsWith("new ") ? "" : "()"}</code>`).join(", ") : "";
+  return `${row.calls === 1 ? "One call" : `${row.calls} calls`}${list ? `: ${list}` : ""}.`;
+}
+
+// A long Rust method chain with each call on its own line, as rustfmt writes chains over 60 characters.
+function formatCall(code) {
+  if (code.length <= 60 || code.includes("\n")) return code;
+  const parts = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c)) depth--;
+    else if (c === "." && depth === 0 && i > start && /[\w)]/.test(code[i - 1])) {
+      parts.push(code.slice(start, i));
+      start = i;
+    }
+  }
+  parts.push(code.slice(start));
+  return parts.length < 2 ? code : parts[0] + parts.slice(1).map(p => "\n    " + p).join("");
+}
+
+// The code a CI artifact compiled or ran, for a line of one of its files, or null for the committed copy.
+function artifactCode(file, line, whole) {
+  const text = (files.rust || {})[file];
+  if (!text) return null;
+  const lines = text.split("\n");
+  if (!whole) return lines[line - 1];
+  const end = lines.indexOf("}", line - 1);
+  return lines.slice(line - 1, end + 1).join("\n");
+}
+
+function chipHtml(view) {
+  const { key, lang: l, type } = view;
+  const row = rowsOf(key, l).find(r => r.type === type);
+  const a = optionIndex[key].api;
+  const example = l === "rust" ? ((rust || {}).examples || {})[type] : null;
+  const call = row.calls === null || row.calls === undefined ? "// No fix in the list works."
+    : l === "rust" ? formatCall((a.calls.rust || "") + row.code) : row.code;
+  const have = example ? `// You have:\n${example}\n\n// You write:\n` : `// You have x: ${type}\n`;
+  const checks = [];
+  if (row.proposed) {
+    const checked = l === "rust" ? "Compiled against a model of it, not run" : "Not compiled";
+    checks.push(`✏️ Proposed: <code>${esc(proposalFor(key, l).signature)}</code>. ${checked}. Today: ${LEVEL[level(row.today)]}.`);
+  } else if (l === "rust") {
+    const run = sources.rust;
+    const where = run ? `in <a href="${esc(run.url)}" target="_blank">CI run ${run.number}</a>, ${ago(run.at)}` : "in the committed copy";
+    if (row.trial) {
+      const compiled = artifactCode("rust_trials.rs", row.trial);
+      checks.push(compiled ? `✅ Compiled ${where}. <details><summary>The code</summary><pre>${esc(compiled)}</pre></details>`
+        : `✅ Compiled ${where}. <a href="${blob(rust.files.trials, row.trial)}" target="_blank">See the code it compiled ↗</a>`);
+    } else {
+      checks.push(`❌ No fix in the list compiled ${where}.`);
+    }
+    if (row.run) {
+      const test = artifactCode("rust_runs.rs", row.test, true);
+      checks.push(`${esc(runText(row.run))} ${test ? `<details><summary>The test</summary><pre>${esc(test)}</pre></details>`
+        : `<a href="${blob(rust.files.runs, row.test)}" target="_blank">See the test ↗</a>`}`);
+    }
+    checks.push(`aws-crypto-tools-rust <a href="https://github.com/aws/aws-crypto-tools-rust/tree/${rust.rust_commit}" target="_blank">`
+      + `${rust.rust_commit.slice(0, 7)}</a>, rustc ${esc(rust.rustc)}. <a href="${workflowLink(PARTS.rust.workflow)}" target="_blank">CI runs it every day ↗</a>`);
+  } else {
+    checks.push("⚙ Written from the release's signature. Not compiled or run.");
+  }
+  const rule = expected(key, row);
+  if (rule) checks.push(`${rule.ok ? "✅" : "⚠"} Rule: ${esc(rule.text)}`);
+  if (risk(row)) checks.push(`⚠ ${esc(risk(row))}`);
+  return `<h2>${esc(type)}</h2>`
+    + `<div class="sub">${esc(langName(l))} · ${esc(a.name)} · ${esc(optionName(key, l))} · ${typeLink(l, type, "explore this type →")}</div>`
+    + `<p class="level">${levelText(row, l)}</p><pre>${esc(have + call)}</pre>`
+    + aboutHtml(l, type) + `<ul class="checks">${checks.map(c => `<li>${c}</li>`).join("")}</ul>`;
+}
+
+// Every option that one type shows up on, in one language.
+function usesOf(l, type) {
+  const out = [];
+  for (const list of Object.values(catalog)) {
+    for (const a of list) {
+      for (const o of a.options) {
+        const row = rawRows(o.key, l).find(r => r.type === type);
+        if (row) out.push({ a, o, row });
+      }
+    }
+  }
+  return out;
+}
+
+// A small graph: what a type belongs to, on the left, and each option it goes into, on the right.
+function graphHtml(l, left, middle, uses) {
+  const targets = uses.length ? uses.map(({ a, o, row }) =>
+    `<a class="node opt go" data-go="chip" data-key="${esc(o.key)}" data-lang="${l}" data-type="${esc(row.type)}">`
+    + `<span class="chip b${level(row.calls)}">${esc(LEVEL[level(row.calls)])}</span> ${esc(a.name)} · <b>${esc(o.names[l] || o.name)}</b>`
+    + `${row.type !== middle ? ` <small>as ${esc(row.type)}</small>` : ""}</a>`).join("") : `<span class="ev">No option takes it.</span>`;
+  return `<div class="graph">${left ? `<div class="col">${left}</div><span class="arrow">→</span>` : ""}`
+    + `<div class="col"><div class="node me">${esc(middle)}</div></div><span class="arrow">→</span><div class="col">${targets}</div></div>`;
+}
+
+// A type in the explorer: what it is, how to make one, and the options it goes into.
+function typeHtml(view) {
+  const { lang: l, type } = view;
+  const base = baseType(type);
+  const example = l === "rust" ? ((rust || {}).examples || {})[type] : null;
+  const found = l === "rust" ? handleOf(base) : null;
+  const left = found ? groupLink(found[0], found[1].group) : "";
+  let html = `<h2>${esc(type)} <span class="sub">${esc(langName(l))}</span></h2>` + aboutHtml(l, type);
+  html += example ? `<h3>Make one</h3><pre>${esc(example)}</pre>` : "";
+  const uses = usesOf(l, type).sort((x, y) => x.a.name.localeCompare(y.a.name) || x.o.name.localeCompare(y.o.name));
+  html += `<h3>Where it goes</h3>` + graphHtml(l, left ? `<div class="node grp">${left}</div>` : "", type, uses);
+  if (l === "rust") {
+    const forms = [base, `&${base}`, `Arc<${base}>`].filter(t => t !== type && usesOf(l, t).length);
+    if (forms.length) html += `<p class="sub">Also held as ${forms.map(t => typeLink(l, t)).join(", ")}.</p>`;
+    const builds = Object.values(catalog).flat().find(a => a.calls.rust && a.calls.rust.split("::")[0] === base);
+    if (builds) html += `<p class="sub">Its own options are on the <a class="go" data-go="api" data-lib="${builds.lib}" data-id="${esc(builds.id)}">${esc(builds.name)}</a> tab.</p>`;
+  }
+  return html;
+}
+
+// A group of types, like every keyring, and the options that take any of them.
+function groupHtml(view) {
+  const info = rust.handles[view.handle];
+  const uses = [view.handle, ...info.members].flatMap(t => usesOf("rust", t))
+    .filter((u, i, all) => all.findIndex(x => x.o.key === u.o.key) === i)
+    .sort((x, y) => x.a.name.localeCompare(y.a.name) || x.o.name.localeCompare(y.o.name));
+  const members = info.members.map(m => `<div class="node">${typeLink("rust", m)}</div>`).join("")
+    || `<span class="ev">None built in. Customers write their own.</span>`;
+  return `<h2>${esc(info.group)} <span class="sub">Rust</span></h2>`
+    + `<p class="sub">Each one converts into ${typeLink("rust", view.handle)}, which holds any of them.</p>`
+    + graphHtml("rust", members, view.handle, uses);
+}
+
+// Every type on the page, for one language, by what it is.
+function typesHtml(view) {
+  const l = view.lang;
+  const byKind = {};
+  for (const list of Object.values(catalog)) for (const a of list) for (const o of a.options) {
+    for (const r of rawRows(o.key, l)) {
+      const kind = l === "rust" && (r.kind === "component" || r.kind === "named" || r.kind === "ctor") ? "our types and clients" : kindOf(r, l) || r.kind;
+      (byKind[kind] = byKind[kind] || new Set()).add(r.type);
+    }
+  }
+  let html = `<h2>Type explorer <span class="sub">${esc(langName(l))}</span></h2>`;
+  if (l === "rust") {
+    html += "<h3>Groups</h3><p>" + Object.entries((rust || {}).handles || {}).map(([h, info]) => groupLink(h, info.group)).join(" · ") + "</p>";
+  }
+  for (const [kind, types] of Object.entries(byKind).sort()) {
+    html += `<h3>${esc(kind)}</h3><p>${[...types].sort().map(t => typeLink(l, t)).join(" · ")}</p>`;
+  }
+  return html;
+}
+
+// The main view when the type explorer is open: the page on top of its history, and a way back.
+function explorerView() {
+  const view = explorer[explorer.length - 1];
+  const back = explorer.length > 1 ? `<button class="tool" data-xback>← Back</button> ` : "";
+  const body = { types: typesHtml, type: typeHtml, group: groupHtml }[view.show](view);
+  return `<div class="crumbs">${back}<a class="go" data-x="types" data-lang="${view.lang || "rust"}">All types</a>`
+    + ` · <a class="go" data-xclose>Back to the options</a></div>` + body;
+}
+
+// How each part of this page is made.
+function howHtml() {
+  const file = (path, name) => `<a href="${COMMONS}/blob/${REF.split("/").map(encodeURIComponent).join("/")}/${path}" target="_blank"><code>${name || path.split("/").pop()}</code></a>`;
+  const t = "api-examples/types/";
+  const from = name => sources[name] ? `This page has <a href="${esc(sources[name].url)}" target="_blank">run ${sources[name].number}</a>, from ${ago(sources[name].at)}.`
+    : "This page has the committed copy, because it has no GitHub token or found no run.";
+  return `<h2>How this page is made</h2>`
+    + `<div class="sub">CI makes every number here, every day. The page loads the newest run. A person only wrote the types lists, the rules and the fixes to try.</div><ol>`
+    + `<li><b>Rust.</b> <a href="${workflowLink(PARTS.rust.workflow)}" target="_blank">API examples types</a> checks out aws-crypto-tools-rust main. `
+    + `${file(t + "rust_api.py")} reads every keyring, CMM, key store, cache and client, and each setter, from rustdoc. `
+    + `${file(t + "compile_rust_types.py")} writes one small function for each setter, type and fix, like <code>x.as_bytes()</code>. The Rust compiler says which ones compile, and each cell is the fix with the fewest calls. It runs some of them too. ${from("rust")}</li>`
+    + `<li><b>Other languages.</b> <a href="${workflowLink(PARTS.others.workflow)}" target="_blank">API examples (shipped)</a> reads each released Java, Python, .NET, Go and JS library. `
+    + `${file(t + "other_languages.py")} writes each call from its signatures. These are not compiled. ${from("others")}</li>`
+    + `<li><b>Customers.</b> <a href="${workflowLink(PARTS.usage.workflow)}" target="_blank">API examples usage</a> searches public GitHub code with ${file("api-examples/usage_search.py")} and keeps every call it finds. ${from("usage")}</li>`
+    + `<li><b>Types lists.</b> ${file(t + "rust-types.json")} lists the Rust types that 174 popular crates hand out. ${file(t + "other_languages.py")} lists the other languages' types. People update these by hand.</li>`
+    + `<li><b>Rules.</b> A person writes ${file("dashboard/api-examples/expectations.json")}, like "a wrapping key takes no text".</li>`
+    + `<li><b>Proposals.</b> The api-signature-proposals skill, an AI agent, writes new signatures. ${file(t + "check_proposals.py")} compiles them. Open the result with Load proposals.</li></ol>`
+    + `<h3>When the library changes</h3><p class="sub">A new keyring or setter on Rust main shows up on the next daily run, with every type. A new release of another language shows up the same way.</p>`;
+}
+
+function renderPane() {
+  const view = pane[pane.length - 1];
+  if (!view) {
+    $("detail").innerHTML = "";
+    $("main").classList.remove("open");
+    return;
+  }
+  const body = { chip: chipHtml, customers: customersHtml, how: howHtml }[view.show](view);
+  $("detail").innerHTML = `<button class="close" data-close title="Close">×</button>`
+    + (pane.length > 1 ? `<button class="tool back" data-back>← Back</button>` : "") + body;
+  $("main").classList.add("open");
+}
+// A click in the main view starts the side pane over. A click inside it adds to the pane's history.
+const openPane = (view, keep) => { pane = keep ? [...pane, view] : [view]; renderPane(); };
+
+// ---------- drawing ----------
+function draw() {
+  $("libs").innerHTML = LIBS.map(([n, l]) => `<button data-lib="${l}" class="${l === lib ? "on" : ""}">${n}</button>`).join("");
+  const apis = currentApis();
+  $("apis").innerHTML = apis.map((a, i) => (i === 0 || a.group !== apis[i - 1].group ? `<span class="grp">${esc(a.group)}</span>` : "")
+    + `<button data-api="${i}" data-id="${esc(a.id)}" class="${i === api ? "on" : ""}">${esc(a.name)}</button>`).join("");
+  const options = ((apis[api] || {}).options || []).map(o => o.key).filter(hasProposal);
+  const allOn = options.length > 0 && options.every(k => proposed.has(k));
+  const toggle = proposals ? `<button class="tool${allOn ? " on" : ""}" data-all-proposals${options.length ? "" : " disabled"}>`
+    + `${allOn ? "Hide" : "Show"} proposed signatures</button>` : "";
+  $("langs").innerHTML = LANGS.map(([n, l]) => `<button data-lang="${l}" class="${l === lang ? "on" : ""}">${n}</button>`).join("")
+    + `<button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`
+    + toggle + `<label class="tool">Load proposals… <input type="file" id="load" accept=".json"></label>`;
+  $("view").innerHTML = mode === "explorer" ? explorerView() : lang === "compare" ? compareView() : mapView();
+  $("explore").className = "tool" + (mode === "explorer" ? " on" : "");
+}
+
+// Opens a type, a group or the index in the type explorer, which takes over the main view.
+function explore(view) {
+  mode = "explorer";
+  explorer.push(view);
+  draw();
+}
+
+// Shows the options of one API, like the Raw AES keyring's.
+function showApi(l, id) {
+  lib = l;
+  api = Math.max(0, currentApis().findIndex(a => a.id === id));
+  mode = "options";
+  lang = lang === "compare" ? "rust" : lang;
+  draw();
+}
+
+function foot() {
+  const parts = [(rust || {}).note, (others || {}).note];
+  if (usage) parts.push(`Customers: GitHub code search on ${usage.generated_at}, ${Object.values(usage.languages).reduce((n, l) => n + l.calls, 0)} calls. `
+    + `Skipped: ${usage.search ? usage.search.skipped.join("; ") : "AWS repos and forks"}. ${usage.search ? usage.search.sources : ""}`);
+  if (proposals) parts.push(proposals.checked);
+  $("foot").textContent = parts.filter(Boolean).join(" ");
+  const from = (label, name) => sources[name]
+    ? `${label}: <a href="${esc(sources[name].url)}" target="_blank">CI ${ago(sources[name].at)}</a>` : `${label}: committed copy`;
+  $("run").innerHTML = [from("Rust", "rust"), from("Others", "others"), from("Customers", "usage")].join(" · ");
+}
+
+// ---------- clicks ----------
+$("libs").addEventListener("click", e => {
+  const button = e.target.closest("button");
+  if (!button) return;
+  lib = button.dataset.lib;
+  api = 0;
+  mode = "options";
+  pane = [];
+  renderPane();
+  draw();
+});
+$("apis").addEventListener("click", e => {
+  const button = e.target.closest("button");
+  if (!button) return;
+  api = Number(button.dataset.api);
+  mode = "options";
+  pane = [];
+  renderPane();
+  draw();
+});
+$("langs").addEventListener("click", e => {
+  const button = e.target.closest("button");
+  if (!button) return;
+  if ("allProposals" in button.dataset) {
+    const options = ((currentApis()[api] || {}).options || []).map(o => o.key).filter(hasProposal);
+    const allOn = options.every(k => proposed.has(k));
+    for (const k of options) allOn ? proposed.delete(k) : proposed.add(k);
+    pane = [];
+    renderPane();
+    draw();
+    return;
+  }
+  lang = button.dataset.lang;
+  if (mode === "explorer" && lang !== "compare") explorer.push({ show: "types", lang });
+  else mode = "options";
+  pane = [];
+  renderPane();
+  draw();
+});
+$("langs").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if (file) file.text().then(text => useProposals(JSON.parse(text)));
+});
+$("how").addEventListener("click", () => openPane({ show: "how" }));
+$("explore").addEventListener("click", () => {
+  if (mode === "explorer") {
+    mode = "options";
+    draw();
+  } else {
+    explore({ show: "types", lang: lang === "compare" ? "rust" : lang });
+  }
+});
+// A click on a link that moves the explorer or opens an API. Returns whether it was one.
+function navigate(e) {
+  const d = (e.target.closest("[data-x], [data-xback], [data-xclose], [data-go]") || {}).dataset;
+  if (!d) return false;
+  if ("xback" in d) {
+    explorer.pop();
+    draw();
+  } else if ("xclose" in d) {
+    mode = "options";
+    draw();
+  } else if (d.x) {
+    explore({ show: d.x, lang: d.lang || "rust", type: d.type, handle: d.handle });
+  } else if (d.go === "api") {
+    showApi(d.lib, d.id);
+  } else if (d.go === "chip") {
+    openPane({ show: "chip", key: d.key, lang: d.lang, type: d.type });
+  } else {
+    return false;
+  }
+  return true;
+}
+const unselect = () => { for (const s of document.querySelectorAll(".chip.sel, .cust.sel")) s.classList.remove("sel"); };
+$("view").addEventListener("click", e => {
+  if (navigate(e)) return;
+  const prop = e.target.closest(".prop");
+  if (prop) {
+    proposed.has(prop.dataset.prop) ? proposed.delete(prop.dataset.prop) : proposed.add(prop.dataset.prop);
+    pane = [];
+    renderPane();
+    draw();
+    return;
+  }
+  const cust = e.target.closest(".cust");
+  if (cust) {
+    unselect();
+    cust.classList.add("sel");
+    openPane({ show: "customers", key: cust.dataset.cust, kind: cust.dataset.kind || null, lang: cust.dataset.lang || null });
+    return;
+  }
+  const c = e.target.closest(".chip");
+  if (c && c.dataset.key) {
+    // Mark the picked chip without redrawing, so open rows stay open.
+    unselect();
+    c.classList.add("sel");
+    openPane({ show: "chip", key: c.dataset.key, lang: c.dataset.lang, type: c.dataset.type });
+    return;
+  }
+  const row = e.target.closest("tr[data-open]");
+  if (row) {
+    const id = row.dataset.open;
+    opened.has(id) ? opened.delete(id) : opened.add(id);
+    draw();
+  }
+});
+$("detail").addEventListener("click", e => {
+  if (e.target.closest("[data-close]")) {
+    unselect();
+    pane = [];
+    renderPane();
+    return;
+  }
+  if (e.target.closest("[data-back]")) {
+    pane.pop();
+    renderPane();
+    return;
+  }
+  navigate(e);
+});
+$("detail").addEventListener("toggle", e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (id) e.target.open ? openDetails.add(id) : openDetails.delete(id);
+}, true);
+
+// Drag the divider to resize the two panes, the same way the test server page does. Double-click resets it.
+(() => {
+  const main = $("main"), div = $("divider");
+  const set = px => main.style.setProperty("--left", px ? px + "px" : "1.4fr");
+  set(+localStorage.getItem("typesLeftPane") || 0);
+  div.addEventListener("mousedown", e => {
+    e.preventDefault(); div.classList.add("drag"); document.body.classList.add("resizing");
+    const move = ev => {
+      const px = Math.min(Math.max(ev.clientX - main.getBoundingClientRect().left, 320), main.clientWidth - 280);
+      set(px); localStorage.setItem("typesLeftPane", Math.round(px));
+    };
+    const up = () => { div.classList.remove("drag"); document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  });
+  div.addEventListener("dblclick", () => { localStorage.removeItem("typesLeftPane"); set(0); });
+})();
+
+function useProposals(found) {
+  proposals = found;
+  proposed.clear();
+  pane = [];
+  renderPane();
+  draw();
+  foot();
+}
+
+Promise.all([loadPart("rust"), loadPart("others"), loadPart("usage"), json("expectations.json")]).then(([r, o, u, x]) => {
+  if (!r && !o) {
+    $("view").textContent = "Could not load types-rust.json or types-others.json.";
+    return;
+  }
+  rust = r;
+  others = o;
+  usage = u;
+  if (x) expectations = x;
+  buildCatalog();
+  useProposals(null);
+  if (OPEN_API && OPEN_API.includes("|")) showApi(...OPEN_API.split("|"));
+  // proposals.json is only here when someone ran the skill and check_proposals.py in this checkout.
+  json("proposals.json").then(p => { if (p) useProposals(p); });
+});
+</script>
+</body>
+</html>

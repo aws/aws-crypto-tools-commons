@@ -44,7 +44,7 @@ class GitHubDashboard {
         // If URL has a hash, switch to that section; otherwise load dashboard
         if (window.location.hash) {
             const section = window.location.hash.slice(1);
-            if (['dashboard', 'pull-requests', 'pr-review', 'issues', 'actions', 'duvet', 'test-servers', 'settings'].includes(section)) {
+            if (['dashboard', 'pull-requests', 'pr-review', 'issues', 'actions', 'duvet', 'api-examples', 'test-servers', 'settings'].includes(section)) {
                 this.switchSection(section);
             } else {
                 this.switchSection('dashboard');
@@ -252,6 +252,13 @@ class GitHubDashboard {
             // The PR review page fetches its own data. ?pr=owner/repo%23N on the dashboard's URL picks the PR.
             const frame = document.getElementById('prReviewFrame');
             if (!frame.getAttribute('src')) frame.src = 'pr-review/index.html' + window.location.search;
+            return;
+        }
+
+        if (section === 'api-examples') {
+            // The frame gets the dashboard's query string, so ?ref=<branch> reaches the types page's links.
+            const frame = document.getElementById('apiExamplesFrame');
+            if (!frame.getAttribute('src')) frame.src = 'api-examples/types.html' + window.location.search;
             return;
         }
 
