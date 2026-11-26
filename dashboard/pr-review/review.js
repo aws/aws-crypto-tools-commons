@@ -124,9 +124,10 @@ function shortPaths(paths) {
 
 // The public items that added and removed lines declare. Each one is
 // {file, line, side, kind, name, owner}: owner is the type of the impl block a method is in.
-// A method in a builder is an option of the API that the builder builds.
+// A method in a builder is an option of the API that the builder builds. A test server is not a library,
+// so its public items are not API.
 function publicItems(file, rows, text) {
-  if (!/\.rs$/.test(file) || /(^|\/)(tests?|benches|examples)\//.test(file)) return [];
+  if (!/\.rs$/.test(file) || /(^|\/)(tests?|benches|examples|test-server)\//.test(file)) return [];
   const lines = String(text || "").split("\n");
   const ownerAt = line => {
     for (let i = line - 2; i >= 0; i--) {
@@ -139,8 +140,10 @@ function publicItems(file, rows, text) {
   const out = [];
   for (const row of rows) {
     if (row.kind !== "add" && row.kind !== "del") continue;
-    const m = row.text.match(/^\s*pub\s+(?:async\s+)?(?:unsafe\s+)?(?:const\s+)?(fn|struct|enum|trait|type|const|static|mod|use)\s+([A-Za-z_]\w*)/);
+    // A use is named by its whole path, like crate::a::{B, C}.
+    const m = row.text.match(/^\s*pub\s+(?:async\s+)?(?:unsafe\s+)?(?:const\s+)?(?:(fn|struct|enum|trait|type|const|static|mod)\s+([A-Za-z_]\w*)|(use)\s+([^;]+))/);
     if (!m) continue;
+    if (m[3]) { m[1] = m[3]; m[2] = m[4].trim(); }
     out.push({ file, line: row.kind === "add" ? row.new : row.old, side: row.kind === "add" ? "added" : "removed",
       kind: m[1], name: m[2], owner: m[1] === "fn" && row.kind === "add" ? ownerAt(row.new) : null });
   }
