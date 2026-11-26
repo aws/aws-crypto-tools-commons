@@ -36,6 +36,10 @@ class GitHubDashboard {
     }
 
     init() {
+        // A link's ?pr= becomes the PR box that the PR Review, Duvet and Test Servers tabs share.
+        const pr = new URLSearchParams(window.location.search).get('pr');
+        if (pr) sessionStorage.setItem('testServerSource', pr);
+
         // Load session token if available
         this.loadSessionToken();
         this.setupEventListeners();
@@ -235,6 +239,30 @@ class GitHubDashboard {
         this.loadSection(section);
     }
 
+    // These tabs' pages fetch their own data and share one PR box (sessionStorage testServerSource).
+    // A frame loads again only when it shows another page, or another PR than the box now holds,
+    // because the reader pasted a PR in another tab.
+    loadFrame(frame, page) {
+        const source = sessionStorage.getItem('testServerSource') || '';
+        let shown = null;
+        try {
+            const loc = frame.contentWindow.location;
+            if (loc.pathname.endsWith('/' + page)) shown = new URLSearchParams(loc.search).get('run') || '';
+        } catch (e) { /* not loaded yet */ }
+        if (frame.getAttribute('src') && shown === source) return;
+        // The dashboard's own ?ref= and ?line= go to the page too. ?pr= is in the box already.
+        const query = new URLSearchParams(window.location.search);
+        query.delete('pr');
+        if (source) query.set('run', source);
+        frame.src = page + (query.toString() ? '?' + query : '');
+        // A link's line opens once, in the first page that loads it.
+        if (query.has('line')) {
+            const top = new URLSearchParams(window.location.search);
+            top.delete('line');
+            history.replaceState(null, '', (top.toString() ? '?' + top : window.location.pathname) + window.location.hash);
+        }
+    }
+
     async loadSection(section) {
         if (section === 'dashboard') {
             await this.loadDashboard();
@@ -242,31 +270,27 @@ class GitHubDashboard {
         }
 
         if (section === 'duvet') {
-            // The duvet page fetches its own reports, so load the frame once.
-            const frame = document.getElementById('duvetFrame');
-            if (!frame.getAttribute('src')) frame.src = 'duvet/index.html';
+            this.loadFrame(document.getElementById('duvetFrame'), 'duvet/index.html');
             return;
         }
 
         if (section === 'pr-review') {
-            // The PR review page fetches its own data. ?pr=owner/repo%23N on the dashboard's URL picks the PR.
-            const frame = document.getElementById('prReviewFrame');
-            if (!frame.getAttribute('src')) frame.src = 'pr-review/index.html' + window.location.search;
+            this.loadFrame(document.getElementById('prReviewFrame'), 'pr-review/index.html');
             return;
         }
 
         if (section === 'test-servers') {
-            // The test server pages fetch their own data, so load the frame once.
             const frame = document.getElementById('testServersFrame');
-            if (!frame.getAttribute('src')) frame.src = 'test-servers/index.html';
             const tabs = document.getElementById('testServersTabs');
+            const active = tabs.querySelector('button.active');
+            this.loadFrame(frame, 'test-servers/' + (active ? active.dataset.page : 'index.html'));
             if (!tabs.dataset.bound) {
                 tabs.dataset.bound = 'true';
                 tabs.addEventListener('click', (e) => {
                     const button = e.target.closest('button[data-page]');
                     if (!button) return;
                     tabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === button));
-                    frame.src = 'test-servers/' + button.dataset.page;
+                    this.loadFrame(frame, 'test-servers/' + button.dataset.page);
                 });
             }
             return;

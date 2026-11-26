@@ -134,6 +134,13 @@ test("a changed library line no test runs is flagged once, not also for its bran
   assert.deepStrictEqual(f[0].lines, [{ file: "mpl/src/k.rs", line: 1, code: true }]);
 });
 
+test("a test server's code is left out of the line checks, as the coverage checks in CI leave it out", () => {
+  const server = { filename: "mpl/test-server/src/handlers.rs", code: true, rows: R.diffRows("@@ -1,0 +1,1 @@\n+fn h() {}") };
+  const d = good();
+  d.local.set("mpl/test-server/src/handlers.rs", new Map([[1, 0]]));
+  assert.deepStrictEqual(ids(R.findFlags([FILE, server], d)), []);
+});
+
 test("a branch no test takes is flagged on a line that runs", () => {
   const d = good();
   d.branches.get("mpl/src/k.rs").get(2).set("0,1", 0);
@@ -233,13 +240,12 @@ function github(over = {}) {
     [`repos/${REPO}/actions/runs/50/artifacts?${page1}`]: { artifacts: [art(1, "mutation-results-mpl"), art(2, "local-coverage-mpl")] },
     [`repos/${REPO}/actions/artifacts/1/zip`]: zipOf({ "results.json": results([{ file: "mpl/src/k.rs", line: 6, status: "killed", description: "replace check with ()", killed_by: "aws-crypto-mpl::t::checks" }]) }),
     [`repos/${REPO}/actions/artifacts/2/zip`]: zipOf({ "mpl.lcov": lcov({ 3: 4, 6: 4, 7: 4 }) }),
-    "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-types.yml/runs?branch=main&per_page=50": { workflow_runs: [] },
     ...over,
   };
 }
 
 // Opens the page on PR 7 against `replies`. Returns its elements, the requests it sent, and a click helper.
-async function open(replies) {
+async function open(replies, query = "") {
   const sent = [];
   const fetch = async (url, opts = {}) => {
     const p = url.replace("https://api.github.com/", "");
@@ -256,23 +262,54 @@ async function open(replies) {
   const el = id => els[id] || (els[id] = { innerHTML: "", value: "", scrollTop: 0, on: {}, classList: { add() {}, remove() {} },
     style: { setProperty() {} }, addEventListener(type, f) { this.on[type] = f; } });
   const storage = () => { const m = new Map([["github-dashboard-token", "t"]]); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: k => m.delete(k) }; };
+  const session = storage();
   new Function("document", "fetch", "location", "localStorage", "sessionStorage", "history", "navigator", "addEventListener", "removeEventListener", PAGE)(
-    { getElementById: el, querySelector: () => null, body: el("body") }, fetch, { search: `?pr=${encodeURIComponent(REPO + "#7")}` },
-    storage(), storage(), { replaceState() {} }, {}, () => {}, () => {});
-  for (let i = 0; i < 200 && !(globalThis.__page.state && globalThis.__page.state.done); i++) await new Promise(r => setTimeout(r, 10));
+    { getElementById: el, querySelector: () => null, body: el("body") }, fetch, { search: `?pr=${encodeURIComponent(REPO + "#7")}${query}` },
+    storage(), session, { replaceState() {} }, {}, () => {}, () => {});
+  for (let i = 0; i < 300 && !(globalThis.__page.state && globalThis.__page.state.done && !globalThis.__page.state.loading.size); i++) await new Promise(r => setTimeout(r, 10));
+  await new Promise(r => setTimeout(r, 30));
   // A click on an element in #id whose closest match for each selector in `matches` has that dataset.
   const click = (id, matches) => els[id].on.click({ preventDefault() {}, target: { closest: s => {
     const key = Object.keys(matches).find(k => s.split(", ").includes(k));
     return key ? { dataset: matches[key] } : null;
   } } });
   const clickLine = line => click("files", { "tr[data-r]": { f: "0", r: String(globalThis.__page.state.files[0].rows.findIndex(r => r.new === line)) } });
-  return { els, sent, click, clickLine, state: globalThis.__page.state };
+  return { els, sent, click, clickLine, session, state: globalThis.__page.state };
 }
 
 test("a PR whose changed lines all run and whose mutants are all caught says there is nothing to look at", async () => {
   const page = await open(github());
   assert.match(page.els.top.innerHTML, /✓ Nothing to look at\. Every changed line runs in a test/);
   assert.doesNotMatch(page.els.top.innerHTML, /class="flags"/);
+  assert.match(page.els.files.innerHTML, /No changed line needs a look\./);
+  assert.doesNotMatch(page.els.files.innerHTML, /<tr class="add"/);
+});
+
+test("a PR from the link becomes the PR box that the other tabs share", async () => {
+  const page = await open(github());
+  assert.strictEqual(page.session.getItem("testServerSource"), `${REPO}#7`);
+});
+
+test("?line= opens a line the PR does not change, with the coverage of its file read too", async () => {
+  const replies = github({
+    [`repos/${REPO}/contents/mpl/src/other.rs?ref=${HEAD}`]: "fn a() {\n    b();\n}",
+    [`repos/${REPO}/actions/artifacts/2/zip`]: zipOf({ "mpl.lcov": lcov({ 3: 4, 6: 4, 7: 4 }) + "SF:mpl/src/other.rs\nDA:2,5\nend_of_record\n" }),
+  });
+  const page = await open(replies, "&line=mpl%2Fsrc%2Fother.rs%3A2");
+  assert.match(page.els.detail.innerHTML, /<h3>mpl\/src\/other\.rs:2<\/h3>/);
+  assert.match(page.els.detail.innerHTML, /local tests ran it 5 times/);
+  assert.match(page.els.files.innerHTML, /lines you opened/);
+  const opened = page.els.files.innerHTML.split("<tr").find(r => r.includes('<td class="ln"></td><td class="ln">2</td>'));
+  assert.match(opened, /class="src run"/);
+});
+
+test("the line box opens a changed line in place", async () => {
+  const page = await open(github());
+  page.els.where = { value: "mpl/src/k.rs:3" };
+  page.els.files.on.submit({ preventDefault() {} });
+  await new Promise(r => setTimeout(r, 20));
+  assert.match(page.els.detail.innerHTML, /<h3>mpl\/src\/k\.rs:3<\/h3>/);
+  assert.strictEqual(page.state.files.filter(f => f.extra).length, 0);
 });
 
 test("a mutant that survives is flagged, marked on its line, and explained in the line's pane", async () => {
@@ -291,15 +328,20 @@ test("a changed line no test runs is flagged and drawn red, and one that runs is
   assert.match(page.els.top.innerHTML, /1 changed line run in no test/);
   const rows = page.els.files.innerHTML.split("<tr").slice(1);
   assert.match(rows.find(r => r.includes('<td class="ln">6</td>')), /class="src miss"/);
-  assert.match(rows.find(r => r.includes('<td class="ln">3</td>')), /class="src run"/);
+  assert.match(rows.find(r => r.includes('<td class="ln">7</td>')), /class="src run"/);
+  // Only the lines to look at and two around them are drawn; GitHub shows the rest.
+  assert.ok(!rows.some(r => r.includes('<td class="ln">3</td>')));
 });
 
-test("a file with gaps in testing is drawn first and says how many", async () => {
-  const replies = github({ [`repos/${REPO}/actions/artifacts/2/zip`]: zipOf({ "mpl.lcov": lcov({ 3: 4, 6: 0, 7: 0 }) }) });
-  replies[`${PR}/files?per_page=100&page=1`].reverse();
+test("files with more gaps in testing come first, and a file with nothing to look at is not drawn", async () => {
+  const replies = github({
+    [`repos/${REPO}/actions/artifacts/2/zip`]: zipOf({ "mpl.lcov": lcov({ 3: 4, 6: 0, 7: 0 }) + "SF:mpl/src/j.rs\nDA:1,0\nend_of_record\n" }),
+    [`repos/${REPO}/contents/mpl/src/j.rs?ref=${HEAD}`]: "fn j() {}",
+  });
+  replies[`${PR}/files?per_page=100&page=1`].unshift({ filename: "mpl/src/j.rs", status: "added", additions: 1, deletions: 0, patch: added("fn j() {}") });
   const page = await open(replies);
   const files = [...page.els.files.innerHTML.matchAll(/<span class="path">([^<]+)<\/span>/g)].map(m => m[1]);
-  assert.deepStrictEqual(files, ["mpl/src/k.rs", "mpl/tests/t.rs"]);
+  assert.deepStrictEqual(files, ["mpl/src/k.rs", "mpl/src/j.rs"]);
   assert.match(page.els.files.innerHTML, /<span class="path">mpl\/src\/k\.rs<\/span>[^]*?<span class="tag warn">2 gaps in testing<\/span>/);
 });
 
@@ -324,22 +366,18 @@ test("Comment posts a review comment on the clicked line of the head commit, and
   assert.match(page.els.detail.innerHTML, /<div>Should this take &amp;str\?<\/div>/);
 });
 
-test("the API types run for the head commit shows what the PR adds to the API, with its option's line", async () => {
-  const runs = { workflow_runs: [
-    { id: 61, event: "workflow_dispatch", display_title: `API types for Rust ${HEAD}`, status: "completed", conclusion: "success", html_url: "https://example.com/61" },
-    { id: 60, event: "schedule", display_title: "API types for Rust main", status: "completed", conclusion: "success", html_url: "https://example.com/60" }] };
-  const types = api => zipOf({ "api-examples/types/rust-api.json": JSON.stringify(api), "dashboard/api-examples/types-rust.json": JSON.stringify({ apis: [], rows: {} }) });
-  const commons = "repos/aws/aws-crypto-tools-commons/actions";
-  const page = await open(github({
-    [`${commons}/workflows/api-examples-types.yml/runs?branch=main&per_page=50`]: runs,
-    [`${commons}/runs/61/artifacts?per_page=100`]: { artifacts: [art(71, "api-types-rust")] },
-    [`${commons}/runs/60/artifacts?per_page=100`]: { artifacts: [art(70, "api-types-rust")] },
-    [`${commons}/artifacts/71/zip`]: types({ apis: [{ lib: "mpl", id: "k", name: "K keyring", span: null,
-      options: [{ name: "key_id", takes: "impl Into<String>", span: { file: "mpl/src/k.rs", line: 3, end: 7 } }] }] }),
-    [`${commons}/artifacts/70/zip`]: types({ apis: [] }),
-  }));
+test("the PR's own CI run gives the API at its head and merge base, and the page shows what the PR adds", async () => {
+  const types = (api, more = {}) => zipOf({ "api-examples/types/rust-api.json": JSON.stringify(api), ...more });
+  const replies = github({
+    [`repos/${REPO}/actions/runs/50/artifacts?per_page=100&page=1`]: { artifacts: [art(1, "mutation-results-mpl"), art(2, "local-coverage-mpl"),
+      art(71, "api-types-rust"), art(70, "api-types-rust-base")] },
+    [`repos/${REPO}/actions/artifacts/71/zip`]: types({ apis: [{ lib: "mpl", id: "k", name: "K keyring", span: null,
+      options: [{ name: "key_id", takes: "impl Into<String>", span: { file: "mpl/src/k.rs", line: 3, end: 7 } }] }] },
+      { "dashboard/api-examples/types-rust.json": JSON.stringify({ apis: [], rows: {} }) }),
+    [`repos/${REPO}/actions/artifacts/70/zip`]: types({ apis: [] }),
+  });
+  const page = await open(replies);
   assert.match(page.els.top.innerHTML, /<b>K keyring<\/b> is new: <code>key_id<\/code> takes <code>impl Into&lt;String&gt;<\/code>/);
-  assert.match(page.els.top.innerHTML, /<b>The public API changes<\/b>/);
   page.clickLine(5);
-  assert.match(page.els.detail.innerHTML, /K keyring: option <code>key_id<\/code> · <a href="\.\.\/api-examples\/types\.html\?ref=main&amp;run=61&amp;api=mpl%7Ck"/);
+  assert.match(page.els.detail.innerHTML, /K keyring: option <code>key_id<\/code> · <a href="\.\.\/api-examples\/types\.html\?ref=main&amp;pr=aws%2Faws-crypto-tools-rust%237&amp;api=mpl%7Ck"/);
 });

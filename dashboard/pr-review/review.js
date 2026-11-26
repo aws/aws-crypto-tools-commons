@@ -7,6 +7,8 @@ const FAILED_CHECK = new Set(["failure", "timed_out", "cancelled", "action_requi
 const CODE_FILE = /\.(rs|java|kt|go|cs|py|ts|js|mjs|c|h|cc|cpp|hpp|dfy)$/;
 // Tests and examples. A line in one that no test runs is not a gap in testing, so the page does not flag it.
 const TEST_FILE = /(^|\/)(tests?|benches|examples)\/|_tests?\.rs$|Tests?\.java$|\.test\.js$/;
+// Test server code. The coverage checks in CI leave it out, so the line and branch flags do too.
+const TEST_SERVER_CODE = /(^|\/)test-server(-control)?\//;
 // Mutation statuses that fail the mutation check: no test failed with the mutant on, or no test runs its line.
 const BAD_MUTANT = new Set(["survived", "not_covered"]);
 
@@ -231,7 +233,9 @@ function findFlags(files, data) {
   if (running.length) add("running", "note", `${running.length} check${running.length === 1 ? " is" : "s are"} still running, so this list may grow`, [], running.map(c => c.name));
 
   const changed = [];
-  for (const f of files) for (const r of f.rows) if (r.kind === "add") changed.push({ file: f.filename, line: r.new, code: f.code && !TEST_FILE.test(f.filename) });
+  for (const f of files) for (const r of f.rows) {
+    if (r.kind === "add") changed.push({ file: f.filename, line: r.new, code: f.code && !TEST_FILE.test(f.filename) && !TEST_SERVER_CODE.test(f.filename) });
+  }
   const coverage = [data.local, data.server].filter(Boolean);
   if (coverage.length) {
     const notRun = changed.filter(c => c.code && lineRun(coverage, c.file, c.line) === "not-run");
@@ -298,6 +302,6 @@ function lineEvidence(data, file, line, side = "add") {
   };
 }
 
-const exported = { FAILED_CHECK, CODE_FILE, TEST_FILE, BAD_MUTANT, parsePR, diffRows, annotations, testFunctions, shortTest,
+const exported = { FAILED_CHECK, CODE_FILE, TEST_FILE, TEST_SERVER_CODE, BAD_MUTANT, parsePR, diffRows, annotations, testFunctions, shortTest,
   junitId, shortPaths, publicItems, apiDiff, apiAt, lineRun, branchesMissed, findFlags, lineEvidence };
 if (typeof module !== "undefined") module.exports = exported;

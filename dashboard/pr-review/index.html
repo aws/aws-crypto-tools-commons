@@ -108,16 +108,17 @@
 <script>
 // One pull request with what CI found about it, line by line.
 //
-// The page reads the PR's diff and files, the check runs and artifacts on its head commit, and the API types
-// run for that commit. It flags only what needs a look: failed checks, changed lines no test runs, branches
-// no test takes, mutants no test catches, duvet tests that miss their code, failed test server cases, open
-// Smithy conformance findings, and API changes. A click on a line shows everything about it, and posts a
-// review comment as you. No AI runs here; "Ask an AI" copies a prompt for the library-pr-review skill.
+// The page reads the PR's diff and files, and the check runs and artifacts on its head commit, the API
+// at the head commit and at the merge base among them. It flags only what needs a look: failed checks,
+// changed lines no test runs, branches no test takes, mutants no test catches, duvet tests that miss their
+// code, failed test server cases, open Smithy conformance findings, and API changes. It shows those lines
+// and a few around them; GitHub shows the whole diff. The line box opens any other line. A click on a line
+// shows everything about it, and posts a review comment as you. No AI runs here; "Ask an AI" copies a
+// prompt for the library-pr-review skill.
 
 const QUERY = new URLSearchParams(location.search);
-// The commons branch whose API types runs the page reads and starts. ?ref= picks another, like a PR's branch.
+// The commons branch the API Examples page reads its daily runs from, passed on in links to that page.
 const REF = QUERY.get("ref") || "main";
-const TYPES = "api-examples-types.yml";
 const RUST_REPO = "aws/aws-crypto-tools-rust";
 const $ = id => document.getElementById(id);
 const esc = escHtml;
@@ -127,7 +128,7 @@ const fileName = path => path.split("/").pop();
 let state = null;           // everything known about the PR on screen
 let selected = null;        // the clicked line: {f, r} indexes into state.files and its rows
 let focus = null;           // the flag whose lines are marked in the diff
-let onlyFlagged = false;    // show only lines with something to look at, and two lines around them
+let pendingLine = QUERY.get("line");  // file:line from a link, opened once the PR loads
 const closed = new Set();   // files whose diff the reader folded
 
 // ---------- GitHub ----------
@@ -219,7 +220,8 @@ async function load() {
   const want = parsePR(text, COMMONS);
   if (!want) return problem("That is not a pull request: use a URL, owner/repo#N, or #N for commons.");
   const mine = state = { ...want, pr: null, files: [], texts: {}, tests: {}, errors: [], loading: new Set(["pr"]),
-    data: { checks: [], comments: new Map(), blocks: new Map(), api: {} }, read: {}, ciCommit: null, moved: new Set() };
+    data: { checks: [], comments: new Map(), blocks: new Map(), api: {} }, read: {}, ciCommit: null, moved: new Set(),
+    extra: new Set() };
   const stale = () => state !== mine;
   render();
   try {
@@ -233,7 +235,8 @@ async function load() {
     ]);
     if (stale()) return;
     mine.files = files.map(f => ({ filename: f.filename, status: f.status, additions: f.additions, deletions: f.deletions,
-      rows: diffRows(f.patch), code: CODE_FILE.test(f.filename), test: TEST_FILE.test(f.filename), noPatch: !f.patch }));
+      rows: diffRows(f.patch), code: CODE_FILE.test(f.filename), test: TEST_FILE.test(f.filename) || TEST_SERVER_CODE.test(f.filename),
+      noPatch: !f.patch }));
     // A rerun adds a check run with the same name; the newest one counts.
     const latest = new Map();
     for (const c of checks) if (!latest.has(c.name) || c.id > latest.get(c.name).id) latest.set(c.name, c);
@@ -243,8 +246,13 @@ async function load() {
     for (const c of comments) addComment(mine, c);
     mine.loading.delete("pr");
     render();
-    await Promise.all([loadTexts(mine), loadArtifacts(mine, runs), loadApi(mine)]);
+    await Promise.all([loadTexts(mine), loadArtifacts(mine)]);
     await findMoved(mine);
+    if (pendingLine && !stale()) {
+      const [file, line] = [pendingLine.replace(/:\d+$/, ""), +pendingLine.split(":").pop()];
+      pendingLine = null;
+      await lookAt(file, line);
+    }
   } catch (e) {
     mine.errors.push(e.message || String(e));
   }
@@ -289,12 +297,19 @@ async function loadTexts(s) {
   render();
 }
 
-async function loadArtifacts(s, runs) {
+async function loadArtifacts(s) {
   s.loading.add("artifacts");
-  const lists = await Promise.all(runs.map(async r => (await allPages(`repos/${s.repo}/actions/runs/${r.id}/artifacts`, "artifacts"))
-    .filter(a => !a.expired).map(a => ({ ...a, run: r }))));
-  const arts = lists.flat();
-  const wanted = new Set(s.files.map(f => f.filename));
+  if (!s.arts) {
+    const lists = await Promise.all(s.runs.map(async r => (await allPages(`repos/${s.repo}/actions/runs/${r.id}/artifacts`, "artifacts"))
+      .filter(a => !a.expired).map(a => ({ ...a, run: r }))));
+    s.arts = lists.flat();
+  }
+  const arts = s.arts;
+  // A second read, after the reader opens a file the PR does not change, starts over with that file added.
+  Object.assign(s.data, { mutants: null, local: null, server: null, branches: null, tests: null, servers: null, reach: null,
+    conformance: null });
+  s.read = {};
+  const wanted = new Set([...s.files.map(f => f.filename), ...s.extra]);
   const tag = hash([...wanted].sort().join("\n"));
   const seen = commit => { if (commit && !s.ciCommit) s.ciCommit = commit; };
   const part = async (name, fn) => {
@@ -415,6 +430,17 @@ async function loadArtifacts(s, runs) {
         s.data.conformance.push({ crate: art.name.replace("smithy-conformance-", ""), ...got });
       }
     }),
+    // The pull request's own CI reads its API at the head commit and at the merge base.
+    part("API", async () => {
+      const [head, base] = ["api-types-rust", "api-types-rust-base"].map(n => newestByName(arts, new RegExp(`^${n}$`))[0]);
+      if (!head || !base) return;
+      const read = art => readArtifact(s.repo, art, "api", async (zip, entries) => {
+        const json = async name => { const e = entries.find(x => x.name.endsWith(name)); return e ? JSON.parse(await zipText(zip, e)) : null; };
+        return { api: await json("rust-api.json"), types: await json("types-rust.json") };
+      });
+      const [pr, was] = await Promise.all([read(head), read(base)]);
+      Object.assign(s.data.api, { pr: pr.api, types: pr.types, diff: apiDiff(was.api, pr.api), run: head.run });
+    }),
   ]);
   s.loading.delete("artifacts");
 }
@@ -443,44 +469,6 @@ async function readReports(zip, entries, repo, wanted, product) {
   return out;
 }
 
-// The API at the PR's head, from the types run started for it, and at main, from the newest daily run.
-async function loadApi(s) {
-  if (s.repo !== RUST_REPO) return;
-  s.loading.add("API");
-  render();
-  try {
-    const head = s.pr.head.sha;
-    const runs = (await ghJson(`repos/${COMMONS}/actions/workflows/${TYPES}/runs?branch=${encodeURIComponent(REF)}&per_page=50`)).workflow_runs;
-    const main = runs.find(r => r.conclusion === "success" && (r.event !== "workflow_dispatch" || r.display_title === "API types for Rust main"));
-    const mine = runs.find(r => r.display_title === `API types for Rust ${head}`);
-    s.data.api.run = mine || null;
-    s.data.api.mainRun = main || null;
-    if (mine && mine.status === "completed" && mine.conclusion === "success" && main) {
-      const [pr, base] = await Promise.all([apiFiles(mine), apiFiles(main)]);
-      s.data.api.pr = pr.api;
-      s.data.api.types = pr.types;
-      s.data.api.diff = apiDiff(base.api, pr.api);
-    } else if (mine && mine.status !== "completed") {
-      // Look again while the run goes, so its result shows up on this page.
-      setTimeout(() => { if (state === s) loadApi(s); }, 20000);
-    }
-  } catch (e) {
-    s.errors.push(`API: ${e.message || e}`);
-  }
-  s.loading.delete("API");
-  render();
-}
-
-async function apiFiles(run) {
-  const arts = (await ghJson(`repos/${COMMONS}/actions/runs/${run.id}/artifacts?per_page=100`)).artifacts;
-  const art = arts.find(a => a.name === "api-types-rust" && !a.expired);
-  if (!art) throw new Error(`run ${run.id} has no api-types-rust artifact`);
-  return readArtifact(COMMONS, art, "api", async (zip, entries) => {
-    const read = async name => { const e = entries.find(x => x.name.endsWith(name)); return e ? JSON.parse(await zipText(zip, e)) : null; };
-    return { api: await read("rust-api.json"), types: await read("types-rust.json") };
-  });
-}
-
 // CI on a pull request runs on its merge with the base branch. A changed file that the merge also changes
 // may have its lines moved, so its marks may be off.
 async function findMoved(s) {
@@ -491,19 +479,6 @@ async function findMoved(s) {
     for (const f of s.files) if (changed.has(f.filename)) s.moved.add(f.filename);
   } catch (e) {
     s.errors.push(`merge commit: ${e.message || e}`);
-  }
-}
-
-async function startApiRun() {
-  const s = state;
-  try {
-    await send("POST", `repos/${COMMONS}/actions/workflows/${TYPES}/dispatches`, { ref: REF, inputs: { "rust-ref": s.pr.head.sha } });
-    s.data.api.started = true;
-    render();
-    setTimeout(() => { if (state === s) loadApi(s); }, 8000);
-  } catch (e) {
-    s.data.api.startError = e.message || String(e);
-    render();
   }
 }
 
@@ -520,10 +495,11 @@ function render() {
   }
   // While artifacts are still loading, missing results are not news yet.
   s.flags = findFlags(s.files, s.data).filter(f => !(s.loading.size && (f.id === "no-coverage" || f.id === "no-mutants")));
-  const scrollFiles = $("files").scrollTop, scrollPane = $("detail").scrollTop;
+  const scrollFiles = $("files").scrollTop, scrollPane = $("detail").scrollTop, typed = $("where") ? $("where").value : "";
   $("top").innerHTML = topHtml(s);
   $("files").innerHTML = filesHtml(s);
   $("files").scrollTop = scrollFiles;
+  if ($("where")) $("where").value = typed;
   $("run").innerHTML = s.ciCommit ? `CI ran on ${s.ciCommit.slice(0, 7)}${s.ciCommit !== s.pr.head.sha ? " (the merge with " + esc(s.pr.base.ref) + ")" : ""}` : "";
   renderPane();
   $("detail").scrollTop = scrollPane;
@@ -567,25 +543,28 @@ function flagDetail(s, f) {
   return [where && `<small>${esc(where)}</small>`, items && `<small>${items}</small>`].filter(Boolean).join(" ");
 }
 
-// The API part: what the types run says changed, or how to get that run.
+// The API part: what the pull request's own CI found changed in the API.
 function apiHtml(s) {
   if (s.repo !== RUST_REPO) return "";
-  const a = s.data.api, link = (text, extra = "") => `<a href="../api-examples/types.html?ref=${encodeURIComponent(REF)}${a.run ? "&run=" + a.run.id : ""}${extra}" target="_blank">${text}</a>`;
+  const a = s.data.api;
   if (a.diff) {
     const d = a.diff, rows = [];
-    for (const api of d.added) rows.push(`<li><b>${esc(api.name)}</b> is new: ${api.options.map(o => `<code>${esc(o.name)}</code> takes <code>${esc(o.takes)}</code>${levels(a.types, api, o)}`).join(", ") || "no options"} · ${link("its types", `&api=${encodeURIComponent(api.lib + "|" + api.id)}`)}</li>`);
+    for (const api of d.added) rows.push(`<li><b>${esc(api.name)}</b> is new: ${api.options.map(o => `<code>${esc(o.name)}</code> takes <code>${esc(o.takes)}</code>${levels(a.types, api, o)}`).join(", ") || "no options"} · ${typesLink(s, "its types", api.lib, api.id)}</li>`);
     for (const o of d.options.added.filter(o => !d.added.some(x => x.lib === o.lib && x.id === o.api))) rows.push(`<li>${esc(o.apiName)}: new option <code>${esc(o.option)}</code> takes <code>${esc(o.takes)}</code></li>`);
     for (const o of d.options.changed) rows.push(`<li>${esc(o.apiName)}: <code>${esc(o.option)}</code> took <code>${esc(o.was)}</code>, now <code>${esc(o.takes)}</code></li>`);
     for (const o of d.options.removed) rows.push(`<li class="bad">${esc(o.apiName)}: <code>${esc(o.option)}</code> is gone</li>`);
     for (const api of d.removed) rows.push(`<li class="bad">${esc(api.name)} is gone</li>`);
-    return rows.length ? `<div class="read"><b>API at this commit</b> (${link("types run")}):</div><ul class="sub">${rows.join("")}</ul>` : "";
+    return rows.length ? `<div class="read"><b>API at this commit</b> (${typesLink(s, "API Examples")}):</div><ul class="sub">${rows.join("")}</ul>` : "";
   }
-  if (a.run && a.run.status !== "completed") return `<div class="read">API: the types run for this commit is ${esc(a.run.status.replace("_", " "))} (<a href="${esc(a.run.html_url)}" target="_blank">run</a>). This page looks again every 20 seconds.</div>`;
-  if (a.run && a.run.conclusion !== "success") return `<div class="read warn">API: the types run for this commit ended ${esc(a.run.conclusion)} (<a href="${esc(a.run.html_url)}" target="_blank">run</a>).</div>`;
-  if (s.loading.has("API") || !s.pr || !changesRustSource(s)) return "";
-  const cmd = `gh workflow run ${TYPES} -R ${COMMONS} --ref ${REF} -f rust-ref=${s.pr.head.sha}`;
-  return `<div class="read">API: no types run for this commit yet. <button class="tool" data-start-api>Read this PR's API (about 3 min)</button>
-    ${a.started ? " started…" : ""}${a.startError ? `<div class="bad">Could not start it: ${esc(a.startError)}. Your token needs Actions write access to commons, or run: <code>${esc(cmd)}</code></div>` : ""}</div>`;
+  if (s.loading.size || !changesRustSource(s)) return "";
+  return `<div class="read">API: this commit's CI has no API types yet. Its api-types job reads them.</div>`;
+}
+
+// A link to the API Examples page with this pull request's API, at one API when lib and id are given.
+function typesLink(s, text, lib, id) {
+  const query = new URLSearchParams({ ref: REF, pr: `${s.repo}#${s.n}` });
+  if (lib) query.set("api", `${lib}|${id}`);
+  return `<a href="${esc(`../api-examples/types.html?${query}`)}" target="_blank">${esc(text)}</a>`;
 }
 
 // How many of the types a customer may hold pass to this option as is, with one call, or with more,
@@ -634,7 +613,7 @@ function marks(s, f, row) {
   const line = row.new, out = [];
   // gap: a hole in testing on a changed line. look: worth showing when the diff shows only lines to look at.
   let gap = false, look = comments.length > 0;
-  const cov = row.kind === "add" && f.code && !f.test ? lineRun([d.local, d.server].filter(Boolean), file, line) : "none";
+  const cov = (row.kind === "add" || f.extra) && f.code && !f.test ? lineRun([d.local, d.server].filter(Boolean), file, line) : "none";
   if (cov === "not-run") gap = true;
   const br = branchesMissed(d.branches, file, line);
   if (cov === "run" && br.missed) { gap = true; out.push(`<i class="m-br" title="${br.missed} of ${br.total} branches never taken">◐</i>`); }
@@ -647,6 +626,7 @@ function marks(s, f, row) {
   if (reach.some(r => r.state === "never-reaches")) { gap = true; out.push(`<i class="m-bad" title="a duvet test never runs this code">§</i>`); }
   else if (blocks.length) out.push(`<i class="m-duvet" title="${esc(blocks.map(b => b.target).join(", "))}">§</i>`);
   if ((d.api.items || []).some(i => i.file === file && i.line === line && i.side !== "removed")) { look = true; out.push(`<i class="m-api" title="public API">API</i>`); }
+  if (s.flags && s.flags.some(fl => fl.lines.some(l => l.file === file && l.line === line))) look = true;
   const tests = d.tests && d.tests.at.get(file) && d.tests.at.get(file).get(line);
   if (tests && tests.length) out.push(`<i class="m-n" title="tests that run this line">${tests.length}</i>`);
   if (comments.length) out.push(`<i title="review comments">💬</i>`);
@@ -658,7 +638,9 @@ function filesHtml(s) {
   const legend = `<span class="legend"><i><span class="good">▌</span>a test runs it</i><i><span class="bad">▌</span>no test runs it</i>
     <i class="m-br">◐ a branch no test takes</i><i class="mk"><span class="m-bad">✗</span> a mutant no test catches</i><i class="mk"><span class="m-ok">✓</span> mutants caught</i>
     <i class="mk"><span class="m-duvet">§</span> duvet</i><i class="mk"><span class="m-api">API</span> public item</i><i>12 tests run it</i><i>💬 comments</i></span>`;
-  let h = `<div class="toolbar"><label><input type="checkbox" id="only"${onlyFlagged ? " checked" : ""}> Only lines to look at</label>${legend}</div>`;
+  let h = `<div class="toolbar"><form id="lookat"><input type="text" id="where" size="40" placeholder="any line: file:line"> <button class="tool">Look at it</button></form>${legend}</div>`;
+  const looked = s.files.filter(f => !f.extra).some(f => f.rows.some(r => marks(s, f, r).look));
+  if (!looked) h += `<div class="quiet">No changed line needs a look. GitHub shows the whole diff; the box above opens any line.</div>`;
   const focused = new Set(((s.flags.find(f => f.id === focus) || {}).lines || []).map(l => `${l.file}:${l.line}`));
   // Files with gaps in testing come first, most first. The rest keep GitHub's order.
   const drawn = s.files.map((f, fi) => ({ f, fi, marks: f.rows.map(r => marks(s, f, r)) }))
@@ -667,12 +649,14 @@ function filesHtml(s) {
   drawn.forEach(({ f, fi, marks: fileMarks, gaps }) => {
     const badges = [];
     if (gaps) badges.push(`<span class="tag warn">${plural(gaps, "gap")} in testing</span>`);
+    if (f.extra) badges.push(`<span class="tag">lines you opened</span>`);
+    const show = f.rows.map((r, i) => f.extra || r.kind === "hunk" || fileMarks.slice(Math.max(0, i - 2), i + 3).some(m => m.look));
+    if (!show.some((v, i) => v && f.rows[i].kind !== "hunk")) return;
     if (s.moved.has(f.filename)) badges.push(`<span class="tag" title="CI ran on the merge, which changes this file too">lines may be off</span>`);
     h += `<details class="file" data-file="${fi}"${closed.has(f.filename) ? "" : " open"}><summary><span class="path">${esc(f.filename)}</span>
       <small class="sub">${esc(f.status)} +${f.additions} −${f.deletions}</small>${badges.join(" ")}</summary>`;
     if (f.noPatch) { h += `<div class="note">GitHub sends no diff for this file. <a href="${esc(s.pr.html_url)}/files" target="_blank">Open it on GitHub</a>.</div></details>`; return; }
     if (closed.has(f.filename)) { h += `</details>`; return; }
-    const show = f.rows.map((r, i) => !onlyFlagged || r.kind === "hunk" || fileMarks.slice(Math.max(0, i - 2), i + 3).some(m => m.look));
     h += `<table class="diff"><tbody>`;
     let hidden = 0;
     f.rows.forEach((r, ri) => {
@@ -783,9 +767,8 @@ function evidenceHtml(s, f, line, ev) {
   }
   const items = (s.data.api.items || []).filter(i => i.file === f.filename && i.line === line);
   if (ev.api.length || items.length) {
-    const run = s.data.api.run, base = `../api-examples/types.html?ref=${encodeURIComponent(REF)}${run ? "&run=" + run.id : ""}`;
     h += `<h4>API</h4><ul>${items.map(i => `<li>${esc(i.side)} public ${esc(i.kind)} <code>${esc(i.name)}</code>${i.owner ? ` on <code>${esc(i.owner)}</code>` : ""}</li>`).join("")}`
-      + ev.api.map(a => `<li>${esc(a.apiName)}${a.option ? `: option <code>${esc(a.option)}</code>` : ""} · <a href="${esc(`${base}&api=${encodeURIComponent(a.lib + "|" + a.api)}`)}" target="_blank">its types</a></li>`).join("") + `</ul>`;
+      + ev.api.map(a => `<li>${esc(a.apiName)}${a.option ? `: option <code>${esc(a.option)}</code>` : ""} · ${typesLink(s, "its types", a.lib, a.api)}</li>`).join("") + `</ul>`;
   }
   return h;
 }
@@ -829,6 +812,46 @@ async function postComment() {
   render();
 }
 
+// Opens a line: a changed line in place, or any other line of the head commit with a few lines around it.
+// A file the PR does not change has no coverage read yet, so the artifacts are read again with it.
+async function lookAt(file, line) {
+  const s = state;
+  let fi = s.files.findIndex(f => f.filename === file && !f.extra);
+  let ri = fi < 0 ? -1 : s.files[fi].rows.findIndex(r => r.new === line && r.kind !== "del");
+  if (ri < 0) {
+    try {
+      if (s.texts[file] === undefined) s.texts[file] = await ghRaw(s.repo, file, s.pr.head.sha);
+    } catch (e) {
+      s.errors.push(`${file}: ${e.message}`);
+      return render();
+    }
+    const lines = s.texts[file].split("\n");
+    if (line < 1 || line > lines.length) { s.errors.push(`${file} has no line ${line}`); return render(); }
+    let entry = s.files.find(f => f.filename === file && f.extra);
+    if (!entry) {
+      entry = { filename: file, status: "opened", additions: 0, deletions: 0, rows: [], code: CODE_FILE.test(file),
+        test: TEST_FILE.test(file), extra: true, shown: new Set() };
+      s.files.push(entry);
+      if (!s.data.blocks.has(file)) s.data.blocks.set(file, annotations(s.texts[file]));
+    }
+    for (let n = Math.max(1, line - 3); n <= Math.min(lines.length, line + 3); n++) entry.shown.add(n);
+    entry.rows = [];
+    let prev = 0;
+    for (const n of [...entry.shown].sort((a, b) => a - b)) {
+      if (n !== prev + 1) entry.rows.push({ kind: "hunk", old: null, new: null, text: `line ${n}` });
+      entry.rows.push({ kind: "ctx", old: null, new: n, text: lines[n - 1] });
+      prev = n;
+    }
+    if (!s.files.some(f => f.filename === file && !f.extra) && !s.extra.has(file)) {
+      s.extra.add(file);
+      await loadArtifacts(s);
+    }
+    fi = s.files.indexOf(entry);
+    ri = entry.rows.findIndex(r => r.new === line);
+  }
+  select(fi, ri);
+}
+
 // ---------- clicks ----------
 function select(fi, ri) {
   selected = { f: fi, r: ri };
@@ -841,7 +864,6 @@ function select(fi, ri) {
 }
 
 $("top").addEventListener("click", e => {
-  if (e.target.closest("[data-start-api]")) return startApiRun();
   if (e.target.closest("[data-ask-pr]")) {
     e.preventDefault();
     state.askPr = !state.askPr;
@@ -866,8 +888,10 @@ $("files").addEventListener("click", e => {
   const tr = e.target.closest("tr[data-r]");
   if (tr) return select(+tr.dataset.f, +tr.dataset.r);
 });
-$("files").addEventListener("change", e => {
-  if (e.target.id === "only") { onlyFlagged = e.target.checked; render(); }
+$("files").addEventListener("submit", e => {
+  e.preventDefault();
+  const where = ($("where").value || "").trim(), m = where.match(/^(.+):(\d+)$/);
+  if (m && state && state.pr) lookAt(m[1], +m[2]);
 });
 $("files").addEventListener("toggle", e => {
   const d = e.target.closest && e.target.closest("details[data-file]");
@@ -910,8 +934,9 @@ $("detail").addEventListener("click", e => {
   div.addEventListener("dblclick", () => { localStorage.removeItem("prReviewLeftPane"); set(0); });
 })();
 
-// ?pr= wins. Otherwise the box shows the PR the test server pages last showed.
+// ?pr= wins, and becomes the PR the other tabs show. Otherwise the box shows the PR the other tabs last showed.
 $("source").value = QUERY.get("pr") || readSource();
+if (QUERY.get("pr")) writeSource(QUERY.get("pr"));
 $("source").addEventListener("change", e => { writeSource(e.target.value.trim()); load(); });
 load();
 </script>
