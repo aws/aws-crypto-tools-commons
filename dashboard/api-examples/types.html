@@ -138,7 +138,8 @@
 const PARTS = {
   rust: { file: "types-rust.json", workflow: "api-examples-types.yml", artifact: "api-types-rust" },
   others: { file: "types-others.json", workflow: "api-examples-shipped.yml", artifact: "api-types-others" },
-  usage: { file: "usage.json", workflow: "api-examples-usage.yml", artifact: "api-examples-usage" },
+  // A pull request runs the customer search with one page per search, so only full runs count.
+  usage: { file: "usage.json", workflow: "api-examples-usage.yml", artifact: "api-examples-usage", events: ["schedule", "workflow_dispatch"] },
 };
 const LIBS = [["ESDK", "esdk"], ["MPL", "mpl"], ["DB-ESDK", "dbesdk"]];
 const GROUPS = ["Keyrings", "CMMs", "Key stores", "Caches", "Branch key ID suppliers", "Client"];
@@ -220,7 +221,7 @@ async function entryText(buf, e) {
 async function fromCi(part) {
   const runs = (await (await gh(`repos/${COMMONS_REPO}/actions/workflows/${part.workflow}/runs?branch=`
     + `${encodeURIComponent(REF)}&status=success&per_page=10`)).json()).workflow_runs;
-  for (const run of runs) {
+  for (const run of runs.filter(r => !part.events || part.events.includes(r.event))) {
     const arts = (await (await gh(`repos/${COMMONS_REPO}/actions/runs/${run.id}/artifacts?per_page=100`)).json()).artifacts;
     const art = arts.find(a => a.name === part.artifact && !a.expired);
     if (!art) continue;
