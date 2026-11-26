@@ -30,14 +30,16 @@ findings.json:
   checked lists, for each check that comments on lines, the project folders whose results the run read,
   and "" when the check covers the whole pull request.
   A finding:
-  {"key", "check", "kind", "level", "file", "line", "side", "title", "what", "why": [<sentence>],
+  {"key", "check", "kind", "level", "file", "line", "end_line", "side", "title", "what", "why": [<sentence>],
    "fix", "evidence": {...}, "patch": [<old line>, <new line>] or null, "rerun": [<shell command>],
    "suggestion": <replacement for the line> or null, "links": {"dashboard", "ci", "ci_name"}}
   level is "block" for a gap in testing, which a required check fails on too, and "warn" for a note
   for the reviewer, on a change to the public API. file and line are null for a finding about no one
-  line, such as a failed test server case. side is "RIGHT" for a line of the head commit and "LEFT"
-  for a removed line. key stays the same for the same finding after a push, so its comment is found
-  again. links.ci is the check run the finding comes from, named ci_name, or else the workflow run.
+  line, such as a failed test server case. end_line is the last line of a finding on several lines,
+  such as the code a duvet test never reaches, or else null. side is "RIGHT" for a line of the head
+  commit and "LEFT" for a removed line. key stays the same for the same finding after a push, so its
+  comment is found again. links.ci is the check run the finding comes from, named ci_name, or else
+  the workflow run.
   The rerun commands use $RUST and $COMMONS for checkouts of the library repository and of commons.
 """
 
@@ -423,42 +425,42 @@ def mutated_line(text, m):
 def mutant_words(m, text, n_tests):
     """(what happened, why no test caught it, the fix) for a surviving mutant, in plain words."""
     change, frm, to = mutant_change(m)
-    ran = f"all {plural(n_tests, 'test')} that run this line still passed" if n_tests else "every test still passed"
+    tests = "every test" if not n_tests else "the one test" if n_tests == 1 else f"all {n_tests} tests"
+    passes = f"still passes {tests}"
     if change == "binary":
-        what = f"`{frm}` became `{to}` here, and {ran}."
+        what = f"Changing `{frm}` to `{to}` {passes}."
         sides = operands(text or "", m.get("column", 0), frm or "")
         if (frm, to) in BOUNDARY:
             if sides:
-                return (what, f"The two differ only when `{sides[0]}` equals `{sides[1]}`, and no test has that.",
+                return (what, f"They differ only when `{sides[0]}` equals `{sides[1]}`, and no test checks that.",
                         f"Add a test where `{sides[0]}` equals `{sides[1]}`.")
-            return (what, "The two differ only when both sides are equal, and no test has that.",
+            return (what, "They differ only when both sides are equal, and no test checks that.",
                     "Add a test where both sides are equal.")
         if (frm, to) in FLIPS:
-            return (what, "No test depends on the result of this comparison.",
+            return (what, "No test depends on this comparison.",
                     "Add a test that checks what happens on each side of it.")
         if (frm, to) in LOGIC:
-            return (what, "The two differ only when one side is true and the other is false, and no test has that.",
+            return (what, "They differ only when one side is true and the other false, and no test checks that.",
                     "Add a test where one side is true and the other is false.")
-        return (what, "No test checks the value this computes.", "Add a test that checks this value.")
+        return (what, "No test checks this value.", "Add a test that checks this value.")
     if change == "condition":
         other = "false" if to == "true" else "true"
-        return (f"The condition was replaced with `{to}`, and {ran}.",
-                f"No test checks what happens when this condition is {other}.",
+        return (f"Replacing the condition with `{to}` {passes}.", f"No test checks the {other} case.",
                 f"Add a test where this condition is {other}, and check the result.")
     if change == "unary":
-        return (f"The `{frm}` was deleted, and {ran}.", "No test depends on it.",
+        return (f"Deleting the `{frm}` {passes}.", "No test depends on it.",
                 "Add a test whose result changes without it.")
     if change == "fn_value":
-        return (f"The body of `{frm}` was replaced with `{to}`, and {ran}.",
-                f"No test checks what `{frm}` returns.", f"Add a test that checks what `{frm}` returns.")
+        return (f"Replacing the body of `{frm}` with `{to}` {passes}.", f"No test checks what `{frm}` returns.",
+                f"Add a test that checks what `{frm}` returns.")
     if change == "match_arm":
-        return (f"The match arm `{frm}` was deleted, and {ran}.",
+        return (f"Deleting the match arm `{frm}` {passes}.",
                 "No test reaches this arm, or the other arms give the same result.",
                 "Add a test that reaches this arm and checks its result.")
     if change == "skip_call":
-        return (f"The call to `{frm}` was skipped, and {ran}.", f"No test notices when `{frm}` is not called.",
+        return (f"Skipping the call to `{frm}` {passes}.", f"No test notices when `{frm}` is not called.",
                 f"Add a test that fails when `{frm}` is not called.")
-    return (f"The mutant `{m.get('description')}` survived: {ran}.", "No test notices this change.",
+    return (f"The mutant `{m.get('description')}` {passes}.", "No test notices this change.",
             "Add a test whose result changes with it.")
 
 
@@ -805,6 +807,14 @@ class PR:
         """The lines this PR adds to file."""
         return [new for kind, _, new, _ in self.rows.get(file, []) if kind == "add"]
 
+    def span_end(self, file, start, end):
+        """The last line of start..end that one comment can cover: a comment on several lines stops where
+        the diff does, since GitHub takes only lines of one hunk."""
+        last = start
+        while last < end and self.commentable(file, last + 1):
+            last += 1
+        return last
+
     def commentable(self, file, line, side="RIGHT"):
         for kind, old, new, _ in self.rows.get(file, []):
             if side == "RIGHT" and kind in ("add", "ctx") and new == line:
@@ -904,12 +914,13 @@ class PR:
 # ---------- finding ----------
 
 def finding(check, kind, level, title, what, file=None, line=None, side="RIGHT", why=(), fix=None, evidence=None,
-            rerun=(), patch=None, suggestion=None, key_parts=()):
+            rerun=(), patch=None, suggestion=None, key_parts=(), end_line=None):
     # The comments of a check missing from CHECKS are hidden as outdated.
     assert check in CHECKS, check
     parts = [check, kind, file or ""] + [str(p) for p in key_parts]
     return {"key": hashlib.sha256("\u0000".join(parts).encode()).hexdigest()[:16], "check": check, "kind": kind,
-            "level": level, "file": file, "line": line, "side": side, "title": title, "what": what,
+            "level": level, "file": file, "line": line, "end_line": end_line if end_line and end_line > line else None,
+            "side": side, "title": title, "what": what,
             "why": [w for w in why if w], "fix": fix, "evidence": evidence or {}, "patch": patch,
             "rerun": list(rerun), "suggestion": suggestion, "links": {}}
 
@@ -1029,9 +1040,8 @@ def line_findings(pr):
                 ids = pr.branches.get(file, {}).get(line, {})
                 missed = [k for k, t in ids.items() if not t]
                 if missed:
-                    out.append(finding("branches", "branch-not-taken", "block", "A branch no test takes",
-                                       f"Tests take {len(ids) - len(missed)} of the {len(ids)} branches on this line.",
-                                       file, line, why=branch_words(text, ids),
+                    out.append(finding("branches", "branch-not-taken", "block", "Untested branch",
+                                       " ".join(branch_words(text, ids)), file, line,
                                        fix="Add a test that takes the missing branch.",
                                        evidence={"branches": ids, "tests_count": len(pr.tests_at(file, line))},
                                        rerun=coverage_rerun(pr, file), key_parts=[text.strip()]))
@@ -1048,15 +1058,15 @@ def mutant_findings(pr):
             for m in (m for m in mutants if m["status"] in BAD_MUTANT):
                 n = m.get("tests_run") or len(tests)
                 if m["status"] == "not_covered":
-                    what, why, fix = ("No test runs this line, so no test can catch the change "
-                                      f"`{m['description']}`.", None, "Add a test that runs this line.")
+                    what, why, fix = (f"No test runs this line, so none can catch `{m['description']}`.", None,
+                                      "Add a test that runs this line.")
                 else:
                     what, why, fix = mutant_words(m, text, n)
                 new = mutated_line(text, m) if text else None
                 p = project_of(file)
                 rerun = [f'cd "$RUST/{p}" && cargo test{feature_flags(p)}']
                 out.append(finding("mutation", "mutant-" + m["status"].replace("_", "-"), "block",
-                                   "Mutant survived" if m["status"] == "survived" else "Mutant on a line no test runs",
+                                   "Mutant survived" if m["status"] == "survived" else "Mutant on an untested line",
                                    what, file, line, why=[why] if why else [], fix=fix,
                                    evidence={"mutant": {k: m.get(k) for k in ("description", "kind", "function",
                                                                               "column", "status", "tests_run")},
@@ -1081,8 +1091,9 @@ def reach_findings(pr):
         names = [run["test"] for run in first["runs"]]
         hits = sorted({line for run in pr.tests["names"] if run["name"] in names
                        for line in lines_of(pr, run["name"], first["path"])})
-        why = [f"The test at {test_file}:{t['line']} cites: “{pr.spec_text(req['quote'], req['target'])}”",
-               f"It runs, but never reaches lines {first['from']}-{first['to']}."]
+        lines = f"lines {first['from']}-{first['to']}" if first["to"] > first["from"] else f"line {first['from']}"
+        what = f"The test at {test_file}:{t['line']} runs, but never reaches {lines}."
+        why = [f"It cites “{pr.spec_text(req['quote'], req['target'])}”"]
         product = PRODUCT_DIRS.get(first["library"], first["library"])
         cls = test_cls(names[0]) if names else None
         rerun = []
@@ -1095,8 +1106,9 @@ def reach_findings(pr):
                      '/tmp/pr-findings-cov-out',
                      f'python3 "$COMMONS/test-server-common/tools/per_test_coverage.py" lines '
                      f"/tmp/pr-findings-cov-out/rust.jsonl '{names[0]}'"]
+        end = pr.span_end(where[0], where[1], next(r["to"] for r in rs if r["path"] == where[0])) if where[0] else None
         f = finding("reach", "duvet-test-misses-code", "block", "A duvet test never runs this code",
-                    "The duvet test for this requirement never runs this code.", where[0], where[1], why=why,
+                    what, where[0], where[1], why=why, end_line=end,
                     fix="Make that test reach this code, or move the annotation to the code it does run.",
                     evidence={"requirement": req, "test": t, "regions": [[r["path"], r["from"], r["to"]] for r in rs],
                               "runs": names[:10], "lines_run": ranges(hits), "library": first["library"]},
@@ -1257,20 +1269,17 @@ def summary_markdown(data):
 
 
 def comment_body(f):
-    """The review comment for one finding."""
+    """The review comment for one finding. A 👎 on it counts as not useful, which the dashboard shows."""
     label = "blocks merging" if f["level"] == "block" else "note"
-    out = [f"**{f['title']}** ({label})", "", f["what"]]
+    out = [f"**{f['title']}** ({label})"]
+    if f["what"].rstrip(".") != f["title"]:
+        out += ["", f["what"]]
     if f["why"]:
         out += [""] + f["why"]
-    if f["fix"]:
-        out += ["", f"**Fix:** {f['fix']}"]
     if f.get("suggestion") is not None:
         out += ["", "```suggestion", f["suggestion"], "```"]
-    # No list of the tests that run the line: per-test coverage counts other tests than the mutation run
-    # that `what` counts. The dashboard lists them.
     ci = f["links"].get("ci_name") or "CI run"
-    out += ["", f"[View in dashboard]({f['links']['dashboard']}) · [{ci}]({f['links']['ci']}) · "
-                "React 👎 if this is not useful."]
+    out += ["", f"[View in dashboard]({f['links']['dashboard']}) · [{ci}]({f['links']['ci']})"]
     out.append(MARKER + json.dumps({"key": f["key"], "kind": f["kind"], "check": f["check"]}) + " -->")
     return "\n".join(out)
 
@@ -1331,7 +1340,10 @@ def plan(data, comments, threads, off=(), login="github-actions[bot]", reviews=(
                 actions["hide"].append(thread)
             continue
         f = wanted.get(marker["key"])
-        same_place = f and c.get("line") == f["line"] and c.get("path") == f["file"] and (c.get("side") or "RIGHT") == f["side"]
+        # GitHub gives a comment on several lines its first line as start_line, and its last as line.
+        same_place = (f and (c.get("start_line") or c.get("line")) == f["line"]
+                      and c.get("line") == (f.get("end_line") or f["line"])
+                      and c.get("path") == f["file"] and (c.get("side") or "RIGHT") == f["side"])
         if f and marker["key"] not in seen and same_place:
             seen.add(marker["key"])
             body = comment_body(f)
@@ -1412,8 +1424,9 @@ def apply(gh, data, actions):
     try:
         if actions["create"]:
             review = {"commit_id": data["head"], "event": "COMMENT", "body": actions["summary"],
-                      "comments": [{"path": f["file"], "line": f["line"], "side": f["side"],
-                                    "body": comment_body(f)} for f in actions["create"]]}
+                      "comments": [{"path": f["file"], "side": f["side"], "body": comment_body(f),
+                                    **({"start_line": f["line"], "start_side": f["side"], "line": f["end_line"]}
+                                       if f.get("end_line") else {"line": f["line"]})} for f in actions["create"]]}
             try:
                 gh.request("POST", f"repos/{repo}/pulls/{n}/reviews", review)
             except RuntimeError as e:

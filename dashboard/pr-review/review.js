@@ -239,9 +239,9 @@ function findFlags(files, data) {
   const coverage = [data.local, data.server].filter(Boolean);
   if (coverage.length) {
     const notRun = changed.filter(c => c.code && lineRun(coverage, c.file, c.line) === "not-run");
-    if (notRun.length) add("lines", "bad", `${notRun.length} changed line${notRun.length === 1 ? "" : "s"} run in no test`, notRun);
+    if (notRun.length) add("lines", "bad", `${notRun.length} changed line${notRun.length === 1 ? " has" : "s have"} no test`, notRun);
     const partial = changed.filter(c => c.code && lineRun(coverage, c.file, c.line) === "run" && branchesMissed(data.branches, c.file, c.line).missed);
-    if (partial.length) add("branches", "bad", `${partial.length} changed line${partial.length === 1 ? " has a branch" : "s have branches"} no test takes`, partial);
+    if (partial.length) add("branches", "bad", `${partial.length} changed line${partial.length === 1 ? " has an untested branch" : "s have untested branches"}`, partial);
   } else if (changed.some(c => c.code)) {
     add("no-coverage", "note", "No line coverage on this commit yet");
   }
@@ -252,7 +252,7 @@ function findFlags(files, data) {
       if (list.some(m => BAD_MUTANT.has(m.status))) bad.push({ file, line });
     }
     const n = bad.reduce((t, b) => t + data.mutants.get(b.file).get(b.line).filter(m => BAD_MUTANT.has(m.status)).length, 0);
-    if (n) add("mutants", "bad", `${n} mutant${n === 1 ? "" : "s"} no test catches`, bad);
+    if (n) add("mutants", "bad", `${n} mutant${n === 1 ? " survives" : "s survive"}`, bad);
   } else if (changed.some(c => c.code)) {
     add("no-mutants", "note", "No mutation results on this commit yet");
   }
@@ -309,9 +309,9 @@ function lineEvidence(data, file, line, side = "add") {
 // Each finding kind's flag: its id, and the flag's text for n findings.
 const FINDING_FLAGS = [
   [/^check-failed$/, "checks", n => `${n} check${n === 1 ? "" : "s"} failed`],
-  [/^line-not-run$/, "lines", n => `${n} changed line${n === 1 ? "" : "s"} run in no test`],
-  [/^branch-not-taken$/, "branches", n => `${n} changed line${n === 1 ? " has a branch" : "s have branches"} no test takes`],
-  [/^mutant-/, "mutants", n => `${n} mutant${n === 1 ? "" : "s"} no test catches`],
+  [/^line-not-run$/, "lines", n => `${n} changed line${n === 1 ? " has" : "s have"} no test`],
+  [/^branch-not-taken$/, "branches", n => `${n} changed line${n === 1 ? " has an untested branch" : "s have untested branches"}`],
+  [/^mutant-/, "mutants", n => `${n} mutant${n === 1 ? " survives" : "s survive"}`],
   [/^duvet-test-misses-code$/, "reach", n => `${n} duvet test${n === 1 ? " never runs the code it cites" : "s never run the code they cite"}`],
   [/^test-server-case-failed$/, "servers", n => `${n} test server case${n === 1 ? "" : "s"} failed`],
   [/^fuzz-case-failed$/, "fuzz", n => `${n} fuzz case${n === 1 ? "" : "s"} failed`],
@@ -345,7 +345,8 @@ function flagsFromFindings(data) {
 
 // The findings on one line, on the head commit's side, or on the base side for a removed line.
 function findingsAt(data, file, line, side = "RIGHT") {
-  return ((data && data.findings) || []).filter(f => f.file === file && f.line === line && (f.side || "RIGHT") === side);
+  return ((data && data.findings) || []).filter(f => f.file === file && f.line <= line && line <= (f.end_line || f.line)
+    && (f.side || "RIGHT") === side);
 }
 
 // The key, kind and check a findings comment carries.

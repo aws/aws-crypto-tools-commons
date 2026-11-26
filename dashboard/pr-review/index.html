@@ -111,7 +111,7 @@
 //
 // The page reads the PR's diff and files, and the check runs and artifacts on its head commit, the API
 // at the head commit and at the merge base among them. It flags only what needs a look: failed checks,
-// changed lines no test runs, branches no test takes, mutants no test catches, duvet tests that miss their
+// changed lines no test runs, untested branches, surviving mutants, duvet tests that miss their
 // code, failed test server cases, open Smithy conformance findings, and API changes. It shows those lines
 // and a few around them; GitHub shows the whole diff. The line box opens any other line. A click on a line
 // shows everything about it, and posts a review comment as you. No AI runs here; "Ask an AI" copies a
@@ -635,7 +635,7 @@ function marks(s, f, row) {
   if (cov === "run" && br.missed) { gap = true; out.push(`<i class="m-br" title="${br.missed} of ${br.total} branches never taken">◐</i>`); }
   const mutants = (d.mutants && d.mutants.get(file) && d.mutants.get(file).get(line)) || [];
   const badMutants = mutants.filter(m => BAD_MUTANT.has(m.status)).length;
-  if (badMutants) { gap = true; out.push(`<i class="m-bad" title="${badMutants} mutants no test catches">✗${badMutants > 1 ? badMutants : ""}</i>`); }
+  if (badMutants) { gap = true; out.push(`<i class="m-bad" title="${badMutants} surviving mutants">✗${badMutants > 1 ? badMutants : ""}</i>`); }
   else if (mutants.some(m => m.status === "killed" || m.status === "timed_out")) out.push(`<i class="m-ok" title="every mutant here makes a test fail">✓</i>`);
   const blocks = ((d.blocks && d.blocks.get(file)) || []).filter(b => b.code === line);
   const reach = (d.reach || []).filter(r => r.path === file && r.from <= line && line <= r.to);
@@ -652,7 +652,7 @@ function marks(s, f, row) {
 
 function filesHtml(s) {
   const legend = `<span class="legend"><i><span class="good">▌</span>a test runs it</i><i><span class="bad">▌</span>no test runs it</i>
-    <i class="m-br">◐ a branch no test takes</i><i class="mk"><span class="m-bad">✗</span> a mutant no test catches</i><i class="mk"><span class="m-ok">✓</span> mutants caught</i>
+    <i class="m-br">◐ untested branch</i><i class="mk"><span class="m-bad">✗</span> surviving mutant</i><i class="mk"><span class="m-ok">✓</span> mutants caught</i>
     <i class="mk"><span class="m-duvet">§</span> duvet</i><i class="mk"><span class="m-api">API</span> public item</i><i>12 tests run it</i><i>💬 comments</i></span>`;
   let h = `<div class="toolbar"><form id="lookat"><input type="text" id="where" size="40" placeholder="any line: file:line"> <button class="tool">Look at it</button></form>${legend}</div>`;
   const looked = s.files.filter(f => !f.extra).some(f => f.rows.some(r => marks(s, f, r).look));
@@ -802,7 +802,7 @@ function findingsHtml(s, file, line, side) {
     const patch = f.patch ? `<pre class="code">-${esc(f.patch[0])}\n+${esc(f.patch[1])}</pre>` : "";
     const rerun = f.rerun && f.rerun.length ? `<details><summary class="sub">Run it locally</summary>${patch}<pre class="code">${esc(f.rerun.join("\n"))}</pre></details>` : "";
     return `<div class="comment"><b class="${f.level === "block" ? "bad" : "warn"}">${esc(f.title)}</b> <small class="sub">${f.level === "block" ? "blocks merging" : "note"}</small>
-      <div>${md(f.what)}</div>${f.why.map(w => `<div class="sub">${md(w)}</div>`).join("")}${f.fix ? `<div><b>Fix:</b> ${md(f.fix)}</div>` : ""}${rerun}
+      ${f.what.replace(/\.$/, "") === f.title ? "" : `<div>${md(f.what)}</div>`}${f.why.map(w => `<div class="sub">${md(w)}</div>`).join("")}${f.fix ? `<div><b>Fix:</b> ${md(f.fix)}</div>` : ""}${rerun}
       ${button}${comment ? ` <a href="${esc(comment.html_url)}" target="_blank">comment on GitHub</a>` : ""}</div>`;
   }).join("");
 }

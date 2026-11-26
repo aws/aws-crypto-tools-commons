@@ -141,7 +141,7 @@ test("a test server's code is left out of the line checks, as the coverage check
   assert.deepStrictEqual(ids(R.findFlags([FILE, server], d)), []);
 });
 
-test("a branch no test takes is flagged on a line that runs", () => {
+test("an untested branch is flagged on a line that runs", () => {
   const d = good();
   d.branches.get("mpl/src/k.rs").get(2).set("0,1", 0);
   assert.deepStrictEqual(ids(R.findFlags([FILE], d)), ["branches"]);
@@ -151,7 +151,7 @@ test("a mutant that survives, or sits on a line no test runs, is flagged with it
   const d = good();
   d.mutants.get("mpl/src/k.rs").set(1, [{ status: "survived" }, { status: "not_covered" }]);
   const f = R.findFlags([FILE], d);
-  assert.deepStrictEqual(f.map(x => [x.id, x.text, x.lines]), [["mutants", "2 mutants no test catches", [{ file: "mpl/src/k.rs", line: 1 }]]]);
+  assert.deepStrictEqual(f.map(x => [x.id, x.text, x.lines]), [["mutants", "2 mutants survive", [{ file: "mpl/src/k.rs", line: 1 }]]]);
 });
 
 test("failed and running checks, missing results, a duvet test that misses its code, test server failures, conformance and API changes are flagged", () => {
@@ -330,7 +330,7 @@ test("the line box opens a changed line in place", async () => {
 test("a mutant that survives is flagged, marked on its line, and explained in the line's pane", async () => {
   const page = await open(github({ [`repos/${REPO}/actions/artifacts/1/zip`]: zipOf({ "results.json": results([
     { file: "mpl/src/k.rs", line: 6, status: "survived", description: "replace check with ()", killed_by: null }]) }) }));
-  assert.match(page.els.top.innerHTML, /<b>1 mutant no test catches<\/b><small>k\.rs:6<\/small>/);
+  assert.match(page.els.top.innerHTML, /<b>1 mutant survives<\/b><small>k\.rs:6<\/small>/);
   const row6 = page.els.files.innerHTML.split("<tr").find(r => /<td class="ln"><\/td><td class="ln">6<\/td>/.test(r));
   assert.match(row6, /class="m-bad"/);
   page.clickLine(6);
@@ -340,7 +340,7 @@ test("a mutant that survives is flagged, marked on its line, and explained in th
 
 test("a changed line no test runs is flagged and drawn red, and one that runs is drawn green", async () => {
   const page = await open(github({ [`repos/${REPO}/actions/artifacts/2/zip`]: zipOf({ "mpl.lcov": lcov({ 3: 4, 6: 0, 7: 4 }) }) }));
-  assert.match(page.els.top.innerHTML, /1 changed line run in no test/);
+  assert.match(page.els.top.innerHTML, /1 changed line has no test/);
   const rows = page.els.files.innerHTML.split("<tr").slice(1);
   assert.match(rows.find(r => r.includes('<td class="ln">6</td>')), /class="src miss"/);
   assert.match(rows.find(r => r.includes('<td class="ln">7</td>')), /class="src run"/);
@@ -407,10 +407,16 @@ test("the findings become one flag per kind, blocking ones first, with no-line f
     FINDING("mutant-survived", "block", "mpl/src/k.rs", 4), FINDING("mutant-not-covered", "block", "mpl/src/k.rs", 9),
     FINDING("test-server-case-failed", "block", null, null, { what: "KTest failed" })] });
   assert.deepStrictEqual(flags.map(f => [f.id, f.level, f.text]), [
-    ["mutants", "bad", "2 mutants no test catches"], ["servers", "bad", "1 test server case failed"],
+    ["mutants", "bad", "2 mutants survive"], ["servers", "bad", "1 test server case failed"],
     ["api", "note", "The public API changes"], ["missing:mutation results", "note", "No mutation results on this commit yet"]]);
   assert.deepStrictEqual(flags[0].lines, [{ file: "mpl/src/k.rs", line: 4 }, { file: "mpl/src/k.rs", line: 9 }]);
   assert.deepStrictEqual(flags[1].items, ["KTest failed"]);
+});
+
+test("a finding on several lines shows in the pane of each of them", () => {
+  const f = FINDING("duvet-test-misses-code", "block", "mpl/src/k.rs", 408, { end_line: 411 });
+  const at = n => R.findingsAt({ findings: [f] }, "mpl/src/k.rs", n).length;
+  assert.deepStrictEqual([at(407), at(408), at(411), at(412)], [0, 1, 1, 0]);
 });
 
 test("a finding's text shows its code and its https links, and no other HTML", () => {
@@ -442,6 +448,14 @@ test("with the findings job's file, the flags are its findings, and a line's pan
   assert.match(page.els.detail.innerHTML, /<b class="warn">New API<\/b> <small class="sub">note<\/small>/);
   assert.match(page.els.detail.innerHTML, /<div class="sub"><code>key_id<\/code> takes <a href="https:\/\/example\.com\/spec#ids" target="_blank">text<\/a>\.<\/div><div><b>Fix:<\/b> Run it\.<\/div>/);
   assert.match(page.els.detail.innerHTML, /<pre class="code">cargo test<\/pre>/);
+});
+
+test("a line's pane does not repeat a title in the sentence under it", async () => {
+  const f = FINDING("line-not-run", "block", "mpl/src/k.rs", 6, { title: "No test runs this line", what: "No test runs this line." });
+  const page = await open(withFindings([f]));
+  page.clickLine(6);
+  assert.match(page.els.detail.innerHTML, /<b class="bad">No test runs this line<\/b>/);
+  assert.doesNotMatch(page.els.detail.innerHTML, /<div>No test runs this line\.<\/div>/);
 });
 
 test("Not useful marks the finding's comment 👎", async () => {
