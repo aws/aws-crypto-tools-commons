@@ -388,21 +388,26 @@ const FINDING = (kind, level, file, line, more = {}) => ({ key: `${kind}:${line}
 
 test("the findings become one flag per kind, blocking ones first, with no-line findings as items", () => {
   const flags = R.flagsFromFindings({ missing: ["mutation results"], findings: [
-    FINDING("cheat-ignore", "warn", "mpl/tests/t.rs", 2),
+    FINDING("api-new", "warn", "mpl/src/k.rs", 1),
     FINDING("mutant-survived", "block", "mpl/src/k.rs", 4), FINDING("mutant-not-covered", "block", "mpl/src/k.rs", 9),
     FINDING("test-server-case-failed", "block", null, null, { what: "KTest failed" })] });
   assert.deepStrictEqual(flags.map(f => [f.id, f.level, f.text]), [
     ["mutants", "bad", "2 mutants no test catches"], ["servers", "bad", "1 test server case failed"],
-    ["cheat", "note", "1 change weakens the checks"], ["missing:mutation results", "note", "No mutation results on this commit yet"]]);
+    ["api", "note", "The public API changes"], ["missing:mutation results", "note", "No mutation results on this commit yet"]]);
   assert.deepStrictEqual(flags[0].lines, [{ file: "mpl/src/k.rs", line: 4 }, { file: "mpl/src/k.rs", line: 9 }]);
   assert.deepStrictEqual(flags[1].items, ["KTest failed"]);
 });
 
+test("a finding's text shows its code and its https links, and no other HTML", () => {
+  assert.strictEqual(R.md("`>=` in [the spec](https://x.test/a?b=1&c=2#d), <b>, [run](javascript:alert(1))"),
+    '<code>&gt;=</code> in <a href="https://x.test/a?b=1&amp;c=2#d" target="_blank">the spec</a>, &lt;b&gt;, [run](javascript:alert(1))');
+});
+
 test("the 👎 count of each kind of findings comment leaves out replies and other comments", () => {
   const c = (kind, down, more = {}) => ({ body: `x\n<!-- pr-findings {"key": "k", "kind": "${kind}"} -->`, reactions: { "-1": down, "+1": 0 }, ...more });
-  assert.deepStrictEqual(R.noise([c("mutant-survived", 1), c("mutant-survived", 0), c("cheat-ignore", 1), c("cheat-ignore", 1),
+  assert.deepStrictEqual(R.noise([c("mutant-survived", 1), c("mutant-survived", 0), c("api-new", 1), c("api-new", 1),
     c("mutant-survived", 5, { in_reply_to_id: 3 }), { body: "a person's comment", reactions: { "-1": 9 } }]), [
-    { kind: "cheat-ignore", comments: 2, down: 2, up: 0 }, { kind: "mutant-survived", comments: 2, down: 1, up: 0 }]);
+    { kind: "api-new", comments: 2, down: 2, up: 0 }, { kind: "mutant-survived", comments: 2, down: 1, up: 0 }]);
 });
 
 function withFindings(findings, comments = []) {
@@ -414,20 +419,20 @@ function withFindings(findings, comments = []) {
 }
 
 test("with the findings job's file, the flags are its findings, and a line's pane shows why and how to run it", async () => {
-  const f = FINDING("cheat-ignore", "warn", "mpl/src/k.rs", 6, { title: "Test ignored", what: "An ignored test does not run in CI.",
-    why: ["It was ignored."], fix: "Run it.", rerun: ["cargo test"] });
+  const f = FINDING("api-new", "warn", "mpl/src/k.rs", 6, { title: "New API", what: "New API: K keyring.",
+    why: ["`key_id` takes [text](https://example.com/spec#ids)."], fix: "Run it.", rerun: ["cargo test"] });
   const page = await open(withFindings([f]));
-  assert.match(page.els.top.innerHTML, /<b>1 change weakens the checks<\/b><small>k\.rs:6<\/small>/);
+  assert.match(page.els.top.innerHTML, /<b>The public API changes<\/b><small>k\.rs:6<\/small>/);
   page.clickLine(6);
-  assert.match(page.els.detail.innerHTML, /<b class="warn">Test ignored<\/b> <small class="sub">note<\/small>/);
-  assert.match(page.els.detail.innerHTML, /<div class="sub">It was ignored\.<\/div><div><b>Fix:<\/b> Run it\.<\/div>/);
+  assert.match(page.els.detail.innerHTML, /<b class="warn">New API<\/b> <small class="sub">note<\/small>/);
+  assert.match(page.els.detail.innerHTML, /<div class="sub"><code>key_id<\/code> takes <a href="https:\/\/example\.com\/spec#ids" target="_blank">text<\/a>\.<\/div><div><b>Fix:<\/b> Run it\.<\/div>/);
   assert.match(page.els.detail.innerHTML, /<pre class="code">cargo test<\/pre>/);
 });
 
 test("Not useful marks the finding's comment 👎", async () => {
-  const f = FINDING("cheat-ignore", "warn", "mpl/src/k.rs", 6);
+  const f = FINDING("api-new", "warn", "mpl/src/k.rs", 6);
   const comment = { id: 41, path: "mpl/src/k.rs", line: 6, side: "RIGHT", user: { login: "github-actions[bot]" }, html_url: "https://example.com/41",
-    body: `x\n<!-- pr-findings {"key": "${f.key}", "kind": "cheat-ignore"} -->`, reactions: { "-1": 2 } };
+    body: `x\n<!-- pr-findings {"key": "${f.key}", "kind": "api-new"} -->`, reactions: { "-1": 2 } };
   const page = await open(withFindings([f], [comment]));
   page.clickLine(6);
   assert.match(page.els.detail.innerHTML, /data-down="41"[^>]*>👎 Not useful \(2\)/);

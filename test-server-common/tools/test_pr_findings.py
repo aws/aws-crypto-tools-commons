@@ -18,7 +18,7 @@ def zipped(files):
     return buf.getvalue()
 
 
-# One pull request with one new library file, a test file and a test server config change.
+# One pull request with one new library file, a test file and a test server file.
 HEAD, BASE = "a" * 40, "b" * 40
 REPO, PR = "aws/aws-crypto-tools-rust", "repos/aws/aws-crypto-tools-rust/pulls/7"
 SOURCE = """pub struct KBuilder {}
@@ -32,9 +32,7 @@ impl KBuilder {
         check(self)
     }
 }"""
-TESTS = "#[test]\n#[ignore]\nfn checks() {}"
-FEATURES_BASE = '{"supportedFeatures": ["a"], "unsupportedFeatures": []}'
-FEATURES_HEAD = '{\n  "supportedFeatures": ["a"],\n  "unsupportedFeatures": [\n    "b"\n  ]\n}'
+TESTS = "#[test]\nfn checks() {}"
 
 
 def added(text):
@@ -86,9 +84,7 @@ def github(over=None):
              "head": {"sha": HEAD}, "base": {"sha": BASE, "ref": "main"}},
         f"{PR}/files": [{"filename": "mpl/src/k.rs", "status": "added", "patch": added(SOURCE)},
                         {"filename": "mpl/tests/t.rs", "status": "added", "patch": added(TESTS)},
-                        {"filename": "mpl/test-server/src/handlers.rs", "status": "added", "patch": added("fn h() {}")},
-                        {"filename": "mpl/test-server/feature-config.json", "status": "modified",
-                         "patch": "@@ -1 +1,6 @@\n-" + FEATURES_BASE + "\n" + "\n".join("+" + l for l in FEATURES_HEAD.split("\n"))}],
+                        {"filename": "mpl/test-server/src/handlers.rs", "status": "added", "patch": added("fn h() {}")}],
         f"repos/{REPO}/commits/{HEAD}/check-runs": {"check_runs": [
             {"id": 1, "name": "Mutation testing (mpl)", "status": "completed", "conclusion": "failure", "html_url": "https://ci/1"},
             {"id": 2, "name": "pr-ci-all-required", "status": "completed", "conclusion": "failure", "html_url": "https://ci/2"},
@@ -98,8 +94,6 @@ def github(over=None):
         f"repos/{REPO}/compare/{BASE}...{HEAD}": {"merge_base_commit": {"sha": BASE}},
         f"raw:mpl/src/k.rs@{HEAD}": SOURCE, f"raw:mpl/tests/t.rs@{HEAD}": TESTS,
         f"raw:mpl/test-server/src/handlers.rs@{HEAD}": "fn h() {}",
-        f"raw:mpl/test-server/feature-config.json@{HEAD}": FEATURES_HEAD,
-        f"raw:mpl/test-server/feature-config.json@{BASE}": FEATURES_BASE,
         "zip:1": zipped({"results.json": json.dumps(MUTANTS)}),
         "zip:2": zipped({"mpl.lcov": LCOV}),
         "zip:3": zipped({"per-test-coverage/rust.jsonl": PER_TEST}),
@@ -166,8 +160,8 @@ class Findings(unittest.TestCase):
 
     def test_a_changed_line_no_test_runs_is_a_blocking_finding_on_that_line(self):
         (f,) = self.kinds["line-not-run"]
-        self.assertEqual((f["file"], f["line"], f["level"]), ("mpl/src/k.rs", 5, "block"))
-        self.assertEqual(f["why"], ["1 test run line 4, just above, but none runs this one."])
+        self.assertEqual((f["file"], f["line"], f["level"], f["why"]), ("mpl/src/k.rs", 5, "block", []))
+        self.assertEqual(f["evidence"]["tests_above"], ["aws-crypto-mpl::t::checks"])
 
     def test_a_branch_no_test_takes_names_the_condition_and_its_side(self):
         (f,) = self.kinds["branch-not-taken"]
@@ -187,7 +181,7 @@ class Findings(unittest.TestCase):
     def test_a_duvet_test_that_misses_its_code_says_where_the_test_went(self):
         (f,) = self.kinds["duvet-test-misses-code"]
         self.assertEqual((f["file"], f["line"]), ("mpl/src/k.rs", 9))
-        self.assertIn("It runs, but never reaches lines 9-9.", f["why"])
+        self.assertEqual(f["why"][1:], ["It runs, but never reaches lines 9-9."])
         self.assertIn("make -C mpl/test-server orchestrate", f["rerun"][0])
 
     def test_failed_test_server_and_fuzz_cases_are_findings_on_no_line_with_a_rerun(self):
@@ -213,24 +207,21 @@ class Findings(unittest.TestCase):
         self.assertIn("Of 2 types a caller may hold, 1 pass as is, 0 need one call, 1 need more", f["why"][0])
         self.assertIn("`PathBuf`: `.key_id(&read(x))`", f["why"][0])
 
-    def test_changes_that_weaken_the_checks_are_notes(self):
-        self.assertEqual([(f["file"], f["line"]) for f in self.kinds["cheat-ignore"]], [("mpl/tests/t.rs", 2)])
-        (feature,) = self.kinds["cheat-unsupported-feature"]
-        self.assertEqual((feature["line"], feature["level"]), (4, "warn"))
+    def test_a_findings_ci_link_opens_the_check_it_comes_from_or_else_the_run(self):
+        (mutant,) = self.kinds["mutant-survived"]
+        (line,) = self.kinds["line-not-run"]
+        self.assertEqual(mutant["links"]["ci"], "https://ci/1")
+        self.assertEqual(mutant["links"]["ci_name"], "Mutation testing (mpl)")
+        self.assertEqual((line["links"]["ci"], line["links"]["ci_name"]), ("https://ci/run/50", None))
+
+    def test_the_only_notes_are_on_the_public_api(self):
+        self.assertEqual({f["check"] for f in self.findings if f["level"] == "warn"}, {"api"})
 
     def test_the_excluded_test_server_code_gets_no_line_findings(self):
         self.assertEqual([f["file"] for f in self.kinds["line-not-run"]], ["mpl/src/k.rs"])
 
     def test_nothing_is_missing_when_every_check_uploaded_results(self):
         self.assertEqual(self.pr.missing, [])
-
-
-class Narrowed(unittest.TestCase):
-    def test_an_exclude_on_a_check_is_a_note_but_one_on_another_tool_is_not(self):
-        workflow = "      run: diff-cover lcov.info --exclude '*/a/*'\n        --exclude '*/test-server/*' --fuzz-count 20"
-        replies = github({f"{PR}/files": [{"filename": ".github/workflows/ci.yml", "status": "modified", "patch": added(workflow)}]})
-        _, findings = build(replies)
-        self.assertEqual([(f["kind"], f["line"]) for f in findings if f["check"] == "cheat"], [("cheat-check-narrowed", 1)])
 
 
 class Missing(unittest.TestCase):
@@ -289,12 +280,36 @@ class NewestReport(unittest.TestCase):
 
 class Keys(unittest.TestCase):
     def test_two_findings_with_the_same_text_in_one_file_get_different_keys(self):
-        source = "//= spec/a.md#x\n//= type=implication\n//# A MUST.\nlet a = 1;\n//= spec/a.md#y\n//= type=implication\n//# B MUST.\nlet b = 2;"
+        source = "fn a() {\n    x();\n}\nfn b() {\n    x();\n}"
         replies = github({f"{PR}/files": [{"filename": "mpl/src/a.rs", "status": "added", "patch": added(source)}],
-                          f"raw:mpl/src/a.rs@{HEAD}": source})
+                          f"raw:mpl/src/a.rs@{HEAD}": source,
+                          "zip:2": zipped({"mpl.lcov": "SF:mpl/src/a.rs\nDA:1,1\nDA:2,0\nDA:4,1\nDA:5,0\nend_of_record\n"})})
         _, findings = build(replies)
-        keys = [f["key"] for f in findings if f["kind"] == "cheat-duvet-implication"]
-        self.assertEqual(len(set(keys)), 2)
+        keys = [f["key"] for f in findings if f["kind"] == "line-not-run"]
+        self.assertEqual((len(keys), len(set(keys))), (2, 2))
+
+
+class SpecLinks(unittest.TestCase):
+    QUOTE = ("Decrypt any [encrypted data key](../structures.md#encrypted-data-key), "
+             "[a key](../keys.md#key) or [a gone part](../structures.md#gone).")
+
+    def test_a_link_in_a_quote_opens_its_part_of_the_spec_and_a_link_that_goes_nowhere_is_its_text(self):
+        replies = github({f"raw:scripts/spec-source.json@{HEAD}":
+                          json.dumps({"spec": {"url": "https://github.com/awslabs/spec.git", "ref": "master"}}),
+                          "raw:framework/structures.md@master": "# Structures\n\n## Encrypted Data Key\n"})
+        pr, _ = build(replies)
+        self.assertEqual(pr.spec_text(self.QUOTE, "spec/framework/aws-kms/k.md#ondecrypt"),
+                         "Decrypt any [encrypted data key](https://github.com/awslabs/spec/blob/master/framework/"
+                         "structures.md#encrypted-data-key), a key or a gone part.")
+
+    def test_a_library_with_no_spec_source_gets_the_links_as_text(self):
+        pr, _ = build()
+        self.assertEqual(pr.spec_text(self.QUOTE, "spec/framework/aws-kms/k.md#ondecrypt"),
+                         "Decrypt any encrypted data key, a key or a gone part.")
+
+    def test_heading_anchors_drop_punctuation_and_number_repeats(self):
+        self.assertEqual(pf.heading_anchors("## `OnDecrypt`\n## Key IDs\n### Key IDs\nnot # a heading"),
+                         {"ondecrypt", "key-ids", "key-ids-1"})
 
 
 class Words(unittest.TestCase):
@@ -367,7 +382,7 @@ class Plan(unittest.TestCase):
     def test_a_finding_with_a_comment_on_its_line_gets_that_comment_edited_not_a_new_one(self):
         plan = pf.plan(self.data, [comment(self.line["key"])], {1: thread()})
         self.assertNotIn(self.line["key"], [f["key"] for f in plan["create"]])
-        self.assertEqual(plan["update"], [(1, pf.comment_body(self.data, self.line))])
+        self.assertEqual(plan["update"], [(1, pf.comment_body(self.line))])
 
     def test_a_comment_whose_finding_is_gone_is_marked_fixed_and_its_thread_closed(self):
         plan = pf.plan(self.data, [comment("gone")], {1: thread()})
@@ -394,9 +409,15 @@ class Plan(unittest.TestCase):
         self.assertIn(self.line["key"], [f["key"] for f in plan["create"]])
         self.assertEqual(plan["close"], [thread()])
 
-    def test_other_accounts_comments_and_kinds_turned_off_are_left_alone(self):
-        comments = [comment("gone", login="someone"), comment(self.line["key"], cid=2)]
-        plan = pf.plan(self.data, comments, {1: thread(), 2: thread()}, off={"line-not-run"})
+    def test_another_accounts_comments_are_left_alone(self):
+        plan = pf.plan(self.data, [comment("gone", login="someone")], {1: thread()})
+        self.assertEqual((plan["close"], plan["update"], plan["hide"]), ([], [], []))
+
+    def test_a_comment_of_a_kind_turned_off_or_of_a_check_no_longer_made_is_hidden_and_not_called_fixed(self):
+        comments = [comment(self.line["key"]), comment("old", cid=2, kind="cheat-duvet-implication", check="cheat")]
+        two = {1: thread(), 2: {**thread(), "id": "T2", "comment": "C2"}}
+        plan = pf.plan(self.data, comments, two, off={"line-not-run"})
+        self.assertEqual(sorted(t["id"] for t in plan["hide"]), ["T1", "T2"])
         self.assertEqual((plan["close"], plan["update"]), ([], []))
         self.assertNotIn(self.line["key"], [f["key"] for f in plan["create"]])
 
@@ -420,25 +441,39 @@ class Recorder:
         if name in self.refuse:
             raise RuntimeError(f"GitHub GraphQL: [{{'type': 'FORBIDDEN', 'path': ['{name}'], "
                                "'message': 'Resource not accessible by integration'}]")
-        self.ran.append((name, variables["id"]))
+        self.ran.append((name, variables["id"], variables.get("why")))
 
 
 class Apply(unittest.TestCase):
     def test_a_token_that_may_not_resolve_threads_hides_each_fixed_comment_as_resolved(self):
         gh = Recorder(refuse={"resolveReviewThread"})
         two = [thread(), {**thread(), "id": "T2", "comment": "C2"}]
-        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": two, "reopen": []})
-        self.assertEqual(gh.ran, [("minimizeComment", "C1"), ("minimizeComment", "C2")])
+        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": two, "reopen": [], "hide": []})
+        self.assertEqual(gh.ran, [("minimizeComment", "C1", "RESOLVED"), ("minimizeComment", "C2", "RESOLVED")])
+
+    def test_a_comment_to_hide_is_hidden_as_outdated(self):
+        gh = Recorder()
+        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": [], "reopen": [], "hide": [thread()]})
+        self.assertEqual(gh.ran, [("minimizeComment", "C1", "OUTDATED")])
+
+
+class Dashboard(unittest.TestCase):
+    def test_the_link_keeps_the_query_of_its_base(self):
+        pr, _ = build()
+        self.assertEqual(pr.dashboard("http://localhost:8765/?ref=lucmcdon/x", "mpl/src/k.rs", 4),
+                         "http://localhost:8765/?ref=lucmcdon/x&pr=aws/aws-crypto-tools-rust%237&line=mpl/src/k.rs:4#pr-review")
 
 
 class Body(unittest.TestCase):
     def test_the_comment_links_the_dashboard_at_its_line_and_carries_its_key(self):
         pr, findings = build()
         f = next(f for f in findings if f["kind"] == "mutant-survived")
-        body = pf.comment_body({"repository": REPO, "pr": 7}, f)
+        body = pf.comment_body(f)
         self.assertIn("[View in dashboard](https://aws.github.io/aws-crypto-tools-commons/"
-                      "?pr=aws/aws-crypto-tools-rust%237&line=mpl/src/k.rs:4#pr-review)", body)
-        self.assertIn("```diff\n-        if id.len() >= LIMIT {\n+        if id.len() > LIMIT {\n```", body)
+                      "?pr=aws/aws-crypto-tools-rust%237&line=mpl/src/k.rs:4#pr-review) · "
+                      "[Mutation testing (mpl)](https://ci/1)", body)
+        self.assertNotIn("Run it locally", body)
+        self.assertNotIn("Ask AI", body)
         self.assertEqual(pf.marker_of(body)["key"], f["key"])
 
 
