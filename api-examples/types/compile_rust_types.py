@@ -8,6 +8,7 @@ For each option, it tries each held type with each fix, keeps the cheapest fix t
 and writes the rows to dashboard/api-examples/types.json.
 """
 import argparse
+import functools
 import json
 import os
 import re
@@ -70,26 +71,46 @@ def with_costs(fixes):
 FIXES = {kind: with_costs(fixes) for kind, fixes in FIX_CODE.items()}
 BYTES_LIKE = ["bytes", "optional bytes", "stream", "text", "optional text", "path", "reader"]
 TEXT_LIKE = ["text", "optional text"]
-MPL = "aws_crypto_mpl::keyring::"
-# Each option: page key, code that starts the call, the part of it the page already shows, setter, kinds.
-OPTIONS = [
-    ("mpl/RawAesKeyring.wrapping_key", MPL + "RawAesKeyring::builder()", None, "wrapping_key", BYTES_LIKE),
-    ("mpl/RawAesKeyring.key_name", MPL + "RawAesKeyring::builder()", None, "key_name", TEXT_LIKE),
-    ("mpl/AwsKmsKeyring.kms_key_id", MPL + "AwsKmsKeyring::builder()", None, "kms_key_id", TEXT_LIKE),
-    ("mpl/AwsKmsKeyring.kms_client", MPL + "AwsKmsKeyring::builder()", None, "kms_client",
-     ["named aws_sdk_kms::Client"]),
-    ("mpl/AwsKmsKeyring.grant_tokens", MPL + "AwsKmsKeyring::builder()", None, "grant_tokens",
-     TEXT_LIKE + ["list", "optional list"]),
-    ("mpl/HierarchicalKeyring.ttl", MPL + "HierarchicalKeyring::builder()", None, "ttl", ["duration", "number"]),
-    ("mpl/HierarchicalKeyring.branch_key_id", MPL + "HierarchicalKeyring::builder()", None, "branch_key_id",
-     TEXT_LIKE),
-    ("esdk/encrypt.plaintext", "client.encrypt()", "client", "plaintext", BYTES_LIKE),
-    ("esdk/decrypt.ciphertext", "client.decrypt()", "client", "ciphertext", BYTES_LIKE),
-    ("esdk/encrypt.encryption_context", "client.encrypt()", "client", "encryption_context", ["map", "pair"]),
-    ("esdk/encrypt.frame_length", "client.encrypt()", "client", "frame_length", ["number"]),
-    ("esdk/Client.max_encrypted_data_keys", "aws_esdk::Client::builder()", None, "max_encrypted_data_keys",
-     ["number"]),
-]
+LOCAL_CRATES = ("aws_crypto_mpl", "aws_esdk")
+INTS = r"u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize"
+# Every API and option, from rust_api.py.
+API = json.loads((HERE / "rust-api.json").read_text())
+
+
+def kinds_of(opt):
+    """The kinds of held value to try on an option, from the type its setter takes."""
+    if opt["params"] == 2:
+        return ["map", "pair"] if "EncryptionContext" in (opt.get("set_takes") or "") else ["pair"]
+    takes = opt["takes"]
+    handle = re.search(r"IntoShared<(\w+)>", takes)
+    if handle:
+        return [f"component {handle.group(1)}"]
+    inner = re.sub(r"^impl (?:Into|AsRef)<(.*)>$", r"\1", takes)
+    inner_code = re.sub(r"^impl (?:std::convert::)?(?:Into|AsRef)<(.*)>$", r"\1", opt["takes_code"])
+    if inner in ("&[u8]", "[u8]", "Vec<u8>", "Blob", "&Blob"):
+        return BYTES_LIKE
+    if inner in ("String", "&str", "str"):
+        # grant_tokens adds one token, and set_grant_tokens takes them all.
+        return TEXT_LIKE + (["list", "optional list"] if opt.get("set_takes") == "Option<Vec<String>>" else [])
+    if inner == "Duration":
+        return ["duration", "number"]
+    if re.fullmatch(INTS, inner):
+        return ["number"]
+    if inner == "bool":
+        return []
+    return [f"named {inner_code}"]
+
+
+def page_key(api, opt):
+    """The page's key for an option, like mpl/RawAesKeyring.wrapping_key or esdk/encrypt.plaintext."""
+    return f"{api['lib']}/{api['type']}.{opt['name']}"
+
+
+# Each option, with the code that starts its call, the part of that code the page shows as the API's call,
+# and the kinds of held value to try on it.
+OPTIONS = [{"key": page_key(api, opt), "start": api["start"], "strip": api["strip"], "setter": opt["setter"],
+            "set": opt["set"], "ctor": opt["ctor"], "kinds": kinds_of(opt)}
+           for api in API["apis"] for opt in api["options"]]
 
 
 TRIALS = HERE / "rust_trials.rs"
@@ -195,17 +216,13 @@ def bare_names(ty):
     return [n for n in re.findall(NAME, ty) if n not in rust_types.PRELUDE]
 
 
-def named_types(path):
-    """Held types for an option that takes one named type: the type, a borrow, an Arc, and what builds it.
-
-    What builds it comes from the type's one-value constructors, like aws_sdk_kms::Client::new(&SdkConfig).
-    It also returns where each name in our dependencies lives, for the constructors' parameter types.
-    """
-    crate_ident, name = path.split("::")[0], path.split("::")[-1]
-    short = crate_ident.removeprefix("aws_sdk_")
+@functools.cache
+def scan_ours():
+    """What rust-scan finds in our crates.io dependencies: where each name is defined, with its doc comment,
+    and each type's one-value constructors as {(crate, type): [(fn, parameter type)]}."""
     lock = json.loads(rust_types.LOCK.read_text())
     scanner = rust_types.build_scanner()
-    defines, ctors, docs = {}, [], {}
+    defines, ctors, docs = {}, {}, {}
     for crate in lock["crates"]:
         if "ours" not in crate["groups"]:
             continue
@@ -216,8 +233,41 @@ def named_types(path):
                 docs.setdefault(row["defines"], []).append(
                     {"crate": crate["name"], "version": crate["version"], "path": row["path"],
                      "doc": rust_types.summary(row.get("doc", "")), "file": row["file"], "line": row["line"]})
-            elif ident == crate_ident and row.get("ctor") == name:
-                ctors.append((row["fn"], row["param"]))
+            elif "ctor" in row:
+                ctors.setdefault((ident, row["ctor"]), []).append((row["fn"], row["param"]))
+    return defines, ctors, docs
+
+
+def component_types(handle):
+    """Held types for an option that takes a component, like a keyring: each built-in one, borrowed, in an
+    Arc, and the shared handle itself."""
+    info = API["handles"][handle]
+    path = info["path"]
+    fixes = with_costs([("x", "base"), ("&x", "base"), ("x.clone()", "base"), ("(*x).clone()", "base"),
+                        (f"{path}::new(x)", "base"), (f"{path}::new(x.clone())", "base"), ("Some(x)", "set"),
+                        ("Some(x.clone())", "set"), (f"Some({path}::new(x))", "set")])
+    held = []
+    for member in info["members"] + [path]:
+        name = member.split("::")[-1]
+        held += [(name, member, "component", fixes), (f"&{name}", f"&{member}", "component", fixes)]
+        if member != path:
+            held.append((f"Arc<{name}>", f"std::sync::Arc<{member}>", "component", fixes))
+    return held
+
+
+def named_types(path):
+    """Held types for an option that takes one named type: the type, a borrow, an Arc, and what builds it.
+
+    What builds it comes from the type's one-value constructors, like aws_sdk_kms::Client::new(&SdkConfig).
+    It also returns where each name in our dependencies lives, for the constructors' parameter types.
+    A type from our own crates, like AesWrappingAlg, is just the type and a borrow.
+    """
+    crate_ident, name = path.split("::")[0], path.split("::")[-1]
+    if crate_ident in LOCAL_CRATES:
+        return [(name, path, "named", FIXES["named"]), (f"&{name}", f"&{path}", "named", FIXES["named"])], {}, {}
+    short = crate_ident.removeprefix("aws_sdk_")
+    defines, all_ctors, docs = scan_ours()
+    ctors = all_ctors.get((crate_ident, name), [])
     label = f"{short}::{name}"
     held = [(label, path, "named", FIXES["named"]), (f"&{label}", f"&{path}", "named", FIXES["named"]),
             (f"Arc<{label}>", f"std::sync::Arc<{path}>", "named", FIXES["named"])]
@@ -253,10 +303,12 @@ def prepare(rust_repo, extra_code=""):
 
     # Held types per option: (label, type, kind, fixes).
     per_option = {}
-    for key, recv, shown, setter, kinds in OPTIONS:
-        held = []
-        for kind in kinds:
-            if kind.startswith("named "):
+    for opt in OPTIONS:
+        key, held = opt["key"], []
+        for kind in opt["kinds"]:
+            if kind.startswith("component "):
+                held += component_types(kind.split(" ", 1)[1])
+            elif kind.startswith("named "):
                 found, defines, named_docs = named_types(kind.split(" ", 1)[1])
                 held += found
                 for name, entries in named_docs.items():
@@ -303,20 +355,35 @@ def trial(n, params, expr, how, glue, call, note=""):
     return f"{asyncness}fn t{n}({params}{arg}) {{ let _ = {call}; }}" + (f" // {note}" if note else "")
 
 
+def call_of(opt, how, glue):
+    """The code that passes glue to an option, or None when the option has no setter of that shape."""
+    if opt["ctor"]:
+        return None if how == "set" else f"{opt['start']}::{opt['ctor']}({glue})"
+    setter = opt["set"] if how == "set" else opt["setter"]
+    return f"{opt['start']}.{setter}({glue})" if setter else None
+
+
+def shown(opt, call):
+    """A call as the page shows it: after the API's own call, with our crates' paths left off."""
+    return re.sub(r"\b(?:aws_crypto_mpl|aws_esdk)::(?:[a-z_]\w*::)*", "", call[len(opt["strip"]):])
+
+
 def setter_trials(held):
     """Trials of every fix on each option's real setter, and their lines.
 
     Each trial is (key, label, Rust type, kind, cost, how, glue, call as the page shows it).
     """
     trials, lines = [], []
-    for key, recv, shown, setter, _ in OPTIONS:
-        params = "client: &aws_esdk::Client, " if recv.startswith("client") else ""
+    for opt in OPTIONS:
+        key = opt["key"]
+        params = "client: &aws_esdk::Client, " if opt["start"].startswith("client") else ""
         for label, expr, kind, fixes in held[key]:
             for cost, glue, how in fixes:
-                call = f"{recv}.set_{setter}({glue})" if how == "set" else f"{recv}.{setter}({glue})"
+                call = call_of(opt, how, glue)
+                if call is None:
+                    continue
                 lines.append(trial(len(trials), params, expr, how, glue, call, f"{key}: {label}"))
-                trials.append((key, label, expr, kind, cost, how, glue,
-                               call[len(shown):] if shown else call[len(recv):]))
+                trials.append((key, label, expr, kind, cost, how, glue, shown(opt, call)))
     return trials, lines
 
 
@@ -339,11 +406,11 @@ def best_rows(trials, failed):
 def receivers():
     """{option: (code that starts a run's call, the part between it and the setter)}."""
     out = {}
-    for key, recv, shown, _, _ in OPTIONS:
-        if shown == "client":
-            out[key] = ("aws_esdk::Client::default()", recv[len(shown):])
+    for opt in OPTIONS:
+        if opt["strip"] == "client":
+            out[opt["key"]] = ("aws_esdk::Client::default()", opt["start"][len("client"):])
         else:
-            out[key] = (recv, "")
+            out[opt["key"]] = (opt["start"], "")
     return out
 
 
@@ -393,9 +460,34 @@ def main():
 
     page = json.loads(PAGE.read_text())
     page["rust"] = rows
+    # The page's APIs and options are rust-api.json's, in its order.
+    page["apis"] = [{"name": a["name"], "group": a["group"], "call": a["shown"],
+                     "options": [page_key(a, o) for o in a["options"]]} for a in API["apis"]]
+    page["takes"] = {page_key(a, o): o["takes"] for a in API["apis"] for o in a["options"]}
+    # Where each option's customer calls are in usage.json: its API and its Smithy member name, which
+    # smithy-names.json gives, like cmm -> materialsManager.
+    smithy = json.loads((HERE.parent / "smithy-names.json").read_text())["libraries"]
+    camel = lambda name: re.sub(r"_(\w)", lambda m: m.group(1).upper(), name)  # noqa: E731
+
+    def member(api, opt):
+        names = smithy.get(api["lib"], {}).get(api["id"], {"members": [], "aliases": {}})
+        return names["aliases"].get(camel(opt["name"]), camel(opt["name"]))
+
+    page["usage_keys"] = {page_key(a, o): [f"{a['lib']}|{a['id']}", member(a, o)]
+                          for a in API["apis"] for o in a["options"]}
     lock = json.loads(rust_types.LOCK.read_text())
     sizes = {name: sum(group in c["groups"] for c in lock["crates"]) for name, (group, _, _) in rust_types.LISTS.items()}
-    page.setdefault("about", {})["rust"] = rust_about.about(held, data, docs, sizes)
+    for name, entries in API["docs"].items():
+        docs.setdefault(name, []).extend({**e, "doc": rust_types.summary(e["doc"])} for e in entries)
+    about = rust_about.about(held, data, docs, sizes)
+    # A component's own API builds it.
+    builds = {a["type"]: a for a in API["apis"]}
+    for label, entry in about.items():
+        made = builds.get(label.lstrip("&").removeprefix("Arc<").rstrip(">"))
+        if made and "held" not in entry:
+            entry["held"] = {"text": f"You build one with {made['shown']}, on the {made['name']} tab.", "why": None,
+                             "examples": []}
+    page.setdefault("about", {})["rust"] = about
     commit = subprocess.run(["git", "-C", rust_repo, "rev-parse", "HEAD"], capture_output=True,
                             text=True, check=True).stdout.strip()
     page["rust_commit"] = commit

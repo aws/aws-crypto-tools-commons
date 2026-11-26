@@ -4,6 +4,7 @@ These scripts make the data for `dashboard/api-examples/types.html`. That page s
 
 To update the page, run these from this folder, in order:
 
+0. `python3 rust_api.py --rust-repo <aws-crypto-tools-rust checkout>` reads every keyring, CMM, key store, cache and client, and each of their setters, from rustdoc, and writes `rust-api.json`. It needs the nightly toolchain. Run it after the Rust API changes, like a new keyring or setter, and the page shows the new one with every type.
 1. `python3 rust_types.py refresh --rust-repo <aws-crypto-tools-rust checkout>` asks crates.io which crates to read and pins them in `rust-types.lock.json`. Skip this step to keep the same crates.
 2. `python3 rust_types.py build` downloads the pinned crates, checks their checksums, reads their public signatures with `rust-scan`, and writes `rust-types.json`. The same lock always gives the same output.
 3. `python3 compile_rust_types.py --rust-repo <aws-crypto-tools-rust checkout>` tries each type on each option with the Rust compiler, and runs the cheapest call that compiled. It writes the Rust rows into the page data, and the code it compiled and ran:

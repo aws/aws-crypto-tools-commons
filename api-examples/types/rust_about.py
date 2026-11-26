@@ -105,8 +105,10 @@ def parts(label, expr, docs):
                 out.append({"name": shown, "text": "", "url": None})
                 continue
             d = found[0]
-            out.append({"name": shown, "text": d["doc"], "from": f"{d['crate']} {d['version']}",
-                        "url": f"https://docs.rs/crate/{d['crate']}/{d['version']}/source/{d['file']}#{d['line']}"})
+            # Our own crates' docs, from rust_api.py, link to the source on GitHub. The rest link to docs.rs.
+            url = d.get("url") or f"https://docs.rs/crate/{d['crate']}/{d['version']}/source/{d['file']}#{d['line']}"
+            source = f"{d['crate']} {d['version']}" if d.get("version") else d["crate"]
+            out.append({"name": shown, "text": d["doc"], "from": source, "url": url})
     return out
 
 

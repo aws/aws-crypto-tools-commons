@@ -81,6 +81,13 @@
   .hits .where { font-size:11px; }
   .hits .source { margin-bottom:8px; }
   .tag { font-size:10px; border:1px solid var(--line); border-radius:8px; padding:0 6px; color:var(--dim); }
+  .grp { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 2px 0 10px; align-self:center; }
+  .grp:first-child { margin-left:0; }
+  .cust { display:inline-block; padding:1px 8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:12px; cursor:pointer; white-space:nowrap; }
+  .cust:hover { border-color:var(--sel); }
+  .cust.sel { outline:2px solid #fff; outline-offset:-1px; }
+  th .cust { margin-top:4px; font-weight:400; }
+  #detail ol { margin:4px 0; padding-left:20px; } #detail ol li { margin:6px 0; }
 </style>
 </head>
 <body>
@@ -89,6 +96,7 @@
   <div class="tabs" id="apis"></div>
   <div class="tabs" id="langs"></div>
   <span class="run" id="run"></span>
+  <button class="tool" id="how">How it's made</button>
 </header>
 <main id="main">
   <section id="left">
@@ -124,7 +132,7 @@ const KINDS = ["bytes", "text", "pairs", "base64 text", "hex text", "file / stre
 // Rust kinds under the comparison's rows. Optional values have no row, because the other languages take null instead.
 const RUST_KIND = { bytes: "bytes", text: "text", pair: "pairs", path: "file / stream", reader: "file / stream",
   stream: "file / stream", number: "number", duration: "Duration", list: "list", map: "map",
-  named: "the type itself", ctor: "what builds it" };
+  named: "the type itself", component: "the type itself", ctor: "what builds it" };
 // What a customer had before a conversion, as usage.json says it, and the row it goes under.
 const FROM_KIND = { "a string": "text", "a &str": "text", "a file": "file / stream", "a file or stream": "file / stream",
   "base64 text": "base64 text", "hex text": "hex text", "your config": "your config", "a byte array": "bytes",
@@ -245,6 +253,13 @@ function conversions(key) {
   return list.map(c => ({ ...c, kind: c.from === null ? "passed as is" : FROM_KIND[c.from] || "other" }));
 }
 
+// A customer cell: how many sources had this kind of value, and a click opens them in the side pane.
+function custCell(key, kind, convs, words) {
+  const sources = convs.reduce((n, c) => n + c.sources, 0);
+  if (!sources) return "";
+  return `<span class="cust" data-cust="${esc(key)}|${esc(kind)}" title="Click to see each call and where it is">${sources} ${sources === 1 ? "source" : "sources"}${words}</span>`;
+}
+
 function compareView() {
   let html = "";
   for (const key of data.apis[api].options) {
@@ -258,13 +273,14 @@ function compareView() {
         if (cheaper(row, best[kind][l])) best[kind][l] = row;
       }
     }
-    const convs = conversions(key);
+    const convs = customerKinds(key, all);
     const on = proposed.has(key);
     const button = hasProposal(key) ? " " + propButton(key) : "";
     const sig = on && proposalFor(key, "rust") ? `<div class="propsig">${esc(proposalFor(key, "rust").signature)}</div>` : "";
-    html += `<table><tr class="head"><th>${esc(option(key))}${button}${sig}</th>` + LANGS.map(l => `<th>${l[0]}</th>`).join("")
-      + "<th>What customers convert</th></tr>";
-    for (const kind of KINDS.filter(k => all[k] || convs.some(c => c.kind === k))) {
+    const asIs = custCell(key, "passed as is", convs.filter(c => c.kind === "passed as is"), " pass it as is");
+    html += `<table><tr class="head"><th>${esc(option(key))}${button}${sig}${asIs ? `<div>${asIs}</div>` : ""}</th>`
+      + LANGS.map(l => `<th>${l[0]}</th>`).join("") + `<th title="Public GitHub code that has this kind of value and converts it before the call">Customers</th></tr>`;
+    for (const kind of KINDS.filter(k => all[k] || (k === "other" && convs.some(c => c.kind === "other")))) {
       const id = `${key}|${kind}`;
       const isOpen = opened.has(id);
       html += `<tr data-open="${esc(id)}"><td class="kind">${isOpen ? "▾" : "▸"} ${esc(kind)}</td>`;
@@ -272,35 +288,44 @@ function compareView() {
         const row = (best[kind] || {})[l];
         const n = ((all[kind] || {})[l] || []).length;
         const more = n > 1 ? ` +${n - 1}` : "";
-        const none = takesOf(key, l) ? "" : "not offered";
+        const none = !takesOf(key, l) ? (l === "rust" || (data.others || {})[key] ? "not offered" : "no data yet") : "";
         html += `<td class="ck">${row ? chip(key, l, row, LEVEL[level(row.calls)]) + `<small>${esc(row.type)}${more}</small>` : `<small>${none}</small>`}</td>`;
       }
-      const mine = convs.filter(c => c.kind === kind && c.sources > 0).sort((a, b) => b.sources - a.sources);
-      html += `<td class="ev">${mine.slice(0, 3).map(c => `${esc(c.conversion)} · ${c.sources} ${c.sources === 1 ? "source" : "sources"}`).join("<br>")}</td></tr>`;
-      if (isOpen) html += detailRow(key, kind, all[kind] || {}, mine);
+      html += `<td>${custCell(key, kind, convs.filter(c => c.kind === kind), "")}</td></tr>`;
+      if (isOpen) html += detailRow(key, kind, all[kind] || {});
     }
-    html += "</table>" + customerList(key, convs);
+    html += "</table>";
   }
+  if (!usage) html += `<p class="sub">usage.json didn't load, so customer counts are hidden.</p>`;
   return html;
 }
 
-// Every type of one kind in each language, and the customer calls under it.
-function detailRow(key, kind, byLang, convs) {
+// usage.json's conversions for an option, each under a row of the table. One whose kind has no row goes under other.
+function customerKinds(key, rows) {
+  return conversions(key).map(c => c.kind === "passed as is" || rows[c.kind] ? c : { ...c, kind: "other" });
+}
+
+// Every type of one kind in each language.
+function detailRow(key, kind, byLang) {
   let html = `<tr class="detail"><td></td>`;
   for (const [name, l] of LANGS) {
     const rows = (byLang[l] || []).slice().sort((a, b) => (a.calls === null) - (b.calls === null) || (a.calls || 0) - (b.calls || 0));
     html += `<td><div class="lang">${name}</div>${rows.map(r => chip(key, l, r, r.type)).join("<br>") || "<span class=\"ev\">none</span>"}</td>`;
   }
-  return html + `<td class="ev">${convs.map(c => `${esc(c.conversion)}: ${c.sources} sources, ${c.count} hits in ${c.repos} repos`).join("<br>")}</td></tr>`;
+  return html + "<td></td></tr>";
 }
 
-// Every customer call for one option, grouped by conversion and then by source. Copies of AWS code come last.
-function customerList(key, convs) {
-  if (!usage) return `<p class="sub">usage.json didn't load, so customer calls are hidden.</p>`;
-  if (!convs.length) return `<p class="sub">The customer search found no calls that set ${esc(option(key))}.</p>`;
-  let html = `<details data-id="${esc(key)}|customers"${openDetails.has(key + "|customers") ? " open" : ""}>`
-    + `<summary><b>How customers call ${esc(option(key))}</b> <span class="ev">${convs.reduce((n, c) => n + c.count, 0)} hits</span></summary>`;
-  for (const c of convs.slice().sort((a, b) => b.sources - a.sources)) {
+// The side pane for one customer cell: each call that converts this kind of value, and every place it is,
+// grouped by source.
+function showCustomers(key, kind) {
+  const convs = customerKinds(key, Object.fromEntries(KINDS.map(k => [k, true]))).filter(c => c.kind === kind)
+    .sort((a, b) => b.sources - a.sources);
+  const sources = convs.reduce((n, c) => n + c.sources, 0), hits = convs.reduce((n, c) => n + c.count, 0);
+  const who = kind === "passed as is" ? "pass the value as is" : `have ${kind}, and convert it before the call`;
+  let html = `<button class="close" data-close title="Close">×</button><h2>${esc(option(key))}</h2>`
+    + `<div class="sub">Customers who ${esc(who)} · ${sources} sources · ${hits} hits</div>`
+    + `<p class="sub">${esc((usage.search || {}).sources || "")} Copies of AWS code are listed, but not counted.</p><h3>What they call</h3>`;
+  for (const c of convs) {
     const id = `${key}|${c.conversion}`;
     const langs = Object.entries(c.languages).map(([l, n]) => `${l} ${n}`).join(", ");
     const copies = c.aws_copies ? `, plus ${c.aws_copies} in copies of AWS code` : "";
@@ -308,7 +333,8 @@ function customerList(key, convs) {
       + ` <span class="ev">from ${esc(c.from || "the same type")} · ${c.sources} sources · ${c.count} hits in ${c.repos} repos (${esc(langs)})${copies}</span></summary>`
       + `<div class="hits">${hitList(c.hits || [])}</div></details>`;
   }
-  return html + "</details>";
+  $("detail").innerHTML = html;
+  $("main").classList.add("open");
 }
 
 const hitLink = h => `<a href="${esc(h.url)}" target="_blank">${esc(h.repo)}/${esc(h.path)}#L${h.line}</a>`;
@@ -361,7 +387,7 @@ function aboutHtml(l, type) {
   }).join("") + "</ul>";
   const held = about.held;
   if (held) {
-    html += `<h3>Where a customer gets one</h3><p class="sub">${esc(held.text)} Some of them:</p><ul>`
+    html += `<h3>Where a customer gets one</h3><p class="sub">${esc(held.text)}${held.examples.length ? " Some of them:" : ""}</p><ul>`
       + held.examples.map(e => `<li>${esc(e.crate)}: <a href="${esc(e.url)}" target="_blank"><code>${esc(e.item)}${e.pos === "return" ? "()" : ""}</code></a> `
         + `${e.pos === "return" ? "returns one" : "is one"}</li>`).join("") + "</ul>";
     if (held.why) html += `<p class="sub">It counts as this kind because ${docHtml(held.why.charAt(0).toLowerCase() + held.why.slice(1))}</p>`;
@@ -405,8 +431,26 @@ function show(key, l, type) {
   $("main").classList.add("open");
 }
 
+// How each part of this page is made.
+function howItsMade() {
+  const file = (path, name) => `<a href="${COMMONS}/blob/${REF.split("/").map(encodeURIComponent).join("/")}/${path}" target="_blank"><code>${name || path.split("/").pop()}</code></a>`;
+  const t = "api-examples/types/";
+  return `<button class="close" data-close title="Close">×</button><h2>How this page is made</h2>`
+    + `<div class="sub">Scripts make every number here. A person only wrote the rules and picked the fixes to try.</div><ol>`
+    + `<li><b>The API.</b> ${file(t + "rust_api.py")} reads every keyring, CMM, key store, cache and client, and each of their setters, from rustdoc. It writes ${file(t + "rust-api.json")}.</li>`
+    + `<li><b>The types.</b> ${file(t + "rust_types.py")} reads the public code of 174 popular crates. It lists the types they hand out, like <code>String</code> or <code>Bytes</code>, in ${file(t + "rust-types.json")}.</li>`
+    + `<li><b>The checks.</b> ${file(t + "compile_rust_types.py")} writes one small function for each setter, type and fix, like <code>x.as_bytes()</code>, in ${file(t + "rust_trials.rs")}. The Rust compiler says which ones compile. Each cell is the fix with the fewest calls that compiled. Then it runs that call for some options, in ${file(t + "rust_runs.rs")}.</li>`
+    + `<li><b>Other languages.</b> ${file(t + "other_languages.py")} writes each call from the released library's signatures. These are not compiled.</li>`
+    + `<li><b>Customers.</b> ${file("api-examples/usage_search.py")} searches public GitHub code and keeps every call it finds, in ${file("dashboard/api-examples/usage.json")}.</li>`
+    + `<li><b>Rules.</b> A person writes ${file("dashboard/api-examples/expectations.json")}, like "a wrapping key takes no text".</li>`
+    + `<li><b>Proposals.</b> The api-signature-proposals skill, an AI agent, writes new signatures. ${file(t + "check_proposals.py")} compiles them the same way as step 3. You open the result with Load proposals.</li></ol>`
+    + `<h3>When the library changes</h3><p class="sub">Add a keyring or a setter, then run steps 1 and 3 again. The new one shows up with every type. `
+    + `<a href="${ciLink()}" target="_blank">CI</a> runs step 3 again on the pinned Rust commit, and fails if the result changed.</p>`;
+}
+
 function draw() {
-  $("apis").innerHTML = data.apis.map((a, i) => `<button data-api="${i}" class="${i === api ? "on" : ""}">${esc(a.name)}</button>`).join("");
+  $("apis").innerHTML = data.apis.map((a, i) => (i === 0 || a.group !== data.apis[i - 1].group ? `<span class="grp">${esc(a.group || "")}</span>` : "")
+    + `<button data-api="${i}" class="${i === api ? "on" : ""}">${esc(a.name)}</button>`).join("");
   const options = data.apis[api].options.filter(hasProposal);
   const allOn = options.length > 0 && options.every(k => proposed.has(k));
   const toggle = proposals ? `<button class="tool${allOn ? " on" : ""}" data-all-proposals${options.length ? "" : " disabled"}>`
@@ -457,9 +501,17 @@ $("langs").addEventListener("change", e => {
   const file = e.target.files && e.target.files[0];
   if (file) file.text().then(text => useProposals(JSON.parse(text)));
 });
+$("how").addEventListener("click", () => {
+  $("detail").innerHTML = howItsMade();
+  $("main").classList.add("open");
+});
+$("detail").addEventListener("toggle", e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (id) e.target.open ? openDetails.add(id) : openDetails.delete(id);
+}, true);
 $("detail").addEventListener("click", e => {
   if (e.target.closest("[data-close]")) {
-    for (const s of document.querySelectorAll(".chip.sel")) s.classList.remove("sel");
+    for (const s of document.querySelectorAll(".chip.sel, .cust.sel")) s.classList.remove("sel");
     reset();
   }
 });
@@ -471,10 +523,18 @@ $("view").addEventListener("click", e => {
     draw();
     return;
   }
+  const cust = e.target.closest(".cust");
+  if (cust) {
+    for (const s of document.querySelectorAll(".chip.sel, .cust.sel")) s.classList.remove("sel");
+    cust.classList.add("sel");
+    const [key, kind] = cust.dataset.cust.split("|");
+    showCustomers(key, kind);
+    return;
+  }
   const c = e.target.closest(".chip");
   if (c && c.dataset.key) {
-    // Mark the picked chip without redrawing, so open rows and lists stay open.
-    for (const s of document.querySelectorAll(".chip.sel")) s.classList.remove("sel");
+    // Mark the picked chip without redrawing, so open rows stay open.
+    for (const s of document.querySelectorAll(".chip.sel, .cust.sel")) s.classList.remove("sel");
     c.classList.add("sel");
     show(c.dataset.key, c.dataset.lang, c.dataset.type);
     return;

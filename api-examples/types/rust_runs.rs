@@ -12,7 +12,7 @@ async fn run_0() {
     // esdk/Client.max_encrypted_data_keys: usize passed as .max_encrypted_data_keys(x)
     let mut r = Report::new("run_0");
     let Ok(x) = usize::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in a usize"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x);
     let result = built.build();
     check_client(&mut r, result).await;
@@ -23,7 +23,7 @@ async fn run_1() {
     // esdk/Client.max_encrypted_data_keys: u16 passed as .max_encrypted_data_keys(x.into())
     let mut r = Report::new("run_1");
     let Ok(x) = u16::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in a u16"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.into());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -34,7 +34,7 @@ async fn run_2() {
     // esdk/Client.max_encrypted_data_keys: u8 passed as .max_encrypted_data_keys(x.into())
     let mut r = Report::new("run_2");
     let Ok(x) = u8::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in a u8"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.into());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -45,7 +45,7 @@ async fn run_3() {
     // esdk/Client.max_encrypted_data_keys: i16 passed as .max_encrypted_data_keys(x.try_into().unwrap())
     let mut r = Report::new("run_3");
     let Ok(x) = i16::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in an i16"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.try_into().unwrap());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -56,7 +56,7 @@ async fn run_4() {
     // esdk/Client.max_encrypted_data_keys: i32 passed as .max_encrypted_data_keys(x.try_into().unwrap())
     let mut r = Report::new("run_4");
     let Ok(x) = i32::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in an i32"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.try_into().unwrap());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -67,7 +67,7 @@ async fn run_5() {
     // esdk/Client.max_encrypted_data_keys: i64 passed as .max_encrypted_data_keys(x.try_into().unwrap())
     let mut r = Report::new("run_5");
     let Ok(x) = i64::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in an i64"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.try_into().unwrap());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -78,7 +78,7 @@ async fn run_6() {
     // esdk/Client.max_encrypted_data_keys: i8 passed as .max_encrypted_data_keys(x.try_into().unwrap())
     let mut r = Report::new("run_6");
     let Ok(x) = i8::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in an i8"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.try_into().unwrap());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -89,7 +89,7 @@ async fn run_7() {
     // esdk/Client.max_encrypted_data_keys: u32 passed as .max_encrypted_data_keys(x.try_into().unwrap())
     let mut r = Report::new("run_7");
     let Ok(x) = u32::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in a u32"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.try_into().unwrap());
     let result = built.build();
     check_client(&mut r, result).await;
@@ -100,7 +100,7 @@ async fn run_8() {
     // esdk/Client.max_encrypted_data_keys: u64 passed as .max_encrypted_data_keys(x.try_into().unwrap())
     let mut r = Report::new("run_8");
     let Ok(x) = u64::try_from(MAX_ENCRYPTED_DATA_KEYS) else { r.skip("the value does not fit in a u64"); return; };
-    let pre = aws_esdk::Client::builder();
+    let pre = aws_esdk::client::Client::builder();
     let built = pre.max_encrypted_data_keys(x.try_into().unwrap());
     let result = built.build();
     check_client(&mut r, result).await;

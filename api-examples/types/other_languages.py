@@ -327,7 +327,8 @@ def main():
         about[lang] = {label: {"parts": [{"name": label, "text": ABOUT[lang][label][0], "url": ABOUT[lang][label][1]}]}
                        for label in held}
     # Where each option's customer calls are in usage.json: its API and its Smithy option name.
-    page["usage_keys"] = {key: [f"{key.split('/')[0]}|{api}", row] for key, (api, row, _) in OPTIONS.items()}
+    page.setdefault("usage_keys", {}).update(
+        {key: [f"{key.split('/')[0]}|{api}", row] for key, (api, row, _) in OPTIONS.items()})
     page["others_note"] = ("Java, Python, .NET, Go, JS: calls written from each release's signatures, not compiled. "
                            "api-examples/types/other_languages.py writes them.")
     PAGE.write_text(json.dumps(page, indent=2, ensure_ascii=False) + "\n")

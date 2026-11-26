@@ -110,6 +110,7 @@ async function open(files = {}, search = "") {
       return els.detail.innerHTML;
     },
     openRow: id => click("view", { "tr[data-open]": { open: id } }),
+    cust: id => click("view", { ".cust": { cust: id } }),
     propose: key => click("view", { ".prop": { prop: key } }),
   };
 }
@@ -215,13 +216,18 @@ test("a comparison row shows each language's cheapest type, and opens to list th
   assert.match(row("bytes"), /▾ bytes/);
 });
 
-test("each customer conversion says what it counts and links every hit, grouped by source", async () => {
+test("a customer cell counts the sources that had that kind of value, and opens every hit, grouped by source", async () => {
   const page = await open();
   page.pickApi("esdk/encrypt.plaintext");
   page.pickLang("compare");
-  const html = page.els.view.innerHTML;
-  assert.match(html, /<code>\.encode\(\)<\/code> <span class="ev">from a string · 3 sources · 5 hits in 4 repos \(python 5\), plus 1 in copies of AWS code<\/span>/);
-  const [counted, aws] = html.split("Copies of AWS code, not counted:");
+  const row = page.els.view.innerHTML.split("<tr").find(r => r.includes('data-open="esdk/encrypt.plaintext|text"'));
+  assert.match(row, /<span class="cust" data-cust="esdk\/encrypt.plaintext\|text"[^>]*>3 sources<\/span>/);
+  assert.doesNotMatch(page.els.view.innerHTML, /\.encode\(\)/, "the table names no calls");
+  page.cust("esdk/encrypt.plaintext|text");
+  const pane = page.els.detail.innerHTML;
+  assert.match(pane, /Customers who have text, and convert it before the call · 3 sources · 5 hits/);
+  assert.match(pane, /<code>\.encode\(\)<\/code> <span class="ev">from a string · 3 sources · 5 hits in 4 repos \(python 5\), plus 1 in copies of AWS code<\/span>/);
+  const [counted, aws] = pane.split("Copies of AWS code, not counted:");
   const links = text => [...text.matchAll(/<a href="([^"]*)"/g)].map(m => m[1]);
   assert.deepStrictEqual(links(counted.split('<div class="hits">')[1]), USAGE.apis["esdk|encrypt"].plaintext[0].hits.slice(0, 5).map(h => h.url));
   assert.deepStrictEqual(links(aws.split("</details>")[0]), ["https://github.com/acme/five/blob/c0ffee/aws_lambda_powertools/kms.py#L7"]);
@@ -240,7 +246,7 @@ test("the footer says how the customer search ran", async () => {
   const without = await open({ "usage.json": null });
   without.pickApi("esdk/encrypt.plaintext");
   without.pickLang("compare");
-  assert.match(without.els.view.innerHTML, /usage\.json didn't load/);
+  assert.match(without.els.view.innerHTML, /usage\.json didn't load, so customer counts are hidden/);
 });
 
 test("a proposal moves the types it makes cheaper, and the panel says what it was", async () => {
@@ -287,10 +293,15 @@ test("each committed Rust row's links land on its trial and its test", () => {
   let checked = 0;
   for (const [key, rows] of Object.entries(types.rust)) {
     for (const row of rows.filter(r => r.trial)) {
-      assert.ok(trials[row.trial - 1].endsWith(`${row.code}; } // ${key}: ${row.type}`), `${key} ${row.type}: ${trials[row.trial - 1]}`);
+      // The trial's call has full paths, and the row's call is how the page shows it.
+      assert.ok(trials[row.trial - 1].endsWith(` // ${key}: ${row.type}`), `${key} ${row.type}: ${trials[row.trial - 1]}`);
+      const call = trials[row.trial - 1].split("let _ = ")[1].split("; }")[0];
+      assert.ok(call.replace(/\b(?:aws_crypto_mpl|aws_esdk)::(?:[a-z_]\w*::)*/g, "").endsWith(row.code), `${key} ${row.type}: ${call}`);
+      checked++;
+      // Only some options have run tests.
+      if (!row.test) continue;
       assert.match(runs[row.test - 1], /^async fn run_\d+\(\) \{$/);
       assert.strictEqual(runs[row.test], `    // ${key}: ${row.type} passed as ${row.code}`);
-      checked++;
     }
   }
   assert.ok(checked > 100, `checked ${checked} rows`);
