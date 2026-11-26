@@ -45,13 +45,22 @@ void kmsKeyIdMustNotBeEmpty(Mpl mpl, MockKms mockKms) {
 
 - Each side gets one comment: `// <scenario>: succeeds` or `// <scenario>: fails`.
 - Use only words from the `//#` quote, so a reader can match the side to the rule.
+- Name the exact thing, never "the call", "the reply" or "first". A reader should not need the code to know what the comment means.
 
 ```java
 // name the side with the quote's words.
 // before:
 // bad reply from KMS
 // after:
-// `KeyId` is not a valid AWS KMS key ARN: fails
+// Generate Data Key response `KeyId` is not a valid AWS KMS key ARN: fails
+```
+
+```java
+// name the call, not "the call".
+// before:
+// the call does not succeed: fails
+// after:
+// GenerateDataKey call does not succeed: fails
 ```
 
 ## A MAY rule also tests the "not provided" side
