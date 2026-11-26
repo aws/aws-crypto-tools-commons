@@ -407,6 +407,9 @@ async function loadArtifacts(s) {
         if (!report) continue;
         seen(report.commit);
         s.read.reach.push(`${report.library} (${plural(report.findings.length, "annotation")})`);
+        // The commons commit the test server tests ran at, so their links open tests that main lacks yet.
+        const test = report.findings.map(f => f.test_annotation).find(t => t && t.repository === COMMONS && t.commit);
+        if (test) s.data.commonsCommit = test.commit;
         report.findings.forEach((f, i) => {
           for (const imp of f.implementations || []) {
             if (!imp.region) continue;
@@ -705,16 +708,16 @@ function lineLink(s, file, line, text) {
   const ri = fi < 0 ? -1 : s.files[fi].rows.findIndex(r => r.new === line);
   return ri >= 0 ? `<a href="#" data-goto="${fi}:${ri}">${text}</a>` : `<a href="${esc(blobUrl(s, file, line))}" target="_blank">${text}</a>`;
 }
-// A test server test's source in commons, from its JUnit class name.
-function serverTestUrl(name) {
+// A test server test's source in commons, from its JUnit class name, at the commit the tests ran at.
+function serverTestUrl(s, name) {
   const cls = String(name).split("#")[0].split("$")[0], product = (cls.match(/^aws\.cryptography\.(\w+)\.testserver\./) || [])[1];
-  return product ? `https://github.com/${COMMONS}/blob/main/${product}/test-server/tests/src/test/java/${cls.replace(/\./g, "/")}.java` : null;
+  return product ? `https://github.com/${COMMONS}/blob/${s.data.commonsCommit || "main"}/${product}/test-server/tests/src/test/java/${cls.replace(/\./g, "/")}.java` : null;
 }
 // A link to the test CI names: to its line in this PR when the PR has it, else to its source on GitHub.
 function testLink(s, name) {
   const id = junitId(name);
   if (id) {
-    const url = serverTestUrl(id.cls), text = `${id.cls.split(".").pop()}.${id.method || "?"}${id.run ? " #" + id.run : ""}`;
+    const url = serverTestUrl(s, id.cls), text = `${id.cls.split(".").pop()}.${id.method || "?"}${id.run ? " #" + id.run : ""}`;
     return url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
   }
   const own = s.tests[shortTest(name)];
@@ -761,7 +764,7 @@ function evidenceHtml(s, f, line, ev) {
     h += `<h4>Tests that run this line</h4>`;
     for (const [group, list] of groups) {
       h += `<div>${esc(group)}: ${list.length}</div><ul>${list.slice(0, 15).map(t => {
-        const own = s.tests[shortTest(t.name)], url = serverTestUrl(t.name);
+        const own = s.tests[shortTest(t.name)], url = serverTestUrl(s, t.name);
         const name = esc(shortTest(t.name)), cls = String(t.name).split("#")[0].split(".").pop();
         const shown = own ? lineLink(s, own.file, own.line, name) : url ? `<a href="${esc(url)}" target="_blank">${esc(cls)}</a> ${name}` : esc(t.name);
         return `<li>${shown}${t.status && t.status !== "passed" ? ` <span class="bad">${esc(t.status)}</span>` : ""}</li>`;

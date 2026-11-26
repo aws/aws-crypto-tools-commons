@@ -303,6 +303,21 @@ test("?line= opens a line the PR does not change, with the coverage of its file 
   assert.match(opened, /class="src run"/);
 });
 
+test("a test server test links to its source at the commons commit the tests ran at", async () => {
+  const commons = "c0ffee".padEnd(40, "0"), cls = "aws.cryptography.mpl.testserver.tests.KTest";
+  const reach = { library: "mpl", commit: HEAD, findings: [{ state: "ok", requirement: { target: "spec/k.md#init", quote: "It MUST check." },
+    test_annotation: { repository: "aws/aws-crypto-tools-commons", commit: commons, path: "mpl/test-server/tests/KTest.java", line: 20 },
+    implementations: [{ path: "mpl/src/k.rs", line: 4, region: [6, 6] }] }] };
+  const run = { test: `${cls}#[k] it checks rust-v1`, source: "test-server", language: "rust", repository: REPO, status: "passed", files: { "mpl/src/k.rs": [6] } };
+  const page = await open(github({
+    [`repos/${REPO}/actions/runs/50/artifacts?per_page=100&page=1`]: { artifacts: [art(1, "mutation-results-mpl"), art(2, "local-coverage-mpl"),
+      art(3, "per-test-coverage-mpl"), art(4, "duvet-test-reach-mpl-rust")] },
+    [`repos/${REPO}/actions/artifacts/3/zip`]: zipOf({ "per-test-coverage/rust.jsonl": JSON.stringify(run) + "\n" }),
+    [`repos/${REPO}/actions/artifacts/4/zip`]: zipOf({ "mpl-rust.json": JSON.stringify(reach) }),
+  }), "&line=mpl%2Fsrc%2Fk.rs%3A6");
+  assert.match(page.els.detail.innerHTML, new RegExp(`<a href="https://github\\.com/aws/aws-crypto-tools-commons/blob/${commons}/mpl/test-server/tests/src/test/java/aws/cryptography/mpl/testserver/tests/KTest\\.java" target="_blank">KTest</a>`));
+});
+
 test("the line box opens a changed line in place", async () => {
   const page = await open(github());
   page.els.where = { value: "mpl/src/k.rs:3" };

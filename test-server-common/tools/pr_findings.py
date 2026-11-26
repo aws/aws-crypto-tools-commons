@@ -1255,12 +1255,6 @@ def summary_markdown(data):
     return "\n".join(out)
 
 
-def short_test(name):
-    """A test's name without its package: "a.b.FooTest#[x] it works rust-v1" -> "FooTest#[x] it works rust-v1"."""
-    head, sep, rest = name.partition("#")
-    return head.split(".")[-1] + sep + rest if sep else name.split("::")[-1]
-
-
 def comment_body(f):
     """The review comment for one finding."""
     label = "blocks merging" if f["level"] == "block" else "note"
@@ -1271,12 +1265,8 @@ def comment_body(f):
         out += ["", f"**Fix:** {f['fix']}"]
     if f.get("suggestion") is not None:
         out += ["", "```suggestion", f["suggestion"], "```"]
-    tests = f["evidence"].get("tests") or []
-    if tests:
-        count = f["evidence"].get("tests_count", len(tests))
-        out += ["", f"<details><summary>{plural(count, 'test runs', 'tests run')} this line</summary>", ""]
-        out += [f"- `{short_test(t)}`" for t in tests[:10]] + ([f"- and {count - 10} more"] if count > 10 else [])
-        out += ["", "</details>"]
+    # No list of the tests that run the line: per-test coverage counts other tests than the mutation run
+    # that `what` counts. The dashboard lists them.
     ci = f["links"].get("ci_name") or "CI run"
     out += ["", f"[View in dashboard]({f['links']['dashboard']}) · [{ci}]({f['links']['ci']}) · "
                 "React 👎 if this is not useful."]
