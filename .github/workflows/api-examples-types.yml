@@ -1,8 +1,12 @@
 # Every day, reads every Rust API and option on aws-crypto-tools-rust main, compiles each held type on each
 # option, runs some of those calls, and uploads the results as api-types-rust. The types page
 # (dashboard/api-examples/types.html) loads the newest successful run's artifact.
+# The PR review page (dashboard/pr-review) starts a run with rust-ref set to a pull request's head commit,
+# and compares that run's rust-api.json with main's.
 
 name: API examples types
+# The PR review page finds the run made for a pull request's head commit by this name.
+run-name: API types for Rust ${{ inputs.rust-ref || 'main' }}
 
 on:
   schedule:

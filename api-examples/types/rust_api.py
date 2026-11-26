@@ -199,6 +199,48 @@ def ctor_options(short_methods, full_methods):
     return out
 
 
+def span_of(crate, span):
+    """Where rustdoc says an item is, as a path from the repo root and its first and last line."""
+    file = span["filename"]
+    return {"file": file if file.startswith(crate + "/") else f"{crate}/{file}",
+            "line": span["begin"][0], "end": span["end"][0]}
+
+
+def method_spans(doc, crate):
+    """{(type name, method name): span} for the methods each type in this crate defines in its own impl blocks.
+
+    The PR review page reads these to tell which option a changed line belongs to.
+    """
+    idx, out = doc["index"], {}
+    for item in idx.values():
+        if item.get("crate_id") != 0 or not item.get("name"):
+            continue
+        kind = item.get("inner", {})
+        held = kind.get("struct") or kind.get("enum") or {}
+        if held and item.get("span"):
+            # Method None is the type itself.
+            out[(item["name"], None)] = span_of(crate, item["span"])
+        for impl_id in held.get("impls", []):
+            impl = idx.get(str(impl_id), {}).get("inner", {}).get("impl")
+            # A trait impl's methods, like Default::default, are not the type's options.
+            if not impl or impl.get("trait") is not None:
+                continue
+            for method_id in impl["items"]:
+                method = idx.get(str(method_id))
+                if method and method.get("name") and method.get("span"):
+                    out[(item["name"], method["name"])] = span_of(crate, method["span"])
+    return out
+
+
+def add_spans(options, owner, spans):
+    """Gives each option the span of its setter, its set_ setter, or its constructor on the type named owner."""
+    for opt in options:
+        for field, method in (("span", opt["setter"] or opt["ctor"]), ("set_span", opt["set"])):
+            if method and (owner, method) in spans:
+                opt[field] = spans[(owner, method)]
+    return options
+
+
 def builder_path(t):
     """The path of the builder that t's builder() returns, or None."""
     m = next((m for m in t["methods"] if m["name"] == "builder" and m["receiver"] is None), None)
@@ -210,7 +252,7 @@ def type_named(types, name):
     return found[0] if len(found) == 1 else None
 
 
-def component_apis(lib, short, full, handles):
+def component_apis(lib, short, full, handles, spans):
     apis = []
     for handle, group in HANDLES:
         path = type_named(short["types"], handle)
@@ -226,17 +268,19 @@ def component_apis(lib, short, full, handles):
             t, f = short["types"][member], full["types"][member]
             builder = builder_path(t)
             if builder in short["types"]:
-                options = options_of(short["types"][builder]["methods"], full["types"][builder]["methods"])
+                options = add_spans(options_of(short["types"][builder]["methods"], full["types"][builder]["methods"]),
+                                    short["types"][builder]["name"], spans)
                 start, strip, shown = f"{member}::builder()", f"{member}::builder()", f"{name}::builder()"
             else:
-                options = ctor_options(t["methods"], f["methods"])
+                options = add_spans(ctor_options(t["methods"], f["methods"]), name, spans)
                 start, strip, shown = member, member, name
             apis.append({"lib": lib, "id": api_id(name), "type": name, "group": group, "name": display_name(name),
-                         "path": member, "start": start, "strip": strip, "shown": shown, "options": options})
+                         "path": member, "start": start, "strip": strip, "shown": shown, "options": options,
+                         "span": spans.get((name, None))})
     return apis
 
 
-def esdk_apis(short, full):
+def esdk_apis(short, full, spans):
     types, full_types = short["types"], full["types"]
     clients = [p for p, t in types.items()
                if all(any(m["name"] == op and m["receiver"] == "&self" for m in t["methods"]) for op in OPERATIONS)]
@@ -247,13 +291,16 @@ def esdk_apis(short, full):
     builder_path = next(m["output_path"] for m in client["methods"] if m["name"] == "builder")
     apis = [{"lib": "esdk", "id": "client", "type": client["name"], "group": "Client", "name": client["name"],
              "path": path, "start": f"{path}::builder()", "strip": f"{path}::builder()",
-             "shown": f"{client['name']}::builder()",
-             "options": options_of(types[builder_path]["methods"], full_types[builder_path]["methods"])}]
+             "shown": f"{client['name']}::builder()", "span": spans.get((client["name"], None)),
+             "options": add_spans(options_of(types[builder_path]["methods"], full_types[builder_path]["methods"]),
+                                  types[builder_path]["name"], spans)}]
     for op in OPERATIONS:
         fluent = next(m["output_path"] for m in client["methods"] if m["name"] == op)
         apis.append({"lib": "esdk", "id": op, "type": op, "group": "Client", "name": op.capitalize(),
                      "path": fluent, "start": f"client.{op}()", "strip": "client", "shown": "client",
-                     "options": options_of(types[fluent]["methods"], full_types[fluent]["methods"])})
+                     "span": spans.get((types[fluent]["name"], None)),
+                     "options": add_spans(options_of(types[fluent]["methods"], full_types[fluent]["methods"]),
+                                          types[fluent]["name"], spans)})
     return apis
 
 
@@ -288,7 +335,8 @@ def main():
     for crate in CRATES:
         doc = rustdoc(rust_repo, crate)
         short, full = surfaces(rs, doc, ours)
-        apis += component_apis(crate, short, full, handles) if crate == "mpl" else esdk_apis(short, full)
+        spans = method_spans(doc, crate)
+        apis += component_apis(crate, short, full, handles, spans) if crate == "mpl" else esdk_apis(short, full, spans)
         for name, found in docs_of(crate, doc, short, commit).items():
             docs.setdefault(name, []).extend(found)
     # Keep the docs of the types that an option takes, and of each handle and its components.

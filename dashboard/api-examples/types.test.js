@@ -114,8 +114,9 @@ const PROPOSALS = {
   } } } },
 };
 
-// Opens the page with these data files. A file that is null fails to load.
-async function open(files = {}, search = "") {
+// Opens the page with these data files. A file that is null fails to load. With `github`, a map from an API path to
+// its reply, the page has a token and reads CI runs from that map.
+async function open(files = {}, search = "", github = null) {
   const all = { "types-rust.json": RUST, "types-others.json": OTHERS, "usage.json": USAGE, "expectations.json": RULES,
     "proposals.json": null, ...files };
   const els = {};
@@ -124,10 +125,18 @@ async function open(files = {}, search = "") {
       style: { setProperty() {} }, addEventListener(type, f) { this.on[type] = f; } }),
     querySelectorAll: () => [],
   };
-  const fetch = async name => ({ ok: all[name] !== null && all[name] !== undefined, json: async () => structuredClone(all[name]) });
-  const localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  const API = "https://api.github.com/";
+  const fetch = async name => {
+    if (name.startsWith(API)) {
+      const reply = github && github[name.slice(API.length)];
+      return { ok: reply !== undefined, status: reply === undefined ? 404 : 200,
+        json: async () => structuredClone(reply), arrayBuffer: async () => reply };
+    }
+    return { ok: all[name] !== null && all[name] !== undefined, json: async () => structuredClone(all[name]) };
+  };
+  const localStorage = { getItem: key => (github && key === "github-dashboard-token" ? "a token" : null), setItem() {}, removeItem() {} };
   new Function("document", "fetch", "location", "localStorage", SCRIPT)(document, fetch, { search }, localStorage);
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await new Promise(resolve => setTimeout(resolve, github ? 200 : 20));
   // A click on an element in #id that matches each selector in `matches`, with that selector's dataset.
   const click = (id, matches) => els[id].on.click({ target: { closest: s => (s in matches ? { dataset: matches[s], classList: { add() {} } } : null) } });
   const page = {
@@ -423,4 +432,53 @@ test("each committed Rust row's links land on its trial and its test", () => {
     }
   }
   assert.ok(checked > 100, `checked ${checked} rows`);
+});
+
+// A zip with one stored (not compressed) file, like an artifact download.
+function zipOf(name, text) {
+  const file = Buffer.from(name), data = Buffer.from(text);
+  const local = Buffer.alloc(30), central = Buffer.alloc(46), end = Buffer.alloc(22);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(file.length, 26);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(data.length, 24);
+  central.writeUInt16LE(file.length, 28);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length + file.length, 12);
+  end.writeUInt32LE(local.length + file.length + data.length, 16);
+  const all = Buffer.concat([local, file, data, central, file, end]);
+  return all.buffer.slice(all.byteOffset, all.byteOffset + all.length);
+}
+
+// The types workflow's runs: the daily one on Rust main, and one the PR review page started for a PR's commit.
+const RUNS = "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-types.yml/runs?branch=main&status=success&per_page=30";
+const run = (id, event, display_title) => ({ id, event, display_title, html_url: `https://example.com/runs/${id}`, created_at: "2026-11-26T00:00:00Z", run_number: id });
+const artifacts = id => ({ artifacts: [{ id: id * 10, name: "api-types-rust", expired: false }] });
+const CI = {
+  [RUNS]: { workflow_runs: [run(2, "workflow_dispatch", "API types for Rust a12add08"), run(1, "schedule", "API types for Rust main")] },
+  "repos/aws/aws-crypto-tools-commons/actions/runs/2": run(2, "workflow_dispatch", "API types for Rust a12add08"),
+  "repos/aws/aws-crypto-tools-commons/actions/runs/1/artifacts?per_page=100": artifacts(1),
+  "repos/aws/aws-crypto-tools-commons/actions/runs/2/artifacts?per_page=100": artifacts(2),
+  "repos/aws/aws-crypto-tools-commons/actions/artifacts/10/zip": zipOf("types-rust.json", JSON.stringify({ ...RUST, note: "Rust main." })),
+  "repos/aws/aws-crypto-tools-commons/actions/artifacts/20/zip": zipOf("types-rust.json", JSON.stringify({ ...RUST, note: "Rust a12add08." })),
+  "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-shipped.yml/runs?branch=main&status=success&per_page=30": { workflow_runs: [] },
+  "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-usage.yml/runs?branch=main&status=success&per_page=30": { workflow_runs: [] },
+};
+
+test("the page shows Rust main, not a run that read a pull request's commit, unless ?run= names that run", async () => {
+  assert.match((await open({}, "", CI)).els.foot.textContent, /^Rust main\./);
+  const pr = await open({}, "?run=2", CI);
+  assert.match(pr.els.foot.textContent, /^Rust a12add08\./);
+  assert.match(pr.els.run.innerHTML, /Rust: <a href="https:\/\/example.com\/runs\/2"/);
+});
+
+test("?api= opens that API", async () => {
+  const page = await open({}, "?api=mpl|default-cmm");
+  assert.match(page.els.apis.innerHTML, /data-id="default-cmm" class="on"/);
+  assert.match(page.els.view.innerHTML, /<b>keyring<\/b>/);
 });

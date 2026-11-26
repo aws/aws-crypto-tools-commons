@@ -23,7 +23,17 @@
      "params": 1,
      "doc": "The AWS KMS key: a key ARN, key ID, alias name, or alias ARN.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+      "line": 593,
+      "end": 596
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+      "line": 600,
+      "end": 603
+     }
     },
     {
      "name": "kms_client",
@@ -35,7 +45,17 @@
      "params": 1,
      "doc": "The AWS KMS client, in the key's region.",
      "set_takes": "Option<Client>",
-     "set_takes_code": "Option<aws_sdk_kms::Client>"
+     "set_takes_code": "Option<aws_sdk_kms::Client>",
+     "span": {
+      "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+      "line": 608,
+      "end": 611
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+      "line": 615,
+      "end": 618
+     }
     },
     {
      "name": "grant_tokens",
@@ -47,9 +67,24 @@
      "params": 1,
      "doc": "Add a grant token, sent with every AWS KMS request.",
      "set_takes": "Option<Vec<String>>",
-     "set_takes_code": "Option<Vec<String>>"
+     "set_takes_code": "Option<Vec<String>>",
+     "span": {
+      "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+      "line": 622,
+      "end": 627
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+      "line": 631,
+      "end": 634
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/aws_kms/aws_kms_keyring.rs",
+    "line": 112,
+    "end": 114
+   }
   },
   {
    "lib": "mpl",
@@ -72,7 +107,17 @@
      "params": 1,
      "doc": "The key store.",
      "set_takes": "Option<SharedKeyStore>",
-     "set_takes_code": "Option<aws_crypto_mpl::key_store::SharedKeyStore>"
+     "set_takes_code": "Option<aws_crypto_mpl::key_store::SharedKeyStore>",
+     "span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 386,
+      "end": 389
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 394,
+      "end": 397
+     }
     },
     {
      "name": "ttl",
@@ -84,7 +129,17 @@
      "params": 1,
      "doc": "The TTL for cached branch-key materials.",
      "set_takes": "Option<Duration>",
-     "set_takes_code": "Option<std::time::Duration>"
+     "set_takes_code": "Option<std::time::Duration>",
+     "span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 408,
+      "end": 411
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 416,
+      "end": 419
+     }
     },
     {
      "name": "branch_key_id",
@@ -96,7 +151,17 @@
      "params": 1,
      "doc": "A static branch key id.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 430,
+      "end": 433
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 438,
+      "end": 441
+     }
     },
     {
      "name": "branch_key_id_supplier",
@@ -108,7 +173,17 @@
      "params": 1,
      "doc": "A [`BranchKeyIdSupplier`].",
      "set_takes": "Option<SharedBranchKeyIdSupplier>",
-     "set_takes_code": "Option<aws_crypto_mpl::keyring::SharedBranchKeyIdSupplier>"
+     "set_takes_code": "Option<aws_crypto_mpl::keyring::SharedBranchKeyIdSupplier>",
+     "span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 452,
+      "end": 458
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 463,
+      "end": 469
+     }
     },
     {
      "name": "cache",
@@ -120,7 +195,17 @@
      "params": 1,
      "doc": "The cache for branch key materials.",
      "set_takes": "Option<SharedCmc>",
-     "set_takes_code": "Option<aws_crypto_mpl::cmc::SharedCmc>"
+     "set_takes_code": "Option<aws_crypto_mpl::cmc::SharedCmc>",
+     "span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 485,
+      "end": 488
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 493,
+      "end": 496
+     }
     },
     {
      "name": "partition_id",
@@ -132,9 +217,24 @@
      "params": 1,
      "doc": "The partition id.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 507,
+      "end": 510
+     },
+     "set_span": {
+      "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+      "line": 515,
+      "end": 518
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/aws_kms/hierarchical_keyring.rs",
+    "line": 270,
+    "end": 272
+   }
   },
   {
    "lib": "mpl",
@@ -157,7 +257,17 @@
      "params": 1,
      "doc": "Set the key namespace, which becomes the key provider ID of each EDK this keyring produces.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 255,
+      "end": 258
+     },
+     "set_span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 263,
+      "end": 266
+     }
     },
     {
      "name": "key_name",
@@ -169,7 +279,17 @@
      "params": 1,
      "doc": "Set the key name, which this keyring serializes into the key provider information of each EDK.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 277,
+      "end": 280
+     },
+     "set_span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 285,
+      "end": 288
+     }
     },
     {
      "name": "wrapping_key",
@@ -181,7 +301,17 @@
      "params": 1,
      "doc": "Set the wrapping key.",
      "set_takes": "Option<Vec<u8>>",
-     "set_takes_code": "Option<Vec<u8>>"
+     "set_takes_code": "Option<Vec<u8>>",
+     "span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 302,
+      "end": 305
+     },
+     "set_span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 310,
+      "end": 313
+     }
     },
     {
      "name": "wrapping_alg",
@@ -193,9 +323,24 @@
      "params": 1,
      "doc": "Set the wrapping algorithm.",
      "set_takes": "Option<AesWrappingAlg>",
-     "set_takes_code": "Option<aws_crypto_mpl::types::AesWrappingAlg>"
+     "set_takes_code": "Option<aws_crypto_mpl::types::AesWrappingAlg>",
+     "span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 324,
+      "end": 327
+     },
+     "set_span": {
+      "file": "mpl/src/keyring/raw_aes_keyring.rs",
+      "line": 332,
+      "end": 335
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/keyring/raw_aes_keyring.rs",
+    "line": 59,
+    "end": 61
+   }
   },
   {
    "lib": "mpl",
@@ -216,9 +361,19 @@
      "takes": "impl IntoShared<SharedKeyring>",
      "takes_code": "impl aws_crypto_mpl::shared::IntoShared<aws_crypto_mpl::keyring::SharedKeyring>",
      "params": 1,
-     "doc": "Construct a `DefaultCmm` wrapping the given keyring."
+     "doc": "Construct a `DefaultCmm` wrapping the given keyring.",
+     "span": {
+      "file": "mpl/src/cmm/default_cmm.rs",
+      "line": 72,
+      "end": 76
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/cmm/default_cmm.rs",
+    "line": 60,
+    "end": 62
+   }
   },
   {
    "lib": "mpl",
@@ -241,7 +396,17 @@
      "params": 1,
      "doc": "Set the DynamoDB table name that backs this key store.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 208,
+      "end": 211
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 216,
+      "end": 219
+     }
     },
     {
      "name": "logical_key_store_name",
@@ -253,7 +418,17 @@
      "params": 1,
      "doc": "Set the logical name cryptographically bound to all keys in the",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 230,
+      "end": 233
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 238,
+      "end": 241
+     }
     },
     {
      "name": "kms_configuration",
@@ -265,7 +440,17 @@
      "params": 1,
      "doc": "Set the KMS key configuration governing encryption and decryption.",
      "set_takes": "Option<KmsConfiguration>",
-     "set_takes_code": "Option<aws_crypto_mpl::key_store::types::KmsConfiguration>"
+     "set_takes_code": "Option<aws_crypto_mpl::key_store::types::KmsConfiguration>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 252,
+      "end": 255
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 260,
+      "end": 263
+     }
     },
     {
      "name": "id",
@@ -277,7 +462,17 @@
      "params": 1,
      "doc": "Set the key store identifier.",
      "set_takes": "Option<String>",
-     "set_takes_code": "Option<String>"
+     "set_takes_code": "Option<String>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 274,
+      "end": 277
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 282,
+      "end": 285
+     }
     },
     {
      "name": "grant_tokens",
@@ -289,7 +484,17 @@
      "params": 1,
      "doc": "Appends an item to the AWS KMS grant tokens. Defaults to none.",
      "set_takes": "Option<Vec<String>>",
-     "set_takes_code": "Option<Vec<String>>"
+     "set_takes_code": "Option<Vec<String>>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 297,
+      "end": 302
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 307,
+      "end": 310
+     }
     },
     {
      "name": "kms_client",
@@ -301,7 +506,17 @@
      "params": 1,
      "doc": "Set the AWS KMS client. Defaults to a client for the Region parsed",
      "set_takes": "Option<Client>",
-     "set_takes_code": "Option<aws_sdk_kms::Client>"
+     "set_takes_code": "Option<aws_sdk_kms::Client>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 322,
+      "end": 325
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 330,
+      "end": 333
+     }
     },
     {
      "name": "ddb_client",
@@ -313,9 +528,24 @@
      "params": 1,
      "doc": "Set the Amazon DynamoDB client. Defaults to a client for the Region",
      "set_takes": "Option<Client>",
-     "set_takes_code": "Option<aws_sdk_dynamodb::Client>"
+     "set_takes_code": "Option<aws_sdk_dynamodb::Client>",
+     "span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 345,
+      "end": 348
+     },
+     "set_span": {
+      "file": "mpl/src/key_store/branch_key_store.rs",
+      "line": 353,
+      "end": 356
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/key_store/branch_key_store.rs",
+    "line": 65,
+    "end": 67
+   }
   },
   {
    "lib": "mpl",
@@ -338,9 +568,24 @@
      "params": 1,
      "doc": "Set the maximum number of entries. Required.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "mpl/src/cmc/default.rs",
+      "line": 53,
+      "end": 56
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/default.rs",
+      "line": 60,
+      "end": 63
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/cmc/default.rs",
+    "line": 26,
+    "end": 28
+   }
   },
   {
    "lib": "mpl",
@@ -363,7 +608,17 @@
      "params": 1,
      "doc": "Set the maximum number of entries. Required.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "mpl/src/cmc/local.rs",
+      "line": 208,
+      "end": 211
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/local.rs",
+      "line": 215,
+      "end": 218
+     }
     },
     {
      "name": "entry_pruning_tail_size",
@@ -375,9 +630,24 @@
      "params": 1,
      "doc": "Set how many least-recently-used entries each get checks for expired entries to evict.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "mpl/src/cmc/local.rs",
+      "line": 229,
+      "end": 232
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/local.rs",
+      "line": 237,
+      "end": 240
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/cmc/local.rs",
+    "line": 37,
+    "end": 39
+   }
   },
   {
    "lib": "mpl",
@@ -400,7 +670,17 @@
      "params": 1,
      "doc": "Set the maximum number of entries. Defaults to 1000.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 435,
+      "end": 438
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 491,
+      "end": 494
+     }
     },
     {
      "name": "entry_pruning_tail_size",
@@ -412,7 +692,17 @@
      "params": 1,
      "doc": "Set how many least-recently-used entries each get checks for expired entries to evict.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 443,
+      "end": 446
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 505,
+      "end": 508
+     }
     },
     {
      "name": "grace_period",
@@ -424,7 +714,17 @@
      "params": 1,
      "doc": "Set how long before an entry expires the cache sends one caller to refresh it.",
      "set_takes": "Option<Duration>",
-     "set_takes_code": "Option<std::time::Duration>"
+     "set_takes_code": "Option<std::time::Duration>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 451,
+      "end": 454
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 519,
+      "end": 522
+     }
     },
     {
      "name": "grace_interval",
@@ -436,7 +736,17 @@
      "params": 1,
      "doc": "Set how long one caller has to refresh an entry before another caller may try.",
      "set_takes": "Option<Duration>",
-     "set_takes_code": "Option<std::time::Duration>"
+     "set_takes_code": "Option<std::time::Duration>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 459,
+      "end": 462
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 533,
+      "end": 536
+     }
     },
     {
      "name": "fan_out",
@@ -448,7 +758,17 @@
      "params": 1,
      "doc": "Set the maximum number of refreshes in flight at once.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 467,
+      "end": 470
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 547,
+      "end": 550
+     }
     },
     {
      "name": "in_flight_ttl",
@@ -460,7 +780,17 @@
      "params": 1,
      "doc": "Set how long a caller waits for another caller's refresh before failing.",
      "set_takes": "Option<Duration>",
-     "set_takes_code": "Option<std::time::Duration>"
+     "set_takes_code": "Option<std::time::Duration>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 475,
+      "end": 478
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 561,
+      "end": 564
+     }
     },
     {
      "name": "sleep",
@@ -472,9 +802,24 @@
      "params": 1,
      "doc": "Set how long a waiting caller sleeps between checks of the cache.",
      "set_takes": "Option<Duration>",
-     "set_takes_code": "Option<std::time::Duration>"
+     "set_takes_code": "Option<std::time::Duration>",
+     "span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 483,
+      "end": 486
+     },
+     "set_span": {
+      "file": "mpl/src/cmc/storm_tracking.rs",
+      "line": 575,
+      "end": 578
+     }
     }
-   ]
+   ],
+   "span": {
+    "file": "mpl/src/cmc/storm_tracking.rs",
+    "line": 77,
+    "end": 79
+   }
   },
   {
    "lib": "esdk",
@@ -486,6 +831,11 @@
    "start": "aws_esdk::client::Client::builder()",
    "strip": "aws_esdk::client::Client::builder()",
    "shown": "Client::builder()",
+   "span": {
+    "file": "esdk/src/client.rs",
+    "line": 54,
+    "end": 64
+   },
    "options": [
     {
      "name": "commitment_policy",
@@ -497,7 +847,17 @@
      "params": 1,
      "doc": "Set the commitment policy.",
      "set_takes": "Option<EsdkCommitmentPolicy>",
-     "set_takes_code": "Option<aws_crypto_mpl::types::EsdkCommitmentPolicy>"
+     "set_takes_code": "Option<aws_crypto_mpl::types::EsdkCommitmentPolicy>",
+     "span": {
+      "file": "esdk/src/config.rs",
+      "line": 87,
+      "end": 90
+     },
+     "set_span": {
+      "file": "esdk/src/config.rs",
+      "line": 93,
+      "end": 99
+     }
     },
     {
      "name": "max_encrypted_data_keys",
@@ -509,7 +869,17 @@
      "params": 1,
      "doc": "Set the maximum number of encrypted data keys per message.",
      "set_takes": "Option<usize>",
-     "set_takes_code": "Option<usize>"
+     "set_takes_code": "Option<usize>",
+     "span": {
+      "file": "esdk/src/config.rs",
+      "line": 104,
+      "end": 107
+     },
+     "set_span": {
+      "file": "esdk/src/config.rs",
+      "line": 110,
+      "end": 116
+     }
     }
    ]
   },
@@ -523,6 +893,11 @@
    "start": "client.encrypt()",
    "strip": "client",
    "shown": "client",
+   "span": {
+    "file": "esdk/src/operation/fluent_builders.rs",
+    "line": 169,
+    "end": 172
+   },
    "options": [
     {
      "name": "plaintext",
@@ -534,7 +909,17 @@
      "params": 1,
      "doc": "The data to encrypt.",
      "set_takes": "Option<&[u8]>",
-     "set_takes_code": "Option<&[u8]>"
+     "set_takes_code": "Option<&[u8]>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 182,
+      "end": 185
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 182,
+      "end": 185
+     }
     },
     {
      "name": "encryption_context",
@@ -546,7 +931,17 @@
      "params": 2,
      "doc": "Key-value pairs bound to the message.",
      "set_takes": "Option<EncryptionContext>",
-     "set_takes_code": "Option<aws_crypto_mpl::types::EncryptionContext>"
+     "set_takes_code": "Option<aws_crypto_mpl::types::EncryptionContext>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 186,
+      "end": 186
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 186,
+      "end": 186
+     }
     },
     {
      "name": "algorithm_suite_id",
@@ -558,7 +953,17 @@
      "params": 1,
      "doc": "The algorithm suite to encrypt with.",
      "set_takes": "Option<EsdkAlgorithmSuiteId>",
-     "set_takes_code": "Option<aws_crypto_mpl::types::EsdkAlgorithmSuiteId>"
+     "set_takes_code": "Option<aws_crypto_mpl::types::EsdkAlgorithmSuiteId>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 186,
+      "end": 186
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 186,
+      "end": 186
+     }
     },
     {
      "name": "frame_length",
@@ -570,7 +975,17 @@
      "params": 1,
      "doc": "Bytes of plaintext per frame. Must be greater than 0. Default is 4096.",
      "set_takes": "Option<u32>",
-     "set_takes_code": "Option<u32>"
+     "set_takes_code": "Option<u32>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 186,
+      "end": 186
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 186,
+      "end": 186
+     }
     },
     {
      "name": "keyring",
@@ -582,7 +997,17 @@
      "params": 1,
      "doc": "The keyring that protects the message's data key.",
      "set_takes": "Option<SharedKeyring>",
-     "set_takes_code": "Option<aws_crypto_mpl::keyring::SharedKeyring>"
+     "set_takes_code": "Option<aws_crypto_mpl::keyring::SharedKeyring>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 187,
+      "end": 187
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 187,
+      "end": 187
+     }
     },
     {
      "name": "cmm",
@@ -594,7 +1019,17 @@
      "params": 1,
      "doc": "The cryptographic materials manager (CMM) that supplies the message's data key.",
      "set_takes": "Option<SharedCmm>",
-     "set_takes_code": "Option<aws_crypto_mpl::cmm::SharedCmm>"
+     "set_takes_code": "Option<aws_crypto_mpl::cmm::SharedCmm>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 187,
+      "end": 187
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 187,
+      "end": 187
+     }
     }
    ]
   },
@@ -608,6 +1043,11 @@
    "start": "client.decrypt()",
    "strip": "client",
    "shown": "client",
+   "span": {
+    "file": "esdk/src/operation/fluent_builders.rs",
+    "line": 223,
+    "end": 226
+   },
    "options": [
     {
      "name": "ciphertext",
@@ -619,7 +1059,17 @@
      "params": 1,
      "doc": "The encrypted message to decrypt.",
      "set_takes": "Option<&[u8]>",
-     "set_takes_code": "Option<&[u8]>"
+     "set_takes_code": "Option<&[u8]>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 236,
+      "end": 239
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 236,
+      "end": 239
+     }
     },
     {
      "name": "encryption_context",
@@ -631,7 +1081,17 @@
      "params": 2,
      "doc": "Key-value pairs the message's encryption context must contain.",
      "set_takes": "Option<EncryptionContext>",
-     "set_takes_code": "Option<aws_crypto_mpl::types::EncryptionContext>"
+     "set_takes_code": "Option<aws_crypto_mpl::types::EncryptionContext>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 240,
+      "end": 240
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 240,
+      "end": 240
+     }
     },
     {
      "name": "keyring",
@@ -643,7 +1103,17 @@
      "params": 1,
      "doc": "The keyring that protects the message's data key.",
      "set_takes": "Option<SharedKeyring>",
-     "set_takes_code": "Option<aws_crypto_mpl::keyring::SharedKeyring>"
+     "set_takes_code": "Option<aws_crypto_mpl::keyring::SharedKeyring>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 241,
+      "end": 241
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 241,
+      "end": 241
+     }
     },
     {
      "name": "cmm",
@@ -655,7 +1125,17 @@
      "params": 1,
      "doc": "The cryptographic materials manager (CMM) that supplies the message's data key.",
      "set_takes": "Option<SharedCmm>",
-     "set_takes_code": "Option<aws_crypto_mpl::cmm::SharedCmm>"
+     "set_takes_code": "Option<aws_crypto_mpl::cmm::SharedCmm>",
+     "span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 241,
+      "end": 241
+     },
+     "set_span": {
+      "file": "esdk/src/operation/fluent_builders.rs",
+      "line": 241,
+      "end": 241
+     }
     }
    ]
   }

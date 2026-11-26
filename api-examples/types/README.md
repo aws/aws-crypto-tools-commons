@@ -12,6 +12,8 @@ Nobody needs to run these by hand. Three workflows run every day, and the page l
 
 So a new keyring or setter on Rust main, or in a new release of another language, shows on the page the next day. The copies of `types-rust.json`, `types-others.json` and `usage.json` in `dashboard/api-examples/` are what the page shows without a token.
 
+`api-examples-types.yml` also runs on demand with `rust-ref` set to a pull request's head commit. The PR review page (`dashboard/pr-review`) starts that run, finds it by its name, `API types for Rust <commit>`, and compares its `rust-api.json` with main's. Each option in `rust-api.json` has the lines of its setter (`span`), so that page can tell which option a changed line belongs to. The types page skips these runs, unless it is opened with `?run=<run id>`. `?api=mpl|aws-kms-keyring` opens one API.
+
 ## What people write
 
 - `rust-types.json`, the Rust types customers hold. `python3 rust_types.py build` makes it from the 174 crates pinned in `rust-types.lock.json`, and `python3 rust_types.py refresh --rust-repo <checkout>` picks new crates. For each type, it gives how many crates use it, names three of them, and lists the rules it used. An optional type is kept only when the type inside it is held on its own.
