@@ -47,6 +47,20 @@ jobs:
           path: .types-rust
           persist-credentials: false
 
+      # The steps below build the ref, which runs its build scripts. Only a commit on a branch of
+      # aws/aws-crypto-tools-rust gets built: only that repo's writers can push one. A pull request from a
+      # fork has its head on no branch there.
+      - name: Check that the Rust ref is on a branch of aws/aws-crypto-tools-rust
+        if: inputs.rust-ref != ''
+        working-directory: .types-rust
+        run: |
+          if [ "$(git rev-parse --is-shallow-repository)" = true ]; then unshallow=--unshallow; fi
+          git fetch -q ${unshallow:-} --filter=tree:0 origin '+refs/heads/*:refs/remotes/origin/*'
+          if [ -z "$(git branch -r --contains HEAD)" ]; then
+            echo "::error::$(git rev-parse HEAD) is on no branch of aws/aws-crypto-tools-rust, so this run does not build it."
+            exit 1
+          fi
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
