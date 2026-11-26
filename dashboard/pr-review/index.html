@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PR Review · Crypto Tools Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e6e8ee; --dim:#8b93a7;
+    --pass:#2ea043; --part:#d29922; --fail:#da3633; --sel:#388bfd;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+  a { color:var(--sel); }
+  header { display:flex; gap:16px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; flex:none; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+  label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .run { color:var(--dim); margin-left:auto; font-size:12px; }
+  #top { flex:none; max-height:45vh; overflow:auto; padding:10px 20px 6px; border-bottom:1px solid var(--line); }
+  #top:empty { display:none; }
+  .title { font-size:14px; }
+  .title small, .sub { color:var(--dim); font-size:12px; }
+  .verdict { font-size:15px; font-weight:600; margin:8px 0 6px; }
+  .verdict.ok { color:#56d364; }
+  .verdict.bad { color:#ffa198; }
+  .verdict.wait { color:var(--dim); font-weight:400; }
+  .flags { list-style:none; margin:0 0 6px; padding:0; }
+  .flags li { display:flex; gap:10px; align-items:baseline; padding:5px 10px; border:1px solid var(--line); border-left-width:3px;
+    border-radius:6px; margin:4px 0; background:var(--panel); cursor:pointer; flex-wrap:wrap; }
+  .flags li.bad { border-left-color:var(--fail); }
+  .flags li.note { border-left-color:var(--part); }
+  .flags li.on { outline:2px solid var(--sel); outline-offset:-1px; }
+  .flags li small { color:var(--dim); }
+  .read { color:var(--dim); font-size:12px; margin:6px 0 2px; }
+  .read b { color:var(--text); font-weight:500; }
+  .bad { color:#ffa198; }
+  .good { color:#56d364; }
+  .warn { color:#e3b341; }
+  button.tool { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:3px 9px; cursor:pointer; font:inherit; font-size:12px; }
+  button.tool:hover { border-color:var(--sel); }
+  main { flex:1; min-height:0; display:grid; grid-template-columns:1fr; }
+  main.open { grid-template-columns:var(--left, 1.6fr) 6px minmax(320px, 1fr); }
+  #files, #detail { overflow:auto; min-height:0; }
+  #files { padding:8px 20px 40px; }
+  #divider { display:none; cursor:col-resize; background:var(--line); }
+  main.open #divider { display:block; }
+  #divider:hover, #divider.drag { background:var(--sel); }
+  body.resizing { cursor:col-resize; user-select:none; }
+  #detail { display:none; background:var(--panel); padding:10px 16px 40px; border-left:1px solid var(--line); }
+  main.open #detail { display:block; }
+  #detail h3 { margin:0 0 6px; font-size:14px; word-break:break-all; padding-right:24px; }
+  #detail h4 { margin:14px 0 4px; font-size:13px; color:var(--dim); font-weight:600; }
+  #detail ul { margin:2px 0 6px; padding-left:18px; }
+  #detail li { margin:2px 0; font-size:13px; }
+  #detail .close { position:sticky; top:0; float:right; background:none; border:0; color:var(--dim); font-size:20px; cursor:pointer; }
+  #detail textarea { width:100%; min-height:70px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px; font:12px/1.4 ui-monospace, monospace; }
+  pre.code { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; margin:4px 0; white-space:pre-wrap; font:12px/1.5 ui-monospace, monospace; }
+  .comment { border:1px solid var(--line); border-radius:6px; padding:6px 8px; margin:6px 0; background:var(--bg); }
+  .comment .who { color:var(--dim); font-size:12px; }
+  .tag { font-size:10px; padding:0 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+  .toolbar { display:flex; gap:14px; align-items:center; flex-wrap:wrap; color:var(--dim); font-size:12px; margin:4px 0 8px; position:sticky; top:0; background:var(--bg); padding:4px 0; z-index:1; }
+  details.file { border:1px solid var(--line); border-radius:8px; margin:8px 0; background:var(--panel); }
+  details.file > summary { padding:6px 10px; cursor:pointer; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  details.file > summary .path { font-family:ui-monospace, monospace; font-size:13px; }
+  details.file .note { padding:6px 10px; color:var(--dim); font-size:12px; }
+  table.diff { border-collapse:collapse; width:100%; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--bg); }
+  .diff td { padding:0 6px; white-space:pre; vertical-align:top; }
+  .diff td.ln { color:var(--dim); text-align:right; width:1%; user-select:none; }
+  .diff td.mk { width:1%; white-space:nowrap; user-select:none; font-family:system-ui, sans-serif; font-size:11px; }
+  .diff td.src { width:100%; }
+  .diff tr { cursor:pointer; }
+  .diff tr.add td.src { background:rgba(46,160,67,.10); }
+  .diff tr.del td.src { background:rgba(218,54,51,.12); }
+  .diff tr.hunk td, .diff tr.gap td { color:var(--dim); background:var(--panel); cursor:default; }
+  .diff td.src.run { box-shadow:inset 3px 0 #2ea043; }
+  .diff td.src.miss { box-shadow:inset 3px 0 #da3633; }
+  .diff tr:hover td.src { background-color:rgba(56,139,253,.10); }
+  .diff tr.hl td.ln { background:rgba(210,153,34,.35); color:var(--text); }
+  .diff tr.sel td { background-color:rgba(56,139,253,.22) !important; }
+  .mk i { font-style:normal; margin-right:3px; }
+  .mk .m-bad { color:#ff7b72; font-weight:700; }
+  .mk .m-ok { color:#56d364; }
+  .mk .m-br { color:#e3b341; }
+  .mk .m-duvet { color:#a5d6ff; }
+  .mk .m-api { color:#d2a8ff; }
+  .mk .m-n { color:var(--dim); }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; }
+  .legend i { font-style:normal; }
+  .quiet { color:var(--dim); padding:24px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PR Review</h1>
+  <label title="A pull request: a URL, owner/repo#N, or #N for commons. The test server pages share this box.">PR <input type="text" id="source" size="44" placeholder="paste a pull request"></label>
+  <span class="run" id="run"></span>
+</header>
+<section id="top"></section>
+<main id="main">
+  <div id="files"></div>
+  <div id="divider" title="Drag to resize. Double-click to reset."></div>
+  <aside id="detail"></aside>
+</main>
+
+<script src="../test-servers/loader.js"></script>
+<script src="review.js"></script>
+<script>
+// One pull request with what CI found about it, line by line.
+//
+// The page reads the PR's diff and files, the check runs and artifacts on its head commit, and the API types
+// run for that commit. It flags only what needs a look: failed checks, changed lines no test runs, branches
+// no test takes, mutants no test catches, duvet tests that miss their code, failed test server cases, open
+// Smithy conformance findings, and API changes. A click on a line shows everything about it, and posts a
+// review comment as you. No AI runs here; "Ask an AI" copies a prompt for the library-pr-review skill.
+
+const QUERY = new URLSearchParams(location.search);
+// The commons branch whose API types runs the page reads and starts. ?ref= picks another, like a PR's branch.
+const REF = QUERY.get("ref") || "main";
+const TYPES = "api-examples-types.yml";
+const RUST_REPO = "aws/aws-crypto-tools-rust";
+const $ = id => document.getElementById(id);
+const esc = escHtml;
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const fileName = path => path.split("/").pop();
+
+let state = null;           // everything known about the PR on screen
+let selected = null;        // the clicked line: {f, r} indexes into state.files and its rows
+let focus = null;           // the flag whose lines are marked in the diff
+let onlyFlagged = false;    // show only lines with something to look at, and two lines around them
+const closed = new Set();   // files whose diff the reader folded
+
+// ---------- GitHub ----------
+async function allPages(path, key) {
+  const out = [];
+  for (let page = 1; page <= 30; page++) {
+    const j = await ghJson(`${path}${path.includes("?") ? "&" : "?"}per_page=100&page=${page}`);
+    const list = key ? j[key] : j;
+    out.push(...list);
+    if (list.length < 100) break;
+  }
+  return out;
+}
+
+async function send(method, path, body) {
+  const res = await fetch("https://api.github.com/" + path, { method, body: JSON.stringify(body),
+    headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + token(), "Content-Type": "application/json" } });
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return res.status === 204 ? null : res.json();
+}
+
+// An artifact never changes, so what the page reads from it is cached by artifact id. tag names the changed
+// files the page kept, because it keeps only those.
+async function readArtifact(repo, art, tag, parse) {
+  const key = `prreview1:${tag}:${repo}:${art.id}`;
+  try { const hit = await cacheGet(key); if (hit !== undefined) return hit; } catch (e) { /* no cache in this browser */ }
+  const zip = await (await gh(`repos/${repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+  const value = await parse(zip, zipEntries(zip));
+  try { await cachePut(key, value); } catch (e) { /* no cache in this browser */ }
+  return value;
+}
+
+// The newest artifact of each name that matches.
+function newestByName(arts, pattern) {
+  const by = new Map();
+  for (const a of arts) if (pattern.test(a.name) && (!by.has(a.name) || a.created_at > by.get(a.name).created_at)) by.set(a.name, a);
+  return [...by.values()];
+}
+
+const keepFiles = (map, wanted) => new Map([...map].filter(([f]) => wanted.has(f)));
+function mergeLines(into, from) {
+  for (const [f, lines] of from) {
+    const to = into.get(f) || new Map();
+    into.set(f, to);
+    for (const [n, h] of lines) to.set(n, Math.max(to.get(n) || 0, h));
+  }
+  return into;
+}
+function mergeTests(into, from) {
+  const offset = into.names.length;
+  into.names.push(...from.names);
+  for (const [f, lines] of from.at) {
+    const to = into.at.get(f) || new Map();
+    into.at.set(f, to);
+    for (const [n, list] of lines) to.set(n, [...(to.get(n) || []), ...list.map(i => i + offset)]);
+  }
+}
+
+// A per-test coverage file: one JSON line per test run, with the lines it ran in each file.
+function readPerTest(text, repo, wanted) {
+  const out = { names: [], at: new Map() };
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    const t = JSON.parse(line);
+    if (t.repository && t.repository !== repo) continue;
+    let index = null;
+    for (const [file, hits] of Object.entries(t.files || {})) {
+      if (!wanted.has(file)) continue;
+      if (index === null) {
+        index = out.names.length;
+        out.names.push({ name: t.test, source: t.source, status: t.status, language: t.language });
+      }
+      const byLine = out.at.get(file) || new Map();
+      out.at.set(file, byLine);
+      for (const n of hits) byLine.set(n, [...(byLine.get(n) || []), index]);
+    }
+  }
+  return out;
+}
+
+// ---------- loading ----------
+async function load() {
+  const text = $("source").value.trim();
+  selected = null;
+  focus = null;
+  state = null;
+  if (!text) return problem("Paste a pull request to review it.");
+  if (!token()) return problem("Add a GitHub token on the main dashboard's Settings page.");
+  const want = parsePR(text, COMMONS);
+  if (!want) return problem("That is not a pull request: use a URL, owner/repo#N, or #N for commons.");
+  const mine = state = { ...want, pr: null, files: [], texts: {}, tests: {}, errors: [], loading: new Set(["pr"]),
+    data: { checks: [], comments: new Map(), blocks: new Map(), api: {} }, read: {}, ciCommit: null, moved: new Set() };
+  const stale = () => state !== mine;
+  render();
+  try {
+    mine.pr = await ghJson(`repos/${want.repo}/pulls/${want.n}`);
+    const head = mine.pr.head.sha;
+    const [files, checks, runs, comments] = await Promise.all([
+      allPages(`repos/${want.repo}/pulls/${want.n}/files`),
+      allPages(`repos/${want.repo}/commits/${head}/check-runs`, "check_runs"),
+      allPages(`repos/${want.repo}/actions/runs?head_sha=${head}`, "workflow_runs"),
+      allPages(`repos/${want.repo}/pulls/${want.n}/comments`),
+    ]);
+    if (stale()) return;
+    mine.files = files.map(f => ({ filename: f.filename, status: f.status, additions: f.additions, deletions: f.deletions,
+      rows: diffRows(f.patch), code: CODE_FILE.test(f.filename), test: TEST_FILE.test(f.filename), noPatch: !f.patch }));
+    // A rerun adds a check run with the same name; the newest one counts.
+    const latest = new Map();
+    for (const c of checks) if (!latest.has(c.name) || c.id > latest.get(c.name).id) latest.set(c.name, c);
+    mine.data.checks = [...latest.values()];
+    mine.runs = runs;
+    mine.short = shortPaths(mine.files.map(f => f.filename));
+    for (const c of comments) addComment(mine, c);
+    mine.loading.delete("pr");
+    render();
+    await Promise.all([loadTexts(mine), loadArtifacts(mine, runs), loadApi(mine)]);
+    await findMoved(mine);
+  } catch (e) {
+    mine.errors.push(e.message || String(e));
+  }
+  mine.loading.clear();
+  mine.done = true;
+  if (!stale()) render();
+}
+
+function problem(text) {
+  $("top").innerHTML = "";
+  $("files").innerHTML = `<div class="quiet">${esc(text)}</div>`;
+  $("detail").innerHTML = "";
+  $("main").classList.remove("open");
+  $("run").innerHTML = "";
+}
+
+function addComment(s, c) {
+  const line = c.line || null;
+  if (!line) return;  // an outdated comment's line is no longer in the diff
+  const byLine = s.data.comments.get(c.path) || new Map();
+  s.data.comments.set(c.path, byLine);
+  const key = (c.side === "LEFT" ? "L" : "R") + line;
+  byLine.set(key, [...(byLine.get(key) || []), c]);
+}
+
+// The changed files' text at the head commit: their duvet annotations, their tests, and the impl block each
+// new public method is in.
+async function loadTexts(s) {
+  s.loading.add("files");
+  const head = s.pr.head.sha;
+  await Promise.all(s.files.filter(f => f.code && f.status !== "removed").slice(0, 80).map(async f => {
+    try {
+      s.texts[f.filename] = await ghRaw(s.repo, f.filename, head);
+      s.data.blocks.set(f.filename, annotations(s.texts[f.filename]));
+    } catch (e) {
+      s.errors.push(`${f.filename}: ${e.message}`);
+    }
+  }));
+  s.tests = testFunctions(s.texts);
+  s.data.api.items = s.files.flatMap(f => publicItems(f.filename, f.rows, s.texts[f.filename]));
+  s.loading.delete("files");
+  render();
+}
+
+async function loadArtifacts(s, runs) {
+  s.loading.add("artifacts");
+  const lists = await Promise.all(runs.map(async r => (await allPages(`repos/${s.repo}/actions/runs/${r.id}/artifacts`, "artifacts"))
+    .filter(a => !a.expired).map(a => ({ ...a, run: r }))));
+  const arts = lists.flat();
+  const wanted = new Set(s.files.map(f => f.filename));
+  const tag = hash([...wanted].sort().join("\n"));
+  const seen = commit => { if (commit && !s.ciCommit) s.ciCommit = commit; };
+  const part = async (name, fn) => {
+    s.loading.add(name);
+    render();
+    try { await fn(); } catch (e) { s.errors.push(`${name}: ${e.message || e}`); }
+    s.loading.delete(name);
+    render();
+  };
+  await Promise.all([
+    part("mutation", async () => {
+      const found = newestByName(arts, /^mutation-results-/);
+      if (!found.length) return;
+      s.data.mutants = new Map();
+      s.read.mutation = [];
+      for (const art of found) {
+        const res = await readArtifact(s.repo, art, tag, async (zip, entries) => {
+          const e = entries.find(x => x.name.endsWith("results.json"));
+          return e ? JSON.parse(await zipText(zip, e)) : null;
+        });
+        if (!res) continue;
+        seen(res.summary.commit);
+        s.read.mutation.push({ name: res.summary.library || art.name.replace("mutation-results-", ""), mutants: res.mutants.length, scope: res.summary.scope });
+        for (const m of res.mutants) {
+          if (!wanted.has(m.file) || m.status === "not_sampled") continue;
+          const byLine = s.data.mutants.get(m.file) || new Map();
+          s.data.mutants.set(m.file, byLine);
+          byLine.set(m.line, [...(byLine.get(m.line) || []), m]);
+        }
+      }
+    }),
+    part("local coverage", async () => {
+      const found = arts.filter(a => /^local-coverage-/.test(a.name));
+      if (!found.length) return;
+      s.data.local = s.data.local || new Map();
+      s.data.branches = s.data.branches || new Map();
+      s.read.local = [...new Set(found.map(a => a.name.replace("local-coverage-", "")))];
+      for (const art of found) {
+        const got = await readArtifact(s.repo, art, tag, async (zip, entries) => {
+          const lines = new Map(), branches = new Map();
+          for (const e of entries.filter(x => x.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), lines, branches);
+          return { lines: keepFiles(lines, wanted), branches: keepFiles(branches, wanted) };
+        });
+        mergeLines(s.data.local, got.lines);
+        mergeBranches(s.data.branches, got.branches);
+      }
+    }),
+    part("local tests", async () => {
+      const found = newestByName(arts, /^per-test-coverage-/);
+      for (const art of found) {
+        const got = await readArtifact(s.repo, art, tag, async (zip, entries) => {
+          const out = { names: [], at: new Map() };
+          for (const e of entries.filter(x => x.name.endsWith(".jsonl"))) mergeTests(out, readPerTest(await zipText(zip, e), s.repo, wanted));
+          return out;
+        });
+        s.data.tests = s.data.tests || { names: [], at: new Map() };
+        mergeTests(s.data.tests, got);
+      }
+    }),
+    part("test servers", async () => {
+      const found = arts.filter(a => /-test-server-reports$/.test(a.name));
+      if (!found.length) return;
+      s.data.server = s.data.server || new Map();
+      s.data.branches = s.data.branches || new Map();
+      s.data.servers = [];
+      for (const art of found) {
+        const product = art.name.replace(/-test-server-reports$/, "");
+        const got = await readArtifact(s.repo, art, tag, (zip, entries) => readReports(zip, entries, s.repo, wanted, product));
+        seen(got.commit);
+        mergeLines(s.data.server, got.lines);
+        mergeBranches(s.data.branches, got.branches);
+        s.data.tests = s.data.tests || { names: [], at: new Map() };
+        mergeTests(s.data.tests, got.tests);
+        const same = s.data.servers.find(x => x.product === product);
+        if (same) {
+          same.failed.push(...got.failed);
+          for (const [l, t] of Object.entries(got.totals)) same.totals[l] = (same.totals[l] || [0, 0, 0, 0, 0]).map((n, i) => n + t[i]);
+        } else {
+          s.data.servers.push({ product, failed: got.failed, totals: got.totals, run: art.run });
+        }
+      }
+    }),
+    part("duvet test reach", async () => {
+      const found = newestByName(arts, /^duvet-test-reach-/);
+      if (!found.length) return;
+      s.data.reach = [];
+      s.read.reach = [];
+      for (const art of found) {
+        const report = await readArtifact(s.repo, art, tag, async (zip, entries) => {
+          const e = entries.find(x => x.name.endsWith(".json"));
+          return e ? JSON.parse(await zipText(zip, e)) : null;
+        });
+        if (!report) continue;
+        seen(report.commit);
+        s.read.reach.push(`${report.library} (${plural(report.findings.length, "annotation")})`);
+        report.findings.forEach((f, i) => {
+          for (const imp of f.implementations || []) {
+            if (!imp.region) continue;
+            s.data.reach.push({ finding: `${art.name}:${i}`, path: imp.path, from: imp.region[0], to: imp.region[1], state: f.state,
+              requirement: f.requirement, test: f.test_annotation, detail: f.detail || null });
+          }
+        });
+      }
+    }),
+    part("conformance", async () => {
+      const found = newestByName(arts, /^smithy-conformance-/);
+      if (!found.length) return;
+      s.data.conformance = [];
+      for (const art of found) {
+        const got = await readArtifact(s.repo, art, tag, async (zip, entries) => {
+          const md = entries.find(x => x.name.endsWith("report.md")), fj = entries.find(x => x.name.endsWith("findings.json"));
+          const text = md ? await zipText(zip, md) : "";
+          const findings = fj ? JSON.parse(await zipText(zip, fj)) : [];
+          const result = (text.match(/result: \*\*(\w+)\*\*/) || [])[1] || null;
+          return { result, open: findings.filter(f => f.status !== "accepted" && f.status !== "deferred")
+            .map(f => ({ id: f.id, message: f.message, where: f.where, status: f.status })) };
+        });
+        s.data.conformance.push({ crate: art.name.replace("smithy-conformance-", ""), ...got });
+      }
+    }),
+  ]);
+  s.loading.delete("artifacts");
+}
+
+// A test server report zip: line and branch coverage of this repository, the lines each test ran, and the
+// JUnit results, kept as totals per language and the failed cases.
+async function readReports(zip, entries, repo, wanted, product) {
+  const out = { product, lines: new Map(), branches: new Map(), tests: { names: [], at: new Map() }, totals: {}, failed: [], commit: null };
+  for (const e of entries.filter(x => /(^|\/)coverage\/[^/]+\.json$/.test(x.name))) {
+    const meta = JSON.parse(await zipText(zip, e));
+    const lcov = entries.find(x => x.name === e.name.replace(/\.json$/, ".lcov"));
+    if (meta.repository !== repo || !lcov) continue;
+    out.commit = out.commit || meta.commit;
+    const lines = new Map(), branches = new Map();
+    parseLcov(await zipText(zip, lcov), lines, branches);
+    mergeLines(out.lines, keepFiles(lines, wanted));
+    mergeBranches(out.branches, keepFiles(branches, wanted));
+  }
+  for (const e of entries.filter(x => /per-test-coverage\/[^/]+\.jsonl$/.test(x.name))) mergeTests(out.tests, readPerTest(await zipText(zip, e), repo, wanted));
+  const cases = new Map();
+  for (const e of entries.filter(x => /test-results\/.*TEST-[^/]*\.xml$/.test(x.name))) await scanXml(entryStream(zip, e), cases, null);
+  for (const c of cases.values()) {
+    for (const [l, r] of Object.entries(c.langs)) out.totals[l] = (out.totals[l] || [0, 0, 0, 0, 0]).map((n, i) => n + r[i]);
+    if (Object.values(c.langs).some(r => r[1])) out.failed.push({ cls: c.c, name: c.n, err: c.err });
+  }
+  return out;
+}
+
+// The API at the PR's head, from the types run started for it, and at main, from the newest daily run.
+async function loadApi(s) {
+  if (s.repo !== RUST_REPO) return;
+  s.loading.add("API");
+  render();
+  try {
+    const head = s.pr.head.sha;
+    const runs = (await ghJson(`repos/${COMMONS}/actions/workflows/${TYPES}/runs?branch=${encodeURIComponent(REF)}&per_page=50`)).workflow_runs;
+    const main = runs.find(r => r.conclusion === "success" && (r.event !== "workflow_dispatch" || r.display_title === "API types for Rust main"));
+    const mine = runs.find(r => r.display_title === `API types for Rust ${head}`);
+    s.data.api.run = mine || null;
+    s.data.api.mainRun = main || null;
+    if (mine && mine.status === "completed" && mine.conclusion === "success" && main) {
+      const [pr, base] = await Promise.all([apiFiles(mine), apiFiles(main)]);
+      s.data.api.pr = pr.api;
+      s.data.api.types = pr.types;
+      s.data.api.diff = apiDiff(base.api, pr.api);
+    } else if (mine && mine.status !== "completed") {
+      // Look again while the run goes, so its result shows up on this page.
+      setTimeout(() => { if (state === s) loadApi(s); }, 20000);
+    }
+  } catch (e) {
+    s.errors.push(`API: ${e.message || e}`);
+  }
+  s.loading.delete("API");
+  render();
+}
+
+async function apiFiles(run) {
+  const arts = (await ghJson(`repos/${COMMONS}/actions/runs/${run.id}/artifacts?per_page=100`)).artifacts;
+  const art = arts.find(a => a.name === "api-types-rust" && !a.expired);
+  if (!art) throw new Error(`run ${run.id} has no api-types-rust artifact`);
+  return readArtifact(COMMONS, art, "api", async (zip, entries) => {
+    const read = async name => { const e = entries.find(x => x.name.endsWith(name)); return e ? JSON.parse(await zipText(zip, e)) : null; };
+    return { api: await read("rust-api.json"), types: await read("types-rust.json") };
+  });
+}
+
+// CI on a pull request runs on its merge with the base branch. A changed file that the merge also changes
+// may have its lines moved, so its marks may be off.
+async function findMoved(s) {
+  if (!s.ciCommit || s.ciCommit === s.pr.head.sha) return;
+  try {
+    const cmp = await ghJson(`repos/${s.repo}/compare/${s.pr.head.sha}...${s.ciCommit}`);
+    const changed = new Set((cmp.files || []).map(f => f.filename));
+    for (const f of s.files) if (changed.has(f.filename)) s.moved.add(f.filename);
+  } catch (e) {
+    s.errors.push(`merge commit: ${e.message || e}`);
+  }
+}
+
+async function startApiRun() {
+  const s = state;
+  try {
+    await send("POST", `repos/${COMMONS}/actions/workflows/${TYPES}/dispatches`, { ref: REF, inputs: { "rust-ref": s.pr.head.sha } });
+    s.data.api.started = true;
+    render();
+    setTimeout(() => { if (state === s) loadApi(s); }, 8000);
+  } catch (e) {
+    s.data.api.startError = e.message || String(e);
+    render();
+  }
+}
+
+const hash = text => { let h = 0; for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+
+// ---------- drawing ----------
+function render() {
+  if (!state) return;
+  const s = state;
+  if (!s.pr) {
+    $("top").innerHTML = `<div class="verdict wait">Loading ${esc(s.repo)}#${s.n}…</div>${errorsHtml(s)}`;
+    $("files").innerHTML = "";
+    return;
+  }
+  // While artifacts are still loading, missing results are not news yet.
+  s.flags = findFlags(s.files, s.data).filter(f => !(s.loading.size && (f.id === "no-coverage" || f.id === "no-mutants")));
+  const scrollFiles = $("files").scrollTop, scrollPane = $("detail").scrollTop;
+  $("top").innerHTML = topHtml(s);
+  $("files").innerHTML = filesHtml(s);
+  $("files").scrollTop = scrollFiles;
+  $("run").innerHTML = s.ciCommit ? `CI ran on ${s.ciCommit.slice(0, 7)}${s.ciCommit !== s.pr.head.sha ? " (the merge with " + esc(s.pr.base.ref) + ")" : ""}` : "";
+  renderPane();
+  $("detail").scrollTop = scrollPane;
+}
+
+function topHtml(s) {
+  const pr = s.pr;
+  const adds = s.files.reduce((n, f) => n + f.additions, 0), dels = s.files.reduce((n, f) => n + f.deletions, 0);
+  let h = `<div class="title"><a href="${esc(pr.html_url)}" target="_blank">${esc(s.repo.split("/")[1])}#${s.n}</a> <b>${esc(pr.title)}</b>
+    <small>by ${esc(pr.user.login)}${pr.draft ? " · draft" : ""} · ${plural(s.files.length, "file")} +${adds} −${dels} · ${esc(pr.base.ref)} ← ${esc(pr.head.ref)} · ${pr.head.sha.slice(0, 7)}</small></div>`;
+  const loading = [...s.loading];
+  const bad = s.flags.filter(f => f.level === "bad").length;
+  if (!s.flags.length) {
+    h += loading.length ? `<div class="verdict wait">Reading ${esc(loading.join(", "))}…</div>` : `<div class="verdict ok">✓ Nothing to look at. ${esc(quietText(s))}</div>`;
+  } else {
+    h += `<div class="verdict ${bad ? "bad" : "wait"}">${plural(s.flags.length, "thing")} to look at${loading.length ? ` <small class="sub">(still reading ${esc(loading.join(", "))})</small>` : ""}</div>`;
+    h += `<ul class="flags">${s.flags.map(f => `<li class="${f.level}${focus === f.id ? " on" : ""}" data-flag="${f.id}">
+      <b>${esc(f.text)}</b>${flagDetail(s, f)}</li>`).join("")}</ul>`;
+  }
+  h += apiHtml(s) + readHtml(s) + errorsHtml(s);
+  if (s.askPr) h += `<div class="sub">Paste this into your agent. The library-pr-review skill reads the same CI artifacts as this page, and the code.</div>
+    <textarea readonly id="pr-prompt" rows="6" style="width:100%">${esc(prPrompt(s))}</textarea><button class="tool" data-copy-pr>Copy</button>`;
+  return h;
+}
+
+// What a quiet verdict rests on. With no flags, coverage and mutation results exist for any changed library code.
+function quietText(s) {
+  const code = s.files.some(f => f.code && !f.test && f.rows.some(r => r.kind === "add"));
+  const checks = s.data.checks.length ? "every check passed" : "no checks ran";
+  return code ? `Every changed line runs in a test, every mutant on them makes a test fail, and ${checks}.`
+    : `This PR changes no library code, and ${checks}.`;
+}
+
+// Whether the PR changes a Rust crate's source, which is when its API can change.
+const changesRustSource = s => s.files.some(f => /\.rs$/.test(f.filename) && /(^|\/)src\//.test(f.filename) && !f.test);
+
+// Where a flag's lines are, as short file:line names, and its items.
+function flagDetail(s, f) {
+  const where = f.lines.slice(0, 6).map(l => `${s.short[l.file] || fileName(l.file)}:${l.line}`).join(", ") + (f.lines.length > 6 ? `, and ${f.lines.length - 6} more` : "");
+  const items = f.items.slice(0, 8).map(esc).join("; ") + (f.items.length > 8 ? `; and ${f.items.length - 8} more` : "");
+  return [where && `<small>${esc(where)}</small>`, items && `<small>${items}</small>`].filter(Boolean).join(" ");
+}
+
+// The API part: what the types run says changed, or how to get that run.
+function apiHtml(s) {
+  if (s.repo !== RUST_REPO) return "";
+  const a = s.data.api, link = (text, extra = "") => `<a href="../api-examples/types.html?ref=${encodeURIComponent(REF)}${a.run ? "&run=" + a.run.id : ""}${extra}" target="_blank">${text}</a>`;
+  if (a.diff) {
+    const d = a.diff, rows = [];
+    for (const api of d.added) rows.push(`<li><b>${esc(api.name)}</b> is new: ${api.options.map(o => `<code>${esc(o.name)}</code> takes <code>${esc(o.takes)}</code>${levels(a.types, api, o)}`).join(", ") || "no options"} · ${link("its types", `&api=${encodeURIComponent(api.lib + "|" + api.id)}`)}</li>`);
+    for (const o of d.options.added.filter(o => !d.added.some(x => x.lib === o.lib && x.id === o.api))) rows.push(`<li>${esc(o.apiName)}: new option <code>${esc(o.option)}</code> takes <code>${esc(o.takes)}</code></li>`);
+    for (const o of d.options.changed) rows.push(`<li>${esc(o.apiName)}: <code>${esc(o.option)}</code> took <code>${esc(o.was)}</code>, now <code>${esc(o.takes)}</code></li>`);
+    for (const o of d.options.removed) rows.push(`<li class="bad">${esc(o.apiName)}: <code>${esc(o.option)}</code> is gone</li>`);
+    for (const api of d.removed) rows.push(`<li class="bad">${esc(api.name)} is gone</li>`);
+    return rows.length ? `<div class="read"><b>API at this commit</b> (${link("types run")}):</div><ul class="sub">${rows.join("")}</ul>` : "";
+  }
+  if (a.run && a.run.status !== "completed") return `<div class="read">API: the types run for this commit is ${esc(a.run.status.replace("_", " "))} (<a href="${esc(a.run.html_url)}" target="_blank">run</a>). This page looks again every 20 seconds.</div>`;
+  if (a.run && a.run.conclusion !== "success") return `<div class="read warn">API: the types run for this commit ended ${esc(a.run.conclusion)} (<a href="${esc(a.run.html_url)}" target="_blank">run</a>).</div>`;
+  if (s.loading.has("API") || !s.pr || !changesRustSource(s)) return "";
+  const cmd = `gh workflow run ${TYPES} -R ${COMMONS} --ref ${REF} -f rust-ref=${s.pr.head.sha}`;
+  return `<div class="read">API: no types run for this commit yet. <button class="tool" data-start-api>Read this PR's API (about 3 min)</button>
+    ${a.started ? " started…" : ""}${a.startError ? `<div class="bad">Could not start it: ${esc(a.startError)}. Your token needs Actions write access to commons, or run: <code>${esc(cmd)}</code></div>` : ""}</div>`;
+}
+
+// How many of the types a customer may hold pass to this option as is, with one call, or with more,
+// from the types run's types-rust.json, the same counts the types page shows.
+function levels(types, api, option) {
+  const entry = ((types && types.apis) || []).find(a => a.lib === api.lib && a.id === api.id);
+  const found = entry && entry.options.find(o => o.name === option.name);
+  const rows = found && types.rows[found.key];
+  if (!rows || !rows.length) return "";
+  const n = [0, 0, 0, 0];
+  for (const r of rows) n[r.calls === null || r.calls === undefined ? 3 : Math.min(r.calls, 2)]++;
+  return ` <small class="sub">(of ${plural(rows.length, "type")} a caller may hold: ${n[0]} as is, ${n[1]} with one call, <span class="${n[2] ? "warn" : ""}">${n[2]} with more</span>, ${n[3]} with no fix)</small>`;
+}
+
+function readHtml(s) {
+  const r = s.read, d = s.data, url = encodeURIComponent(s.pr.html_url);
+  const parts = [];
+  const failedChecks = d.checks.filter(c => FAILED_CHECK.has(c.conclusion)).length, going = d.checks.filter(c => c.status !== "completed").length;
+  parts.push(`<b>${plural(d.checks.length, "check")}</b>${failedChecks ? `, <span class="bad">${failedChecks} failed</span>` : ""}${going ? `, ${going} running` : ""}`);
+  if (r.mutation) parts.push(`<b>mutation</b> ${r.mutation.map(m => `${esc(m.name)} (${plural(m.mutants, "mutant")})`).join(", ")}`);
+  if (r.local) parts.push(`<b>local coverage</b> ${esc(r.local.join(", "))}`);
+  if (d.servers) parts.push(`<b>test servers</b> ${d.servers.map(x => {
+    const langs = Object.keys(x.totals).filter(l => l !== "(none)"), failed = x.failed.length;
+    return `<span title="${esc(langs.join(", "))}">${esc(x.product.toUpperCase())} against ${plural(langs.length, "server")}</span>${failed ? `, <span class="bad">${failed} failed</span>` : ", all passed"}`;
+  }).join("; ")}`);
+  if (d.tests && d.tests.names.length) parts.push(`<b>per-test lines</b> ${plural(d.tests.names.length, "test")}`);
+  if (r.reach) parts.push(`<b>duvet test reach</b> ${esc(r.reach.join(", "))}`);
+  if (d.conformance) parts.push(`<b>Smithy conformance</b> ${d.conformance.map(c => `${esc(c.crate)} ${esc(c.result || "?")}`).join(", ")}`);
+  const pages = [["Test server results", "../test-servers/index.html"], ["Line coverage", "../test-servers/coverage.html"],
+    ["Mutation testing", "../test-servers/mutation.html"], ["Checks by language", "../test-servers/pr-report.html"]]
+    .map(([name, page]) => `<a href="${page}?run=${url}" target="_blank">${name}</a>`);
+  const moved = s.moved.size ? `<div class="read warn">${plural(s.moved.size, "changed file")} also change${s.moved.size === 1 ? "s" : ""} in the merge CI ran on, so ${s.moved.size === 1 ? "its" : "their"} marks may be a few lines off: ${esc([...s.moved].map(fileName).join(", "))}.</div>` : "";
+  return `<div class="read">Read: ${parts.join(" · ")}</div><div class="read">Open: ${pages.join(" · ")} · <a href="#" data-ask-pr>Ask an AI about this PR</a></div>${moved}`;
+}
+
+function errorsHtml(s) {
+  return s.errors.length ? `<div class="read bad">Could not read: ${s.errors.map(esc).join("; ")}</div>` : "";
+}
+
+// What one line shows in the margin, and whether it needs a look.
+function marks(s, f, row) {
+  const d = s.data, file = f.filename;
+  if (row.kind === "hunk") return { look: false, gap: false, html: "", cov: "" };
+  const comments = (d.comments.get(file) && d.comments.get(file).get((row.kind === "del" ? "L" : "R") + (row.kind === "del" ? row.old : row.new))) || [];
+  if (row.kind === "del") return { look: comments.length > 0, gap: false, html: comments.length ? `<i title="review comments">💬</i>` : "", cov: "" };
+  const line = row.new, out = [];
+  // gap: a hole in testing on a changed line. look: worth showing when the diff shows only lines to look at.
+  let gap = false, look = comments.length > 0;
+  const cov = row.kind === "add" && f.code && !f.test ? lineRun([d.local, d.server].filter(Boolean), file, line) : "none";
+  if (cov === "not-run") gap = true;
+  const br = branchesMissed(d.branches, file, line);
+  if (cov === "run" && br.missed) { gap = true; out.push(`<i class="m-br" title="${br.missed} of ${br.total} branches never taken">◐</i>`); }
+  const mutants = (d.mutants && d.mutants.get(file) && d.mutants.get(file).get(line)) || [];
+  const badMutants = mutants.filter(m => BAD_MUTANT.has(m.status)).length;
+  if (badMutants) { gap = true; out.push(`<i class="m-bad" title="${badMutants} mutants no test catches">✗${badMutants > 1 ? badMutants : ""}</i>`); }
+  else if (mutants.some(m => m.status === "killed" || m.status === "timed_out")) out.push(`<i class="m-ok" title="every mutant here makes a test fail">✓</i>`);
+  const blocks = ((d.blocks && d.blocks.get(file)) || []).filter(b => b.code === line);
+  const reach = (d.reach || []).filter(r => r.path === file && r.from <= line && line <= r.to);
+  if (reach.some(r => r.state === "never-reaches")) { gap = true; out.push(`<i class="m-bad" title="a duvet test never runs this code">§</i>`); }
+  else if (blocks.length) out.push(`<i class="m-duvet" title="${esc(blocks.map(b => b.target).join(", "))}">§</i>`);
+  if ((d.api.items || []).some(i => i.file === file && i.line === line && i.side !== "removed")) { look = true; out.push(`<i class="m-api" title="public API">API</i>`); }
+  const tests = d.tests && d.tests.at.get(file) && d.tests.at.get(file).get(line);
+  if (tests && tests.length) out.push(`<i class="m-n" title="tests that run this line">${tests.length}</i>`);
+  if (comments.length) out.push(`<i title="review comments">💬</i>`);
+  gap = gap && row.kind === "add";
+  return { look: gap || (look && (row.kind === "add" || comments.length > 0)), gap, html: out.join(""), cov: cov === "run" ? "run" : cov === "not-run" ? "miss" : "" };
+}
+
+function filesHtml(s) {
+  const legend = `<span class="legend"><i><span class="good">▌</span>a test runs it</i><i><span class="bad">▌</span>no test runs it</i>
+    <i class="m-br">◐ a branch no test takes</i><i class="mk"><span class="m-bad">✗</span> a mutant no test catches</i><i class="mk"><span class="m-ok">✓</span> mutants caught</i>
+    <i class="mk"><span class="m-duvet">§</span> duvet</i><i class="mk"><span class="m-api">API</span> public item</i><i>12 tests run it</i><i>💬 comments</i></span>`;
+  let h = `<div class="toolbar"><label><input type="checkbox" id="only"${onlyFlagged ? " checked" : ""}> Only lines to look at</label>${legend}</div>`;
+  const focused = new Set(((s.flags.find(f => f.id === focus) || {}).lines || []).map(l => `${l.file}:${l.line}`));
+  // Files with gaps in testing come first, most first. The rest keep GitHub's order.
+  const drawn = s.files.map((f, fi) => ({ f, fi, marks: f.rows.map(r => marks(s, f, r)) }))
+    .map(x => ({ ...x, gaps: x.marks.filter(m => m.gap).length }));
+  drawn.sort((a, b) => b.gaps - a.gaps || a.fi - b.fi);
+  drawn.forEach(({ f, fi, marks: fileMarks, gaps }) => {
+    const badges = [];
+    if (gaps) badges.push(`<span class="tag warn">${plural(gaps, "gap")} in testing</span>`);
+    if (s.moved.has(f.filename)) badges.push(`<span class="tag" title="CI ran on the merge, which changes this file too">lines may be off</span>`);
+    h += `<details class="file" data-file="${fi}"${closed.has(f.filename) ? "" : " open"}><summary><span class="path">${esc(f.filename)}</span>
+      <small class="sub">${esc(f.status)} +${f.additions} −${f.deletions}</small>${badges.join(" ")}</summary>`;
+    if (f.noPatch) { h += `<div class="note">GitHub sends no diff for this file. <a href="${esc(s.pr.html_url)}/files" target="_blank">Open it on GitHub</a>.</div></details>`; return; }
+    if (closed.has(f.filename)) { h += `</details>`; return; }
+    const show = f.rows.map((r, i) => !onlyFlagged || r.kind === "hunk" || fileMarks.slice(Math.max(0, i - 2), i + 3).some(m => m.look));
+    h += `<table class="diff"><tbody>`;
+    let hidden = 0;
+    f.rows.forEach((r, ri) => {
+      if (!show[ri]) { hidden++; return; }
+      if (hidden) { h += `<tr class="gap"><td colspan="4">⋯ ${plural(hidden, "line")}</td></tr>`; hidden = 0; }
+      if (r.kind === "hunk") { h += `<tr class="hunk"><td colspan="4">${esc(r.text)}</td></tr>`; return; }
+      const m = fileMarks[ri], line = r.kind === "del" ? r.old : r.new;
+      const cls = [r.kind, selected && selected.f === fi && selected.r === ri ? "sel" : "", r.kind !== "del" && focused.has(`${f.filename}:${line}`) ? "hl" : ""].filter(Boolean).join(" ");
+      h += `<tr class="${cls}" data-f="${fi}" data-r="${ri}"><td class="ln">${r.old || ""}</td><td class="ln">${r.new || ""}</td><td class="mk">${m.html}</td>`
+        + `<td class="src ${m.cov}">${r.kind === "add" ? "+" : r.kind === "del" ? "-" : " "}${esc(r.text)}</td></tr>`;
+    });
+    if (hidden) h += `<tr class="gap"><td colspan="4">⋯ ${plural(hidden, "line")}</td></tr>`;
+    h += `</tbody></table></details>`;
+  });
+  return h;
+}
+
+// ---------- the side pane ----------
+function renderPane() {
+  if (!state || !selected || !state.files[selected.f]) {
+    $("detail").innerHTML = "";
+    $("main").classList.remove("open");
+    return;
+  }
+  $("detail").innerHTML = paneHtml(state, state.files[selected.f], state.files[selected.f].rows[selected.r]);
+  $("main").classList.add("open");
+}
+
+const blobUrl = (s, file, line) => `https://github.com/${s.repo}/blob/${s.pr.head.sha}/${file.split("/").map(encodeURIComponent).join("/")}#L${line}`;
+// A link that opens a line of this PR in the diff, or GitHub when the diff does not have that line.
+function lineLink(s, file, line, text) {
+  const fi = s.files.findIndex(f => f.filename === file);
+  const ri = fi < 0 ? -1 : s.files[fi].rows.findIndex(r => r.new === line);
+  return ri >= 0 ? `<a href="#" data-goto="${fi}:${ri}">${text}</a>` : `<a href="${esc(blobUrl(s, file, line))}" target="_blank">${text}</a>`;
+}
+// A test server test's source in commons, from its JUnit class name.
+function serverTestUrl(name) {
+  const cls = String(name).split("#")[0].split("$")[0], product = (cls.match(/^aws\.cryptography\.(\w+)\.testserver\./) || [])[1];
+  return product ? `https://github.com/${COMMONS}/blob/main/${product}/test-server/tests/src/test/java/${cls.replace(/\./g, "/")}.java` : null;
+}
+// A link to the test CI names: to its line in this PR when the PR has it, else to its source on GitHub.
+function testLink(s, name) {
+  const id = junitId(name);
+  if (id) {
+    const url = serverTestUrl(id.cls), text = `${id.cls.split(".").pop()}.${id.method || "?"}${id.run ? " #" + id.run : ""}`;
+    return url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
+  }
+  const own = s.tests[shortTest(name)];
+  return own ? lineLink(s, own.file, own.line, esc(shortTest(name))) : esc(name);
+}
+
+function paneHtml(s, f, row) {
+  const file = f.filename, side = row.kind === "del" ? "del" : "add", line = row.kind === "del" ? row.old : row.new;
+  const ev = lineEvidence(s.data, file, line, side);
+  let h = `<button class="close" data-close title="Close">×</button><h3>${esc(file)}:${line}</h3><pre class="code">${esc(row.text)}</pre>`;
+  if (side === "add") h += `<div class="sub"><a href="${esc(blobUrl(s, file, line))}" target="_blank">Open on GitHub</a>${row.kind === "ctx" ? " · this PR does not change this line" : ""}</div>`;
+  else h += `<div class="sub">This PR removes this line.</div>`;
+  if (side === "add") h += evidenceHtml(s, f, line, ev);
+  h += commentsHtml(s, f, row, line, ev.comments);
+  h += `<h4>Ask an AI</h4><div class="sub">Paste this into your agent. The library-pr-review skill reads the same CI artifacts as this page, and the code.</div>
+    <textarea readonly id="prompt">${esc(promptFor(s, file, line, row.text))}</textarea><button class="tool" data-copy="prompt">Copy</button>`;
+  return h;
+}
+
+function evidenceHtml(s, f, line, ev) {
+  let h = "<h4>Coverage</h4>";
+  if (!f.code) h += `<div class="sub">Not a code file.</div>`;
+  else if (ev.local === null && ev.server === null) h += `<div class="sub">${s.data.local || s.data.server ? "No coverage tool counts this line, so it is not code that runs, like a comment or a declaration." : "No coverage on this commit yet."}</div>`;
+  else {
+    const runs = [ev.local !== null && `local tests ran it ${plural(ev.local, "time")}`, ev.server !== null && `test servers ran it ${plural(ev.server, "time")}`].filter(Boolean);
+    h += `<div class="${ev.local || ev.server ? "" : "bad"}">${ev.local || ev.server ? esc(runs.join("; ")) : "No test runs this line."}</div>`;
+    if (ev.branches.total) h += `<div class="${ev.branches.missed ? "warn" : "sub"}">${ev.branches.missed ? `${ev.branches.missed} of ${ev.branches.total} branches here never taken` : `all ${ev.branches.total} branches taken`}</div>`;
+  }
+  if (ev.mutants.length) {
+    h += `<h4>Mutants</h4><ul>${ev.mutants.map(m => {
+      const by = m.killed_by ? ` · caught by ${testLink(s, m.killed_by)}` : "";
+      const why = { survived: "every test that runs this line still passes", not_covered: "no test runs this line", unviable: "does not compile, not counted" }[m.status] || "";
+      return `<li><span class="${BAD_MUTANT.has(m.status) ? "bad" : m.status === "unviable" ? "sub" : "good"}">${esc(m.status.replace("_", " "))}</span>: ${esc(m.description)}${by}${why ? ` <small class="sub">(${why})</small>` : ""}</li>`;
+    }).join("")}</ul>`;
+  }
+  if (ev.tests.length) {
+    const groups = new Map();
+    for (const t of ev.tests) {
+      const group = t.source === "local" ? "Local tests" : `Test server (${t.language})`;
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push(t);
+    }
+    h += `<h4>Tests that run this line</h4>`;
+    for (const [group, list] of groups) {
+      h += `<div>${esc(group)}: ${list.length}</div><ul>${list.slice(0, 15).map(t => {
+        const own = s.tests[shortTest(t.name)], url = serverTestUrl(t.name);
+        const name = esc(shortTest(t.name)), cls = String(t.name).split("#")[0].split(".").pop();
+        const shown = own ? lineLink(s, own.file, own.line, name) : url ? `<a href="${esc(url)}" target="_blank">${esc(cls)}</a> ${name}` : esc(t.name);
+        return `<li>${shown}${t.status && t.status !== "passed" ? ` <span class="bad">${esc(t.status)}</span>` : ""}</li>`;
+      }).join("")}${list.length > 15 ? `<li class="sub">and ${list.length - 15} more</li>` : ""}</ul>`;
+    }
+  } else if (f.code && s.data.tests && (ev.local || ev.server)) {
+    const sources = [...new Set(s.data.tests.names.map(t => (t.source === "local" ? "local tests" : `${t.language} test server`)))];
+    h += `<h4>Tests that run this line</h4><div class="sub">Coverage says tests run it, but no per-test record names it. This commit has per-test records only for: ${esc(sources.join(", "))}.</div>`;
+  }
+  if (ev.duvet.length || ev.reach.length) {
+    h += `<h4>Duvet</h4><ul>${ev.duvet.map(b => `<li><span class="tag">${esc(b.type)}</span> <code>${esc(b.target)}</code>: ${esc(b.quote)}${b.reason ? ` <small class="sub">(${esc(b.reason)})</small>` : ""}</li>`).join("")}`
+      + ev.reach.map(r => {
+        const t = r.test, url = `https://github.com/${t.repository}/blob/${t.commit || "main"}/${t.path}#L${t.line}`;
+        const said = { ok: "runs this code", "never-reaches": "never runs this code", "not-run": "did not run" }[r.state] || r.state;
+        return `<li><span class="${r.state === "ok" ? "good" : r.state === "never-reaches" ? "bad" : "warn"}">The test at <a href="${esc(url)}" target="_blank">${esc(fileName(t.path))}:${t.line}</a> ${esc(said)}</span>: ${esc(r.requirement.quote)}${r.detail ? `<div class="sub">${esc(r.detail)}</div>` : ""}</li>`;
+      }).join("") + `</ul>`;
+  }
+  const items = (s.data.api.items || []).filter(i => i.file === f.filename && i.line === line);
+  if (ev.api.length || items.length) {
+    const run = s.data.api.run, base = `../api-examples/types.html?ref=${encodeURIComponent(REF)}${run ? "&run=" + run.id : ""}`;
+    h += `<h4>API</h4><ul>${items.map(i => `<li>${esc(i.side)} public ${esc(i.kind)} <code>${esc(i.name)}</code>${i.owner ? ` on <code>${esc(i.owner)}</code>` : ""}</li>`).join("")}`
+      + ev.api.map(a => `<li>${esc(a.apiName)}${a.option ? `: option <code>${esc(a.option)}</code>` : ""} · <a href="${esc(`${base}&api=${encodeURIComponent(a.lib + "|" + a.api)}`)}" target="_blank">its types</a></li>`).join("") + `</ul>`;
+  }
+  return h;
+}
+
+function commentsHtml(s, f, row, line, comments) {
+  let h = `<h4>Review comments</h4>`;
+  h += comments.map(c => `<div class="comment"><div class="who">${esc(c.user ? c.user.login : "")} · <a href="${esc(c.html_url)}" target="_blank">${esc((c.created_at || "").slice(0, 10))}</a></div>
+    <div>${esc(c.body).replace(/\n/g, "<br>")}</div><button class="tool" data-reply="${c.in_reply_to_id || c.id}">Reply</button></div>`).join("");
+  if (row.kind === "hunk") return h;
+  const where = (s.composing && s.composing.reply) ? `Reply to comment ${s.composing.reply}` : `Comment on line ${line}`;
+  h += `<textarea id="comment" placeholder="${esc(where)}. GitHub posts it as you, with your dashboard token.">${esc((s.composing && s.composing.text) || "")}</textarea>
+    <button class="tool" data-post>${esc(where)}</button>${s.composing && s.composing.reply ? ` <button class="tool" data-cancel-reply>Comment on the line instead</button>` : ""}
+    ${s.posted ? `<div class="${s.posted.ok ? "good" : "bad"}">${esc(s.posted.text)}</div>` : ""}`;
+  return h;
+}
+
+function promptFor(s, file, line, text) {
+  return `Use the library-pr-review skill on ${s.repo}#${s.n}. Look at ${file}:${line}:\n    ${text.trim()}\nQuestion: `;
+}
+function prPrompt(s) {
+  const flags = s.flags.map(f => `- ${f.text}`).join("\n") || "- nothing flagged";
+  return `Use the library-pr-review skill to review ${s.repo}#${s.n} (${s.pr.title}). The PR review page flags:\n${flags}\nReview the code against its spec, probe each flag, and draft review comments in chat. Do not post them.`;
+}
+
+async function postComment() {
+  const s = state, f = s.files[selected.f], row = f.rows[selected.r];
+  const body = ($("comment").value || "").trim();
+  if (!body) return;
+  s.composing = { ...(s.composing || {}), text: body };
+  try {
+    const c = s.composing.reply
+      ? await send("POST", `repos/${s.repo}/pulls/${s.n}/comments/${s.composing.reply}/replies`, { body })
+      : await send("POST", `repos/${s.repo}/pulls/${s.n}/comments`, { body, commit_id: s.pr.head.sha, path: f.filename,
+        line: row.kind === "del" ? row.old : row.new, side: row.kind === "del" ? "LEFT" : "RIGHT" });
+    addComment(s, c);
+    s.composing = null;
+    s.posted = { ok: true, text: "Posted." };
+  } catch (e) {
+    s.posted = { ok: false, text: `Not posted: ${e.message}. The token needs write access to pull requests in ${s.repo}.` };
+  }
+  render();
+}
+
+// ---------- clicks ----------
+function select(fi, ri) {
+  selected = { f: fi, r: ri };
+  state.composing = null;
+  state.posted = null;
+  closed.delete(state.files[fi].filename);
+  render();
+  const row = document.querySelector && document.querySelector(`tr[data-f="${fi}"][data-r="${ri}"]`);
+  if (row && row.scrollIntoView) row.scrollIntoView({ block: "center" });
+}
+
+$("top").addEventListener("click", e => {
+  if (e.target.closest("[data-start-api]")) return startApiRun();
+  if (e.target.closest("[data-ask-pr]")) {
+    e.preventDefault();
+    state.askPr = !state.askPr;
+    return render();
+  }
+  const copy = e.target.closest("[data-copy-pr]");
+  if (copy) {
+    if (navigator.clipboard) navigator.clipboard.writeText($("pr-prompt").value);
+    copy.textContent = "Copied";
+    return;
+  }
+  const li = e.target.closest("[data-flag]");
+  if (!li || e.target.closest("a")) return;
+  focus = focus === li.dataset.flag ? null : li.dataset.flag;
+  render();
+  const first = focus && document.querySelector && document.querySelector("tr.hl");
+  if (first && first.scrollIntoView) first.scrollIntoView({ block: "center" });
+});
+
+$("files").addEventListener("click", e => {
+  if (e.target.closest("a")) return;
+  const tr = e.target.closest("tr[data-r]");
+  if (tr) return select(+tr.dataset.f, +tr.dataset.r);
+});
+$("files").addEventListener("change", e => {
+  if (e.target.id === "only") { onlyFlagged = e.target.checked; render(); }
+});
+$("files").addEventListener("toggle", e => {
+  const d = e.target.closest && e.target.closest("details[data-file]");
+  if (!d || !state) return;
+  const name = state.files[+d.dataset.file].filename;
+  if (d.open === closed.has(name)) { d.open ? closed.delete(name) : closed.add(name); render(); }
+}, true);
+
+$("detail").addEventListener("click", e => {
+  if (e.target.closest("[data-close]")) { selected = null; return render(); }
+  const go = e.target.closest("[data-goto]");
+  if (go) { e.preventDefault(); const [fi, ri] = go.dataset.goto.split(":").map(Number); return select(fi, ri); }
+  if (e.target.closest("[data-post]")) return postComment();
+  const reply = e.target.closest("[data-reply]");
+  if (reply) { state.composing = { reply: +reply.dataset.reply, text: $("comment").value || "" }; return render(); }
+  if (e.target.closest("[data-cancel-reply]")) { state.composing = { text: $("comment").value || "" }; return render(); }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    const text = $(copy.dataset.copy).value;
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+    copy.textContent = "Copied";
+  }
+});
+
+// Drag the divider to resize the two panes, like the test server and types pages. Double-click resets it.
+(() => {
+  const main = $("main"), div = $("divider");
+  const set = px => main.style.setProperty("--left", px ? px + "px" : "1.6fr");
+  set(+localStorage.getItem("prReviewLeftPane") || 0);
+  div.addEventListener("mousedown", e => {
+    e.preventDefault(); div.classList.add("drag"); document.body.classList.add("resizing");
+    const move = ev => {
+      const px = Math.min(Math.max(ev.clientX - main.getBoundingClientRect().left, 360), main.clientWidth - 300);
+      set(px); localStorage.setItem("prReviewLeftPane", Math.round(px));
+    };
+    const up = () => { div.classList.remove("drag"); document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  });
+  div.addEventListener("dblclick", () => { localStorage.removeItem("prReviewLeftPane"); set(0); });
+})();
+
+// ?pr= wins. Otherwise the box shows the PR the test server pages last showed.
+$("source").value = QUERY.get("pr") || readSource();
+$("source").addEventListener("change", e => { writeSource(e.target.value.trim()); load(); });
+load();
+</script>
+</body>
+</html>

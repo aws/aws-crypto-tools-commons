@@ -44,7 +44,7 @@ class GitHubDashboard {
         // If URL has a hash, switch to that section; otherwise load dashboard
         if (window.location.hash) {
             const section = window.location.hash.slice(1);
-            if (['dashboard', 'pull-requests', 'issues', 'actions', 'duvet', 'test-servers', 'settings'].includes(section)) {
+            if (['dashboard', 'pull-requests', 'pr-review', 'issues', 'actions', 'duvet', 'test-servers', 'settings'].includes(section)) {
                 this.switchSection(section);
             } else {
                 this.switchSection('dashboard');
@@ -245,6 +245,13 @@ class GitHubDashboard {
             // The duvet page fetches its own reports, so load the frame once.
             const frame = document.getElementById('duvetFrame');
             if (!frame.getAttribute('src')) frame.src = 'duvet/index.html';
+            return;
+        }
+
+        if (section === 'pr-review') {
+            // The PR review page fetches its own data. ?pr=owner/repo%23N on the dashboard's URL picks the PR.
+            const frame = document.getElementById('prReviewFrame');
+            if (!frame.getAttribute('src')) frame.src = 'pr-review/index.html' + window.location.search;
             return;
         }
 
@@ -1309,10 +1316,20 @@ class GitHubDashboard {
             <div class="card-body">
                 <div class="card-body-content markdown-body">${body}</div>
                 <a href="${item.html_url}" target="_blank" class="card-body-link">View on GitHub →</a>
+                ${section === 'pull-requests' ? this.reviewLink(item) : ''}
             </div>
         `;
 
         return el;
+    }
+
+    // A link that opens this PR on the PR Review page.
+    reviewLink(pr) {
+        const m = (pr.html_url || '').match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+        if (!m) return '';
+        const query = new URLSearchParams(window.location.search);
+        query.set('pr', `${m[1]}#${m[2]}`);
+        return `<a href="?${this.escapeHtml(query.toString())}#pr-review" class="card-body-link" onclick="event.stopPropagation()">Review it here →</a>`;
     }
 
     createPullRequestCard(pr) {
@@ -1342,6 +1359,7 @@ class GitHubDashboard {
             <div class="card-body">
                 <div class="card-body-content markdown-body">${body}</div>
                 <a href="${pr.html_url}" target="_blank" class="card-body-link">View on GitHub →</a>
+                ${this.reviewLink(pr)}
             </div>
             <div class="card-footer">
                 <div class="card-labels">
