@@ -317,8 +317,14 @@ const FINDING_FLAGS = [
   [/^fuzz-case-failed$/, "fuzz", n => `${n} fuzz case${n === 1 ? "" : "s"} failed`],
   [/^conformance-open$/, "conformance", n => `Smithy conformance: ${n} open finding${n === 1 ? "" : "s"}`],
   [/^api-/, "api", () => "The public API changes"],
-  [/^cheat-/, "cheat", n => `${n} change${n === 1 ? " weakens" : "s weaken"} the checks`],
 ];
+
+// A finding's text, which is GitHub markdown, as HTML: its `code`, and its links to https pages.
+function md(text) {
+  const html = String(text == null ? "" : text).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  return html.replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+}
 
 // The page's flags from findings.json, one per kind of finding, blocking ones first.
 function flagsFromFindings(data) {
@@ -363,6 +369,6 @@ function noise(comments) {
   return [...by.values()].sort((a, b) => b.down / b.comments - a.down / a.comments || b.down - a.down);
 }
 
-const exported = { FAILED_CHECK, FINDING_FLAGS, flagsFromFindings, findingsAt, markerOf, noise, CODE_FILE, TEST_FILE, TEST_SERVER_CODE, BAD_MUTANT, parsePR, diffRows, annotations, testFunctions, shortTest,
+const exported = { FAILED_CHECK, FINDING_FLAGS, flagsFromFindings, findingsAt, markerOf, noise, md, CODE_FILE, TEST_FILE, TEST_SERVER_CODE, BAD_MUTANT, parsePR, diffRows, annotations, testFunctions, shortTest,
   junitId, shortPaths, publicItems, apiDiff, apiAt, lineRun, branchesMissed, findFlags, lineEvidence };
 if (typeof module !== "undefined") module.exports = exported;

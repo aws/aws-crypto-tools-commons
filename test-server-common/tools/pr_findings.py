@@ -15,7 +15,8 @@ Usage:
       token's account. A finding that changed has its comment edited. A comment whose finding is gone
       gets a "Fixed" line, and its thread is resolved. A token without contents: write cannot resolve
       a thread, so then the comment is hidden as resolved. A comment is marked fixed only when the run
-      read its check's results for that comment's project.
+      read its check's results for that comment's project. A comment of a kind turned off with --off,
+      or of a check this script no longer has, is hidden as outdated.
   pr_findings.py line <owner/repo#N> <file>:<line> [--run <id>]...
       Prints everything CI found on one line, changed or not.
 
@@ -30,11 +31,12 @@ findings.json:
   A finding:
   {"key", "check", "kind", "level", "file", "line", "side", "title", "what", "why": [<sentence>],
    "fix", "evidence": {...}, "patch": [<old line>, <new line>] or null, "rerun": [<shell command>],
-   "suggestion": <replacement for the line> or null, "links": {"dashboard", "ci"}}
+   "suggestion": <replacement for the line> or null, "links": {"dashboard", "ci", "ci_name"}}
   level is "block" for a gap in testing, which a required check fails on too, and "warn" for a note
-  for the reviewer, such as a new API option. file and line are null for a finding about no one line,
-  such as a failed test server case. side is "RIGHT" for a line of the head commit and "LEFT" for a
-  removed line. key stays the same for the same finding after a push, so its comment is found again.
+  for the reviewer, on a change to the public API. file and line are null for a finding about no one
+  line, such as a failed test server case. side is "RIGHT" for a line of the head commit and "LEFT"
+  for a removed line. key stays the same for the same finding after a push, so its comment is found
+  again. links.ci is the check run the finding comes from, named ci_name, or else the workflow run.
   The rerun commands use $RUST and $COMMONS for checkouts of the library repository and of commons.
 """
 
@@ -45,6 +47,7 @@ import hashlib
 import io
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -66,6 +69,17 @@ CODE_FILE = re.compile(r"\.(rs|java|kt|go|cs|py|ts|js|mjs|c|h|cc|cpp|hpp|dfy)$")
 TEST_FILE = re.compile(r"(^|/)(tests?|benches|examples)/|_tests?\.rs$|Tests?\.java$|\.test\.js$")
 # The check runs that only sum up the others, and the job that runs this script.
 SUMMARY_CHECKS = re.compile(r"^pr-ci-all-required$|^PR findings\b", re.I)
+# The checks that findings come from. A findings comment of another check is from an older version of
+# this script, and is hidden.
+CHECKS = {"checks", "lines", "branches", "mutation", "reach", "servers", "fuzz", "conformance", "api"}
+# The names of the check runs that some checks read their results from; {folder} is the project's folder.
+CHECK_RUNS = {
+    "lines": r"^Patch coverage \({folder}\)( /|$)",
+    "branches": r"^Patch coverage \({folder}\)( /|$)",
+    "mutation": r"^Mutation testing \({folder}\)( /|$)",
+    "reach": r"^duvet test reach \({folder}\)( /|$)",
+    "api": r"^API types$",
+}
 
 
 # ---------- GitHub ----------
@@ -308,6 +322,19 @@ def ranges(numbers):
 
 def plural(n, one, many=None):
     return f"{n} {one if n == 1 else (many or one + 's')}"
+
+
+MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+
+
+def heading_anchors(text):
+    """The anchors GitHub gives a markdown file's headings: "## Encrypted Data Key" -> "encrypted-data-key"."""
+    seen, out = collections.Counter(), set()
+    for m in re.finditer(r"^#{1,6}[ \t]+(.+?)[ \t#]*$", text, re.M):
+        anchor = re.sub(r"[^\w\- ]", "", m[1].strip().lower()).replace(" ", "-")
+        out.add(f"{anchor}-{seen[anchor]}" if seen[anchor] else anchor)
+        seen[anchor] += 1
+    return out
 
 
 # ---------- mutants ----------
@@ -574,6 +601,7 @@ class PR:
         self.reach, self.servers, self.fuzz, self.conformance = [], {}, {}, []
         self.api = {}
         self.blocks = {}
+        self._spec, self.spec_files = "unread", {}
         self._load()
 
     # ----- loading -----
@@ -645,8 +673,6 @@ class PR:
         self._read_servers()
         self._read_conformance()
         self._read_api()
-        # The notes on changes that weaken the checks come from the diff, which every run reads.
-        self.checked["cheat"].add("")
 
     def zip(self, art):
         try:
@@ -805,21 +831,81 @@ class PR:
         return TEST_FILE.search(file) or any(fnmatch.fnmatch(file, g) for g in self.excludes)
 
     def dashboard(self, base, file=None, line=None):
-        query = {"pr": f"{self.repo}#{self.n}"}
+        """The PR Review tab on this PR, at file:line; base may carry a query of its own, such as ?ref=."""
+        url = urllib.parse.urlsplit(base)
+        query = dict(urllib.parse.parse_qsl(url.query))
+        query["pr"] = f"{self.repo}#{self.n}"
         if file:
             query["line"] = f"{file}:{line}"
-        return f"{base}?{urllib.parse.urlencode(query, safe='/:')}#pr-review"
+        return urllib.parse.urlunsplit(url._replace(query=urllib.parse.urlencode(query, safe="/:"), fragment="pr-review"))
 
     def ci_url(self, check=None):
         if check:
             return check.get("html_url")
         return self.runs[0]["html_url"] if self.runs else self.pr["html_url"] + "/checks"
 
+    def check_of(self, f):
+        """The check run a finding comes from, the failed one if one failed, or None."""
+        pattern = CHECK_RUNS.get(f["check"])
+        if not pattern:
+            return None
+        folder = re.escape(f["evidence"].get("library") or folder_of(f["file"] or ""))
+        found = [c for c in self.checks if re.search(pattern.format(folder=folder), c["name"])]
+        return max(found, key=lambda c: (c.get("conclusion") in FAILED_CHECK, c["id"]), default=None)
+
+    # ----- the spec -----
+    def spec_source(self):
+        """(owner/repo, ref) of the spec that the annotations cite as spec/, from scripts/spec-source.json."""
+        if self._spec == "unread":
+            self._spec = None
+            try:
+                src = json.loads(self.gh.raw_file(self.repo, "scripts/spec-source.json", self.head))["spec"]
+                got = re.match(r"https://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$", src["url"])
+                self._spec = (got[1], src["ref"]) if got else None
+            except (RuntimeError, ValueError, KeyError, TypeError):
+                pass
+        return self._spec
+
+    def spec_file(self, path):
+        if path not in self.spec_files:
+            try:
+                self.spec_files[path] = self.gh.raw_file(self._spec[0], path, self._spec[1])
+            except RuntimeError:
+                self.spec_files[path] = None
+        return self.spec_files[path]
+
+    def spec_text(self, quote, target):
+        """A requirement's quote, with each link in it made a GitHub link that opens its part of the spec.
+
+        A quote links to other spec files by relative paths, which go nowhere from a PR comment. A link
+        whose file or heading this cannot find is left as its text.
+        """
+        source = target.split("#")[0]
+
+        def fix(m):
+            text, link = m[1], m[2]
+            if re.match(r"https?://", link):
+                return m[0]
+            path, _, anchor = link.partition("#")
+            if not source.startswith("spec/") or not self.spec_source():
+                return text
+            here = source[len("spec/"):]
+            path = posixpath.normpath(posixpath.join(posixpath.dirname(here), path)) if path else here
+            body = None if path.startswith("..") else self.spec_file(path)
+            if body is None or (anchor and anchor not in heading_anchors(body)):
+                return text
+            repo, ref = self._spec
+            return f"[{text}](https://github.com/{repo}/blob/{ref}/{path}{'#' + anchor if anchor else ''})"
+
+        return MD_LINK.sub(fix, quote)
+
 
 # ---------- finding ----------
 
 def finding(check, kind, level, title, what, file=None, line=None, side="RIGHT", why=(), fix=None, evidence=None,
             rerun=(), patch=None, suggestion=None, key_parts=()):
+    # The comments of a check missing from CHECKS are hidden as outdated.
+    assert check in CHECKS, check
     parts = [check, kind, file or ""] + [str(p) for p in key_parts]
     return {"key": hashlib.sha256("\u0000".join(parts).encode()).hexdigest()[:16], "check": check, "kind": kind,
             "level": level, "file": file, "line": line, "side": side, "title": title, "what": what,
@@ -881,7 +967,6 @@ def build_findings(pr, dashboard=DASHBOARD):
     out += server_findings(pr)
     out += conformance_findings(pr)
     out += api_findings(pr)
-    out += cheat_findings(pr)
     unrun = {(f["file"], f["line"]) for f in out if f["kind"] == "line-not-run"}
     out = [f for f in out if not (f["kind"] == "mutant-not-covered" and (f["file"], f["line"]) in unrun)]
     # Two findings can have the same key, such as two `//= type=implication` lines in one file.
@@ -902,7 +987,10 @@ def build_findings(pr, dashboard=DASHBOARD):
         pr.missing.append("API types")
     for f in out:
         f["links"]["dashboard"] = pr.dashboard(dashboard, f["file"], f["line"])
-        f["links"]["ci"] = f["links"].get("ci") or pr.ci_url()
+        if not f["links"].get("ci"):
+            check = pr.check_of(f)
+            f["links"]["ci"] = check["html_url"] if check else pr.ci_url()
+            f["links"]["ci_name"] = check["name"].split(" / ")[0] if check else None
     return out
 
 
@@ -912,7 +1000,7 @@ def check_findings(pr):
         if c.get("conclusion") in FAILED_CHECK and not SUMMARY_CHECKS.search(c["name"]):
             f = finding("checks", "check-failed", "block", "Check failed", f"`{c['name']}` failed.",
                         key_parts=[c["name"]], evidence={"conclusion": c["conclusion"]})
-            f["links"]["ci"] = c.get("html_url")
+            f["links"]["ci"], f["links"]["ci_name"] = c.get("html_url"), c["name"].split(" / ")[0]
             out.append(f)
     return out
 
@@ -929,12 +1017,11 @@ def line_findings(pr):
             state = pr.run_state(file, line)
             text = pr.line_text(file, line) or ""
             if state == "not-run":
+                # The tests that run a line just above are the ones to extend, for an agent that adds the test.
                 above = next((n for n in range(line - 1, max(0, line - 12), -1) if pr.run_state(file, n) == "run"), None)
                 tests = pr.tests_at(file, above) if above else []
-                why = [f"{plural(len(tests), 'test')} run line {above}, just above, but none runs this one."
-                       if tests else f"Tests run line {above}, just above, but none runs this one." if above else None]
                 out.append(finding("lines", "line-not-run", "block", "No test runs this line", "No test runs this line.",
-                                   file, line, why=why, fix="Add a test that runs this line, or remove it if nothing can.",
+                                   file, line, fix="Add a test that runs this line, or remove it if nothing can.",
                                    evidence={"above": above, "tests_above": [t["name"] for t in tests[:10]]},
                                    rerun=coverage_rerun(pr, file), key_parts=[text.strip()]))
             elif state == "run":
@@ -993,17 +1080,8 @@ def reach_findings(pr):
         names = [run["test"] for run in first["runs"]]
         hits = sorted({line for run in pr.tests["names"] if run["name"] in names
                        for line in lines_of(pr, run["name"], first["path"])})
-        last = max((h for h in hits if h < first["from"]), default=None)
-        why = [f"The test at {test_file}:{t['line']} cites: “{req['quote']}”",
+        why = [f"The test at {test_file}:{t['line']} cites: “{pr.spec_text(req['quote'], req['target'])}”",
                f"It runs, but never reaches lines {first['from']}-{first['to']}."]
-        after = min((h for h in hits if h > first["to"]), default=None)
-        if hits:
-            near = [f"the last one before this code is {last}" if last else None,
-                    f"the next one after it is {after}" if after else None]
-            why.append(f"It runs {plural(len(hits), 'line')} of this file" + (": " if any(near) else "")
-                       + ", and ".join(n for n in near if n) + ".")
-        elif names:
-            why.append("It runs no line of this file.")
         product = PRODUCT_DIRS.get(first["library"], first["library"])
         cls = test_cls(names[0]) if names else None
         rerun = []
@@ -1020,7 +1098,7 @@ def reach_findings(pr):
                     "The duvet test for this requirement never runs this code.", where[0], where[1], why=why,
                     fix="Make that test reach this code, or move the annotation to the code it does run.",
                     evidence={"requirement": req, "test": t, "regions": [[r["path"], r["from"], r["to"]] for r in rs],
-                              "runs": names[:10], "lines_run": ranges(hits)},
+                              "runs": names[:10], "lines_run": ranges(hits), "library": first["library"]},
                     rerun=rerun, key_parts=[req["target"], req["quote"], t["path"], t["line"]])
         out.append(f)
     return out
@@ -1117,121 +1195,6 @@ def api_findings(pr):
     return out
 
 
-# ---------- changes that weaken the checks ----------
-
-CHEAT_ADDED = [
-    # (file pattern, line pattern, kind, title, why)
-    (r"\.rs$", r"^\s*#\[ignore\b", "cheat-ignore", "Test ignored", "An ignored test does not run in CI."),
-    (r"", r"coverage\(off\)|coverage_nightly|LCOV_EXCL|grcov[-_]excl", "cheat-coverage-off", "Coverage turned off",
-     "Lines under this are left out of the line and branch checks."),
-    (r"", r"mutants::skip|#\[mutants?\b|//\s*mutants?:\s*skip", "cheat-mutation-skip", "Mutation skipped",
-     "Mutants under this are not tested."),
-    (r"", r"^\s*//=\s*type=exception\b", "cheat-duvet-exception", "Duvet exception",
-     "An exception marks a requirement as not done on purpose."),
-    (r"", r"^\s*//=\s*type=implication\b", "cheat-duvet-implication", "Duvet implication",
-     "An implication counts as both the code and the test for a requirement."),
-    (r"^\.github/", r"continue-on-error:\s*true", "cheat-continue-on-error", "A failing step no longer fails",
-     "With continue-on-error, this step can fail and the job still passes."),
-    # Only on the line that runs the check: other tools take --exclude too, this one included.
-    (r"^\.github/", r"(diff-cover|branch_gate|llvm-cov|mutate\.py).*(--exclude|--sample)\b",
-     "cheat-check-narrowed", "A check covers less", "This leaves code out of a check."),
-    (r"(^|/)scripts/smithy-conformance/.*\.toml$", r"^\s*accepted\s*=|status\s*=\s*\"(accepted|deferred)\"",
-     "cheat-deviation", "Conformance deviation", "A deviation lets code differ from the Smithy model."),
-]
-CHEAT_REMOVED = [
-    (r"^\.github/", r"--fail-on-survivors|--fail-under\s+100\b", "cheat-check-narrowed", "A check covers less",
-     "A check no longer fails on this."),
-]
-
-
-def cheat_findings(pr):
-    out = []
-    for f in pr.files:
-        file, rows = f["file"], f["rows"]
-        for kind_row, _, new, text in rows:
-            if kind_row != "add":
-                continue
-            for fpat, lpat, kind, title, why in CHEAT_ADDED:
-                if re.search(fpat, file) and re.search(lpat, text):
-                    out.append(finding("cheat", kind, "warn", title, why, file, new, key_parts=[text.strip()]))
-        for kind_row, old, _, text in rows:
-            if kind_row != "del":
-                continue
-            for fpat, lpat, kind, title, why in CHEAT_REMOVED:
-                if re.search(fpat, file) and re.search(lpat, text):
-                    out.append(finding("cheat", kind, "warn", title, why, file, old, side="LEFT",
-                                       key_parts=["removed", text.strip()]))
-        if TEST_FILE.search(file) and file.endswith(".rs"):
-            gone = [old for k, old, _, text in rows if k == "del" and re.search(r"\bassert\w*!", text)]
-            added = [1 for k, _, _, text in rows if k == "add" and re.search(r"\bassert\w*!", text)]
-            if len(gone) > len(added):
-                out.append(finding("cheat", "cheat-assert-removed", "warn", "Asserts removed",
-                                   f"This file loses {plural(len(gone) - len(added), 'assert')}.", file, gone[0],
-                                   side="LEFT", why=["A test with fewer asserts checks less."],
-                                   key_parts=[len(gone) - len(added)]))
-        name = file.split("/")[-1]
-        if name in ("bug-config.json", "feature-config.json"):
-            out += config_findings(pr, file, name)
-        if file.endswith(".github/workflows/ci.yml"):
-            out += required_findings(pr, file)
-    return out
-
-
-def json_or(text, default):
-    try:
-        return json.loads(text) if text else default
-    except ValueError:
-        return default
-
-
-def line_of(text, needle):
-    for i, line in enumerate((text or "").split("\n"), 1):
-        if needle in line:
-            return i
-    return None
-
-
-def config_findings(pr, file, name):
-    head, base = json_or(pr.text(file), None), json_or(pr.base_text(file), {})
-    if head is None:
-        return []
-    out = []
-    if name == "bug-config.json":
-        new = [b for b in (head if isinstance(head, list) else head.get("bugs", []))
-               if b not in (base if isinstance(base, list) else base.get("bugs", []))]
-        for bug in new:
-            label = bug if isinstance(bug, str) else bug.get("id") or json.dumps(bug)[:60]
-            line = line_of(pr.text(file), label if isinstance(label, str) else "")
-            out.append(finding("cheat", "cheat-known-bug", "warn", "Known bug added",
-                               f"This adds the known bug `{label}`.", file if line else None, line,
-                               why=["The tests it names are skipped for this language."], key_parts=[label]))
-    else:
-        was = set(base.get("unsupportedFeatures", [])) if isinstance(base, dict) else set()
-        for feature in sorted(set(head.get("unsupportedFeatures", [])) - was):
-            line = line_of(pr.text(file), f'"{feature}"')
-            out.append(finding("cheat", "cheat-unsupported-feature", "warn", "Feature marked unsupported",
-                               f"`{feature}` is now unsupported here.", file if line else None, line,
-                               why=["Its test server tests are skipped for this language."], key_parts=[feature]))
-    return [f for f in out if f["file"] is None or pr.commentable(f["file"], f["line"])]
-
-
-def required_needs(text):
-    """The jobs that pr-ci-all-required waits on, in a ci.yml."""
-    got = re.search(r"\n  pr-ci-all-required:\n(?:    .*\n)*?    needs:\n((?:      - .*\n)+)", text or "")
-    return [re.sub(r"^\s*-\s*", "", line).strip() for line in got[1].splitlines()] if got else []
-
-
-def required_findings(pr, file):
-    gone = sorted(set(required_needs(pr.base_text(file))) - set(required_needs(pr.text(file))))
-    out = []
-    for job in gone:
-        line = next((old for k, old, _, text in pr.rows[file] if k == "del" and text.strip() == f"- {job}"), None)
-        out.append(finding("cheat", "cheat-required-removed", "warn", "A check no longer blocks merging",
-                           f"pr-ci-all-required no longer waits on `{job}`.", file if line else None, line,
-                           side="LEFT", key_parts=[job]))
-    return out
-
-
 # ---------- writing ----------
 
 def build(args):
@@ -1298,7 +1261,7 @@ def short_test(name):
     return head.split(".")[-1] + sep + rest if sep else name.split("::")[-1]
 
 
-def comment_body(data, f):
+def comment_body(f):
     """The review comment for one finding."""
     label = "blocks merging" if f["level"] == "block" else "note"
     out = [f"**{f['title']}** ({label})", "", f["what"]]
@@ -1314,20 +1277,8 @@ def comment_body(data, f):
         out += ["", f"<details><summary>{plural(count, 'test runs', 'tests run')} this line</summary>", ""]
         out += [f"- `{short_test(t)}`" for t in tests[:10]] + ([f"- and {count - 10} more"] if count > 10 else [])
         out += ["", "</details>"]
-    if f["patch"] or f["rerun"]:
-        out += ["", "<details><summary>Run it locally</summary>", ""]
-        if f["patch"]:
-            out += ["Make this change, run the tests, then undo it. A test must fail.", "", "```diff",
-                    f"-{f['patch'][0]}", f"+{f['patch'][1]}", "```", ""]
-        if f["rerun"]:
-            out += ["Set `RUST` and `COMMONS` to your checkouts. These are the steps CI runs.", "", "```sh"]
-            out += f["rerun"] + ["```", ""]
-        out += ["</details>"]
-    where = f"{f['file']}:{f['line']}" if f["file"] else ""
-    ask = (f"Use the library-pr-review skill on {data['repository']}#{data['pr']}. "
-           f"Look at {where}: {f['title'].lower()}.")
-    out += ["", "<details><summary>Ask AI</summary>", "", "```text", ask, "```", "", "</details>"]
-    out += ["", f"[View in dashboard]({f['links']['dashboard']}) · [CI run]({f['links']['ci']}) · "
+    ci = f["links"].get("ci_name") or "CI run"
+    out += ["", f"[View in dashboard]({f['links']['dashboard']}) · [{ci}]({f['links']['ci']}) · "
                 "React 👎 if this is not useful."]
     out.append(MARKER + json.dumps({"key": f["key"], "kind": f["kind"], "check": f["check"]}) + " -->")
     return "\n".join(out)
@@ -1360,21 +1311,26 @@ def plan(data, comments, threads, off=(), login="github-actions[bot]"):
     wanted = {f["key"]: f for f in data["findings"] if f["file"] and f["kind"] not in off}
     ours = [c for c in comments if not c.get("in_reply_to_id") and marker_of(c.get("body"))
             and (c.get("user") or {}).get("login") == login]
-    actions = {"create": [], "update": [], "close": [], "reopen": []}
+    actions = {"create": [], "update": [], "close": [], "reopen": [], "hide": []}
     seen = set()
     for c in sorted(ours, key=lambda c: c["id"], reverse=True):
         marker, thread = marker_of(c["body"]), threads.get(c["id"])
+        if marker.get("kind") in off or marker.get("check", "lines") not in CHECKS:
+            # A kind turned off, or a check this script no longer has: its comment goes, but nothing was fixed.
+            if thread and not thread["hidden"]:
+                actions["hide"].append(thread)
+            continue
         f = wanted.get(marker["key"])
         same_place = f and c.get("line") == f["line"] and c.get("path") == f["file"] and (c.get("side") or "RIGHT") == f["side"]
         if f and marker["key"] not in seen and same_place:
             seen.add(marker["key"])
-            body = comment_body(data, f)
+            body = comment_body(f)
             if c["body"] != body:
                 actions["update"].append((c["id"], body))
             if thread and (thread["resolved"] or thread["hidden"]):
                 actions["reopen"].append(thread)
             continue
-        if not thread or thread["resolved"] or thread["hidden"] or marker.get("kind") in off:
+        if not thread or thread["resolved"] or thread["hidden"]:
             continue
         if not f:
             # A finding is also missing when the run did not read its check's results, and that is no fix.
@@ -1410,10 +1366,11 @@ def threads_of(gh, repo, n):
 
 # The changes to a findings comment's thread, by GraphQL mutation.
 MUTATIONS = {
-    "resolveReviewThread": "resolveReviewThread(input: {threadId: $id}) { thread { id } }",
-    "unresolveReviewThread": "unresolveReviewThread(input: {threadId: $id}) { thread { id } }",
-    "minimizeComment": "minimizeComment(input: {subjectId: $id, classifier: RESOLVED}) { minimizedComment { isMinimized } }",
-    "unminimizeComment": "unminimizeComment(input: {subjectId: $id}) { unminimizedComment { isMinimized } }",
+    "resolveReviewThread": "mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { id } } }",
+    "unresolveReviewThread": "mutation($id: ID!) { unresolveReviewThread(input: {threadId: $id}) { thread { id } } }",
+    "minimizeComment": ("mutation($id: ID!, $why: ReportedContentClassifiers!) { minimizeComment("
+                        "input: {subjectId: $id, classifier: $why}) { minimizedComment { isMinimized } } }"),
+    "unminimizeComment": "mutation($id: ID!) { unminimizeComment(input: {subjectId: $id}) { unminimizedComment { isMinimized } } }",
 }
 
 
@@ -1430,10 +1387,10 @@ def post(args):
     threads = threads_of(gh, repo, n)
     actions = plan(data, comments, threads, off=set(args.off), login=args.login)
     print(f"create {len(actions['create'])}, edit {len(actions['update'])}, close {len(actions['close'])}, "
-          f"reopen {len(actions['reopen'])}")
+          f"reopen {len(actions['reopen'])}, hide {len(actions['hide'])}")
     if args.dry_run:
         for f in actions["create"]:
-            print(f"--- would comment on {f['file']}:{f['line']} ({f['side']})\n{comment_body(data, f)}\n")
+            print(f"--- would comment on {f['file']}:{f['line']} ({f['side']})\n{comment_body(f)}\n")
         return
     apply(gh, data, actions)
 
@@ -1448,7 +1405,7 @@ def apply(gh, data, actions):
                     f" ({blocks} blocking). [View in dashboard]({data['dashboard']})")
             review = {"commit_id": data["head"], "event": "COMMENT", "body": body,
                       "comments": [{"path": f["file"], "line": f["line"], "side": f["side"],
-                                    "body": comment_body(data, f)} for f in actions["create"]]}
+                                    "body": comment_body(f)} for f in actions["create"]]}
             try:
                 gh.request("POST", f"repos/{repo}/pulls/{n}/reviews", review)
             except RuntimeError as e:
@@ -1471,12 +1428,12 @@ def apply(gh, data, actions):
         raise
     refusals = set()
 
-    def run(name, node):
+    def run(name, node, **more):
         """Runs one mutation, and returns False when GitHub refuses it to this token."""
         if name in refusals:
             return False
         try:
-            gh.graphql(f"mutation($id: ID!) {{ {MUTATIONS[name]} }}", id=node)
+            gh.graphql(MUTATIONS[name], id=node, **more)
             return True
         except RuntimeError as e:
             if not refused(e):
@@ -1489,7 +1446,9 @@ def apply(gh, data, actions):
         # GitHub resolves a thread only for a token with contents: write, which the PR findings job does
         # not get. Hiding the comment as resolved folds it away the same way.
         if not run("resolveReviewThread", t["id"]):
-            run("minimizeComment", t["comment"])
+            run("minimizeComment", t["comment"], why="RESOLVED")
+    for t in actions["hide"]:
+        run("minimizeComment", t["comment"], why="OUTDATED")
     for t in actions["reopen"]:
         if t["hidden"]:
             run("unminimizeComment", t["comment"])
