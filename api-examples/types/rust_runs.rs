@@ -928,7 +928,7 @@ async fn run_73() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x);
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -940,7 +940,7 @@ async fn run_74() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x);
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -951,7 +951,7 @@ async fn run_75() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x);
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -963,7 +963,7 @@ async fn run_76() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_grant_tokens(x);
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -974,7 +974,7 @@ async fn run_77() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x);
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -985,7 +985,7 @@ async fn run_78() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_grant_tokens(Some(x));
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1004,7 +1004,7 @@ async fn run_80() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_grant_tokens(Some(x.to_vec()));
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1017,7 +1017,7 @@ async fn run_81() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x.unwrap());
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1029,7 +1029,7 @@ async fn run_82() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x.unwrap());
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1041,7 +1041,7 @@ async fn run_83() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x.unwrap());
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1052,7 +1052,7 @@ async fn run_84() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.grant_tokens(x.to_string());
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1065,7 +1065,7 @@ async fn run_85() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()));
     let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
+    check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);
 }
 
 #[tokio::test]
@@ -1145,7 +1145,7 @@ async fn run_92() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.kms_key_id(x);
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1157,7 +1157,7 @@ async fn run_93() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.kms_key_id(x);
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1168,7 +1168,7 @@ async fn run_94() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.kms_key_id(x);
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1180,7 +1180,7 @@ async fn run_95() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_kms_key_id(x);
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1191,7 +1191,7 @@ async fn run_96() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.kms_key_id(x);
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1211,7 +1211,7 @@ async fn run_98() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_kms_key_id(x.map(Into::into));
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1223,7 +1223,7 @@ async fn run_99() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.set_kms_key_id(x.map(Into::into));
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1234,7 +1234,7 @@ async fn run_100() {
     let pre = aws_crypto_mpl::keyring::AwsKmsKeyring::builder();
     let built = pre.kms_key_id(x.to_string());
     let result = built.kms_client(kms_client()).build().await;
-    check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
+    check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);
 }
 
 #[tokio::test]
@@ -1246,7 +1246,7 @@ async fn run_101() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x);
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1258,7 +1258,7 @@ async fn run_102() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x);
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1269,7 +1269,7 @@ async fn run_103() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x);
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1281,7 +1281,7 @@ async fn run_104() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.set_branch_key_id(x);
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1292,7 +1292,7 @@ async fn run_105() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x);
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1312,7 +1312,7 @@ async fn run_107() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.set_branch_key_id(x.map(Into::into));
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1324,7 +1324,7 @@ async fn run_108() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.set_branch_key_id(x.map(Into::into));
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1335,7 +1335,7 @@ async fn run_109() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x.to_string());
     let result = built.key_store(key_store().await).ttl(ttl()).build().await;
-    check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
+    check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));
 }
 
 #[tokio::test]
@@ -1346,7 +1346,7 @@ async fn run_110() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(x);
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1357,7 +1357,7 @@ async fn run_111() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1368,7 +1368,7 @@ async fn run_112() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1379,7 +1379,7 @@ async fn run_113() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1390,7 +1390,7 @@ async fn run_114() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1401,7 +1401,7 @@ async fn run_115() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1412,7 +1412,7 @@ async fn run_116() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1423,7 +1423,7 @@ async fn run_117() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1434,7 +1434,7 @@ async fn run_118() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]
@@ -1445,7 +1445,7 @@ async fn run_119() {
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_hierarchical(&mut r, result, |k| k.ttl() == ttl());
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
 }
 
 #[tokio::test]

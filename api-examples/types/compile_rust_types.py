@@ -190,8 +190,9 @@ class Scratch:
         if failed:
             return "", failed
         if built.returncode != 0:
-            # The support code names APIs, like the AWS KMS keyring, that this Rust commit may not have.
-            print("the run tests don't build on this commit, so nothing runs:\n" + built.stderr[-2000:], file=sys.stderr)
+            # The support code may name an API that this Rust commit doesn't have.
+            errors = [m for _, m in compiler_errors(built, ".rs")]
+            print("the run tests don't build on this commit, so nothing runs:\n" + "\n".join(errors)[-3000:], file=sys.stderr)
             return None, {}
         # The tests write their files to the temp folder. This one is in the crate, so remove() deletes them.
         temp = self.dir / "tmp"

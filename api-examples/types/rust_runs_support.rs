@@ -12,7 +12,7 @@ use std::time::Duration;
 
 pub use aws_crypto_mpl::key_store::types::KmsConfiguration;
 pub use aws_crypto_mpl::key_store::DynamoDbKeyStore;
-pub use aws_crypto_mpl::keyring::{AwsKmsKeyring, HierarchicalKeyring, RawAesKeyring};
+pub use aws_crypto_mpl::keyring::RawAesKeyring;
 pub use aws_crypto_mpl::types::AesWrappingAlg;
 
 pub const KEY_NAMESPACE: &str = "my-key-namespace";
@@ -260,18 +260,9 @@ pub async fn check_raw_aes(r: &mut Report, result: Result<RawAesKeyring, aws_cry
     check_encrypt_quietly(r, encrypted).await;
 }
 
-pub fn check_kms(r: &mut Report, result: Result<AwsKmsKeyring, aws_crypto_mpl::Error>, same: fn(&AwsKmsKeyring) -> bool) {
-    r.built(&result);
-    if let Ok(keyring) = &result {
-        r.same(same(keyring));
-    }
-}
-
-pub fn check_hierarchical(
-    r: &mut Report,
-    result: Result<HierarchicalKeyring, aws_crypto_mpl::Error>,
-    same: fn(&HierarchicalKeyring) -> bool,
-) {
+// A keyring that the tests can't use without AWS, like the AWS KMS keyring, is the same when its getter
+// returns the value. This takes any keyring type, so this file builds on a Rust commit that lacks one.
+pub fn check_getter<T>(r: &mut Report, result: Result<T, aws_crypto_mpl::Error>, same: impl Fn(&T) -> bool) {
     r.built(&result);
     if let Ok(keyring) = &result {
         r.same(same(keyring));

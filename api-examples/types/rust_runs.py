@@ -44,7 +44,7 @@ OPTIONS = {
     "mpl/AwsKmsKeyring.kms_key_id": {
         "values": {"text": "KMS_KEY_ARN.to_string()"},
         "finish": ["let result = built.kms_client(kms_client()).build().await;",
-                   "check_kms(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);"],
+                   "check_getter(&mut r, result, |k| k.kms_key_id() == KMS_KEY_ARN);"],
     },
     "mpl/AwsKmsKeyring.kms_client": {
         "values": {},
@@ -53,17 +53,17 @@ OPTIONS = {
     "mpl/AwsKmsKeyring.grant_tokens": {
         "values": {"text": "GRANT_TOKEN.to_string()"},
         "finish": ["let result = built.kms_key_id(KMS_KEY_ARN).kms_client(kms_client()).build().await;",
-                   "check_kms(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);"],
+                   "check_getter(&mut r, result, |k| k.grant_tokens() == [GRANT_TOKEN.to_string()]);"],
     },
     "mpl/HierarchicalKeyring.ttl": {
         "values": {"number": "TTL_SECONDS"},
         "finish": ["let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;",
-                   "check_hierarchical(&mut r, result, |k| k.ttl() == ttl());"],
+                   "check_getter(&mut r, result, |k| k.ttl() == ttl());"],
     },
     "mpl/HierarchicalKeyring.branch_key_id": {
         "values": {"text": "BRANCH_KEY_ID.to_string()"},
         "finish": ["let result = built.key_store(key_store().await).ttl(ttl()).build().await;",
-                   "check_hierarchical(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));"],
+                   "check_getter(&mut r, result, |k| k.branch_key_id() == Some(BRANCH_KEY_ID));"],
     },
     "esdk/encrypt.plaintext": {
         "values": {"bytes": "plaintext_bytes()", "text": "plaintext_text()"},
