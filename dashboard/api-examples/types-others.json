@@ -1761,6 +1761,7 @@
           "type": "ESDKCommitmentPolicy",
           "calls": 0,
           "code": "new AwsEncryptionSdkConfig { CommitmentPolicy = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -1769,6 +1770,7 @@
           "type": "ESDKCommitmentPolicy",
           "calls": 0,
           "code": "AwsEncryptionSdkConfig{CommitmentPolicy: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -1777,6 +1779,7 @@
           "type": "CommitmentPolicy",
           "calls": 0,
           "code": "AwsCrypto.builder().withCommitmentPolicy(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -1785,6 +1788,7 @@
           "type": "CommitmentPolicy",
           "calls": 0,
           "code": "buildClient(options: CommitmentPolicy)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -1793,6 +1797,7 @@
           "type": "CommitmentPolicy",
           "calls": 0,
           "code": "EncryptionSDKClient(commitment_policy=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -1803,6 +1808,7 @@
           "type": "CryptoAlgorithm",
           "calls": 0,
           "code": "AwsCrypto.builder().withEncryptionAlgorithm(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -1813,12 +1819,14 @@
           "type": "int",
           "calls": 0,
           "code": "AwsCrypto.builder().withEncryptionFrameSize(x)",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "long",
           "calls": 1,
           "code": "AwsCrypto.builder().withEncryptionFrameSize(Math.toIntExact(x))",
+          "fix": "Math.toIntExact(x)",
           "kind": "number"
         }
       ]
@@ -1829,6 +1837,7 @@
           "type": "MaterialProviders",
           "calls": 0,
           "code": "AwsCrypto.builder().withMaterialProviders(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -1839,12 +1848,14 @@
           "type": "int",
           "calls": 0,
           "code": "new AwsEncryptionSdkConfig { MaxEncryptedDataKeys = x }",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "long",
           "calls": 0,
           "code": "new AwsEncryptionSdkConfig { MaxEncryptedDataKeys = x }",
+          "fix": "x",
           "kind": "number"
         }
       ],
@@ -1853,6 +1864,7 @@
           "type": "*int64",
           "calls": 0,
           "code": "AwsEncryptionSdkConfig{MaxEncryptedDataKeys: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -1861,12 +1873,14 @@
           "type": "int",
           "calls": 0,
           "code": "AwsCrypto.builder().withMaxEncryptedDataKeys(x)",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "long",
           "calls": 1,
           "code": "AwsCrypto.builder().withMaxEncryptedDataKeys(Math.toIntExact(x))",
+          "fix": "Math.toIntExact(x)",
           "kind": "number"
         }
       ],
@@ -1875,12 +1889,14 @@
           "type": "false",
           "calls": 0,
           "code": "buildClient({ maxEncryptedDataKeys: x })",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "number",
           "calls": 0,
           "code": "buildClient({ maxEncryptedDataKeys: x })",
+          "fix": "x",
           "kind": "number"
         }
       ],
@@ -1889,6 +1905,7 @@
           "type": "int",
           "calls": 0,
           "code": "EncryptionSDKClient(max_encrypted_data_keys=x)",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -1899,6 +1916,7 @@
           "type": "NetV4_0_0_RetryPolicy",
           "calls": 0,
           "code": "new AwsEncryptionSdkConfig { NetV4_0_0_RetryPolicy = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -1907,6 +1925,7 @@
           "type": "*NetV4_0_0_RetryPolicy",
           "calls": 0,
           "code": "AwsEncryptionSdkConfig{NetV4_0_0_RetryPolicy: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -1917,36 +1936,42 @@
           "type": "MemoryStream",
           "calls": 0,
           "code": "new DecryptInput { Ciphertext = x }",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "new DecryptInput { Ciphertext = new MemoryStream(x) }",
+          "fix": "new MemoryStream(x)",
           "kind": "bytes"
         },
         {
           "type": "FileInfo",
           "calls": 2,
           "code": "new DecryptInput { Ciphertext = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "fix": "new MemoryStream(File.ReadAllBytes(x.FullName))",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new DecryptInput { Ciphertext = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "fix": "new MemoryStream(Encoding.UTF8.GetBytes(x))",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 2,
           "code": "new DecryptInput { Ciphertext = new MemoryStream(Convert.FromBase64String(x)) }",
+          "fix": "new MemoryStream(Convert.FromBase64String(x))",
           "kind": "base64 text"
         },
         {
           "type": "Stream",
           "calls": 4,
           "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew DecryptInput { Ciphertext = copy }",
+          "fix": "var copy = new MemoryStream();\nx.CopyTo(copy);\ncopy",
           "kind": "file / stream"
         }
       ],
@@ -1955,30 +1980,35 @@
           "type": "[]byte",
           "calls": 0,
           "code": "DecryptInput{Ciphertext: x}",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "DecryptInput{Ciphertext: []byte(x)}",
+          "fix": "[]byte(x)",
           "kind": "text"
         },
         {
           "type": "io.Reader",
           "calls": 3,
           "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
+          "fix": "data, err := io.ReadAll(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         },
         {
           "type": "string (base64)",
           "calls": 3,
           "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
+          "fix": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\ndata",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 3,
           "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nDecryptInput{Ciphertext: data}",
+          "fix": "data, err := os.ReadFile(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         }
       ],
@@ -1987,42 +2017,49 @@
           "type": "InputStream",
           "calls": 0,
           "code": "crypto.createUnsignedMessageDecryptingStream(provider, x)",
+          "fix": "x",
           "kind": "file / stream"
         },
         {
           "type": "ParsedCiphertext",
           "calls": 0,
           "code": "crypto.decryptData(provider, x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "String",
           "calls": 0,
           "code": "crypto.decryptString(provider, x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "crypto.decryptString(provider, x)",
+          "fix": "x",
           "kind": "base64 text"
         },
         {
           "type": "byte[]",
           "calls": 0,
           "code": "crypto.decryptData(provider, x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "ByteBuffer",
           "calls": 1,
           "code": "crypto.decryptData(provider, x.array())",
+          "fix": "x.array()",
           "kind": "bytes"
         },
         {
           "type": "Path",
           "calls": 1,
           "code": "crypto.createUnsignedMessageDecryptingStream(provider, Files.newInputStream(x))",
+          "fix": "Files.newInputStream(x)",
           "kind": "file / stream"
         }
       ],
@@ -2031,42 +2068,49 @@
           "type": "Buffer",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "Readable",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "file / stream"
         },
         {
           "type": "ReadableStream",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Uint8Array",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 1,
           "code": "decrypt(keyring, Buffer.from(x, \"base64\"))",
+          "fix": "Buffer.from(x, \"base64\")",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 1,
           "code": "decrypt(keyring, fs.createReadStream(x))",
+          "fix": "fs.createReadStream(x)",
           "kind": "file / stream"
         }
       ],
@@ -2075,42 +2119,49 @@
           "type": "BinaryIO",
           "calls": 0,
           "code": "client.decrypt(source=x)",
+          "fix": "x",
           "kind": "file / stream"
         },
         {
           "type": "bytes",
           "calls": 0,
           "code": "client.decrypt(source=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "file",
           "calls": 0,
           "code": "client.decrypt(source=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "client.decrypt(source=x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "bytearray",
           "calls": 1,
           "code": "client.decrypt(source=bytes(x))",
+          "fix": "bytes(x)",
           "kind": "bytes"
         },
         {
           "type": "pathlib.Path",
           "calls": 1,
           "code": "client.decrypt(source=open(x, \"rb\"))",
+          "fix": "open(x, \"rb\")",
           "kind": "file / stream"
         },
         {
           "type": "str (base64)",
           "calls": 1,
           "code": "client.decrypt(source=base64.b64decode(x))",
+          "fix": "base64.b64decode(x)",
           "kind": "base64 text"
         }
       ]
@@ -2121,6 +2172,7 @@
           "type": "BufferEncoding",
           "calls": 0,
           "code": "decrypt(keyring, ciphertext, { encoding: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2131,12 +2183,14 @@
           "type": "Dictionary<string, string>",
           "calls": 0,
           "code": "new DecryptInput { EncryptionContext = x }",
+          "fix": "x",
           "kind": "map"
         },
         {
           "type": "(string, string)",
           "calls": 1,
           "code": "new DecryptInput { EncryptionContext = new Dictionary<string, string> { [k] = v } }",
+          "fix": "new Dictionary<string, string> { [k] = v }",
           "kind": "pairs"
         }
       ],
@@ -2145,12 +2199,14 @@
           "type": "(string, string)",
           "calls": 0,
           "code": "DecryptInput{EncryptionContext: map[string]string{k: v}}",
+          "fix": "map[string]string{k: v}",
           "kind": "pairs"
         },
         {
           "type": "map[string]string",
           "calls": 0,
           "code": "DecryptInput{EncryptionContext: x}",
+          "fix": "x",
           "kind": "map"
         }
       ],
@@ -2159,12 +2215,14 @@
           "type": "Map<String, String>",
           "calls": 0,
           "code": "crypto.decryptData(keyring, ciphertext, x)",
+          "fix": "x",
           "kind": "map"
         },
         {
           "type": "(String, String)",
           "calls": 1,
           "code": "crypto.decryptData(keyring, ciphertext, Map.of(k, v))",
+          "fix": "Map.of(k, v)",
           "kind": "pairs"
         }
       ],
@@ -2173,12 +2231,14 @@
           "type": "(str, str)",
           "calls": 0,
           "code": "client.decrypt(encryption_context={k: v})",
+          "fix": "{k: v}",
           "kind": "pairs"
         },
         {
           "type": "dict",
           "calls": 0,
           "code": "client.decrypt(encryption_context=x)",
+          "fix": "x",
           "kind": "map"
         }
       ]
@@ -2189,6 +2249,7 @@
           "type": "MasterKeyProvider",
           "calls": 0,
           "code": "client.decrypt(key_provider=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2199,6 +2260,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "new DecryptInput { Keyring = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2207,6 +2269,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "DecryptInput{Keyring: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2215,6 +2278,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "crypto.decryptData(x, ciphertext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2223,6 +2287,7 @@
           "type": "KeyringNode",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2231,6 +2296,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "client.decrypt(keyring=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2241,6 +2307,7 @@
           "type": "com.amazonaws.encryptionsdk.MasterKeyProvider<K>",
           "calls": 0,
           "code": "crypto.decryptData(provider, ciphertext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2251,6 +2318,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "new DecryptInput { MaterialsManager = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2259,6 +2327,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "DecryptInput{MaterialsManager: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2267,12 +2336,14 @@
           "type": "CryptoMaterialsManager",
           "calls": 0,
           "code": "crypto.decryptData(x, ciphertext)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "crypto.decryptData(x, ciphertext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2281,6 +2352,7 @@
           "type": "NodeMaterialsManager",
           "calls": 0,
           "code": "decrypt(keyring, x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2289,6 +2361,7 @@
           "type": "CryptoMaterialsManager",
           "calls": 0,
           "code": "client.decrypt(materials_manager=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2299,6 +2372,7 @@
           "type": "int",
           "calls": 0,
           "code": "client.decrypt(max_body_length=x)",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -2309,6 +2383,7 @@
           "type": "number",
           "calls": 0,
           "code": "decrypt(keyring, ciphertext, { maxBodySize: x })",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -2319,6 +2394,7 @@
           "type": "OutputStream",
           "calls": 0,
           "code": "crypto.createUnsignedMessageDecryptingStream(provider, x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2329,6 +2405,7 @@
           "type": "int",
           "calls": 0,
           "code": "client.decrypt(source_length=x)",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -2339,6 +2416,7 @@
           "type": "ESDKAlgorithmSuiteId",
           "calls": 0,
           "code": "new EncryptInput { AlgorithmSuiteId = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2347,6 +2425,7 @@
           "type": "ESDKAlgorithmSuiteId",
           "calls": 0,
           "code": "EncryptInput{AlgorithmSuiteId: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2355,6 +2434,7 @@
           "type": "AlgorithmSuiteIdentifier",
           "calls": 0,
           "code": "encrypt(keyring, plaintext, { suiteId: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2363,6 +2443,7 @@
           "type": "Algorithm",
           "calls": 0,
           "code": "client.encrypt(algorithm=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2373,6 +2454,7 @@
           "type": "BufferEncoding",
           "calls": 0,
           "code": "encrypt(keyring, plaintext, { encoding: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2383,12 +2465,14 @@
           "type": "Dictionary<string, string>",
           "calls": 0,
           "code": "new EncryptInput { EncryptionContext = x }",
+          "fix": "x",
           "kind": "map"
         },
         {
           "type": "(string, string)",
           "calls": 1,
           "code": "new EncryptInput { EncryptionContext = new Dictionary<string, string> { [k] = v } }",
+          "fix": "new Dictionary<string, string> { [k] = v }",
           "kind": "pairs"
         }
       ],
@@ -2397,12 +2481,14 @@
           "type": "(string, string)",
           "calls": 0,
           "code": "EncryptInput{EncryptionContext: map[string]string{k: v}}",
+          "fix": "map[string]string{k: v}",
           "kind": "pairs"
         },
         {
           "type": "map[string]string",
           "calls": 0,
           "code": "EncryptInput{EncryptionContext: x}",
+          "fix": "x",
           "kind": "map"
         }
       ],
@@ -2411,12 +2497,14 @@
           "type": "Map<String, String>",
           "calls": 0,
           "code": "crypto.encryptData(keyring, plaintext, x)",
+          "fix": "x",
           "kind": "map"
         },
         {
           "type": "(String, String)",
           "calls": 1,
           "code": "crypto.encryptData(keyring, plaintext, Map.of(k, v))",
+          "fix": "Map.of(k, v)",
           "kind": "pairs"
         }
       ],
@@ -2425,12 +2513,14 @@
           "type": "Record<string, string>",
           "calls": 0,
           "code": "encrypt(keyring, plaintext, { encryptionContext: x })",
+          "fix": "x",
           "kind": "map"
         },
         {
           "type": "[string, string]",
           "calls": 0,
           "code": "encrypt(keyring, plaintext, { encryptionContext: { [k]: v } })",
+          "fix": "{ [k]: v }",
           "kind": "pairs"
         }
       ],
@@ -2439,12 +2529,14 @@
           "type": "(str, str)",
           "calls": 0,
           "code": "client.encrypt(encryption_context={k: v})",
+          "fix": "{k: v}",
           "kind": "pairs"
         },
         {
           "type": "dict",
           "calls": 0,
           "code": "client.encrypt(encryption_context=x)",
+          "fix": "x",
           "kind": "map"
         }
       ]
@@ -2455,12 +2547,14 @@
           "type": "int",
           "calls": 0,
           "code": "new EncryptInput { FrameLength = x }",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "long",
           "calls": 0,
           "code": "new EncryptInput { FrameLength = x }",
+          "fix": "x",
           "kind": "number"
         }
       ],
@@ -2469,6 +2563,7 @@
           "type": "*int64",
           "calls": 0,
           "code": "EncryptInput{FrameLength: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2477,6 +2572,7 @@
           "type": "number",
           "calls": 0,
           "code": "encrypt(keyring, plaintext, { frameLength: x })",
+          "fix": "x",
           "kind": "number"
         }
       ],
@@ -2485,6 +2581,7 @@
           "type": "int",
           "calls": 0,
           "code": "client.encrypt(frame_length=x)",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -2495,6 +2592,7 @@
           "type": "MasterKeyProvider",
           "calls": 0,
           "code": "client.encrypt(key_provider=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2505,6 +2603,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "new EncryptInput { Keyring = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2513,6 +2612,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "EncryptInput{Keyring: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2521,6 +2621,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "crypto.encryptData(x, plaintext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2529,6 +2630,7 @@
           "type": "KeyringNode",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2537,6 +2639,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "client.encrypt(keyring=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2547,6 +2650,7 @@
           "type": "com.amazonaws.encryptionsdk.MasterKeyProvider<K>",
           "calls": 0,
           "code": "crypto.encryptData(provider, plaintext, encryptionContext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2557,6 +2661,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "new EncryptInput { MaterialsManager = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2565,6 +2670,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "EncryptInput{MaterialsManager: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2573,12 +2679,14 @@
           "type": "CryptoMaterialsManager",
           "calls": 0,
           "code": "crypto.encryptData(x, plaintext, encryptionContext)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "crypto.encryptData(x, plaintext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2587,6 +2695,7 @@
           "type": "NodeMaterialsManager",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2595,6 +2704,7 @@
           "type": "CryptoMaterialsManager",
           "calls": 0,
           "code": "client.encrypt(materials_manager=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2605,6 +2715,7 @@
           "type": "OutputStream",
           "calls": 0,
           "code": "crypto.createEncryptingStream(provider, x, encryptionContext)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2615,36 +2726,42 @@
           "type": "MemoryStream",
           "calls": 0,
           "code": "new EncryptInput { Plaintext = x }",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "new EncryptInput { Plaintext = new MemoryStream(x) }",
+          "fix": "new MemoryStream(x)",
           "kind": "bytes"
         },
         {
           "type": "FileInfo",
           "calls": 2,
           "code": "new EncryptInput { Plaintext = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "fix": "new MemoryStream(File.ReadAllBytes(x.FullName))",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new EncryptInput { Plaintext = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "fix": "new MemoryStream(Encoding.UTF8.GetBytes(x))",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 2,
           "code": "new EncryptInput { Plaintext = new MemoryStream(Convert.FromBase64String(x)) }",
+          "fix": "new MemoryStream(Convert.FromBase64String(x))",
           "kind": "base64 text"
         },
         {
           "type": "Stream",
           "calls": 4,
           "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew EncryptInput { Plaintext = copy }",
+          "fix": "var copy = new MemoryStream();\nx.CopyTo(copy);\ncopy",
           "kind": "file / stream"
         }
       ],
@@ -2653,30 +2770,35 @@
           "type": "[]byte",
           "calls": 0,
           "code": "EncryptInput{Plaintext: x}",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "EncryptInput{Plaintext: []byte(x)}",
+          "fix": "[]byte(x)",
           "kind": "text"
         },
         {
           "type": "io.Reader",
           "calls": 3,
           "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
+          "fix": "data, err := io.ReadAll(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         },
         {
           "type": "string (base64)",
           "calls": 3,
           "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
+          "fix": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\ndata",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 3,
           "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nEncryptInput{Plaintext: data}",
+          "fix": "data, err := os.ReadFile(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         }
       ],
@@ -2685,36 +2807,42 @@
           "type": "InputStream",
           "calls": 0,
           "code": "crypto.createEncryptingStream(provider, x, encryptionContext)",
+          "fix": "x",
           "kind": "file / stream"
         },
         {
           "type": "String",
           "calls": 0,
           "code": "crypto.encryptString(provider, x, encryptionContext)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "crypto.encryptString(provider, x, encryptionContext)",
+          "fix": "x",
           "kind": "base64 text"
         },
         {
           "type": "byte[]",
           "calls": 0,
           "code": "crypto.encryptData(keyring, x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "ByteBuffer",
           "calls": 1,
           "code": "crypto.encryptData(keyring, x.array())",
+          "fix": "x.array()",
           "kind": "bytes"
         },
         {
           "type": "Path",
           "calls": 1,
           "code": "crypto.createEncryptingStream(provider, Files.newInputStream(x), encryptionContext)",
+          "fix": "Files.newInputStream(x)",
           "kind": "file / stream"
         }
       ],
@@ -2723,42 +2851,49 @@
           "type": "Buffer",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "Readable",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "file / stream"
         },
         {
           "type": "ReadableStream",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Uint8Array",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "encrypt(keyring, x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 1,
           "code": "encrypt(keyring, Buffer.from(x, \"base64\"))",
+          "fix": "Buffer.from(x, \"base64\")",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 1,
           "code": "encrypt(keyring, fs.createReadStream(x))",
+          "fix": "fs.createReadStream(x)",
           "kind": "file / stream"
         }
       ],
@@ -2767,42 +2902,49 @@
           "type": "BinaryIO",
           "calls": 0,
           "code": "client.encrypt(source=x)",
+          "fix": "x",
           "kind": "file / stream"
         },
         {
           "type": "bytes",
           "calls": 0,
           "code": "client.encrypt(source=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "file",
           "calls": 0,
           "code": "client.encrypt(source=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "client.encrypt(source=x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "bytearray",
           "calls": 1,
           "code": "client.encrypt(source=bytes(x))",
+          "fix": "bytes(x)",
           "kind": "bytes"
         },
         {
           "type": "pathlib.Path",
           "calls": 1,
           "code": "client.encrypt(source=open(x, \"rb\"))",
+          "fix": "open(x, \"rb\")",
           "kind": "file / stream"
         },
         {
           "type": "str (base64)",
           "calls": 1,
           "code": "client.encrypt(source=base64.b64decode(x))",
+          "fix": "base64.b64decode(x)",
           "kind": "base64 text"
         }
       ]
@@ -2813,6 +2955,7 @@
           "type": "number",
           "calls": 0,
           "code": "encrypt(keyring, plaintext, { plaintextLength: x })",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -2823,6 +2966,7 @@
           "type": "int",
           "calls": 0,
           "code": "client.encrypt(source_length=x)",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -2833,6 +2977,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryKeyringInput { DiscoveryFilter = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2841,6 +2986,7 @@
           "type": "*DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput{DiscoveryFilter: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2849,6 +2995,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput.builder().discoveryFilter(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -2857,6 +3004,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput(discovery_filter=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -2867,18 +3015,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -2887,12 +3038,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -2901,18 +3054,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -2921,18 +3077,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -2943,12 +3102,14 @@
           "type": "AmazonKeyManagementServiceClient",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryKeyringInput { KmsClient = x }",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "AmazonKeyManagementServiceConfig",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "fix": "new AmazonKeyManagementServiceClient(x)",
           "kind": "what builds it"
         }
       ],
@@ -2957,12 +3118,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput{KmsClient: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -2971,12 +3134,14 @@
           "type": "KmsClient",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput.builder().kmsClient(x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Region",
           "calls": 3,
           "code": "CreateAwsKmsDiscoveryKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "fix": "KmsClient.builder().region(x).build()",
           "kind": "what builds it"
         }
       ],
@@ -2985,12 +3150,14 @@
           "type": "BaseClient",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryKeyringInput(kms_client=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "boto3.Session",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryKeyringInput(kms_client=x.client(\"kms\"))",
+          "fix": "x.client(\"kms\")",
           "kind": "what builds it"
         }
       ]
@@ -3001,6 +3168,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { ClientSupplier = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3009,6 +3177,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput{ClientSupplier: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3017,6 +3186,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().clientSupplier(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3025,6 +3195,7 @@
           "type": "ClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(client_supplier=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3035,6 +3206,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { DiscoveryFilter = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3043,6 +3215,7 @@
           "type": "*DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput{DiscoveryFilter: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3051,6 +3224,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().discoveryFilter(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3059,6 +3233,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(discovery_filter=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3069,18 +3244,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -3089,12 +3267,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -3103,18 +3283,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -3123,18 +3306,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -3145,18 +3331,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { Regions = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { Regions = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsDiscoveryMultiKeyringInput { Regions = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -3165,12 +3354,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput{Regions: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput{Regions: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -3179,18 +3370,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().regions(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().regions(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput.builder().regions(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -3199,18 +3393,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(regions=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(regions=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsDiscoveryMultiKeyringInput(regions=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -3221,6 +3418,7 @@
           "type": "KmsEcdhStaticConfigurations",
           "calls": 0,
           "code": "new CreateAwsKmsEcdhKeyringInput { KeyAgreementScheme = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3229,6 +3427,7 @@
           "type": "KmsEcdhStaticConfigurations",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput{KeyAgreementScheme: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3237,6 +3436,7 @@
           "type": "KmsEcdhStaticConfigurations",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().KeyAgreementScheme(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3245,6 +3445,7 @@
           "type": "KmsEcdhStaticConfigurations",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput(key_agreement_scheme=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3255,6 +3456,7 @@
           "type": "ECDHCurveSpec",
           "calls": 0,
           "code": "new CreateAwsKmsEcdhKeyringInput { CurveSpec = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3263,6 +3465,7 @@
           "type": "ECDHCurveSpec",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput{CurveSpec: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3271,6 +3474,7 @@
           "type": "ECDHCurveSpec",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().curveSpec(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3279,6 +3483,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput(curve_spec=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -3289,18 +3494,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsEcdhKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsEcdhKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsEcdhKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -3309,12 +3517,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -3323,18 +3533,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -3343,18 +3556,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsEcdhKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -3365,12 +3581,14 @@
           "type": "AmazonKeyManagementServiceClient",
           "calls": 0,
           "code": "new CreateAwsKmsEcdhKeyringInput { KmsClient = x }",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "AmazonKeyManagementServiceConfig",
           "calls": 1,
           "code": "new CreateAwsKmsEcdhKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "fix": "new AmazonKeyManagementServiceClient(x)",
           "kind": "what builds it"
         }
       ],
@@ -3379,12 +3597,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput{KmsClient: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsEcdhKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -3393,12 +3613,14 @@
           "type": "KmsClient",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().kmsClient(x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Region",
           "calls": 3,
           "code": "CreateAwsKmsEcdhKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "fix": "KmsClient.builder().region(x).build()",
           "kind": "what builds it"
         }
       ],
@@ -3407,12 +3629,14 @@
           "type": "BaseClient",
           "calls": 0,
           "code": "CreateAwsKmsEcdhKeyringInput(kms_client=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "boto3.Session",
           "calls": 1,
           "code": "CreateAwsKmsEcdhKeyringInput(kms_client=x.client(\"kms\"))",
+          "fix": "x.client(\"kms\")",
           "kind": "what builds it"
         }
       ]
@@ -3423,6 +3647,7 @@
           "type": "boolean",
           "calls": 0,
           "code": "new KmsKeyringNode({ discovery: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3433,6 +3658,7 @@
           "type": "{ accountIDs: string[]; partition: string; }",
           "calls": 0,
           "code": "new KmsKeyringNode({ discoveryFilter: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3443,18 +3669,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -3463,12 +3692,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -3477,18 +3708,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -3497,12 +3731,14 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsKeyringNode({ grantTokens: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "new KmsKeyringNode({ grantTokens: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -3511,18 +3747,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -3533,12 +3772,14 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsKeyringNode({ keyIds: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "new KmsKeyringNode({ keyIds: x })",
+          "fix": "x",
           "kind": "list"
         }
       ]
@@ -3549,12 +3790,14 @@
           "type": "AmazonKeyManagementServiceClient",
           "calls": 0,
           "code": "new CreateAwsKmsKeyringInput { KmsClient = x }",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "AmazonKeyManagementServiceConfig",
           "calls": 1,
           "code": "new CreateAwsKmsKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "fix": "new AmazonKeyManagementServiceClient(x)",
           "kind": "what builds it"
         }
       ],
@@ -3563,12 +3806,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput{KmsClient: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -3577,12 +3822,14 @@
           "type": "KmsClient",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput.builder().kmsClient(x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Region",
           "calls": 3,
           "code": "CreateAwsKmsKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "fix": "KmsClient.builder().region(x).build()",
           "kind": "what builds it"
         }
       ],
@@ -3591,6 +3838,7 @@
           "type": "KmsClientSupplier<AwsEsdkKMSInterface>",
           "calls": 0,
           "code": "new KmsKeyringNode({ clientProvider: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3599,12 +3847,14 @@
           "type": "BaseClient",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput(kms_client=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "boto3.Session",
           "calls": 1,
           "code": "CreateAwsKmsKeyringInput(kms_client=x.client(\"kms\"))",
+          "fix": "x.client(\"kms\")",
           "kind": "what builds it"
         }
       ]
@@ -3615,6 +3865,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsKeyringInput { KmsKeyId = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -3623,6 +3874,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput{KmsKeyId: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -3631,12 +3883,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput.builder().kmsKeyId(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput.builder().kmsKeyId(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -3645,6 +3899,7 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsKeyringNode({ generatorKeyId: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -3653,6 +3908,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsKeyringInput(kms_key_id=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -3663,6 +3919,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { DiscoveryFilter = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3671,6 +3928,7 @@
           "type": "*DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput{DiscoveryFilter: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3679,6 +3937,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().discoveryFilter(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3687,6 +3946,7 @@
           "type": "Readonly<{ accountIDs: readonly string[]; partition: string; }>",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricDiscoveryKeyringNode({ discoveryFilter: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3695,6 +3955,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(discovery_filter=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3705,18 +3966,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -3725,12 +3989,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -3739,18 +4005,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -3759,12 +4028,14 @@
           "type": "string",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricDiscoveryKeyringNode({ grantTokens: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricDiscoveryKeyringNode({ grantTokens: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -3773,18 +4044,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -3795,12 +4069,14 @@
           "type": "AmazonKeyManagementServiceClient",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { KmsClient = x }",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "AmazonKeyManagementServiceConfig",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "fix": "new AmazonKeyManagementServiceClient(x)",
           "kind": "what builds it"
         }
       ],
@@ -3809,12 +4085,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput{KmsClient: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -3823,12 +4101,14 @@
           "type": "KmsClient",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().kmsClient(x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Region",
           "calls": 3,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "fix": "KmsClient.builder().region(x).build()",
           "kind": "what builds it"
         }
       ],
@@ -3837,6 +4117,7 @@
           "type": "AwsEsdkKMSInterface",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricDiscoveryKeyringNode({ client: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3845,12 +4126,14 @@
           "type": "BaseClient",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(kms_client=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "boto3.Session",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(kms_client=x.client(\"kms\"))",
+          "fix": "x.client(\"kms\")",
           "kind": "what builds it"
         }
       ]
@@ -3861,6 +4144,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryKeyringInput { Region = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -3869,6 +4153,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput{Region: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -3877,12 +4162,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().region(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput.builder().region(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -3891,6 +4178,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryKeyringInput(region=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -3901,6 +4189,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { ClientSupplier = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3909,6 +4198,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput{ClientSupplier: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3917,6 +4207,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().clientSupplier(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3925,6 +4216,7 @@
           "type": "KmsClientSupplier<AwsEsdkKMSInterface>",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareDiscoveryMultiKeyringNode({ clientProvider: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3933,6 +4225,7 @@
           "type": "ClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(client_supplier=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3943,6 +4236,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { DiscoveryFilter = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3951,6 +4245,7 @@
           "type": "*DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput{DiscoveryFilter: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3959,6 +4254,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().discoveryFilter(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3967,6 +4263,7 @@
           "type": "Readonly<{ accountIDs: readonly string[]; partition: string; }>",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareDiscoveryMultiKeyringNode({ discoveryFilter: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -3975,6 +4272,7 @@
           "type": "DiscoveryFilter",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(discovery_filter=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -3985,18 +4283,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4005,12 +4306,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4019,18 +4322,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4039,12 +4345,14 @@
           "type": "string",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareDiscoveryMultiKeyringNode({ grantTokens: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareDiscoveryMultiKeyringNode({ grantTokens: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4053,18 +4361,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4075,18 +4386,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { Regions = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { Regions = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMrkDiscoveryMultiKeyringInput { Regions = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4095,12 +4409,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput{Regions: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput{Regions: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4109,18 +4425,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().regions(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().regions(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput.builder().regions(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4129,12 +4448,14 @@
           "type": "string",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareDiscoveryMultiKeyringNode({ regions: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareDiscoveryMultiKeyringNode({ regions: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4143,18 +4464,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(regions=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(regions=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMrkDiscoveryMultiKeyringInput(regions=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4165,18 +4489,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMrkKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMrkKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMrkKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4185,12 +4512,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4199,18 +4528,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMrkKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMrkKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4219,12 +4551,14 @@
           "type": "string",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricKeyringNode({ grantTokens: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricKeyringNode({ grantTokens: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4233,18 +4567,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMrkKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4255,12 +4592,14 @@
           "type": "AmazonKeyManagementServiceClient",
           "calls": 0,
           "code": "new CreateAwsKmsMrkKeyringInput { KmsClient = x }",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "AmazonKeyManagementServiceConfig",
           "calls": 1,
           "code": "new CreateAwsKmsMrkKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "fix": "new AmazonKeyManagementServiceClient(x)",
           "kind": "what builds it"
         }
       ],
@@ -4269,12 +4608,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput{KmsClient: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsMrkKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -4283,12 +4624,14 @@
           "type": "KmsClient",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput.builder().kmsClient(x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Region",
           "calls": 3,
           "code": "CreateAwsKmsMrkKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "fix": "KmsClient.builder().region(x).build()",
           "kind": "what builds it"
         }
       ],
@@ -4297,6 +4640,7 @@
           "type": "AwsEsdkKMSInterface",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricKeyringNode({ client: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4305,12 +4649,14 @@
           "type": "BaseClient",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput(kms_client=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "boto3.Session",
           "calls": 1,
           "code": "CreateAwsKmsMrkKeyringInput(kms_client=x.client(\"kms\"))",
+          "fix": "x.client(\"kms\")",
           "kind": "what builds it"
         }
       ]
@@ -4321,6 +4667,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsMrkKeyringInput { KmsKeyId = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4329,6 +4676,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput{KmsKeyId: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4337,12 +4685,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput.builder().kmsKeyId(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput.builder().kmsKeyId(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -4351,6 +4701,7 @@
           "type": "string",
           "calls": 0,
           "code": "new AwsKmsMrkAwareSymmetricKeyringNode({ keyId: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4359,6 +4710,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkKeyringInput(kms_key_id=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -4369,6 +4721,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { ClientSupplier = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4377,6 +4730,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput{ClientSupplier: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4385,6 +4739,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().clientSupplier(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4393,6 +4748,7 @@
           "type": "KmsClientSupplier<AwsEsdkKMSInterface>",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareStrictMultiKeyringNode({ clientProvider: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4401,6 +4757,7 @@
           "type": "ClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput(client_supplier=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -4411,6 +4768,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { Generator = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4419,6 +4777,7 @@
           "type": "*string",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput{Generator: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4427,12 +4786,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().generator(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().generator(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -4441,6 +4802,7 @@
           "type": "string",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareStrictMultiKeyringNode({ generatorKeyId: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4449,6 +4811,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput(generator=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -4459,18 +4822,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4479,12 +4845,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4493,18 +4861,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4513,12 +4884,14 @@
           "type": "string",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareStrictMultiKeyringNode({ grantTokens: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareStrictMultiKeyringNode({ grantTokens: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4527,18 +4900,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMrkMultiKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4549,18 +4925,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { KmsKeyIds = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { KmsKeyIds = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMrkMultiKeyringInput { KmsKeyIds = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4569,12 +4948,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput{KmsKeyIds: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput{KmsKeyIds: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4583,18 +4964,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().kmsKeyIds(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().kmsKeyIds(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMrkMultiKeyringInput.builder().kmsKeyIds(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4603,12 +4987,14 @@
           "type": "string",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareStrictMultiKeyringNode({ keyIds: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "buildAwsKmsMrkAwareStrictMultiKeyringNode({ keyIds: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4617,18 +5003,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput(kms_key_ids=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMrkMultiKeyringInput(kms_key_ids=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMrkMultiKeyringInput(kms_key_ids=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4639,6 +5028,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "new CreateAwsKmsMultiKeyringInput { ClientSupplier = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4647,6 +5037,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput{ClientSupplier: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4655,6 +5046,7 @@
           "type": "IClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput.builder().clientSupplier(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4663,6 +5055,7 @@
           "type": "KmsClientSupplier<AwsEsdkKMSInterface>",
           "calls": 0,
           "code": "new KmsKeyringNode({ clientProvider: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4671,6 +5064,7 @@
           "type": "ClientSupplier",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput(client_supplier=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -4681,6 +5075,7 @@
           "type": "boolean",
           "calls": 0,
           "code": "new KmsKeyringNode({ discovery: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -4691,6 +5086,7 @@
           "type": "{ accountIDs: string[]; partition: string; }",
           "calls": 0,
           "code": "new KmsKeyringNode({ discoveryFilter: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -4701,6 +5097,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsMultiKeyringInput { Generator = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4709,6 +5106,7 @@
           "type": "*string",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput{Generator: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4717,12 +5115,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput.builder().generator(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput.builder().generator(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -4731,6 +5131,7 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsKeyringNode({ generatorKeyId: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -4739,6 +5140,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput(generator=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -4749,18 +5151,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMultiKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMultiKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMultiKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4769,12 +5174,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4783,18 +5190,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMultiKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4803,12 +5213,14 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsKeyringNode({ grantTokens: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "new KmsKeyringNode({ grantTokens: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4817,18 +5229,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMultiKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4839,18 +5254,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsMultiKeyringInput { KmsKeyIds = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsMultiKeyringInput { KmsKeyIds = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsMultiKeyringInput { KmsKeyIds = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4859,12 +5277,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput{KmsKeyIds: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput{KmsKeyIds: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4873,18 +5293,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput.builder().kmsKeyIds(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsMultiKeyringInput.builder().kmsKeyIds(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsMultiKeyringInput.builder().kmsKeyIds(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -4893,12 +5316,14 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsKeyringNode({ keyIds: [x] })",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 0,
           "code": "new KmsKeyringNode({ keyIds: x })",
+          "fix": "x",
           "kind": "list"
         }
       ],
@@ -4907,18 +5332,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput(kms_key_ids=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsMultiKeyringInput(kms_key_ids=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsMultiKeyringInput(kms_key_ids=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -4929,6 +5357,7 @@
           "type": "EncryptionAlgorithmSpec",
           "calls": 0,
           "code": "new CreateAwsKmsRsaKeyringInput { EncryptionAlgorithm = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4937,6 +5366,7 @@
           "type": "EncryptionAlgorithmSpec",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput{EncryptionAlgorithm: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4945,6 +5375,7 @@
           "type": "EncryptionAlgorithmSpec",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput.builder().encryptionAlgorithm(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -4953,6 +5384,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(encryption_algorithm=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -4963,18 +5395,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateAwsKmsRsaKeyringInput { GrantTokens = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateAwsKmsRsaKeyringInput { GrantTokens = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateAwsKmsRsaKeyringInput { GrantTokens = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -4983,12 +5418,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput{GrantTokens: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput{GrantTokens: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -4997,18 +5434,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput.builder().grantTokens(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput.builder().grantTokens(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -5017,18 +5457,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(grant_tokens=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(grant_tokens=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput(grant_tokens=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -5039,12 +5482,14 @@
           "type": "AmazonKeyManagementServiceClient",
           "calls": 0,
           "code": "new CreateAwsKmsRsaKeyringInput { KmsClient = x }",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "AmazonKeyManagementServiceConfig",
           "calls": 1,
           "code": "new CreateAwsKmsRsaKeyringInput { KmsClient = new AmazonKeyManagementServiceClient(x) }",
+          "fix": "new AmazonKeyManagementServiceClient(x)",
           "kind": "what builds it"
         }
       ],
@@ -5053,12 +5498,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput{KmsClient: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput{KmsClient: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -5067,12 +5514,14 @@
           "type": "KmsClient",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput.builder().kmsClient(x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "Region",
           "calls": 3,
           "code": "CreateAwsKmsRsaKeyringInput.builder().kmsClient(KmsClient.builder().region(x).build())",
+          "fix": "KmsClient.builder().region(x).build()",
           "kind": "what builds it"
         }
       ],
@@ -5081,12 +5530,14 @@
           "type": "BaseClient",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(kms_client=x)",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "boto3.Session",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput(kms_client=x.client(\"kms\"))",
+          "fix": "x.client(\"kms\")",
           "kind": "what builds it"
         }
       ]
@@ -5097,6 +5548,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsRsaKeyringInput { KmsKeyId = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5105,6 +5557,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput{KmsKeyId: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5113,12 +5566,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput.builder().kmsKeyId(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput.builder().kmsKeyId(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -5127,6 +5582,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(kms_key_id=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -5137,36 +5593,42 @@
           "type": "MemoryStream",
           "calls": 0,
           "code": "new CreateAwsKmsRsaKeyringInput { PublicKey = x }",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "new CreateAwsKmsRsaKeyringInput { PublicKey = new MemoryStream(x) }",
+          "fix": "new MemoryStream(x)",
           "kind": "bytes"
         },
         {
           "type": "FileInfo",
           "calls": 2,
           "code": "new CreateAwsKmsRsaKeyringInput { PublicKey = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "fix": "new MemoryStream(File.ReadAllBytes(x.FullName))",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new CreateAwsKmsRsaKeyringInput { PublicKey = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "fix": "new MemoryStream(Encoding.UTF8.GetBytes(x))",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 2,
           "code": "new CreateAwsKmsRsaKeyringInput { PublicKey = new MemoryStream(Convert.FromBase64String(x)) }",
+          "fix": "new MemoryStream(Convert.FromBase64String(x))",
           "kind": "base64 text"
         },
         {
           "type": "Stream",
           "calls": 4,
           "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew CreateAwsKmsRsaKeyringInput { PublicKey = copy }",
+          "fix": "var copy = new MemoryStream();\nx.CopyTo(copy);\ncopy",
           "kind": "file / stream"
         }
       ],
@@ -5175,30 +5637,35 @@
           "type": "[]byte",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput{PublicKey: x}",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput{PublicKey: []byte(x)}",
+          "fix": "[]byte(x)",
           "kind": "text"
         },
         {
           "type": "io.Reader",
           "calls": 3,
           "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nCreateAwsKmsRsaKeyringInput{PublicKey: data}",
+          "fix": "data, err := io.ReadAll(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         },
         {
           "type": "string (base64)",
           "calls": 3,
           "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nCreateAwsKmsRsaKeyringInput{PublicKey: data}",
+          "fix": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\ndata",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 3,
           "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nCreateAwsKmsRsaKeyringInput{PublicKey: data}",
+          "fix": "data, err := os.ReadFile(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         }
       ],
@@ -5207,36 +5674,42 @@
           "type": "ByteBuffer",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput.builder().publicKey(x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput.builder().publicKey(StandardCharsets.UTF_8.encode(x))",
+          "fix": "StandardCharsets.UTF_8.encode(x)",
           "kind": "text"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(x))",
+          "fix": "ByteBuffer.wrap(x)",
           "kind": "bytes"
         },
         {
           "type": "InputStream",
           "calls": 2,
           "code": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(x.readAllBytes()))",
+          "fix": "ByteBuffer.wrap(x.readAllBytes())",
           "kind": "file / stream"
         },
         {
           "type": "Path",
           "calls": 2,
           "code": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(Files.readAllBytes(x)))",
+          "fix": "ByteBuffer.wrap(Files.readAllBytes(x))",
           "kind": "file / stream"
         },
         {
           "type": "String (base64)",
           "calls": 3,
           "code": "CreateAwsKmsRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(Base64.getDecoder().decode(x)))",
+          "fix": "ByteBuffer.wrap(Base64.getDecoder().decode(x))",
           "kind": "base64 text"
         }
       ],
@@ -5245,36 +5718,42 @@
           "type": "bytearray",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(public_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "bytes",
           "calls": 0,
           "code": "CreateAwsKmsRsaKeyringInput(public_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "BinaryIO",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput(public_key=x.read())",
+          "fix": "x.read()",
           "kind": "file / stream"
         },
         {
           "type": "pathlib.Path",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput(public_key=x.read_bytes())",
+          "fix": "x.read_bytes()",
           "kind": "file / stream"
         },
         {
           "type": "str",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput(public_key=x.encode())",
+          "fix": "x.encode()",
           "kind": "text"
         },
         {
           "type": "str (base64)",
           "calls": 1,
           "code": "CreateAwsKmsRsaKeyringInput(public_key=base64.b64decode(x))",
+          "fix": "base64.b64decode(x)",
           "kind": "base64 text"
         }
       ]
@@ -5285,6 +5764,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "new CreateDefaultCryptographicMaterialsManagerInput { Keyring = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5293,6 +5773,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "CreateDefaultCryptographicMaterialsManagerInput{Keyring: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5301,6 +5782,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "CreateDefaultCryptographicMaterialsManagerInput.builder().keyring(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5309,6 +5791,7 @@
           "type": "KeyringNode",
           "calls": 0,
           "code": "new NodeDefaultCryptographicMaterialsManager(keyring: KeyringNode)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5317,6 +5800,7 @@
           "type": "Keyring",
           "calls": 0,
           "code": "CreateDefaultCryptographicMaterialsManagerInput(keyring=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5327,6 +5811,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { BranchKeyId = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5335,6 +5820,7 @@
           "type": "*string",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput{BranchKeyId: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5343,12 +5829,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyId(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -5357,6 +5845,7 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ branchKeyId: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5365,6 +5854,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput(branch_key_id=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -5375,6 +5865,7 @@
           "type": "IBranchKeyIdSupplier",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { BranchKeyIdSupplier = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5383,6 +5874,7 @@
           "type": "IBranchKeyIdSupplier",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput{BranchKeyIdSupplier: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5391,6 +5883,7 @@
           "type": "IBranchKeyIdSupplier",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().branchKeyIdSupplier(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5399,6 +5892,7 @@
           "type": "BranchKeyIdSupplier",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ branchKeyIdSupplier: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5407,6 +5901,7 @@
           "type": "BranchKeyIdSupplier",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput(branch_key_id_supplier=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5417,6 +5912,7 @@
           "type": "CacheType",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { Cache = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5425,6 +5921,7 @@
           "type": "CacheType",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput{Cache: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5433,6 +5930,7 @@
           "type": "CacheType",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().cache(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5441,6 +5939,7 @@
           "type": "CryptographicMaterialsCache<NodeAlgorithmSuite>",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ cache: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5449,6 +5948,7 @@
           "type": "CacheType",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput(cache=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5459,6 +5959,7 @@
           "type": "KeyStore",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { KeyStore = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5467,12 +5968,14 @@
           "type": "*kms.Client",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput{KeyStore: x}",
+          "fix": "x",
           "kind": "the type itself"
         },
         {
           "type": "aws.Config",
           "calls": 1,
           "code": "CreateAwsKmsHierarchicalKeyringInput{KeyStore: kms.NewFromConfig(x)}",
+          "fix": "kms.NewFromConfig(x)",
           "kind": "what builds it"
         }
       ],
@@ -5481,6 +5984,7 @@
           "type": "KeyStore",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().keyStore(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5489,6 +5993,7 @@
           "type": "BranchKeyStoreNode",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ keyStore: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5497,6 +6002,7 @@
           "type": "KeyStore",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput(key_store=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5507,6 +6013,7 @@
           "type": "number",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ maxCacheSize: x })",
+          "fix": "x",
           "kind": "number"
         }
       ]
@@ -5517,6 +6024,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { PartitionId = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5525,6 +6033,7 @@
           "type": "*string",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput{PartitionId: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5533,12 +6042,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().partitionId(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().partitionId(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -5547,6 +6058,7 @@
           "type": "string",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ partitionId: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5555,6 +6067,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput(partition_id=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -5565,18 +6078,21 @@
           "type": "int",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = x }",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "long",
           "calls": 0,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = x }",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "TimeSpan",
           "calls": 1,
           "code": "new CreateAwsKmsHierarchicalKeyringInput { TtlSeconds = (long)x.TotalSeconds }",
+          "fix": "(long)x.TotalSeconds",
           "kind": "Duration"
         }
       ],
@@ -5585,18 +6101,21 @@
           "type": "int64",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: x}",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "int",
           "calls": 1,
           "code": "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: int64(x)}",
+          "fix": "int64(x)",
           "kind": "number"
         },
         {
           "type": "time.Duration",
           "calls": 2,
           "code": "CreateAwsKmsHierarchicalKeyringInput{TtlSeconds: int64(x.Seconds())}",
+          "fix": "int64(x.Seconds())",
           "kind": "Duration"
         }
       ],
@@ -5605,18 +6124,21 @@
           "type": "int",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x)",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "long",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x)",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "Duration",
           "calls": 1,
           "code": "CreateAwsKmsHierarchicalKeyringInput.builder().ttlSeconds(x.getSeconds())",
+          "fix": "x.getSeconds()",
           "kind": "Duration"
         }
       ],
@@ -5625,6 +6147,7 @@
           "type": "number",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ cacheLimitTtl: x })",
+          "fix": "x",
           "kind": "number"
         }
       ],
@@ -5633,12 +6156,14 @@
           "type": "int",
           "calls": 0,
           "code": "CreateAwsKmsHierarchicalKeyringInput(ttl_seconds=x)",
+          "fix": "x",
           "kind": "number"
         },
         {
           "type": "timedelta",
           "calls": 2,
           "code": "CreateAwsKmsHierarchicalKeyringInput(ttl_seconds=int(x.total_seconds()))",
+          "fix": "int(x.total_seconds())",
           "kind": "Duration"
         }
       ]
@@ -5649,6 +6174,7 @@
           "type": "boolean",
           "calls": 0,
           "code": "new KmsHierarchicalKeyRingNode({ utf8Sorting: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5659,6 +6185,7 @@
           "type": "List<IKeyring>",
           "calls": 0,
           "code": "new CreateMultiKeyringInput { ChildKeyrings = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5667,6 +6194,7 @@
           "type": "[]IKeyring",
           "calls": 0,
           "code": "CreateMultiKeyringInput{ChildKeyrings: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5675,6 +6203,7 @@
           "type": "List<software.amazon.cryptography.materialproviders.IKeyring>",
           "calls": 0,
           "code": "CreateMultiKeyringInput.builder().childKeyrings(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5683,6 +6212,7 @@
           "type": "Keyring<NodeAlgorithmSuite>[]",
           "calls": 0,
           "code": "new MultiKeyringNode({ children: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5691,6 +6221,7 @@
           "type": "Keyring']",
           "calls": 0,
           "code": "CreateMultiKeyringInput(child_keyrings=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5701,6 +6232,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "new CreateMultiKeyringInput { Generator = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5709,6 +6241,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "CreateMultiKeyringInput{Generator: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5717,6 +6250,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "CreateMultiKeyringInput.builder().generator(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5725,6 +6259,7 @@
           "type": "Keyring<NodeAlgorithmSuite>",
           "calls": 0,
           "code": "new MultiKeyringNode({ generator: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5733,6 +6268,7 @@
           "type": "Keyring",
           "calls": 0,
           "code": "CreateMultiKeyringInput(generator=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5743,6 +6279,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateRawAesKeyringInput { KeyName = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5751,6 +6288,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateRawAesKeyringInput{KeyName: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5759,12 +6297,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateRawAesKeyringInput.builder().keyName(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateRawAesKeyringInput.builder().keyName(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -5773,6 +6313,7 @@
           "type": "string",
           "calls": 0,
           "code": "new RawAesKeyringNode({ keyName: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5781,6 +6322,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawAesKeyringInput(key_name=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -5791,6 +6333,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateRawAesKeyringInput { KeyNamespace = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5799,6 +6342,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateRawAesKeyringInput{KeyNamespace: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5807,12 +6351,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateRawAesKeyringInput.builder().keyNamespace(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateRawAesKeyringInput.builder().keyNamespace(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -5821,6 +6367,7 @@
           "type": "string",
           "calls": 0,
           "code": "new RawAesKeyringNode({ keyNamespace: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -5829,6 +6376,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawAesKeyringInput(key_namespace=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -5839,6 +6387,7 @@
           "type": "boolean",
           "calls": 0,
           "code": "new RawAesKeyringNode({ utf8Sorting: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -5849,6 +6398,7 @@
           "type": "AesWrappingAlg",
           "calls": 0,
           "code": "new CreateRawAesKeyringInput { WrappingAlg = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5857,6 +6407,7 @@
           "type": "AesWrappingAlg",
           "calls": 0,
           "code": "CreateRawAesKeyringInput{WrappingAlg: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5865,6 +6416,7 @@
           "type": "AesWrappingAlg",
           "calls": 0,
           "code": "CreateRawAesKeyringInput.builder().wrappingAlg(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5873,6 +6425,7 @@
           "type": "AlgorithmSuiteIdentifier",
           "calls": 0,
           "code": "new RawAesKeyringNode({ wrappingSuite: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -5881,6 +6434,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawAesKeyringInput(wrapping_alg=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -5891,36 +6445,42 @@
           "type": "MemoryStream",
           "calls": 0,
           "code": "new CreateRawAesKeyringInput { WrappingKey = x }",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(x) }",
+          "fix": "new MemoryStream(x)",
           "kind": "bytes"
         },
         {
           "type": "FileInfo",
           "calls": 2,
           "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "fix": "new MemoryStream(File.ReadAllBytes(x.FullName))",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "fix": "new MemoryStream(Encoding.UTF8.GetBytes(x))",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 2,
           "code": "new CreateRawAesKeyringInput { WrappingKey = new MemoryStream(Convert.FromBase64String(x)) }",
+          "fix": "new MemoryStream(Convert.FromBase64String(x))",
           "kind": "base64 text"
         },
         {
           "type": "Stream",
           "calls": 4,
           "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew CreateRawAesKeyringInput { WrappingKey = copy }",
+          "fix": "var copy = new MemoryStream();\nx.CopyTo(copy);\ncopy",
           "kind": "file / stream"
         }
       ],
@@ -5929,30 +6489,35 @@
           "type": "[]byte",
           "calls": 0,
           "code": "CreateRawAesKeyringInput{WrappingKey: x}",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "CreateRawAesKeyringInput{WrappingKey: []byte(x)}",
+          "fix": "[]byte(x)",
           "kind": "text"
         },
         {
           "type": "io.Reader",
           "calls": 3,
           "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
+          "fix": "data, err := io.ReadAll(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         },
         {
           "type": "string (base64)",
           "calls": 3,
           "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
+          "fix": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\ndata",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 3,
           "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nCreateRawAesKeyringInput{WrappingKey: data}",
+          "fix": "data, err := os.ReadFile(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         }
       ],
@@ -5961,36 +6526,42 @@
           "type": "ByteBuffer",
           "calls": 0,
           "code": "CreateRawAesKeyringInput.builder().wrappingKey(x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateRawAesKeyringInput.builder().wrappingKey(StandardCharsets.UTF_8.encode(x))",
+          "fix": "StandardCharsets.UTF_8.encode(x)",
           "kind": "text"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(x))",
+          "fix": "ByteBuffer.wrap(x)",
           "kind": "bytes"
         },
         {
           "type": "InputStream",
           "calls": 2,
           "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(x.readAllBytes()))",
+          "fix": "ByteBuffer.wrap(x.readAllBytes())",
           "kind": "file / stream"
         },
         {
           "type": "Path",
           "calls": 2,
           "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(Files.readAllBytes(x)))",
+          "fix": "ByteBuffer.wrap(Files.readAllBytes(x))",
           "kind": "file / stream"
         },
         {
           "type": "String (base64)",
           "calls": 3,
           "code": "CreateRawAesKeyringInput.builder().wrappingKey(ByteBuffer.wrap(Base64.getDecoder().decode(x)))",
+          "fix": "ByteBuffer.wrap(Base64.getDecoder().decode(x))",
           "kind": "base64 text"
         }
       ],
@@ -5999,36 +6570,42 @@
           "type": "Buffer",
           "calls": 0,
           "code": "new RawAesKeyringNode({ unencryptedMasterKey: x })",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "Uint8Array",
           "calls": 0,
           "code": "new RawAesKeyringNode({ unencryptedMasterKey: x })",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string (base64)",
           "calls": 1,
           "code": "new RawAesKeyringNode({ unencryptedMasterKey: Buffer.from(x, \"base64\") })",
+          "fix": "Buffer.from(x, \"base64\")",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 1,
           "code": "new RawAesKeyringNode({ unencryptedMasterKey: fs.readFileSync(x) })",
+          "fix": "fs.readFileSync(x)",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new RawAesKeyringNode({ unencryptedMasterKey: new TextEncoder().encode(x) })",
+          "fix": "new TextEncoder().encode(x)",
           "kind": "text"
         },
         {
           "type": "Readable",
           "calls": 3,
           "code": "new RawAesKeyringNode({ unencryptedMasterKey: Buffer.concat(await x.toArray()) })",
+          "fix": "Buffer.concat(await x.toArray())",
           "kind": "file / stream"
         }
       ],
@@ -6037,36 +6614,42 @@
           "type": "bytearray",
           "calls": 0,
           "code": "CreateRawAesKeyringInput(wrapping_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "bytes",
           "calls": 0,
           "code": "CreateRawAesKeyringInput(wrapping_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "BinaryIO",
           "calls": 1,
           "code": "CreateRawAesKeyringInput(wrapping_key=x.read())",
+          "fix": "x.read()",
           "kind": "file / stream"
         },
         {
           "type": "pathlib.Path",
           "calls": 1,
           "code": "CreateRawAesKeyringInput(wrapping_key=x.read_bytes())",
+          "fix": "x.read_bytes()",
           "kind": "file / stream"
         },
         {
           "type": "str",
           "calls": 1,
           "code": "CreateRawAesKeyringInput(wrapping_key=x.encode())",
+          "fix": "x.encode()",
           "kind": "text"
         },
         {
           "type": "str (base64)",
           "calls": 1,
           "code": "CreateRawAesKeyringInput(wrapping_key=base64.b64decode(x))",
+          "fix": "base64.b64decode(x)",
           "kind": "base64 text"
         }
       ]
@@ -6077,6 +6660,7 @@
           "type": "RawEcdhStaticConfigurations",
           "calls": 0,
           "code": "new CreateRawEcdhKeyringInput { KeyAgreementScheme = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6085,6 +6669,7 @@
           "type": "RawEcdhStaticConfigurations",
           "calls": 0,
           "code": "CreateRawEcdhKeyringInput{KeyAgreementScheme: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6093,6 +6678,7 @@
           "type": "RawEcdhStaticConfigurations",
           "calls": 0,
           "code": "CreateRawEcdhKeyringInput.builder().KeyAgreementScheme(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6101,6 +6687,7 @@
           "type": "RawEcdhStaticConfigurations",
           "calls": 0,
           "code": "CreateRawEcdhKeyringInput(key_agreement_scheme=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -6111,6 +6698,7 @@
           "type": "ECDHCurveSpec",
           "calls": 0,
           "code": "new CreateRawEcdhKeyringInput { CurveSpec = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6119,6 +6707,7 @@
           "type": "ECDHCurveSpec",
           "calls": 0,
           "code": "CreateRawEcdhKeyringInput{CurveSpec: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6127,6 +6716,7 @@
           "type": "ECDHCurveSpec",
           "calls": 0,
           "code": "CreateRawEcdhKeyringInput.builder().curveSpec(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6135,6 +6725,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawEcdhKeyringInput(curve_spec=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -6145,6 +6736,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateRawRsaKeyringInput { KeyName = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -6153,6 +6745,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput{KeyName: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -6161,12 +6754,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().keyName(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().keyName(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -6175,6 +6770,7 @@
           "type": "string",
           "calls": 0,
           "code": "new RawRsaKeyringNode({ keyName: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -6183,6 +6779,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(key_name=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -6193,6 +6790,7 @@
           "type": "string",
           "calls": 0,
           "code": "new CreateRawRsaKeyringInput { KeyNamespace = x }",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -6201,6 +6799,7 @@
           "type": "string",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput{KeyNamespace: x}",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -6209,12 +6808,14 @@
           "type": "String",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().keyNamespace(x)",
+          "fix": "x",
           "kind": "text"
         },
         {
           "type": "String (base64)",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().keyNamespace(x)",
+          "fix": "x",
           "kind": "base64 text"
         }
       ],
@@ -6223,6 +6824,7 @@
           "type": "string",
           "calls": 0,
           "code": "new RawRsaKeyringNode({ keyNamespace: x })",
+          "fix": "x",
           "kind": "text"
         }
       ],
@@ -6231,6 +6833,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(key_namespace=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -6241,6 +6844,7 @@
           "type": "\"sha1\" | \"sha256\" | \"sha384\" | \"sha512\"",
           "calls": 0,
           "code": "new RawRsaKeyringNode({ oaepHash: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -6251,6 +6855,7 @@
           "type": "PaddingScheme",
           "calls": 0,
           "code": "new CreateRawRsaKeyringInput { PaddingScheme = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6259,6 +6864,7 @@
           "type": "PaddingScheme",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput{PaddingScheme: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6267,6 +6873,7 @@
           "type": "PaddingScheme",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().paddingScheme(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6275,6 +6882,7 @@
           "type": "number",
           "calls": 0,
           "code": "new RawRsaKeyringNode({ padding: x })",
+          "fix": "x",
           "kind": "number"
         }
       ],
@@ -6283,6 +6891,7 @@
           "type": "str",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(padding_scheme=x)",
+          "fix": "x",
           "kind": "text"
         }
       ]
@@ -6293,36 +6902,42 @@
           "type": "MemoryStream",
           "calls": 0,
           "code": "new CreateRawRsaKeyringInput { PrivateKey = x }",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "new CreateRawRsaKeyringInput { PrivateKey = new MemoryStream(x) }",
+          "fix": "new MemoryStream(x)",
           "kind": "bytes"
         },
         {
           "type": "FileInfo",
           "calls": 2,
           "code": "new CreateRawRsaKeyringInput { PrivateKey = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "fix": "new MemoryStream(File.ReadAllBytes(x.FullName))",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new CreateRawRsaKeyringInput { PrivateKey = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "fix": "new MemoryStream(Encoding.UTF8.GetBytes(x))",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 2,
           "code": "new CreateRawRsaKeyringInput { PrivateKey = new MemoryStream(Convert.FromBase64String(x)) }",
+          "fix": "new MemoryStream(Convert.FromBase64String(x))",
           "kind": "base64 text"
         },
         {
           "type": "Stream",
           "calls": 4,
           "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew CreateRawRsaKeyringInput { PrivateKey = copy }",
+          "fix": "var copy = new MemoryStream();\nx.CopyTo(copy);\ncopy",
           "kind": "file / stream"
         }
       ],
@@ -6331,30 +6946,35 @@
           "type": "[]byte",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput{PrivateKey: x}",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput{PrivateKey: []byte(x)}",
+          "fix": "[]byte(x)",
           "kind": "text"
         },
         {
           "type": "io.Reader",
           "calls": 3,
           "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nCreateRawRsaKeyringInput{PrivateKey: data}",
+          "fix": "data, err := io.ReadAll(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         },
         {
           "type": "string (base64)",
           "calls": 3,
           "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nCreateRawRsaKeyringInput{PrivateKey: data}",
+          "fix": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\ndata",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 3,
           "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nCreateRawRsaKeyringInput{PrivateKey: data}",
+          "fix": "data, err := os.ReadFile(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         }
       ],
@@ -6363,36 +6983,42 @@
           "type": "ByteBuffer",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().privateKey(x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput.builder().privateKey(StandardCharsets.UTF_8.encode(x))",
+          "fix": "StandardCharsets.UTF_8.encode(x)",
           "kind": "text"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer.wrap(x))",
+          "fix": "ByteBuffer.wrap(x)",
           "kind": "bytes"
         },
         {
           "type": "InputStream",
           "calls": 2,
           "code": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer.wrap(x.readAllBytes()))",
+          "fix": "ByteBuffer.wrap(x.readAllBytes())",
           "kind": "file / stream"
         },
         {
           "type": "Path",
           "calls": 2,
           "code": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer.wrap(Files.readAllBytes(x)))",
+          "fix": "ByteBuffer.wrap(Files.readAllBytes(x))",
           "kind": "file / stream"
         },
         {
           "type": "String (base64)",
           "calls": 3,
           "code": "CreateRawRsaKeyringInput.builder().privateKey(ByteBuffer.wrap(Base64.getDecoder().decode(x)))",
+          "fix": "ByteBuffer.wrap(Base64.getDecoder().decode(x))",
           "kind": "base64 text"
         }
       ],
@@ -6401,36 +7027,42 @@
           "type": "bytearray",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(private_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "bytes",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(private_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "BinaryIO",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(private_key=x.read())",
+          "fix": "x.read()",
           "kind": "file / stream"
         },
         {
           "type": "pathlib.Path",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(private_key=x.read_bytes())",
+          "fix": "x.read_bytes()",
           "kind": "file / stream"
         },
         {
           "type": "str",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(private_key=x.encode())",
+          "fix": "x.encode()",
           "kind": "text"
         },
         {
           "type": "str (base64)",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(private_key=base64.b64decode(x))",
+          "fix": "base64.b64decode(x)",
           "kind": "base64 text"
         }
       ]
@@ -6441,36 +7073,42 @@
           "type": "MemoryStream",
           "calls": 0,
           "code": "new CreateRawRsaKeyringInput { PublicKey = x }",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "new CreateRawRsaKeyringInput { PublicKey = new MemoryStream(x) }",
+          "fix": "new MemoryStream(x)",
           "kind": "bytes"
         },
         {
           "type": "FileInfo",
           "calls": 2,
           "code": "new CreateRawRsaKeyringInput { PublicKey = new MemoryStream(File.ReadAllBytes(x.FullName)) }",
+          "fix": "new MemoryStream(File.ReadAllBytes(x.FullName))",
           "kind": "file / stream"
         },
         {
           "type": "string",
           "calls": 2,
           "code": "new CreateRawRsaKeyringInput { PublicKey = new MemoryStream(Encoding.UTF8.GetBytes(x)) }",
+          "fix": "new MemoryStream(Encoding.UTF8.GetBytes(x))",
           "kind": "text"
         },
         {
           "type": "string (base64)",
           "calls": 2,
           "code": "new CreateRawRsaKeyringInput { PublicKey = new MemoryStream(Convert.FromBase64String(x)) }",
+          "fix": "new MemoryStream(Convert.FromBase64String(x))",
           "kind": "base64 text"
         },
         {
           "type": "Stream",
           "calls": 4,
           "code": "var copy = new MemoryStream();\nx.CopyTo(copy);\nnew CreateRawRsaKeyringInput { PublicKey = copy }",
+          "fix": "var copy = new MemoryStream();\nx.CopyTo(copy);\ncopy",
           "kind": "file / stream"
         }
       ],
@@ -6479,30 +7117,35 @@
           "type": "[]byte",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput{PublicKey: x}",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput{PublicKey: []byte(x)}",
+          "fix": "[]byte(x)",
           "kind": "text"
         },
         {
           "type": "io.Reader",
           "calls": 3,
           "code": "data, err := io.ReadAll(x)\nif err != nil { return err }\nCreateRawRsaKeyringInput{PublicKey: data}",
+          "fix": "data, err := io.ReadAll(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         },
         {
           "type": "string (base64)",
           "calls": 3,
           "code": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\nCreateRawRsaKeyringInput{PublicKey: data}",
+          "fix": "data, err := base64.StdEncoding.DecodeString(x)\nif err != nil { return err }\ndata",
           "kind": "base64 text"
         },
         {
           "type": "string (path)",
           "calls": 3,
           "code": "data, err := os.ReadFile(x)\nif err != nil { return err }\nCreateRawRsaKeyringInput{PublicKey: data}",
+          "fix": "data, err := os.ReadFile(x)\nif err != nil { return err }\ndata",
           "kind": "file / stream"
         }
       ],
@@ -6511,36 +7154,42 @@
           "type": "ByteBuffer",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput.builder().publicKey(x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput.builder().publicKey(StandardCharsets.UTF_8.encode(x))",
+          "fix": "StandardCharsets.UTF_8.encode(x)",
           "kind": "text"
         },
         {
           "type": "byte[]",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(x))",
+          "fix": "ByteBuffer.wrap(x)",
           "kind": "bytes"
         },
         {
           "type": "InputStream",
           "calls": 2,
           "code": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(x.readAllBytes()))",
+          "fix": "ByteBuffer.wrap(x.readAllBytes())",
           "kind": "file / stream"
         },
         {
           "type": "Path",
           "calls": 2,
           "code": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(Files.readAllBytes(x)))",
+          "fix": "ByteBuffer.wrap(Files.readAllBytes(x))",
           "kind": "file / stream"
         },
         {
           "type": "String (base64)",
           "calls": 3,
           "code": "CreateRawRsaKeyringInput.builder().publicKey(ByteBuffer.wrap(Base64.getDecoder().decode(x)))",
+          "fix": "ByteBuffer.wrap(Base64.getDecoder().decode(x))",
           "kind": "base64 text"
         }
       ],
@@ -6549,36 +7198,42 @@
           "type": "bytearray",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(public_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "bytes",
           "calls": 0,
           "code": "CreateRawRsaKeyringInput(public_key=x)",
+          "fix": "x",
           "kind": "bytes"
         },
         {
           "type": "BinaryIO",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(public_key=x.read())",
+          "fix": "x.read()",
           "kind": "file / stream"
         },
         {
           "type": "pathlib.Path",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(public_key=x.read_bytes())",
+          "fix": "x.read_bytes()",
           "kind": "file / stream"
         },
         {
           "type": "str",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(public_key=x.encode())",
+          "fix": "x.encode()",
           "kind": "text"
         },
         {
           "type": "str (base64)",
           "calls": 1,
           "code": "CreateRawRsaKeyringInput(public_key=base64.b64decode(x))",
+          "fix": "base64.b64decode(x)",
           "kind": "base64 text"
         }
       ]
@@ -6589,6 +7244,7 @@
           "type": "RsaKey",
           "calls": 0,
           "code": "new RawRsaKeyringNode({ rsaKey: x })",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -6599,6 +7255,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "new CreateRequiredEncryptionContextCMMInput { Keyring = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6607,6 +7264,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput{Keyring: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6615,6 +7273,7 @@
           "type": "IKeyring",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput.builder().keyring(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6623,6 +7282,7 @@
           "type": "Keyring",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput(keyring=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]
@@ -6633,18 +7293,21 @@
           "type": "List<string>",
           "calls": 0,
           "code": "new CreateRequiredEncryptionContextCMMInput { RequiredEncryptionContextKeys = x }",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 1,
           "code": "new CreateRequiredEncryptionContextCMMInput { RequiredEncryptionContextKeys = new List<string> { x } }",
+          "fix": "new List<string> { x }",
           "kind": "text"
         },
         {
           "type": "string[]",
           "calls": 1,
           "code": "new CreateRequiredEncryptionContextCMMInput { RequiredEncryptionContextKeys = x.ToList() }",
+          "fix": "x.ToList()",
           "kind": "list"
         }
       ],
@@ -6653,12 +7316,14 @@
           "type": "[]string",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput{RequiredEncryptionContextKeys: x}",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "string",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput{RequiredEncryptionContextKeys: []string{x}}",
+          "fix": "[]string{x}",
           "kind": "text"
         }
       ],
@@ -6667,18 +7332,21 @@
           "type": "List<String>",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput.builder().requiredEncryptionContextKeys(x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "String",
           "calls": 1,
           "code": "CreateRequiredEncryptionContextCMMInput.builder().requiredEncryptionContextKeys(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "text"
         },
         {
           "type": "String[]",
           "calls": 1,
           "code": "CreateRequiredEncryptionContextCMMInput.builder().requiredEncryptionContextKeys(List.of(x))",
+          "fix": "List.of(x)",
           "kind": "list"
         }
       ],
@@ -6687,18 +7355,21 @@
           "type": "list[str]",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput(required_encryption_context_keys=x)",
+          "fix": "x",
           "kind": "list"
         },
         {
           "type": "str",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput(required_encryption_context_keys=[x])",
+          "fix": "[x]",
           "kind": "text"
         },
         {
           "type": "tuple[str, ...]",
           "calls": 1,
           "code": "CreateRequiredEncryptionContextCMMInput(required_encryption_context_keys=list(x))",
+          "fix": "list(x)",
           "kind": "list"
         }
       ]
@@ -6709,6 +7380,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "new CreateRequiredEncryptionContextCMMInput { UnderlyingCMM = x }",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6717,6 +7389,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput{UnderlyingCMM: x}",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6725,6 +7398,7 @@
           "type": "ICryptographicMaterialsManager",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput.builder().underlyingCMM(x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ],
@@ -6733,6 +7407,7 @@
           "type": "CryptographicMaterialsManager",
           "calls": 0,
           "code": "CreateRequiredEncryptionContextCMMInput(underlying_cmm=x)",
+          "fix": "x",
           "kind": "the type itself"
         }
       ]

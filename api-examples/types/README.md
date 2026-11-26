@@ -6,7 +6,7 @@ These scripts make the data for `dashboard/api-examples/types.html`. That page s
 
 Nobody needs to run these by hand. Three workflows run every day, and the page loads the newest successful run of each, with the GitHub token from the dashboard's Settings:
 
-- `api-examples-types.yml` checks out aws-crypto-tools-rust main. `rust_api.py` reads every keyring, CMM, key store, cache and client, and each of their setters, from rustdoc, into `rust-api.json`. `compile_rust_types.py` tries each held type on each option with the Rust compiler, runs the cheapest call that compiled for some options, and writes `types-rust.json`. Its artifact also has `rust_trials.rs`, one fn for each try, and `rust_runs.rs`, one test for each run.
+- `api-examples-types.yml` checks out aws-crypto-tools-rust main. `rust_api.py` reads every keyring, CMM, key store, cache and client, and each of their setters, from rustdoc, into `rust-api.json`. `compile_rust_types.py` tries each held type on each option with the Rust compiler, runs the cheapest call that compiled for some options, and writes `types-rust.json`. Its artifact also has `rust_trials.rs`, one fn for each try, and `rust_runs.rs`, one test for each run. It also compiles an example of making each type, from `rust_examples.py`, and the page shows the ones that compiled.
 - `api-examples-shipped.yml` reads each released Java, Python, .NET, Go and JS library. `other_languages.py` writes every API and option it finds into `types-others.json`. These calls are not compiled.
 - `api-examples-usage.yml` runs `../usage_search.py`, which searches public GitHub code for calls that set each option, into `usage.json`.
 

@@ -295,14 +295,14 @@ def rows_for(key, lang, takes):
             setup, value = conversion if isinstance(conversion, tuple) else ([], conversion)
             cost = calls.count("\n".join(setup + [value]))
             if taken in takes and (best is None or cost < best[0]):
-                best = (cost, "\n".join(setup + [takes[taken].replace("{x}", value)]))
-        cost, code = best if best else (None, "")
-        rows.append({"type": label, "calls": cost, "code": code, "kind": kind})
+                best = (cost, "\n".join(setup + [takes[taken].replace("{x}", value)]), "\n".join(setup + [value]))
+        cost, code, fix = best if best else (None, "", "")
+        rows.append({"type": label, "calls": cost, "code": code, "fix": fix, "kind": kind})
     # A type that no held value passes as is, like a keyring interface, shows as itself.
     covered = {t for _, conversions in held.values() for t, c in conversions if c == "x"}
     for taken, call in takes.items():
         if taken not in covered:
-            rows.append({"type": taken, "calls": 0, "code": call.replace("{x}", "x"), "kind": "the type itself"})
+            rows.append({"type": taken, "calls": 0, "code": call.replace("{x}", "x"), "fix": "x", "kind": "the type itself"})
     return sorted(rows, key=lambda r: (r["calls"] is None, r["calls"] or 0, r["type"]))
 
 

@@ -21,6 +21,7 @@ from pathlib import Path
 
 import calls
 import rust_about
+import rust_examples
 import rust_runs
 import rust_types
 
@@ -413,11 +414,12 @@ def best_rows(trials, failed):
     rust_trials.rs. calls is None when no fix compiled.
     """
     rows = {}
-    for n, (key, label, _, kind, cost, _, _, call) in enumerate(trials):
+    for n, (key, label, _, kind, cost, _, glue, call) in enumerate(trials):
         best = rows.setdefault(key, {}).setdefault(label, {"type": label, "calls": None, "code": "", "kind": kind,
                                                            "trial": None})
         if n not in failed and (best["calls"] is None or cost < best["calls"]):
-            best.update(calls=cost, code=call, trial=TRIALS_FIRST_LINE + n)
+            # fix is the part of the call that passes the value, which the page names the calls of.
+            best.update(calls=cost, code=call, fix=glue, trial=TRIALS_FIRST_LINE + n)
     order = lambda r: (r["calls"] is None, r["calls"] or 0, r["type"])  # noqa: E731
     return {key: sorted(found.values(), key=order) for key, found in rows.items()}
 
@@ -465,6 +467,39 @@ def run_checks(scratch, rows, trials):
     return text
 
 
+def await_variants(lines):
+    """The example, and copies with .await after some of its builds, because some builders are async."""
+    spots = [i for i, line in enumerate(lines) if line.strip() == ".build()?;"]
+    out = []
+    for mask in range(2 ** min(len(spots), 3)):
+        out.append([line.replace(".build()?;", ".build().await?;") if i in spots and mask >> spots.index(i) & 1 else line
+                    for i, line in enumerate(lines)])
+    return out
+
+
+def check_examples(scratch, held):
+    """{label: code} for each held type whose example of making it compiled. See rust_examples.py."""
+    enums = {name: found[0]["variants"][-1] for name, found in API["docs"].items() if found[0].get("variants")}
+    ours = {name: found[0]["path"] for name, found in API["docs"].items()}
+    types = {}
+    for found in held.values():
+        for label, expr, _, _ in found:
+            types.setdefault(label, expr)
+    candidates, lines = [], []
+    for label, expr in sorted(types.items()):
+        made = rust_examples.example(label, enums)
+        for variant in await_variants(made) if made else []:
+            use = rust_examples.uses(variant, ours)
+            candidates.append((label, use + variant))
+            lines.append(rust_examples.check_line(len(lines), variant, use, expr))
+    failed = scratch.errors(lines)
+    out = {}
+    for n, (label, code) in enumerate(candidates):
+        if n not in failed:
+            out.setdefault(label, "\n".join(code).replace(".build().await?;", ".build()\n    .await?;"))
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--rust-repo", required=True)
@@ -472,12 +507,14 @@ def main():
     args = parser.parse_args()
     rust_repo = str(Path(args.rust_repo).resolve())
     data = json.loads(rust_types.OUT.read_text())
-    held, scratch, docs = prepare(rust_repo, RUNS_SUPPORT.read_text() + "\n".join(rust_runs.OWNED.values()))
+    extra = RUNS_SUPPORT.read_text() + "\n".join(rust_runs.OWNED.values()) + Path(rust_examples.__file__).read_text()
+    held, scratch, docs = prepare(rust_repo, extra)
     trials, lines = setter_trials(held)
     failed = scratch.errors(lines)
     TRIALS.write_text(trials_text(lines))
     rows = best_rows(trials, failed)
     RUNS.write_text(run_checks(scratch, rows, trials))
+    examples = check_examples(scratch, held)
     scratch.remove()
 
     lock = json.loads(rust_types.LOCK.read_text())
@@ -513,6 +550,8 @@ def main():
                  for a in API["apis"]],
         "rows": {neutral[key]: found for key, found in rows.items()},
         "about": about,
+        # An example of making each type, for the ones whose example compiled.
+        "examples": examples,
         # Each shared handle, like SharedKeyring, with its group and the built-in types that convert into it,
         # for the page's type explorer.
         "handles": {name: {"group": h["group"], "members": [m.split("::")[-1] for m in h["members"]]}

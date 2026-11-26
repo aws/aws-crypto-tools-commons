@@ -46,8 +46,8 @@ class BestRowsTest(unittest.TestCase):
         rows = crt.best_rows(self.TRIALS, failed={1: ["error"], 3: ["error"]})["k"]
         first = crt.TRIALS_FIRST_LINE
         self.assertEqual(rows, [
-            {"type": "Vec<u8>", "calls": 0, "code": ".a(x)", "kind": "bytes", "trial": first + 2},
-            {"type": "Bytes", "calls": 2, "code": ".a(x.f().g())", "kind": "bytes", "trial": first + 4},
+            {"type": "Vec<u8>", "calls": 0, "code": ".a(x)", "fix": "x", "kind": "bytes", "trial": first + 2},
+            {"type": "Bytes", "calls": 2, "code": ".a(x.f().g())", "fix": "x", "kind": "bytes", "trial": first + 4},
             {"type": "char", "calls": None, "code": "", "kind": "bytes", "trial": None}])
 
     def test_of_two_calls_that_cost_the_same_the_first_wins(self):

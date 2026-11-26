@@ -705,7 +705,12 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::types::AesWrappingAlg",
     "doc": "An AES-GCM wrapping algorithm, with a 12-byte IV and a 16-byte tag.\nThe wrapping key's length must match the algorithm's key size.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/aes_wrapping_alg.rs#L12"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/aes_wrapping_alg.rs#L12",
+    "variants": [
+     "AlgAes128GcmIv12Tag16",
+     "AlgAes192GcmIv12Tag16",
+     "AlgAes256GcmIv12Tag16"
+    ]
    }
   ],
   "AwsKmsKeyring": [
@@ -713,7 +718,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::keyring::AwsKmsKeyring",
     "doc": "A keyring that protects each data key with one AWS KMS key.\n\nOn encrypt, it calls AWS KMS `GenerateDataKey`,\nor `Encrypt` when the materials already have a data key.\nOn decrypt, it tries only the encrypted data keys that this KMS key wrote.\nDecrypting needs a key ARN: a keyring built with a key ID or an alias fails on decrypt.\n\n```no_run\nuse aws_crypto_mpl::keyring::AwsKmsKeyring;\n\n# async fn example() -> Result<(), aws_crypto_mpl::Error> {\nlet sdk_config = aws_crypto_mpl::aws_config::load_defaults(aws_crypto_mpl::aws_config::BehaviorVersion::latest()).await;\nlet keyring = AwsKmsKeyring::builder()\n    .kms_key_id(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\")\n    .kms_client(aws_crypto_mpl::aws_sdk_kms::Client::new(&sdk_config))\n    .build()\n    .await?;\n# Ok(())\n# }\n```",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/aws_kms_keyring.rs#L112"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/aws_kms_keyring.rs#L112",
+    "variants": []
    }
   ],
   "Client": [
@@ -721,7 +727,8 @@
     "crate": "aws-esdk",
     "path": "aws_esdk::client::Client",
     "doc": "The AWS Encryption SDK client.\nApplies one [`Config`] to every operation.\nBuild with [`Client::builder`], or from a [`Config`] with [`Client::from_conf`].\n\nEach operation method returns a fluent builder that takes `commitment_policy`\nand `max_encrypted_data_keys` from the client.\nSet the rest on the builder and finish with `send`.\n\n# Example\n\n```no_run\n# use aws_esdk::{types::CommitmentPolicy, types::EncryptionContext, keyring::SharedKeyring};\n# async fn example(plaintext: &[u8], ec: EncryptionContext, keyring: SharedKeyring) -> Result<(), aws_esdk::Error> {\nlet esdk = aws_esdk::Client::builder()\n    .commitment_policy(CommitmentPolicy::RequireEncryptRequireDecrypt)\n    .build()?;\nlet output = esdk\n    .encrypt()\n    .plaintext(plaintext)\n    .set_encryption_context(Some(ec))\n    .keyring(keyring)\n    .send()\n    .await?;\n# Ok(())\n# }\n```",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/esdk/src/client.rs#L54"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/esdk/src/client.rs#L54",
+    "variants": []
    }
   ],
   "DefaultCmc": [
@@ -729,7 +736,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::cmc::DefaultCmc",
     "doc": "The default Cryptographic Materials Cache.\n\nA [`StormTrackingCmc`] with the defaults documented on [`StormTrackingCmcBuilder`](super::StormTrackingCmcBuilder),\nexcept for the entry capacity, which you set.\nConstruct with [`DefaultCmc::builder`].\n\nA clone refers to the same cache, not a copy of it.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/default.rs#L26"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/default.rs#L26",
+    "variants": []
    }
   ],
   "DefaultCmm": [
@@ -737,7 +745,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::cmm::DefaultCmm",
     "doc": "Concrete CMM that uses a single keyring and resolves an algorithm suite\nfrom each input's commitment policy.\n\nOn `get_encryption_materials` the default CMM:\n- Resolves the algorithm suite from the request (or, if absent, from the\n  commitment policy's default).\n- For signing suites: generates an ECDSA key pair via `aws-mpl-primitives`, attaches\n  the private signing key to the materials, and inserts the\n  base64-encoded SEC1-compressed public key into a copy of the input's\n  encryption context under the reserved `aws-crypto-public-key` key.\n- Calls the wrapped keyring's `on_encrypt` to populate the plaintext data\n  key and encrypted data keys.\n\nOn `decrypt_materials` the default CMM:\n- Validates the algorithm suite against the input's commitment policy.\n- Merges the input's encryption context with its Reproduced\n  Encryption Context: shared keys must agree, and pairs present only in\n  the reproduced context are appended and reported as Required Encryption\n  Context Keys. See `merge_reproduced_encryption_context`.\n- For signing suites: extracts and base64-decodes the verification key\n  from the merged encryption context.\n- For non-signing suites: rejects requests whose merged encryption\n  context contains the reserved `aws-crypto-public-key`.\n- Calls the wrapped keyring's `on_decrypt` to populate the plaintext data\n  key.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/default_cmm.rs#L60"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/default_cmm.rs#L60",
+    "variants": []
    }
   ],
   "DynamoDbKeyStore": [
@@ -745,7 +754,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::key_store::DynamoDbKeyStore",
     "doc": "A key store backed by AWS KMS and Amazon DynamoDB.\n\nEach key store operation is a method that returns a fluent builder: set the input, then call `send`.\nPass it anywhere a key store is accepted.\n\nCloning is cheap: clones share one key store.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/branch_key_store.rs#L65"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/branch_key_store.rs#L65",
+    "variants": []
    }
   ],
   "EncryptionContext": [
@@ -753,7 +763,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::types::EncryptionContext",
     "doc": "A key-value mapping of arbitrary, non-secret, UTF-8 encoded strings used as AAD.\n\nIteration and [`to_bytes`](Self::to_bytes) visit keys in ascending UTF-8 byte order,\nthe order the message format requires.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/encryption_context.rs#L16"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/encryption_context.rs#L16",
+    "variants": []
    }
   ],
   "EsdkAlgorithmSuiteId": [
@@ -761,7 +772,20 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::types::EsdkAlgorithmSuiteId",
     "doc": "ESDK Format Algorithm Suite ENUM.\nIts variants correspond 1:1 to the ESDK rows of the Supported Algorithm Suites table.\n\nConstruct an `AlgorithmSuite` from a variant via [`Self::specification`].",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/algorithm_suite.rs#L69"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/algorithm_suite.rs#L69",
+    "variants": [
+     "AlgAes128GcmIv12Tag16NoKdf",
+     "AlgAes192GcmIv12Tag16NoKdf",
+     "AlgAes256GcmIv12Tag16NoKdf",
+     "AlgAes128GcmIv12Tag16HkdfSha256",
+     "AlgAes192GcmIv12Tag16HkdfSha256",
+     "AlgAes256GcmIv12Tag16HkdfSha256",
+     "AlgAes128GcmIv12Tag16HkdfSha256EcdsaP256",
+     "AlgAes192GcmIv12Tag16HkdfSha384EcdsaP384",
+     "AlgAes256GcmIv12Tag16HkdfSha384EcdsaP384",
+     "AlgAes256GcmHkdfSha512CommitKey",
+     "AlgAes256GcmHkdfSha512CommitKeyEcdsaP384"
+    ]
    }
   ],
   "EsdkCommitmentPolicy": [
@@ -769,7 +793,12 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::types::EsdkCommitmentPolicy",
     "doc": "ESDK Format Commitment Policy ENUM. Its variants correspond 1:1 to the\nrows of the ESDK Commitment Policy ENUM table in `commitment-policy.md`.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/commitment_policy.rs#L28"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/commitment_policy.rs#L28",
+    "variants": [
+     "ForbidEncryptAllowDecrypt",
+     "RequireEncryptAllowDecrypt",
+     "RequireEncryptRequireDecrypt"
+    ]
    }
   ],
   "HierarchicalKeyring": [
@@ -777,7 +806,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::keyring::HierarchicalKeyring",
     "doc": "AWS KMS Hierarchical Keyring.\n\nConstruct with [`HierarchicalKeyring::builder`].",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L270"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L270",
+    "variants": []
    }
   ],
   "IntoShared": [
@@ -785,7 +815,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::shared::IntoShared",
     "doc": "Converts a component into its shared handle.\n\nA value that is already the handle is returned as-is, not wrapped again.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/shared.rs#L48"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/shared.rs#L48",
+    "variants": []
    }
   ],
   "KmsConfiguration": [
@@ -793,7 +824,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::key_store::types::KmsConfiguration",
     "doc": "The KMS key configuration for a key store.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/config.rs#L12"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/config.rs#L12",
+    "variants": []
    }
   ],
   "LocalCmc": [
@@ -801,7 +833,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::cmc::LocalCmc",
     "doc": "Concrete in-memory LRU Cryptographic Materials Cache.\n\n`LocalCmc` is parameterised by an `entry_capacity` (caller-supplied\nupper bound on the number of stored entries) and an\n`entry_pruning_tail_size` (number of least-recently-used entries the\ncache scans for TTL-expired evictees during pruning). It implements the\nabstract [`Cmc`] trait so callers can plug it into a caching CMM.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/local.rs#L37"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/local.rs#L37",
+    "variants": []
    }
   ],
   "RawAesKeyring": [
@@ -809,7 +842,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::keyring::RawAesKeyring",
     "doc": "A keyring that wraps and unwraps data keys with a local AES-GCM wrapping key.\n\nConstruct with [`RawAesKeyring::builder`].\nThe keyring uses the serialized encryption context as AES-GCM additional authenticated data.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/raw_aes_keyring.rs#L59"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/raw_aes_keyring.rs#L59",
+    "variants": []
    }
   ],
   "SharedBranchKeyIdSupplier": [
@@ -817,7 +851,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::keyring::SharedBranchKeyIdSupplier",
     "doc": "A branch key ID supplier whose concrete type is chosen at runtime.\n\nPass it anywhere a branch key ID supplier is accepted.\nCallers that know their branch key ID supplier's type pass it directly and never need this one.\n\nIts operation returns a fluent builder: set the input, then call `send`.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L195"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L195",
+    "variants": []
    }
   ],
   "SharedCmc": [
@@ -825,7 +860,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::cmc::SharedCmc",
     "doc": "A cache whose concrete type is chosen at runtime.\n\nPass it anywhere a cache is accepted.\nCallers that know their cache's type pass it directly and never need this one.\n\nEach operation returns a fluent builder: set the input, then call `send`.\n\nA clone of a `SharedCmc` refers to the same cache, not a copy of it.\nGive several keyrings clones of one handle\nand they read and write the same entries.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/mod.rs#L93"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/mod.rs#L93",
+    "variants": []
    }
   ],
   "SharedCmm": [
@@ -833,7 +869,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::cmm::SharedCmm",
     "doc": "A CMM whose concrete type is chosen at runtime.\n\nPass it anywhere a CMM is accepted.\nCallers that know their CMM's type pass it directly and never need this one.\n\nEach operation returns a fluent builder: set the input, then call `send`.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/mod.rs#L62"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/mod.rs#L62",
+    "variants": []
    }
   ],
   "SharedKeyStore": [
@@ -841,7 +878,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::key_store::SharedKeyStore",
     "doc": "A handle to a key store, with one method per key store operation.\n\nEach method returns a fluent builder: set the input, then call `send`.\n\n```no_run\n# async fn example(key_store: aws_crypto_mpl::key_store::SharedKeyStore) -> Result<(), aws_crypto_mpl::Error> {\nlet materials = key_store\n    .get_active_branch_key()\n    .branch_key_id(\"my-branch-key\")\n    .send()\n    .await?\n    .into_branch_key_materials();\n# Ok(())\n# }\n```\n\nCloning is cheap: clones share one key store.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/client_impl.rs#L17"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/client_impl.rs#L17",
+    "variants": []
    }
   ],
   "SharedKeyring": [
@@ -849,7 +887,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::keyring::SharedKeyring",
     "doc": "A keyring whose concrete type is chosen at runtime.\n\nPass it anywhere a keyring is accepted.\nCallers that know their keyring's type pass it directly and never need this one.\n\nEach operation returns a fluent builder: set the input, then call `send`.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/mod.rs#L178"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/mod.rs#L178",
+    "variants": []
    }
   ],
   "StormTrackingCmc": [
@@ -857,7 +896,8 @@
     "crate": "aws-crypto-mpl",
     "path": "aws_crypto_mpl::cmc::StormTrackingCmc",
     "doc": "Storm-tracking Cryptographic Materials Cache.\n\nWraps a [`LocalCmc`] and adds grace-period / grace-interval storm\nprotection.  See the module-level docs and\n`spec/framework/storm-tracking-cryptographic-materials-cache.md` for the\nfull behavioral specification.",
-    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/storm_tracking.rs#L77"
+    "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/storm_tracking.rs#L77",
+    "variants": []
    }
   ]
  }

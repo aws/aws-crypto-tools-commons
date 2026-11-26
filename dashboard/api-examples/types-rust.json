@@ -417,6 +417,7 @@
         "code": ".kms_key_id(x)",
         "kind": "text",
         "trial": 40,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -429,6 +430,7 @@
         "code": ".kms_key_id(x)",
         "kind": "text",
         "trial": 4,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -441,6 +443,7 @@
         "code": ".kms_key_id(x)",
         "kind": "text",
         "trial": 31,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -453,6 +456,7 @@
         "code": ".set_kms_key_id(x)",
         "kind": "optional text",
         "trial": 63,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -465,6 +469,7 @@
         "code": ".kms_key_id(x)",
         "kind": "text",
         "trial": 13,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -477,6 +482,7 @@
         "code": ".kms_key_id(x)",
         "kind": "text",
         "trial": 22,
+        "fix": "x",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
         },
@@ -488,6 +494,7 @@
         "code": ".set_kms_key_id(x.map(Into::into))",
         "kind": "optional text",
         "trial": 59,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -500,6 +507,7 @@
         "code": ".set_kms_key_id(x.map(Into::into))",
         "kind": "optional text",
         "trial": 69,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -512,6 +520,7 @@
         "code": ".kms_key_id(x.to_string())",
         "kind": "text",
         "trial": 52,
+        "fix": "x.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -526,6 +535,7 @@
         "code": ".kms_client(x)",
         "kind": "named",
         "trial": 73,
+        "fix": "x",
         "run": {
           "builds": true
         },
@@ -537,6 +547,7 @@
         "code": ".kms_client(aws_sdk_kms::Client::new(x))",
         "kind": "ctor",
         "trial": 92,
+        "fix": "aws_sdk_kms::Client::new(x)",
         "run": {
           "builds": true
         },
@@ -548,6 +559,7 @@
         "code": ".kms_client(x.clone())",
         "kind": "named",
         "trial": 78,
+        "fix": "x.clone()",
         "run": {
           "builds": true
         },
@@ -559,6 +571,7 @@
         "code": ".kms_client((*x).clone())",
         "kind": "named",
         "trial": 83,
+        "fix": "(*x).clone()",
         "run": {
           "builds": true
         },
@@ -570,6 +583,7 @@
         "code": ".kms_client(aws_sdk_kms::Client::new(&x))",
         "kind": "ctor",
         "trial": 90,
+        "fix": "aws_sdk_kms::Client::new(&x)",
         "run": {
           "builds": true
         },
@@ -581,6 +595,7 @@
         "code": ".kms_client(aws_sdk_kms::Client::from_conf(x))",
         "kind": "ctor",
         "trial": 87,
+        "fix": "aws_sdk_kms::Client::from_conf(x)",
         "run": {
           "builds": true
         },
@@ -594,6 +609,7 @@
         "code": ".grant_tokens(x)",
         "kind": "text",
         "trial": 129,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -606,6 +622,7 @@
         "code": ".grant_tokens(x)",
         "kind": "text",
         "trial": 93,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -618,6 +635,7 @@
         "code": ".grant_tokens(x)",
         "kind": "text",
         "trial": 120,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -630,6 +648,7 @@
         "code": ".set_grant_tokens(x)",
         "kind": "optional list",
         "trial": 177,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -642,6 +661,7 @@
         "code": ".grant_tokens(x)",
         "kind": "text",
         "trial": 102,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -654,6 +674,7 @@
         "code": ".set_grant_tokens(Some(x))",
         "kind": "list",
         "trial": 174,
+        "fix": "Some(x)",
         "run": {
           "builds": true,
           "same": true
@@ -666,6 +687,7 @@
         "code": ".grant_tokens(x)",
         "kind": "text",
         "trial": 111,
+        "fix": "x",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
         },
@@ -677,6 +699,7 @@
         "code": ".set_grant_tokens(Some(x.to_vec()))",
         "kind": "list",
         "trial": 170,
+        "fix": "Some(x.to_vec())",
         "run": {
           "builds": true,
           "same": true
@@ -689,6 +712,7 @@
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
         "trial": 150,
+        "fix": "x.unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -701,6 +725,7 @@
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
         "trial": 160,
+        "fix": "x.unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -713,6 +738,7 @@
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
         "trial": 155,
+        "fix": "x.unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -725,6 +751,7 @@
         "code": ".grant_tokens(x.to_string())",
         "kind": "text",
         "trial": 141,
+        "fix": "x.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -737,6 +764,7 @@
         "code": ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
         "kind": "list",
         "trial": 166,
+        "fix": "Some(x.iter().map(|s| s.to_string()).collect())",
         "run": {
           "builds": true,
           "same": true
@@ -750,35 +778,40 @@
         "calls": 0,
         "code": ".key_store(x)",
         "kind": "component",
-        "trial": 179
+        "trial": 179,
+        "fix": "x"
       },
       {
         "type": "SharedKeyStore",
         "calls": 0,
         "code": ".key_store(x)",
         "kind": "component",
-        "trial": 206
+        "trial": 206,
+        "fix": "x"
       },
       {
         "type": "&DynamoDbKeyStore",
         "calls": 1,
         "code": ".key_store(x.clone())",
         "kind": "component",
-        "trial": 190
+        "trial": 190,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedKeyStore",
         "calls": 1,
         "code": ".key_store(x.clone())",
         "kind": "component",
-        "trial": 217
+        "trial": 217,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<DynamoDbKeyStore>",
         "calls": 1,
         "code": ".key_store((*x).clone())",
         "kind": "component",
-        "trial": 200
+        "trial": 200,
+        "fix": "(*x).clone()"
       }
     ],
     "mpl|hierarchical-keyring|ttlSeconds": [
@@ -788,6 +821,7 @@
         "code": ".ttl(x)",
         "kind": "duration",
         "trial": 224,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -800,6 +834,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
         "trial": 250,
+        "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
           "same": true
@@ -812,6 +847,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
         "trial": 240,
+        "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
           "same": true
@@ -824,6 +860,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
         "trial": 235,
+        "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
           "same": true
@@ -836,6 +873,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
         "trial": 245,
+        "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
           "same": true
@@ -848,6 +886,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
         "trial": 266,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
           "same": true
@@ -860,6 +899,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
         "trial": 256,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
           "same": true
@@ -872,6 +912,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
         "trial": 261,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
           "same": true
@@ -884,6 +925,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
         "trial": 271,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
           "same": true
@@ -896,6 +938,7 @@
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
         "trial": 231,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
           "same": true
@@ -910,6 +953,7 @@
         "code": ".branch_key_id(x)",
         "kind": "text",
         "trial": 308,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -922,6 +966,7 @@
         "code": ".branch_key_id(x)",
         "kind": "text",
         "trial": 272,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -934,6 +979,7 @@
         "code": ".branch_key_id(x)",
         "kind": "text",
         "trial": 299,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -946,6 +992,7 @@
         "code": ".set_branch_key_id(x)",
         "kind": "optional text",
         "trial": 331,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -958,6 +1005,7 @@
         "code": ".branch_key_id(x)",
         "kind": "text",
         "trial": 281,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -970,6 +1018,7 @@
         "code": ".branch_key_id(x)",
         "kind": "text",
         "trial": 290,
+        "fix": "x",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
         },
@@ -981,6 +1030,7 @@
         "code": ".set_branch_key_id(x.map(Into::into))",
         "kind": "optional text",
         "trial": 327,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -993,6 +1043,7 @@
         "code": ".set_branch_key_id(x.map(Into::into))",
         "kind": "optional text",
         "trial": 337,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1005,6 +1056,7 @@
         "code": ".branch_key_id(x.to_string())",
         "kind": "text",
         "trial": 320,
+        "fix": "x.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -1018,14 +1070,16 @@
         "calls": 0,
         "code": ".branch_key_id_supplier(x)",
         "kind": "component",
-        "trial": 341
+        "trial": 341,
+        "fix": "x"
       },
       {
         "type": "&SharedBranchKeyIdSupplier",
         "calls": 1,
         "code": ".branch_key_id_supplier(x.clone())",
         "kind": "component",
-        "trial": 352
+        "trial": 352,
+        "fix": "x.clone()"
       }
     ],
     "mpl|hierarchical-keyring|cache": [
@@ -1034,77 +1088,88 @@
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 359
+        "trial": 359,
+        "fix": "x"
       },
       {
         "type": "LocalCmc",
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 386
+        "trial": 386,
+        "fix": "x"
       },
       {
         "type": "SharedCmc",
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 440
+        "trial": 440,
+        "fix": "x"
       },
       {
         "type": "StormTrackingCmc",
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 413
+        "trial": 413,
+        "fix": "x"
       },
       {
         "type": "&DefaultCmc",
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 370
+        "trial": 370,
+        "fix": "x.clone()"
       },
       {
         "type": "&LocalCmc",
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 397
+        "trial": 397,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedCmc",
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 451
+        "trial": 451,
+        "fix": "x.clone()"
       },
       {
         "type": "&StormTrackingCmc",
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 424
+        "trial": 424,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<DefaultCmc>",
         "calls": 1,
         "code": ".cache((*x).clone())",
         "kind": "component",
-        "trial": 380
+        "trial": 380,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<LocalCmc>",
         "calls": 1,
         "code": ".cache((*x).clone())",
         "kind": "component",
-        "trial": 407
+        "trial": 407,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<StormTrackingCmc>",
         "calls": 1,
         "code": ".cache((*x).clone())",
         "kind": "component",
-        "trial": 434
+        "trial": 434,
+        "fix": "(*x).clone()"
       }
     ],
     "mpl|hierarchical-keyring|partitionId": [
@@ -1113,63 +1178,72 @@
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 494
+        "trial": 494,
+        "fix": "x"
       },
       {
         "type": "&str",
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 458
+        "trial": 458,
+        "fix": "x"
       },
       {
         "type": "Cow<str>",
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 485
+        "trial": 485,
+        "fix": "x"
       },
       {
         "type": "Option<String>",
         "calls": 0,
         "code": ".set_partition_id(x)",
         "kind": "optional text",
-        "trial": 517
+        "trial": 517,
+        "fix": "x"
       },
       {
         "type": "String",
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 467
+        "trial": 467,
+        "fix": "x"
       },
       {
         "type": "char",
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 476
+        "trial": 476,
+        "fix": "x"
       },
       {
         "type": "Option<&str>",
         "calls": 1,
         "code": ".set_partition_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 513
+        "trial": 513,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Option<Cow<str>>",
         "calls": 1,
         "code": ".set_partition_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 523
+        "trial": 523,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Zeroizing<String>",
         "calls": 1,
         "code": ".partition_id(x.to_string())",
         "kind": "text",
-        "trial": 506
+        "trial": 506,
+        "fix": "x.to_string()"
       }
     ],
     "mpl|raw-aes-keyring|keyNamespace": [
@@ -1178,63 +1252,72 @@
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 563
+        "trial": 563,
+        "fix": "x"
       },
       {
         "type": "&str",
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 527
+        "trial": 527,
+        "fix": "x"
       },
       {
         "type": "Cow<str>",
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 554
+        "trial": 554,
+        "fix": "x"
       },
       {
         "type": "Option<String>",
         "calls": 0,
         "code": ".set_key_namespace(x)",
         "kind": "optional text",
-        "trial": 586
+        "trial": 586,
+        "fix": "x"
       },
       {
         "type": "String",
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 536
+        "trial": 536,
+        "fix": "x"
       },
       {
         "type": "char",
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 545
+        "trial": 545,
+        "fix": "x"
       },
       {
         "type": "Option<&str>",
         "calls": 1,
         "code": ".set_key_namespace(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 582
+        "trial": 582,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Option<Cow<str>>",
         "calls": 1,
         "code": ".set_key_namespace(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 592
+        "trial": 592,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Zeroizing<String>",
         "calls": 1,
         "code": ".key_namespace(x.to_string())",
         "kind": "text",
-        "trial": 575
+        "trial": 575,
+        "fix": "x.to_string()"
       }
     ],
     "mpl|raw-aes-keyring|keyName": [
@@ -1244,6 +1327,7 @@
         "code": ".key_name(x)",
         "kind": "text",
         "trial": 632,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1256,6 +1340,7 @@
         "code": ".key_name(x)",
         "kind": "text",
         "trial": 596,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1268,6 +1353,7 @@
         "code": ".key_name(x)",
         "kind": "text",
         "trial": 623,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1280,6 +1366,7 @@
         "code": ".set_key_name(x)",
         "kind": "optional text",
         "trial": 655,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1292,6 +1379,7 @@
         "code": ".key_name(x)",
         "kind": "text",
         "trial": 605,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1304,6 +1392,7 @@
         "code": ".key_name(x)",
         "kind": "text",
         "trial": 614,
+        "fix": "x",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
         },
@@ -1315,6 +1404,7 @@
         "code": ".set_key_name(x.map(Into::into))",
         "kind": "optional text",
         "trial": 651,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1327,6 +1417,7 @@
         "code": ".set_key_name(x.map(Into::into))",
         "kind": "optional text",
         "trial": 661,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1339,6 +1430,7 @@
         "code": ".key_name(x.to_string())",
         "kind": "text",
         "trial": 644,
+        "fix": "x.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -1353,6 +1445,7 @@
         "code": ".wrapping_key(x)",
         "kind": "bytes",
         "trial": 665,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1365,6 +1458,7 @@
         "code": ".wrapping_key(x)",
         "kind": "text",
         "trial": 771,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1377,6 +1471,7 @@
         "code": ".wrapping_key(x)",
         "kind": "bytes",
         "trial": 715,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1389,6 +1484,7 @@
         "code": ".wrapping_key(x)",
         "kind": "bytes",
         "trial": 685,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1401,6 +1497,7 @@
         "code": ".wrapping_key(x)",
         "kind": "bytes",
         "trial": 695,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1413,6 +1510,7 @@
         "code": ".set_wrapping_key(x)",
         "kind": "optional bytes",
         "trial": 734,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1425,6 +1523,7 @@
         "code": ".wrapping_key(x)",
         "kind": "text",
         "trial": 780,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1437,6 +1536,7 @@
         "code": ".wrapping_key(x)",
         "kind": "bytes",
         "trial": 675,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1449,6 +1549,7 @@
         "code": ".wrapping_key(x)",
         "kind": "bytes",
         "trial": 705,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -1461,6 +1562,7 @@
         "code": ".wrapping_key(x.clone())",
         "kind": "text",
         "trial": 809,
+        "fix": "x.clone()",
         "run": {
           "builds": true,
           "same": true
@@ -1473,6 +1575,7 @@
         "code": ".wrapping_key(x.to_string())",
         "kind": "text",
         "trial": 801,
+        "fix": "x.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -1485,6 +1588,7 @@
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional bytes",
         "trial": 726,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1497,6 +1601,7 @@
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional text",
         "trial": 826,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1509,6 +1614,7 @@
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional bytes",
         "trial": 753,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1521,6 +1627,7 @@
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional text",
         "trial": 831,
+        "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
           "same": true
@@ -1533,6 +1640,7 @@
         "code": ".wrapping_key(x.to_string())",
         "kind": "text",
         "trial": 819,
+        "fix": "x.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -1545,6 +1653,7 @@
         "code": ".wrapping_key(x.to_string())",
         "kind": "text",
         "trial": 792,
+        "fix": "x.to_string()",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
         },
@@ -1556,6 +1665,7 @@
         "code": ".wrapping_key(std::fs::read(x).unwrap())",
         "kind": "path",
         "trial": 844,
+        "fix": "std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -1568,6 +1678,7 @@
         "code": ".wrapping_key(x.bytes().unwrap())",
         "kind": "stream",
         "trial": 762,
+        "fix": "x.bytes().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -1580,6 +1691,7 @@
         "code": ".wrapping_key(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 749,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
           "same": true
@@ -1592,6 +1704,7 @@
         "code": ".wrapping_key(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 839,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": true,
           "same": true
@@ -1604,6 +1717,7 @@
         "code": ".wrapping_key(std::fs::read(x).unwrap())",
         "kind": "path",
         "trial": 841,
+        "fix": "std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -1616,6 +1730,7 @@
         "code": ".wrapping_key(x.bytes().unwrap())",
         "kind": "stream",
         "trial": 767,
+        "fix": "x.bytes().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -1628,6 +1743,7 @@
         "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
         "trial": 847,
+        "fix": "{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "builds": true,
           "same": true
@@ -1640,6 +1756,7 @@
         "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
         "trial": 850,
+        "fix": "{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "skipped": "needs a network connection"
         },
@@ -1652,14 +1769,16 @@
         "calls": 0,
         "code": ".wrapping_alg(x)",
         "kind": "named",
-        "trial": 852
+        "trial": 852,
+        "fix": "x"
       },
       {
         "type": "&AesWrappingAlg",
         "calls": 1,
         "code": ".wrapping_alg(x.clone())",
         "kind": "named",
-        "trial": 857
+        "trial": 857,
+        "fix": "x.clone()"
       }
     ],
     "mpl|default-cmm|keyring": [
@@ -1668,77 +1787,88 @@
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 860
+        "trial": 860,
+        "fix": "x"
       },
       {
         "type": "HierarchicalKeyring",
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 878
+        "trial": 878,
+        "fix": "x"
       },
       {
         "type": "RawAesKeyring",
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 896
+        "trial": 896,
+        "fix": "x"
       },
       {
         "type": "SharedKeyring",
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 914
+        "trial": 914,
+        "fix": "x"
       },
       {
         "type": "&AwsKmsKeyring",
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 868
+        "trial": 868,
+        "fix": "x.clone()"
       },
       {
         "type": "&HierarchicalKeyring",
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 886
+        "trial": 886,
+        "fix": "x.clone()"
       },
       {
         "type": "&RawAesKeyring",
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 904
+        "trial": 904,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedKeyring",
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 922
+        "trial": 922,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<AwsKmsKeyring>",
         "calls": 1,
         "code": "::new((*x).clone())",
         "kind": "component",
-        "trial": 875
+        "trial": 875,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<HierarchicalKeyring>",
         "calls": 1,
         "code": "::new((*x).clone())",
         "kind": "component",
-        "trial": 893
+        "trial": 893,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<RawAesKeyring>",
         "calls": 1,
         "code": "::new((*x).clone())",
         "kind": "component",
-        "trial": 911
+        "trial": 911,
+        "fix": "(*x).clone()"
       }
     ],
     "mpl|dynamo-db-key-store|ddbTableName": [
@@ -1747,63 +1877,72 @@
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 962
+        "trial": 962,
+        "fix": "x"
       },
       {
         "type": "&str",
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 926
+        "trial": 926,
+        "fix": "x"
       },
       {
         "type": "Cow<str>",
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 953
+        "trial": 953,
+        "fix": "x"
       },
       {
         "type": "Option<String>",
         "calls": 0,
         "code": ".set_ddb_table_name(x)",
         "kind": "optional text",
-        "trial": 985
+        "trial": 985,
+        "fix": "x"
       },
       {
         "type": "String",
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 935
+        "trial": 935,
+        "fix": "x"
       },
       {
         "type": "char",
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 944
+        "trial": 944,
+        "fix": "x"
       },
       {
         "type": "Option<&str>",
         "calls": 1,
         "code": ".set_ddb_table_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 981
+        "trial": 981,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Option<Cow<str>>",
         "calls": 1,
         "code": ".set_ddb_table_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 991
+        "trial": 991,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Zeroizing<String>",
         "calls": 1,
         "code": ".ddb_table_name(x.to_string())",
         "kind": "text",
-        "trial": 974
+        "trial": 974,
+        "fix": "x.to_string()"
       }
     ],
     "mpl|dynamo-db-key-store|logicalKeyStoreName": [
@@ -1812,63 +1951,72 @@
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1031
+        "trial": 1031,
+        "fix": "x"
       },
       {
         "type": "&str",
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 995
+        "trial": 995,
+        "fix": "x"
       },
       {
         "type": "Cow<str>",
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1022
+        "trial": 1022,
+        "fix": "x"
       },
       {
         "type": "Option<String>",
         "calls": 0,
         "code": ".set_logical_key_store_name(x)",
         "kind": "optional text",
-        "trial": 1054
+        "trial": 1054,
+        "fix": "x"
       },
       {
         "type": "String",
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1004
+        "trial": 1004,
+        "fix": "x"
       },
       {
         "type": "char",
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1013
+        "trial": 1013,
+        "fix": "x"
       },
       {
         "type": "Option<&str>",
         "calls": 1,
         "code": ".set_logical_key_store_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1050
+        "trial": 1050,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Option<Cow<str>>",
         "calls": 1,
         "code": ".set_logical_key_store_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1060
+        "trial": 1060,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Zeroizing<String>",
         "calls": 1,
         "code": ".logical_key_store_name(x.to_string())",
         "kind": "text",
-        "trial": 1043
+        "trial": 1043,
+        "fix": "x.to_string()"
       }
     ],
     "mpl|dynamo-db-key-store|kmsConfiguration": [
@@ -1877,14 +2025,16 @@
         "calls": 0,
         "code": ".kms_configuration(x)",
         "kind": "named",
-        "trial": 1064
+        "trial": 1064,
+        "fix": "x"
       },
       {
         "type": "&KmsConfiguration",
         "calls": 1,
         "code": ".kms_configuration(x.clone())",
         "kind": "named",
-        "trial": 1069
+        "trial": 1069,
+        "fix": "x.clone()"
       }
     ],
     "mpl|dynamo-db-key-store|id": [
@@ -1893,63 +2043,72 @@
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1108
+        "trial": 1108,
+        "fix": "x"
       },
       {
         "type": "&str",
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1072
+        "trial": 1072,
+        "fix": "x"
       },
       {
         "type": "Cow<str>",
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1099
+        "trial": 1099,
+        "fix": "x"
       },
       {
         "type": "Option<String>",
         "calls": 0,
         "code": ".set_id(x)",
         "kind": "optional text",
-        "trial": 1131
+        "trial": 1131,
+        "fix": "x"
       },
       {
         "type": "String",
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1081
+        "trial": 1081,
+        "fix": "x"
       },
       {
         "type": "char",
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1090
+        "trial": 1090,
+        "fix": "x"
       },
       {
         "type": "Option<&str>",
         "calls": 1,
         "code": ".set_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1127
+        "trial": 1127,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Option<Cow<str>>",
         "calls": 1,
         "code": ".set_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1137
+        "trial": 1137,
+        "fix": "x.map(Into::into)"
       },
       {
         "type": "Zeroizing<String>",
         "calls": 1,
         "code": ".id(x.to_string())",
         "kind": "text",
-        "trial": 1120
+        "trial": 1120,
+        "fix": "x.to_string()"
       }
     ],
     "mpl|dynamo-db-key-store|grantTokens": [
@@ -1958,91 +2117,104 @@
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1177
+        "trial": 1177,
+        "fix": "x"
       },
       {
         "type": "&str",
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1141
+        "trial": 1141,
+        "fix": "x"
       },
       {
         "type": "Cow<str>",
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1168
+        "trial": 1168,
+        "fix": "x"
       },
       {
         "type": "Option<Vec<String>>",
         "calls": 0,
         "code": ".set_grant_tokens(x)",
         "kind": "optional list",
-        "trial": 1225
+        "trial": 1225,
+        "fix": "x"
       },
       {
         "type": "String",
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1150
+        "trial": 1150,
+        "fix": "x"
       },
       {
         "type": "Vec<String>",
         "calls": 0,
         "code": ".set_grant_tokens(Some(x))",
         "kind": "list",
-        "trial": 1222
+        "trial": 1222,
+        "fix": "Some(x)"
       },
       {
         "type": "char",
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1159
+        "trial": 1159,
+        "fix": "x"
       },
       {
         "type": "&[String]",
         "calls": 1,
         "code": ".set_grant_tokens(Some(x.to_vec()))",
         "kind": "list",
-        "trial": 1218
+        "trial": 1218,
+        "fix": "Some(x.to_vec())"
       },
       {
         "type": "Option<&str>",
         "calls": 1,
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
-        "trial": 1198
+        "trial": 1198,
+        "fix": "x.unwrap()"
       },
       {
         "type": "Option<Cow<str>>",
         "calls": 1,
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
-        "trial": 1208
+        "trial": 1208,
+        "fix": "x.unwrap()"
       },
       {
         "type": "Option<String>",
         "calls": 1,
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
-        "trial": 1203
+        "trial": 1203,
+        "fix": "x.unwrap()"
       },
       {
         "type": "Zeroizing<String>",
         "calls": 1,
         "code": ".grant_tokens(x.to_string())",
         "kind": "text",
-        "trial": 1189
+        "trial": 1189,
+        "fix": "x.to_string()"
       },
       {
         "type": "&[&str]",
         "calls": 4,
         "code": ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
         "kind": "list",
-        "trial": 1214
+        "trial": 1214,
+        "fix": "Some(x.iter().map(|s| s.to_string()).collect())"
       }
     ],
     "mpl|dynamo-db-key-store|kmsClient": [
@@ -2051,42 +2223,48 @@
         "calls": 0,
         "code": ".kms_client(x)",
         "kind": "named",
-        "trial": 1227
+        "trial": 1227,
+        "fix": "x"
       },
       {
         "type": "&SdkConfig",
         "calls": 1,
         "code": ".kms_client(aws_sdk_kms::Client::new(x))",
         "kind": "ctor",
-        "trial": 1246
+        "trial": 1246,
+        "fix": "aws_sdk_kms::Client::new(x)"
       },
       {
         "type": "&kms::Client",
         "calls": 1,
         "code": ".kms_client(x.clone())",
         "kind": "named",
-        "trial": 1232
+        "trial": 1232,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<kms::Client>",
         "calls": 1,
         "code": ".kms_client((*x).clone())",
         "kind": "named",
-        "trial": 1237
+        "trial": 1237,
+        "fix": "(*x).clone()"
       },
       {
         "type": "SdkConfig",
         "calls": 1,
         "code": ".kms_client(aws_sdk_kms::Client::new(&x))",
         "kind": "ctor",
-        "trial": 1244
+        "trial": 1244,
+        "fix": "aws_sdk_kms::Client::new(&x)"
       },
       {
         "type": "kms::Config",
         "calls": 1,
         "code": ".kms_client(aws_sdk_kms::Client::from_conf(x))",
         "kind": "ctor",
-        "trial": 1241
+        "trial": 1241,
+        "fix": "aws_sdk_kms::Client::from_conf(x)"
       }
     ],
     "mpl|dynamo-db-key-store|ddbClient": [
@@ -2095,42 +2273,48 @@
         "calls": 0,
         "code": ".ddb_client(x)",
         "kind": "named",
-        "trial": 1247
+        "trial": 1247,
+        "fix": "x"
       },
       {
         "type": "&SdkConfig",
         "calls": 1,
         "code": ".ddb_client(aws_sdk_dynamodb::Client::new(x))",
         "kind": "ctor",
-        "trial": 1266
+        "trial": 1266,
+        "fix": "aws_sdk_dynamodb::Client::new(x)"
       },
       {
         "type": "&dynamodb::Client",
         "calls": 1,
         "code": ".ddb_client(x.clone())",
         "kind": "named",
-        "trial": 1252
+        "trial": 1252,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<dynamodb::Client>",
         "calls": 1,
         "code": ".ddb_client((*x).clone())",
         "kind": "named",
-        "trial": 1257
+        "trial": 1257,
+        "fix": "(*x).clone()"
       },
       {
         "type": "SdkConfig",
         "calls": 1,
         "code": ".ddb_client(aws_sdk_dynamodb::Client::new(&x))",
         "kind": "ctor",
-        "trial": 1264
+        "trial": 1264,
+        "fix": "aws_sdk_dynamodb::Client::new(&x)"
       },
       {
         "type": "dynamodb::Config",
         "calls": 1,
         "code": ".ddb_client(aws_sdk_dynamodb::Client::from_conf(x))",
         "kind": "ctor",
-        "trial": 1261
+        "trial": 1261,
+        "fix": "aws_sdk_dynamodb::Client::from_conf(x)"
       }
     ],
     "mpl|default-cmc|entryCapacity": [
@@ -2139,63 +2323,72 @@
         "calls": 0,
         "code": ".entry_capacity(x)",
         "kind": "number",
-        "trial": 1267
+        "trial": 1267,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1288
+        "trial": 1288,
+        "fix": "x.into()"
       },
       {
         "type": "u8",
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1283
+        "trial": 1283,
+        "fix": "x.into()"
       },
       {
         "type": "i16",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1304
+        "trial": 1304,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i32",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1294
+        "trial": 1294,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i64",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1299
+        "trial": 1299,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i8",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1309
+        "trial": 1309,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1279
+        "trial": 1279,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1274
+        "trial": 1274,
+        "fix": "x.try_into().unwrap()"
       }
     ],
     "mpl|local-cmc|entryCapacity": [
@@ -2204,63 +2397,72 @@
         "calls": 0,
         "code": ".entry_capacity(x)",
         "kind": "number",
-        "trial": 1312
+        "trial": 1312,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1333
+        "trial": 1333,
+        "fix": "x.into()"
       },
       {
         "type": "u8",
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1328
+        "trial": 1328,
+        "fix": "x.into()"
       },
       {
         "type": "i16",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1349
+        "trial": 1349,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i32",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1339
+        "trial": 1339,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i64",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1344
+        "trial": 1344,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i8",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1354
+        "trial": 1354,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1324
+        "trial": 1324,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1319
+        "trial": 1319,
+        "fix": "x.try_into().unwrap()"
       }
     ],
     "mpl|local-cmc|entryPruningTailSize": [
@@ -2269,63 +2471,72 @@
         "calls": 0,
         "code": ".entry_pruning_tail_size(x)",
         "kind": "number",
-        "trial": 1357
+        "trial": 1357,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1378
+        "trial": 1378,
+        "fix": "x.into()"
       },
       {
         "type": "u8",
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1373
+        "trial": 1373,
+        "fix": "x.into()"
       },
       {
         "type": "i16",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1394
+        "trial": 1394,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i32",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1384
+        "trial": 1384,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i64",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1389
+        "trial": 1389,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i8",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1399
+        "trial": 1399,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1369
+        "trial": 1369,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1364
+        "trial": 1364,
+        "fix": "x.try_into().unwrap()"
       }
     ],
     "mpl|storm-tracking-cmc|entryCapacity": [
@@ -2334,63 +2545,72 @@
         "calls": 0,
         "code": ".entry_capacity(x)",
         "kind": "number",
-        "trial": 1402
+        "trial": 1402,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1423
+        "trial": 1423,
+        "fix": "x.into()"
       },
       {
         "type": "u8",
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1418
+        "trial": 1418,
+        "fix": "x.into()"
       },
       {
         "type": "i16",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1439
+        "trial": 1439,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i32",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1429
+        "trial": 1429,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i64",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1434
+        "trial": 1434,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i8",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1444
+        "trial": 1444,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1414
+        "trial": 1414,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1409
+        "trial": 1409,
+        "fix": "x.try_into().unwrap()"
       }
     ],
     "mpl|storm-tracking-cmc|entryPruningTailSize": [
@@ -2399,63 +2619,72 @@
         "calls": 0,
         "code": ".entry_pruning_tail_size(x)",
         "kind": "number",
-        "trial": 1447
+        "trial": 1447,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1468
+        "trial": 1468,
+        "fix": "x.into()"
       },
       {
         "type": "u8",
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1463
+        "trial": 1463,
+        "fix": "x.into()"
       },
       {
         "type": "i16",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1484
+        "trial": 1484,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i32",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1474
+        "trial": 1474,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i64",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1479
+        "trial": 1479,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i8",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1489
+        "trial": 1489,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1459
+        "trial": 1459,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1454
+        "trial": 1454,
+        "fix": "x.try_into().unwrap()"
       }
     ],
     "mpl|storm-tracking-cmc|gracePeriod": [
@@ -2464,70 +2693,80 @@
         "calls": 0,
         "code": ".grace_period(x)",
         "kind": "duration",
-        "trial": 1492
+        "trial": 1492,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1518
+        "trial": 1518,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1508
+        "trial": 1508,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1503
+        "trial": 1503,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u8",
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1513
+        "trial": 1513,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "i16",
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1534
+        "trial": 1534,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i32",
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1524
+        "trial": 1524,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i64",
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1529
+        "trial": 1529,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i8",
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1539
+        "trial": 1539,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "usize",
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1499
+        "trial": 1499,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
     "mpl|storm-tracking-cmc|graceInterval": [
@@ -2536,70 +2775,80 @@
         "calls": 0,
         "code": ".grace_interval(x)",
         "kind": "duration",
-        "trial": 1540
+        "trial": 1540,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1566
+        "trial": 1566,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1556
+        "trial": 1556,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1551
+        "trial": 1551,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u8",
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1561
+        "trial": 1561,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "i16",
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1582
+        "trial": 1582,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i32",
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1572
+        "trial": 1572,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i64",
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1577
+        "trial": 1577,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i8",
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1587
+        "trial": 1587,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "usize",
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1547
+        "trial": 1547,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
     "mpl|storm-tracking-cmc|fanOut": [
@@ -2608,63 +2857,72 @@
         "calls": 0,
         "code": ".fan_out(x)",
         "kind": "number",
-        "trial": 1588
+        "trial": 1588,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 1,
         "code": ".fan_out(x.into())",
         "kind": "number",
-        "trial": 1609
+        "trial": 1609,
+        "fix": "x.into()"
       },
       {
         "type": "u8",
         "calls": 1,
         "code": ".fan_out(x.into())",
         "kind": "number",
-        "trial": 1604
+        "trial": 1604,
+        "fix": "x.into()"
       },
       {
         "type": "i16",
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1625
+        "trial": 1625,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i32",
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1615
+        "trial": 1615,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i64",
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1620
+        "trial": 1620,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "i8",
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1630
+        "trial": 1630,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1600
+        "trial": 1600,
+        "fix": "x.try_into().unwrap()"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1595
+        "trial": 1595,
+        "fix": "x.try_into().unwrap()"
       }
     ],
     "mpl|storm-tracking-cmc|inFlightTtl": [
@@ -2673,70 +2931,80 @@
         "calls": 0,
         "code": ".in_flight_ttl(x)",
         "kind": "duration",
-        "trial": 1633
+        "trial": 1633,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1659
+        "trial": 1659,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1649
+        "trial": 1649,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1644
+        "trial": 1644,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u8",
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1654
+        "trial": 1654,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "i16",
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1675
+        "trial": 1675,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i32",
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1665
+        "trial": 1665,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i64",
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1670
+        "trial": 1670,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i8",
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1680
+        "trial": 1680,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "usize",
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1640
+        "trial": 1640,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
     "mpl|storm-tracking-cmc|sleep": [
@@ -2745,70 +3013,80 @@
         "calls": 0,
         "code": ".sleep(x)",
         "kind": "duration",
-        "trial": 1681
+        "trial": 1681,
+        "fix": "x"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1707
+        "trial": 1707,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u32",
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1697
+        "trial": 1697,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u64",
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1692
+        "trial": 1692,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "u8",
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1702
+        "trial": 1702,
+        "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
         "type": "i16",
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1723
+        "trial": 1723,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i32",
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1713
+        "trial": 1713,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i64",
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1718
+        "trial": 1718,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "i8",
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1728
+        "trial": 1728,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
         "type": "usize",
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1688
+        "trial": 1688,
+        "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
     "esdk|client|commitmentPolicy": [
@@ -2817,14 +3095,16 @@
         "calls": 0,
         "code": ".commitment_policy(x)",
         "kind": "named",
-        "trial": 1729
+        "trial": 1729,
+        "fix": "x"
       },
       {
         "type": "&EsdkCommitmentPolicy",
         "calls": 1,
         "code": ".commitment_policy(x.clone())",
         "kind": "named",
-        "trial": 1734
+        "trial": 1734,
+        "fix": "x.clone()"
       }
     ],
     "esdk|client|maxEncryptedDataKeys": [
@@ -2834,6 +3114,7 @@
         "code": ".max_encrypted_data_keys(x)",
         "kind": "number",
         "trial": 1737,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -2846,6 +3127,7 @@
         "code": ".max_encrypted_data_keys(x.into())",
         "kind": "number",
         "trial": 1758,
+        "fix": "x.into()",
         "run": {
           "builds": true,
           "same": true
@@ -2858,6 +3140,7 @@
         "code": ".max_encrypted_data_keys(x.into())",
         "kind": "number",
         "trial": 1753,
+        "fix": "x.into()",
         "run": {
           "builds": true,
           "same": true
@@ -2870,6 +3153,7 @@
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
         "trial": 1774,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -2882,6 +3166,7 @@
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
         "trial": 1764,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -2894,6 +3179,7 @@
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
         "trial": 1769,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -2906,6 +3192,7 @@
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
         "trial": 1779,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -2918,6 +3205,7 @@
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
         "trial": 1749,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -2930,6 +3218,7 @@
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
         "trial": 1744,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -2944,6 +3233,7 @@
         "code": ".encrypt().plaintext(x)",
         "kind": "bytes",
         "trial": 1782,
+        "fix": "x",
         "run": {
           "copies": false,
           "builds": true,
@@ -2957,6 +3247,7 @@
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
         "trial": 1803,
+        "fix": "&x",
         "run": {
           "copies": false,
           "builds": true,
@@ -2970,6 +3261,7 @@
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
         "trial": 1813,
+        "fix": "&x",
         "run": {
           "copies": false,
           "builds": true,
@@ -2983,6 +3275,7 @@
         "code": ".encrypt().set_plaintext(x)",
         "kind": "optional bytes",
         "trial": 1842,
+        "fix": "x",
         "run": {
           "copies": false,
           "builds": true,
@@ -2996,6 +3289,7 @@
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
         "trial": 1793,
+        "fix": "&x",
         "run": {
           "copies": false,
           "builds": true,
@@ -3009,6 +3303,7 @@
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
         "trial": 1823,
+        "fix": "&x",
         "run": {
           "skipped": "the value is not 32 bytes"
         },
@@ -3020,6 +3315,7 @@
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
         "trial": 1929,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3033,6 +3329,7 @@
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
         "trial": 1893,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3046,6 +3343,7 @@
         "code": ".encrypt().plaintext(x.as_ref())",
         "kind": "bytes",
         "trial": 1837,
+        "fix": "x.as_ref()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3059,6 +3357,7 @@
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
         "trial": 1920,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3072,6 +3371,7 @@
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
         "trial": 1902,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3085,6 +3385,7 @@
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
         "trial": 1938,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3098,6 +3399,7 @@
         "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
         "kind": "path",
         "trial": 1962,
+        "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3110,6 +3412,7 @@
         "code": ".encrypt().plaintext(x.bytes().unwrap())",
         "kind": "stream",
         "trial": 1879,
+        "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3123,6 +3426,7 @@
         "code": ".encrypt().plaintext(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 1866,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3136,6 +3440,7 @@
         "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 1946,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3149,6 +3454,7 @@
         "code": ".encrypt().plaintext(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 1875,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
           "same": true
@@ -3161,6 +3467,7 @@
         "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 1956,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": true,
           "same": true
@@ -3173,6 +3480,7 @@
         "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 1951,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": true,
           "same": true
@@ -3185,6 +3493,7 @@
         "code": ".encrypt().plaintext(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 1857,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
           "same": true
@@ -3197,6 +3506,7 @@
         "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
         "kind": "path",
         "trial": 1959,
+        "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3209,6 +3519,7 @@
         "code": ".encrypt().plaintext(x.bytes().unwrap())",
         "kind": "stream",
         "trial": 1884,
+        "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3222,6 +3533,7 @@
         "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
         "trial": 1965,
+        "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "builds": true,
           "same": true
@@ -3234,6 +3546,7 @@
         "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
         "trial": 1968,
+        "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "skipped": "needs a network connection"
         },
@@ -3254,6 +3567,7 @@
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
         "trial": 1988,
+        "fix": "x, y",
         "run": {
           "builds": true,
           "same": true
@@ -3266,6 +3580,7 @@
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
         "trial": 1976,
+        "fix": "x, y",
         "run": {
           "builds": true,
           "same": true
@@ -3278,6 +3593,7 @@
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
         "trial": 1985,
+        "fix": "x, y",
         "run": {
           "builds": true,
           "same": true
@@ -3290,6 +3606,7 @@
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
         "trial": 1979,
+        "fix": "x, y",
         "run": {
           "builds": true,
           "same": true
@@ -3302,6 +3619,7 @@
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
         "trial": 1982,
+        "fix": "x, y",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
         },
@@ -3313,6 +3631,7 @@
         "code": ".encrypt().set_encryption_context(Some(x.into()))",
         "kind": "map",
         "trial": 1972,
+        "fix": "Some(x.into())",
         "run": {
           "builds": true,
           "same": true
@@ -3325,6 +3644,7 @@
         "code": ".encrypt().encryption_context(x.to_string(), y.to_string())",
         "kind": "pair",
         "trial": 1993,
+        "fix": "x.to_string(), y.to_string()",
         "run": {
           "builds": true,
           "same": true
@@ -3338,14 +3658,16 @@
         "calls": 0,
         "code": ".encrypt().algorithm_suite_id(x)",
         "kind": "named",
-        "trial": 1994
+        "trial": 1994,
+        "fix": "x"
       },
       {
         "type": "&EsdkAlgorithmSuiteId",
         "calls": 1,
         "code": ".encrypt().algorithm_suite_id(x.clone())",
         "kind": "named",
-        "trial": 1999
+        "trial": 1999,
+        "fix": "x.clone()"
       }
     ],
     "esdk|encrypt|frameLength": [
@@ -3355,6 +3677,7 @@
         "code": ".encrypt().frame_length(x)",
         "kind": "number",
         "trial": 2012,
+        "fix": "x",
         "run": {
           "builds": true,
           "same": true
@@ -3367,6 +3690,7 @@
         "code": ".encrypt().frame_length(x.into())",
         "kind": "number",
         "trial": 2023,
+        "fix": "x.into()",
         "run": {
           "builds": true,
           "same": true
@@ -3379,6 +3703,7 @@
         "code": ".encrypt().frame_length(x.into())",
         "kind": "number",
         "trial": 2018,
+        "fix": "x.into()",
         "run": {
           "builds": true,
           "same": true
@@ -3391,6 +3716,7 @@
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
         "trial": 2039,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3403,6 +3729,7 @@
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
         "trial": 2029,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3415,6 +3742,7 @@
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
         "trial": 2034,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3427,6 +3755,7 @@
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
         "trial": 2044,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "skipped": "the value does not fit in an i8"
         },
@@ -3438,6 +3767,7 @@
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
         "trial": 2009,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3450,6 +3780,7 @@
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
         "trial": 2004,
+        "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3463,77 +3794,88 @@
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2047
+        "trial": 2047,
+        "fix": "x"
       },
       {
         "type": "HierarchicalKeyring",
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2074
+        "trial": 2074,
+        "fix": "x"
       },
       {
         "type": "RawAesKeyring",
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2101
+        "trial": 2101,
+        "fix": "x"
       },
       {
         "type": "SharedKeyring",
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2128
+        "trial": 2128,
+        "fix": "x"
       },
       {
         "type": "&AwsKmsKeyring",
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2058
+        "trial": 2058,
+        "fix": "x.clone()"
       },
       {
         "type": "&HierarchicalKeyring",
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2085
+        "trial": 2085,
+        "fix": "x.clone()"
       },
       {
         "type": "&RawAesKeyring",
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2112
+        "trial": 2112,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedKeyring",
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2139
+        "trial": 2139,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<AwsKmsKeyring>",
         "calls": 1,
         "code": ".encrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2068
+        "trial": 2068,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<HierarchicalKeyring>",
         "calls": 1,
         "code": ".encrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2095
+        "trial": 2095,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<RawAesKeyring>",
         "calls": 1,
         "code": ".encrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2122
+        "trial": 2122,
+        "fix": "(*x).clone()"
       }
     ],
     "esdk|encrypt|materialsManager": [
@@ -3542,35 +3884,40 @@
         "calls": 0,
         "code": ".encrypt().cmm(x)",
         "kind": "component",
-        "trial": 2146
+        "trial": 2146,
+        "fix": "x"
       },
       {
         "type": "SharedCmm",
         "calls": 0,
         "code": ".encrypt().cmm(x)",
         "kind": "component",
-        "trial": 2173
+        "trial": 2173,
+        "fix": "x"
       },
       {
         "type": "&DefaultCmm",
         "calls": 1,
         "code": ".encrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2157
+        "trial": 2157,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedCmm",
         "calls": 1,
         "code": ".encrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2184
+        "trial": 2184,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<DefaultCmm>",
         "calls": 1,
         "code": ".encrypt().cmm((*x).clone())",
         "kind": "component",
-        "trial": 2167
+        "trial": 2167,
+        "fix": "(*x).clone()"
       }
     ],
     "esdk|decrypt|ciphertext": [
@@ -3580,6 +3927,7 @@
         "code": ".decrypt().ciphertext(x)",
         "kind": "bytes",
         "trial": 2191,
+        "fix": "x",
         "run": {
           "copies": false,
           "builds": true,
@@ -3593,6 +3941,7 @@
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
         "trial": 2212,
+        "fix": "&x",
         "run": {
           "copies": false,
           "builds": true,
@@ -3606,6 +3955,7 @@
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
         "trial": 2222,
+        "fix": "&x",
         "run": {
           "copies": false,
           "builds": true,
@@ -3619,6 +3969,7 @@
         "code": ".decrypt().set_ciphertext(x)",
         "kind": "optional bytes",
         "trial": 2251,
+        "fix": "x",
         "run": {
           "copies": false,
           "builds": true,
@@ -3632,6 +3983,7 @@
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
         "trial": 2202,
+        "fix": "&x",
         "run": {
           "copies": false,
           "builds": true,
@@ -3645,6 +3997,7 @@
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
         "trial": 2232,
+        "fix": "&x",
         "run": {
           "skipped": "the value is not 32 bytes"
         },
@@ -3656,6 +4009,7 @@
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
         "trial": 2338,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": false,
@@ -3669,6 +4023,7 @@
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
         "trial": 2302,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": false,
@@ -3682,6 +4037,7 @@
         "code": ".decrypt().ciphertext(x.as_ref())",
         "kind": "bytes",
         "trial": 2246,
+        "fix": "x.as_ref()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3695,6 +4051,7 @@
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
         "trial": 2329,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": false,
@@ -3708,6 +4065,7 @@
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
         "trial": 2311,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": false,
@@ -3721,6 +4079,7 @@
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
         "trial": 2347,
+        "fix": "x.as_bytes()",
         "run": {
           "copies": false,
           "builds": false,
@@ -3734,6 +4093,7 @@
         "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
         "kind": "path",
         "trial": 2371,
+        "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3746,6 +4106,7 @@
         "code": ".decrypt().ciphertext(x.bytes().unwrap())",
         "kind": "stream",
         "trial": 2288,
+        "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3759,6 +4120,7 @@
         "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 2275,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3772,6 +4134,7 @@
         "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 2355,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "copies": false,
           "builds": false,
@@ -3785,6 +4148,7 @@
         "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 2284,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
           "same": true
@@ -3797,6 +4161,7 @@
         "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 2365,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": false,
           "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
@@ -3809,6 +4174,7 @@
         "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
         "kind": "optional text",
         "trial": 2360,
+        "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": false,
           "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
@@ -3821,6 +4187,7 @@
         "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
         "kind": "optional bytes",
         "trial": 2266,
+        "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
           "same": true
@@ -3833,6 +4200,7 @@
         "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
         "kind": "path",
         "trial": 2368,
+        "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
           "same": true
@@ -3845,6 +4213,7 @@
         "code": ".decrypt().ciphertext(x.bytes().unwrap())",
         "kind": "stream",
         "trial": 2293,
+        "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
           "builds": true,
@@ -3858,6 +4227,7 @@
         "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
         "trial": 2374,
+        "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "builds": true,
           "same": true
@@ -3870,6 +4240,7 @@
         "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
         "trial": 2377,
+        "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "skipped": "needs a network connection"
         },
@@ -3889,49 +4260,56 @@
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2397
+        "trial": 2397,
+        "fix": "x, y"
       },
       {
         "type": "(&str, &str)",
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2385
+        "trial": 2385,
+        "fix": "x, y"
       },
       {
         "type": "(Cow<str>, Cow<str>)",
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2394
+        "trial": 2394,
+        "fix": "x, y"
       },
       {
         "type": "(String, String)",
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2388
+        "trial": 2388,
+        "fix": "x, y"
       },
       {
         "type": "(char, char)",
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2391
+        "trial": 2391,
+        "fix": "x, y"
       },
       {
         "type": "HashMap<String, String>",
         "calls": 1,
         "code": ".decrypt().set_encryption_context(Some(x.into()))",
         "kind": "map",
-        "trial": 2381
+        "trial": 2381,
+        "fix": "Some(x.into())"
       },
       {
         "type": "(Zeroizing<String>, Zeroizing<String>)",
         "calls": 2,
         "code": ".decrypt().encryption_context(x.to_string(), y.to_string())",
         "kind": "pair",
-        "trial": 2402
+        "trial": 2402,
+        "fix": "x.to_string(), y.to_string()"
       }
     ],
     "esdk|decrypt|keyring": [
@@ -3940,77 +4318,88 @@
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2403
+        "trial": 2403,
+        "fix": "x"
       },
       {
         "type": "HierarchicalKeyring",
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2430
+        "trial": 2430,
+        "fix": "x"
       },
       {
         "type": "RawAesKeyring",
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2457
+        "trial": 2457,
+        "fix": "x"
       },
       {
         "type": "SharedKeyring",
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2484
+        "trial": 2484,
+        "fix": "x"
       },
       {
         "type": "&AwsKmsKeyring",
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2414
+        "trial": 2414,
+        "fix": "x.clone()"
       },
       {
         "type": "&HierarchicalKeyring",
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2441
+        "trial": 2441,
+        "fix": "x.clone()"
       },
       {
         "type": "&RawAesKeyring",
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2468
+        "trial": 2468,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedKeyring",
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2495
+        "trial": 2495,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<AwsKmsKeyring>",
         "calls": 1,
         "code": ".decrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2424
+        "trial": 2424,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<HierarchicalKeyring>",
         "calls": 1,
         "code": ".decrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2451
+        "trial": 2451,
+        "fix": "(*x).clone()"
       },
       {
         "type": "Arc<RawAesKeyring>",
         "calls": 1,
         "code": ".decrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2478
+        "trial": 2478,
+        "fix": "(*x).clone()"
       }
     ],
     "esdk|decrypt|materialsManager": [
@@ -4019,35 +4408,40 @@
         "calls": 0,
         "code": ".decrypt().cmm(x)",
         "kind": "component",
-        "trial": 2502
+        "trial": 2502,
+        "fix": "x"
       },
       {
         "type": "SharedCmm",
         "calls": 0,
         "code": ".decrypt().cmm(x)",
         "kind": "component",
-        "trial": 2529
+        "trial": 2529,
+        "fix": "x"
       },
       {
         "type": "&DefaultCmm",
         "calls": 1,
         "code": ".decrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2513
+        "trial": 2513,
+        "fix": "x.clone()"
       },
       {
         "type": "&SharedCmm",
         "calls": 1,
         "code": ".decrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2540
+        "trial": 2540,
+        "fix": "x.clone()"
       },
       {
         "type": "Arc<DefaultCmm>",
         "calls": 1,
         "code": ".decrypt().cmm((*x).clone())",
         "kind": "component",
-        "trial": 2523
+        "trial": 2523,
+        "fix": "(*x).clone()"
       }
     ]
   },
@@ -6416,6 +6810,104 @@
         ]
       }
     }
+  },
+  "examples": {
+    "&AesWrappingAlg": "use aws_crypto_mpl::types::AesWrappingAlg;\nlet value = AesWrappingAlg::AlgAes256GcmIv12Tag16;\nlet x = &value;",
+    "&AwsKmsKeyring": "use aws_crypto_mpl::keyring::AwsKmsKeyring;\nlet value = AwsKmsKeyring::builder()\n    .kms_key_id(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\")\n    .kms_client(aws_sdk_kms::Client::new(&aws_config::load_from_env().await))\n    .build()\n    .await?;\nlet x = &value;",
+    "&DefaultCmc": "use aws_crypto_mpl::cmc::DefaultCmc;\nlet value = DefaultCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = &value;",
+    "&DefaultCmm": "use aws_crypto_mpl::cmm::DefaultCmm;\nuse aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet value = DefaultCmm::new(keyring);\nlet x = &value;",
+    "&DynamoDbKeyStore": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nlet config = aws_config::load_from_env().await;\nlet value = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet x = &value;",
+    "&EsdkAlgorithmSuiteId": "use aws_crypto_mpl::types::EsdkAlgorithmSuiteId;\nlet value = EsdkAlgorithmSuiteId::AlgAes256GcmHkdfSha512CommitKeyEcdsaP384;\nlet x = &value;",
+    "&EsdkCommitmentPolicy": "use aws_crypto_mpl::types::EsdkCommitmentPolicy;\nlet value = EsdkCommitmentPolicy::RequireEncryptRequireDecrypt;\nlet x = &value;",
+    "&HierarchicalKeyring": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nuse aws_crypto_mpl::keyring::HierarchicalKeyring;\nuse std::time::Duration;\nlet config = aws_config::load_from_env().await;\nlet key_store = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet value = HierarchicalKeyring::builder()\n    .key_store(key_store)\n    .branch_key_id(\"my-branch-key-id\")\n    .ttl(Duration::from_secs(300))\n    .build()\n    .await?;\nlet x = &value;",
+    "&KmsConfiguration": "use aws_crypto_mpl::key_store::types::KmsConfiguration;\nlet value = KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\");\nlet x = &value;",
+    "&LocalCmc": "use aws_crypto_mpl::cmc::LocalCmc;\nlet value = LocalCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = &value;",
+    "&Path": "use std::path::Path;\nlet x: &Path = Path::new(\"data.txt\");",
+    "&RawAesKeyring": "use aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet value = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet x = &value;",
+    "&SdkConfig": "let value = aws_config::load_from_env().await;\nlet x = &value;",
+    "&SharedCmc": "use aws_crypto_mpl::cmc::DefaultCmc;\nuse aws_crypto_mpl::cmc::SharedCmc;\nlet cache = DefaultCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet value = SharedCmc::new(cache);\nlet x = &value;",
+    "&SharedCmm": "use aws_crypto_mpl::cmm::DefaultCmm;\nuse aws_crypto_mpl::cmm::SharedCmm;\nuse aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet cmm = DefaultCmm::new(keyring);\nlet value = SharedCmm::new(cmm);\nlet x = &value;",
+    "&SharedKeyStore": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::SharedKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nlet config = aws_config::load_from_env().await;\nlet key_store = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet value = SharedKeyStore::new(key_store);\nlet x = &value;",
+    "&SharedKeyring": "use aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::keyring::SharedKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet value = SharedKeyring::new(keyring);\nlet x = &value;",
+    "&StormTrackingCmc": "use aws_crypto_mpl::cmc::StormTrackingCmc;\nlet value = StormTrackingCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = &value;",
+    "&String": "let value = String::from(\"my text\");\nlet x = &value;",
+    "&[&str]": "let x: &[&str] = &[\"my text\"];",
+    "&[String]": "let value = vec![String::from(\"my text\")];\nlet x: &[String] = &value;",
+    "&[u8]": "let x: &[u8] = b\"my bytes\";",
+    "&dynamodb::Client": "let value = aws_sdk_dynamodb::Client::new(&aws_config::load_from_env().await);\nlet x = &value;",
+    "&kms::Client": "let value = aws_sdk_kms::Client::new(&aws_config::load_from_env().await);\nlet x = &value;",
+    "&str": "let x: &str = \"my text\";",
+    "(&String, &String)": "let (key, value) = (String::from(\"purpose\"), String::from(\"test\"));\nlet (x, y) = (&key, &value);",
+    "(&str, &str)": "let (x, y): (&str, &str) = (\"purpose\", \"test\");",
+    "(Cow<str>, Cow<str>)": "use std::borrow::Cow;\nlet (x, y) = (Cow::Borrowed(\"purpose\"), Cow::Borrowed(\"test\"));",
+    "(String, String)": "let (x, y) = (String::from(\"purpose\"), String::from(\"test\"));",
+    "(Zeroizing<String>, Zeroizing<String>)": "use zeroize::Zeroizing;\nlet (x, y) = (Zeroizing::new(String::from(\"purpose\")), Zeroizing::new(String::from(\"test\")));",
+    "(char, char)": "let (x, y) = ('m', 'm');",
+    "AesWrappingAlg": "use aws_crypto_mpl::types::AesWrappingAlg;\nlet x = AesWrappingAlg::AlgAes256GcmIv12Tag16;",
+    "Arc<AwsKmsKeyring>": "use aws_crypto_mpl::keyring::AwsKmsKeyring;\nuse std::sync::Arc;\nlet value = AwsKmsKeyring::builder()\n    .kms_key_id(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\")\n    .kms_client(aws_sdk_kms::Client::new(&aws_config::load_from_env().await))\n    .build()\n    .await?;\nlet x = Arc::new(value);",
+    "Arc<DefaultCmc>": "use aws_crypto_mpl::cmc::DefaultCmc;\nuse std::sync::Arc;\nlet value = DefaultCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = Arc::new(value);",
+    "Arc<DefaultCmm>": "use aws_crypto_mpl::cmm::DefaultCmm;\nuse aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nuse std::sync::Arc;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet value = DefaultCmm::new(keyring);\nlet x = Arc::new(value);",
+    "Arc<DynamoDbKeyStore>": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nuse std::sync::Arc;\nlet config = aws_config::load_from_env().await;\nlet value = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet x = Arc::new(value);",
+    "Arc<HierarchicalKeyring>": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nuse aws_crypto_mpl::keyring::HierarchicalKeyring;\nuse std::sync::Arc;\nuse std::time::Duration;\nlet config = aws_config::load_from_env().await;\nlet key_store = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet value = HierarchicalKeyring::builder()\n    .key_store(key_store)\n    .branch_key_id(\"my-branch-key-id\")\n    .ttl(Duration::from_secs(300))\n    .build()\n    .await?;\nlet x = Arc::new(value);",
+    "Arc<LocalCmc>": "use aws_crypto_mpl::cmc::LocalCmc;\nuse std::sync::Arc;\nlet value = LocalCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = Arc::new(value);",
+    "Arc<RawAesKeyring>": "use aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nuse std::sync::Arc;\nlet value = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet x = Arc::new(value);",
+    "Arc<StormTrackingCmc>": "use aws_crypto_mpl::cmc::StormTrackingCmc;\nuse std::sync::Arc;\nlet value = StormTrackingCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = Arc::new(value);",
+    "Arc<dynamodb::Client>": "use std::sync::Arc;\nlet x = Arc::new(aws_sdk_dynamodb::Client::new(&aws_config::load_from_env().await));",
+    "Arc<kms::Client>": "use std::sync::Arc;\nlet x = Arc::new(aws_sdk_kms::Client::new(&aws_config::load_from_env().await));",
+    "AwsKmsKeyring": "use aws_crypto_mpl::keyring::AwsKmsKeyring;\nlet x = AwsKmsKeyring::builder()\n    .kms_key_id(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\")\n    .kms_client(aws_sdk_kms::Client::new(&aws_config::load_from_env().await))\n    .build()\n    .await?;",
+    "Blob": "use aws_smithy_types::Blob;\nlet x = Blob::new(b\"my bytes\".to_vec());",
+    "Box<[u8]>": "let x: Box<[u8]> = Box::from(&b\"my bytes\"[..]);",
+    "ByteStream": "use aws_smithy_types::byte_stream::ByteStream;\nlet x = ByteStream::from(b\"my bytes\".to_vec());",
+    "Bytes": "use bytes::Bytes;\nlet x = Bytes::from_static(b\"my bytes\");",
+    "Cow<str>": "use std::borrow::Cow;\nlet x: Cow<str> = Cow::Borrowed(\"my text\");",
+    "DefaultCmc": "use aws_crypto_mpl::cmc::DefaultCmc;\nlet x = DefaultCmc::builder()\n    .entry_capacity(100)\n    .build()?;",
+    "DefaultCmm": "use aws_crypto_mpl::cmm::DefaultCmm;\nuse aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet x = DefaultCmm::new(keyring);",
+    "Duration": "use std::time::Duration;\nlet x = Duration::from_secs(300);",
+    "DynamoDbKeyStore": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nlet config = aws_config::load_from_env().await;\nlet x = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;",
+    "EsdkAlgorithmSuiteId": "use aws_crypto_mpl::types::EsdkAlgorithmSuiteId;\nlet x = EsdkAlgorithmSuiteId::AlgAes256GcmHkdfSha512CommitKeyEcdsaP384;",
+    "EsdkCommitmentPolicy": "use aws_crypto_mpl::types::EsdkCommitmentPolicy;\nlet x = EsdkCommitmentPolicy::RequireEncryptRequireDecrypt;",
+    "File": "use std::fs::File;\nlet x = File::open(\"data.txt\")?;",
+    "HashMap<String, String>": "use std::collections::HashMap;\nlet x = HashMap::from([(String::from(\"purpose\"), String::from(\"test\"))]);",
+    "HierarchicalKeyring": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nuse aws_crypto_mpl::keyring::HierarchicalKeyring;\nuse std::time::Duration;\nlet config = aws_config::load_from_env().await;\nlet key_store = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet x = HierarchicalKeyring::builder()\n    .key_store(key_store)\n    .branch_key_id(\"my-branch-key-id\")\n    .ttl(Duration::from_secs(300))\n    .build()\n    .await?;",
+    "KmsConfiguration": "use aws_crypto_mpl::key_store::types::KmsConfiguration;\nlet x = KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\");",
+    "LocalCmc": "use aws_crypto_mpl::cmc::LocalCmc;\nlet x = LocalCmc::builder()\n    .entry_capacity(100)\n    .build()?;",
+    "Option<&Blob>": "use aws_smithy_types::Blob;\nlet value = Blob::new(b\"my bytes\".to_vec());\nlet x: Option<&Blob> = Some(&value);",
+    "Option<&[u8]>": "let x: Option<&[u8]> = Some(b\"my bytes\");",
+    "Option<&str>": "let x: Option<&str> = Some(\"my text\");",
+    "Option<Blob>": "use aws_smithy_types::Blob;\nlet x: Option<Blob> = Some(Blob::new(b\"my bytes\".to_vec()));",
+    "Option<Cow<str>>": "use std::borrow::Cow;\nlet x: Option<Cow<str>> = Some(Cow::Borrowed(\"my text\"));",
+    "Option<String>": "let x: Option<String> = Some(String::from(\"my text\"));",
+    "Option<Vec<String>>": "let x: Option<Vec<String>> = Some(vec![String::from(\"my text\")]);",
+    "Option<Vec<u8>>": "let x: Option<Vec<u8>> = Some(b\"my bytes\".to_vec());",
+    "PathBuf": "use std::path::PathBuf;\nlet x = PathBuf::from(\"data.txt\");",
+    "RawAesKeyring": "use aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet x = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;",
+    "SdkBody": "use aws_smithy_types::body::SdkBody;\nlet x = SdkBody::from(\"my bytes\");",
+    "SdkConfig": "let x = aws_config::load_from_env().await;",
+    "SharedCmc": "use aws_crypto_mpl::cmc::DefaultCmc;\nuse aws_crypto_mpl::cmc::SharedCmc;\nlet cache = DefaultCmc::builder()\n    .entry_capacity(100)\n    .build()?;\nlet x = SharedCmc::new(cache);",
+    "SharedCmm": "use aws_crypto_mpl::cmm::DefaultCmm;\nuse aws_crypto_mpl::cmm::SharedCmm;\nuse aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet cmm = DefaultCmm::new(keyring);\nlet x = SharedCmm::new(cmm);",
+    "SharedKeyStore": "use aws_crypto_mpl::key_store::DynamoDbKeyStore;\nuse aws_crypto_mpl::key_store::SharedKeyStore;\nuse aws_crypto_mpl::key_store::types::KmsConfiguration;\nlet config = aws_config::load_from_env().await;\nlet key_store = DynamoDbKeyStore::builder()\n    .ddb_table_name(\"KeyStoreTable\")\n    .logical_key_store_name(\"KeyStoreTable\")\n    .kms_configuration(KmsConfiguration::kms_key_arn(\"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\"))\n    .kms_client(aws_sdk_kms::Client::new(&config))\n    .ddb_client(aws_sdk_dynamodb::Client::new(&config))\n    .build()\n    .await?;\nlet x = SharedKeyStore::new(key_store);",
+    "SharedKeyring": "use aws_crypto_mpl::keyring::RawAesKeyring;\nuse aws_crypto_mpl::keyring::SharedKeyring;\nuse aws_crypto_mpl::types::AesWrappingAlg;\nlet keyring = RawAesKeyring::builder()\n    .key_namespace(\"my-namespace\")\n    .key_name(\"my-key\")\n    .wrapping_key(vec![7u8; 32])\n    .wrapping_alg(AesWrappingAlg::AlgAes256GcmIv12Tag16)\n    .build()?;\nlet x = SharedKeyring::new(keyring);",
+    "StormTrackingCmc": "use aws_crypto_mpl::cmc::StormTrackingCmc;\nlet x = StormTrackingCmc::builder()\n    .entry_capacity(100)\n    .build()?;",
+    "String": "let x = String::from(\"my text\");",
+    "TcpStream": "use std::net::TcpStream;\nlet x = TcpStream::connect(\"example.com:443\")?;",
+    "Vec<String>": "let x = vec![String::from(\"my text\")];",
+    "Vec<u8>": "let x = b\"my bytes\".to_vec();",
+    "Zeroizing<String>": "use zeroize::Zeroizing;\nlet x = Zeroizing::new(String::from(\"my text\"));",
+    "[u8; 32]": "let x = [7u8; 32];",
+    "char": "let x = 'm';",
+    "dynamodb::Client": "let x = aws_sdk_dynamodb::Client::new(&aws_config::load_from_env().await);",
+    "dynamodb::Config": "let x = aws_sdk_dynamodb::Config::from(&aws_config::load_from_env().await);",
+    "i16": "let x: i16 = 4096i16;",
+    "i32": "let x: i32 = 4096i32;",
+    "i64": "let x: i64 = 4096i64;",
+    "i8": "let x: i8 = 64i8;",
+    "kms::Client": "let x = aws_sdk_kms::Client::new(&aws_config::load_from_env().await);",
+    "kms::Config": "let x = aws_sdk_kms::Config::from(&aws_config::load_from_env().await);",
+    "u16": "let x: u16 = 4096u16;",
+    "u32": "let x: u32 = 4096u32;",
+    "u64": "let x: u64 = 4096u64;",
+    "u8": "let x: u8 = 64u8;",
+    "usize": "let x: usize = 4096usize;"
   },
   "handles": {
     "SharedKeyring": {

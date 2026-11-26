@@ -269,8 +269,10 @@ def docs_of(crate, doc, short, commit):
             file = span["filename"]
             file = file if file.startswith(crate + "/") else f"{crate}/{file}"
             url = f"{REPO_URL}/blob/{commit}/{file}#L{span['begin'][0]}"
+        # An enum's variants that hold nothing, like AesWrappingAlg::AlgAes256GcmIv12Tag16, so the page can show one.
+        plain = [v["name"] for v in t.get("variants", []) if v["payload"] is None]
         out.setdefault(t["name"], []).append({"crate": short["crate"].replace("_", "-"), "path": path,
-                                              "doc": t["docs"], "url": url})
+                                              "doc": t["docs"], "url": url, "variants": plain})
     return out
 
 

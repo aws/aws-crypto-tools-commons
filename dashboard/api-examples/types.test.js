@@ -39,7 +39,7 @@ const RUST = {
     [PLAIN]: [
       ROW("&[u8]", 0, ".encrypt().plaintext(x)", "bytes", { trial: 10, test: 20, run: { builds: true, same: true, copies: false } }),
       ROW("[u8; 32]", 0, ".encrypt().plaintext(&x)", "bytes", { trial: 11, test: 30, run: { skipped: "the value is not 32 bytes" } }),
-      ROW("String", 1, ".encrypt().plaintext(x.as_bytes())", "text", { trial: 12, test: 40, run: { builds: true, same: true, copies: true } }),
+      ROW("String", 1, ".encrypt().plaintext(x.as_bytes())", "text", { trial: 12, test: 40, fix: "x.as_bytes()", run: { builds: true, same: true, copies: true } }),
       ROW("PathBuf", 2, ".encrypt().plaintext(&std::fs::read(x).unwrap())", "path", { trial: 13, test: 50, run: { builds: true, same: false } }),
       ROW("char", null, "", "text", { trial: null }),
     ],
@@ -156,6 +156,7 @@ async function open(files = {}, search = "") {
       return els.detail.innerHTML;
     },
     openRow: id => click("view", { "tr[data-open]": { open: id } }),
+    click,
     propose: key => click("view", { ".prop": { prop: key } }),
   };
   return page;
@@ -208,8 +209,8 @@ test("a Rust chip shows its call, says where it compiled, and links the code and
   const page = await open();
   page.pickApi(PLAIN);
   const pane = page.chip(PLAIN, "rust", "String");
-  assert.match(pane, /<pre>client\.encrypt\(\)\.plaintext\(x\.as_bytes\(\)\)<\/pre>/);
-  assert.match(pane, /one call: 1 call\./);
+  assert.match(pane, /<pre>\/\/ You have x: String\nclient\.encrypt\(\)\.plaintext\(x\.as_bytes\(\)\)<\/pre>/);
+  assert.match(pane, /One call: <code>as_bytes\(\)<\/code>\./);
   assert.match(pane, /✅ Compiled in the committed copy\./);
   const links = [...pane.matchAll(/href="([^"]*)"/g)].map(m => m[1]);
   for (const link of ["https://github.com/aws/aws-crypto-tools-commons/blob/main/api-examples/types/rust_trials.rs#L12",
@@ -218,7 +219,7 @@ test("a Rust chip shows its call, says where it compiled, and links the code and
     "https://github.com/aws/aws-crypto-tools-commons/actions/workflows/api-examples-types.yml?query=branch%3Amain"]) {
     assert.ok(links.includes(link), link);
   }
-  assert.match(page.chip(PLAIN, "rust", "char"), /<pre>No fix in the list works\.<\/pre>.*❌ No fix in the list compiled/);
+  assert.match(page.chip(PLAIN, "rust", "char"), /<pre>\/\/ You have x: char\n\/\/ No fix in the list works\.<\/pre>.*❌ No fix in the list compiled/);
 });
 
 test("links go to the branch that ?ref names", async () => {
@@ -250,7 +251,7 @@ test("another language's chip shows its own code and says it is not compiled", a
   page.pickLang("java");
   assert.deepStrictEqual(Object.keys(chips(page.els.view.innerHTML)), ["byte[]", "String"]);
   const pane = page.chip(PLAIN, "java", "String");
-  assert.match(pane, /<pre>crypto\.encryptString\(provider, x, context\)<\/pre>/);
+  assert.match(pane, /<pre>\/\/ You have x: String\ncrypto\.encryptString\(provider, x, context\)<\/pre>/);
   assert.match(pane, /Not compiled or run\./);
   assert.doesNotMatch(pane, /rust_trials/);
 });
@@ -325,24 +326,55 @@ test("a proposal moves the types it makes cheaper, and the pane says what it was
     /✏️ Proposed: <code>plaintext\(impl Into&lt;Plaintext&gt;\)<\/code>\. Compiled against a model of it, not run\. Today: one call\./);
 });
 
-test("the type explorer goes from a chip to its type, the group it is in, and back", async () => {
+test("a chip says why it sits where it does, and shows how to make the type", async () => {
+  const rust = structuredClone(RUST);
+  rust.rows[PLAIN][2].fix = "x.as_bytes()";
+  rust.rows[PLAIN][0].fix = "x";
+  rust.rows[KEYRING][2].fix = "x.clone()";
+  rust.rows[WRAP][0] = { ...rust.rows[WRAP][0], fix: "&x" };
+  rust.examples = { "Cow<str>": 'use std::borrow::Cow;\nlet x: Cow<str> = Cow::Borrowed("my text");' };
+  rust.rows[PLAIN].push(ROW("Cow<str>", 1, ".encrypt().plaintext(x.as_bytes())", "text", { trial: 18, fix: "x.as_bytes()" }));
+  const page = await open({ "types-rust.json": rust });
+  page.pickApi(PLAIN);
+  assert.match(page.chip(PLAIN, "rust", "&[u8]"), /As is: you pass it without a call\./);
+  assert.match(page.chip(PLAIN, "rust", "Cow<str>"),
+    /<pre>\/\/ You have:\nuse std::borrow::Cow;\nlet x: Cow&lt;str&gt; = Cow::Borrowed\(&quot;my text&quot;\);\n\n\/\/ You write:\nclient\.encrypt\(\)\.plaintext\(x\.as_bytes\(\)\)<\/pre>/);
+  page.pickApi(WRAP);
+  assert.match(page.chip(WRAP, "rust", "Vec<u8>"), /As is: <code>&amp;x<\/code> only lends it, so it is not a call\./);
+  page.pickApi(KEYRING);
+  assert.doesNotMatch(page.chip(KEYRING, "rust", "&RawAesKeyring"), /Where a customer gets one/);
+});
+
+test("a long call puts each step on its own line", async () => {
+  const rust = structuredClone(RUST);
+  rust.rows[PLAIN][3].code = ".encrypt().plaintext(&std::fs::read(x).unwrap()).frame_length(4096)";
+  const page = await open({ "types-rust.json": rust });
+  page.pickApi(PLAIN);
+  assert.match(page.chip(PLAIN, "rust", "PathBuf"), /\nclient\n    \.encrypt\(\)\n    \.plaintext\(&amp;std::fs::read\(x\)\.unwrap\(\)\)\n    \.frame_length\(4096\)<\/pre>/);
+});
+
+test("explore this type opens the type explorer in the main view, with its group and the options it goes into", async () => {
   const page = await open();
   page.pickApi(KEYRING);
-  assert.match(page.chip(KEYRING, "rust", "&RawAesKeyring"), /data-go="type" data-lang="rust" data-type="&amp;RawAesKeyring">explore this type →/);
-  const type = page.go({ go: "type", lang: "rust", type: "RawAesKeyring" });
-  assert.match(type, /data-back>← Back/);
+  assert.match(page.chip(KEYRING, "rust", "&RawAesKeyring"), /data-x="type" data-lang="rust" data-type="&amp;RawAesKeyring">explore this type →/);
+  page.click("detail", { "[data-x], [data-xback], [data-xclose], [data-go]": { x: "type", lang: "rust", type: "RawAesKeyring" } });
+  const type = page.els.view.innerHTML;
+  assert.match(type, /<h2>RawAesKeyring <span class="sub">Rust<\/span><\/h2>/);
   assert.match(type, /A keyring with a local AES key\./);
-  assert.match(type, /data-go="group" data-handle="SharedKeyring">Keyrings<\/a>/);
-  assert.match(type, /<code>RawAesKeyring::builder\(\)<\/code>: <a class="go" data-go="api" data-lib="mpl" data-id="raw-aes-keyring">open the Raw AES keyring tab/);
-  assert.match(type, /Also held as<\/h3><p><a class="go" data-go="type" data-lang="rust" data-type="&amp;RawAesKeyring">/);
-  assert.match(type, /<td>Encrypt<\/td><td><a class="go" data-go="chip" data-key="esdk\|encrypt\|keyring"[^>]*>keyring<\/a><\/td><td><span class="chip b0">as is<\/span> <code>\.encrypt\(\)\.keyring\(x\)<\/code>/);
-  const group = page.go({ go: "group", handle: "SharedKeyring" });
-  assert.match(group, /<h2>Keyrings<\/h2>/);
-  assert.match(group, /data-type="RawAesKeyring">RawAesKeyring<\/a>/);
+  assert.match(type, /<div class="node grp"><a class="go" data-x="group" data-handle="SharedKeyring">Keyrings<\/a><\/div>/);
+  const targets = [...type.matchAll(/data-go="chip" data-key="([^"]*)"/g)].map(m => m[1]);
+  assert.deepStrictEqual(targets, [CMM_KEYRING, KEYRING]);
+  assert.match(type, /Also held as <a class="go" data-x="type" data-lang="rust" data-type="&amp;RawAesKeyring">/);
+  page.click("view", { "[data-x], [data-xback], [data-xclose], [data-go]": { x: "group", handle: "SharedKeyring" } });
+  const group = page.els.view.innerHTML;
+  assert.match(group, /<h2>Keyrings <span class="sub">Rust<\/span><\/h2>/);
   assert.deepStrictEqual([...group.matchAll(/data-go="chip" data-key="([^"]*)"/g)].map(m => m[1]), [CMM_KEYRING, KEYRING],
     "each option that takes a keyring shows once");
-  assert.match(page.back(), /<h2>RawAesKeyring<\/h2>/);
-  page.go({ go: "api", lib: "mpl", id: "raw-aes-keyring" });
+  page.click("view", { "[data-x], [data-xback], [data-xclose], [data-go]": { xback: "" } });
+  assert.match(page.els.view.innerHTML, /<h2>RawAesKeyring/);
+  page.click("view", { "[data-x], [data-xback], [data-xclose], [data-go]": { go: "chip", key: KEYRING, lang: "rust", type: "RawAesKeyring" } });
+  assert.match(page.els.detail.innerHTML, /<h2>RawAesKeyring<\/h2>/);
+  page.click("view", { "[data-x], [data-xback], [data-xclose], [data-go]": { go: "api", lib: "mpl", id: "raw-aes-keyring" } });
   assert.match(page.els.view.innerHTML, /<b>wrapping_key<\/b>/);
 });
 

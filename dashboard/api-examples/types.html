@@ -91,6 +91,18 @@
   #detail .back { float:right; margin-right:6px; }
   a.go { cursor:pointer; text-decoration:underline dotted; }
   #run a { color:var(--dim); }
+  .crumbs { margin-bottom:10px; font-size:12px; color:var(--dim); }
+  .graph { display:flex; align-items:center; gap:12px; margin:8px 0 12px; flex-wrap:wrap; }
+  .graph .col { display:flex; flex-direction:column; gap:6px; }
+  .graph .arrow { color:var(--dim); font-size:18px; }
+  .node { display:block; border:1px solid var(--line); border-radius:8px; padding:5px 10px; background:var(--panel); color:var(--text); text-decoration:none; font-size:13px; }
+  .node.me { border-color:var(--sel); font-family:ui-monospace, monospace; font-weight:600; }
+  .node.grp { border-style:dashed; }
+  a.node:hover { border-color:var(--sel); }
+  .node small { color:var(--dim); font-family:ui-monospace, monospace; }
+  .level { margin:6px 0; }
+  ul.about, ul.checks { padding-left:18px; font-size:12px; }
+  ul.checks details { display:inline; }
 </style>
 </head>
 <body>
@@ -106,7 +118,7 @@
 <main id="main">
   <section id="left">
     <div class="legend">
-      <span><i class="sw b0"></i>as is</span>
+      <span><i class="sw b0"></i>as is: no calls, and <code>&amp;x</code> or <code>Some(x)</code> don't count</span>
       <span><i class="sw b1"></i>one call</span>
       <span><i class="sw b2"></i>&gt;1 call</span>
       <span><i class="sw bx" style="border:1px dashed var(--line)"></i>no fix found</span>
@@ -168,6 +180,8 @@ const proposed = new Set();
 const opened = new Set();      // option|kind rows that are open in the comparison
 const openDetails = new Set(); // customer lists that are open
 let pane = [];                 // what the side pane showed, newest last, for its back button
+let mode = "options";          // the main view: "options", or "explorer" for the type explorer
+let explorer = [];             // what the type explorer showed, newest last, for its back button
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // Doc text keeps its `code` spans.
@@ -536,32 +550,60 @@ function runText(run) {
   return text + ".";
 }
 
-// A link that moves the side pane to a type, or a group of types, in the explorer.
-const typeLink = (l, type, text) => `<a class="go" data-go="type" data-lang="${l}" data-type="${esc(type)}">${esc(text || type)}</a>`;
-const groupLink = (handle, text) => `<a class="go" data-go="group" data-handle="${esc(handle)}">${esc(text)}</a>`;
+// A link that opens a type, or a group of types, in the type explorer, which takes over the main view.
+const typeLink = (l, type, text) => `<a class="go" data-x="type" data-lang="${l}" data-type="${esc(type)}">${esc(text || type)}</a>`;
+const groupLink = (handle, text) => `<a class="go" data-x="group" data-handle="${esc(handle)}">${esc(text)}</a>`;
 // A type without & and Arc<>, like RawAesKeyring for &RawAesKeyring.
 const baseType = type => type.replace(/^&/, "").replace(/^Arc<(.*)>$/, "$1");
 const handleOf = type => Object.entries((rust || {}).handles || {}).find(([h, info]) => h === type || info.members.includes(type));
 
-// What a type is, part by part, and for Rust, where a customer gets one.
+// What a type is, one line for each part of it.
 function aboutHtml(l, type) {
   const about = aboutOf(l, type);
   if (!about) return "";
-  let html = "<h3>What it is</h3><ul>" + about.parts.map(p => {
-    const text = p.text ? (p.from ? `<span class="quote">“${docHtml(p.text)}”</span>` : esc(p.text)) : `<span class="ev">No doc comment.</span>`;
-    const link = p.url ? ` <a href="${esc(p.url)}" target="_blank">${p.from ? `${esc(p.from)} source ↗` : "docs ↗"}</a>` : "";
+  return `<ul class="about">` + about.parts.map(p => {
+    const text = p.text ? docHtml(p.text.split(/(?<=\.)\s/)[0]) : `<span class="ev">No doc comment.</span>`;
+    const link = p.url ? ` <a href="${esc(p.url)}" target="_blank">docs ↗</a>` : "";
     return `<li><code>${esc(p.name)}</code> ${text}${link}</li>`;
   }).join("") + "</ul>";
-  const held = about.held;
-  if (held) {
-    html += `<h3>Where a customer gets one</h3><p class="sub">${esc(held.text)}${held.examples.length ? " Some of them:" : ""}</p><ul>`
-      + held.examples.map(e => `<li>${esc(e.crate)}: <a href="${esc(e.url)}" target="_blank"><code>${esc(e.item)}${e.pos === "return" ? "()" : ""}</code></a> `
-        + `${e.pos === "return" ? "returns one" : "is one"}</li>`).join("") + "</ul>";
-    if (held.why) html += `<p class="sub">It counts as this kind because ${docHtml(held.why.charAt(0).toLowerCase() + held.why.slice(1))}</p>`;
-  } else if (l !== "rust") {
-    html += `<p class="sub">Picked by hand for this page.</p>`;
+}
+
+// The calls in a fix, like as_bytes and unwrap in x.as_bytes().unwrap(). & and Some(...) are not calls.
+const callNames = fix => [...(fix || "").matchAll(/(?<!new )\b([A-Za-z_]\w*)\s*\(/g)].map(m => m[1]).filter(n => n !== "Some")
+  .concat((fix || "").match(/\bawait\b/g) || []).concat([...(fix || "").matchAll(/\bnew\s+([A-Za-z_][\w.]*)/g)].map(m => "new " + m[1]));
+
+// Why a type sits where it does, in words.
+function levelText(row, l) {
+  if (row.calls === null || row.calls === undefined) {
+    return l === "rust" ? "No fix found: none of the fixes the page tries compiles." : "No fix found: no conversion in the list reaches a type it takes.";
   }
-  return html;
+  const fix = row.fix || "";
+  if (row.calls === 0) {
+    if (/&x\b|&\{/.test(fix)) return "As is: <code>&amp;x</code> only lends it, so it is not a call.";
+    if (/^Some\(/.test(fix)) return "As is: <code>Some(x)</code> only wraps it, so it is not a call.";
+    return "As is: you pass it without a call.";
+  }
+  const names = callNames(fix);
+  const list = names.length ? names.map(n => `<code>${esc(n)}${n.startsWith("new ") ? "" : "()"}</code>`).join(", ") : "";
+  return `${row.calls === 1 ? "One call" : `${row.calls} calls`}${list ? `: ${list}` : ""}.`;
+}
+
+// A long Rust method chain with each call on its own line, as rustfmt writes chains over 60 characters.
+function formatCall(code) {
+  if (code.length <= 60 || code.includes("\n")) return code;
+  const parts = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c)) depth--;
+    else if (c === "." && depth === 0 && i > start && /[\w)]/.test(code[i - 1])) {
+      parts.push(code.slice(start, i));
+      start = i;
+    }
+  }
+  parts.push(code.slice(start));
+  return parts.length < 2 ? code : parts[0] + parts.slice(1).map(p => "\n    " + p).join("");
 }
 
 // The code a CI artifact compiled or ran, for a line of one of its files, or null for the committed copy.
@@ -578,15 +620,11 @@ function chipHtml(view) {
   const { key, lang: l, type } = view;
   const row = rowsOf(key, l).find(r => r.type === type);
   const a = optionIndex[key].api;
-  // A pair row stands for two values: x and y in Rust, k and v in the other languages.
-  const pair = row.kind === "pair" || row.kind === "pairs";
-  const held = pair ? `${l === "rust" ? "x, y" : "k, v"}: ${type.slice(1, -1).split(", ")[0]}` : `x: ${type}`;
+  const example = l === "rust" ? ((rust || {}).examples || {})[type] : null;
+  const call = row.calls === null || row.calls === undefined ? "// No fix in the list works."
+    : l === "rust" ? formatCall((a.calls.rust || "") + row.code) : row.code;
+  const have = example ? `// You have:\n${example}\n\n// You write:\n` : `// You have x: ${type}\n`;
   const checks = [];
-  let code = "No fix in the list works.";
-  if (row.calls !== null && row.calls !== undefined) {
-    code = l === "rust" ? (a.calls.rust || "") + row.code : row.code;
-    checks.push(`${LEVEL[level(row.calls)]}: ${row.calls} ${row.calls === 1 ? "call" : "calls"}.`);
-  }
   if (row.proposed) {
     const checked = l === "rust" ? "Compiled against a model of it, not run" : "Not compiled";
     checks.push(`✏️ Proposed: <code>${esc(proposalFor(key, l).signature)}</code>. ${checked}. Today: ${LEVEL[level(row.today)]}.`);
@@ -595,7 +633,7 @@ function chipHtml(view) {
     const where = run ? `in <a href="${esc(run.url)}" target="_blank">CI run ${run.number}</a>, ${ago(run.at)}` : "in the committed copy";
     if (row.trial) {
       const compiled = artifactCode("rust_trials.rs", row.trial);
-      checks.push(compiled ? `✅ Compiled ${where}:<pre>${esc(compiled)}</pre>`
+      checks.push(compiled ? `✅ Compiled ${where}. <details><summary>The code</summary><pre>${esc(compiled)}</pre></details>`
         : `✅ Compiled ${where}. <a href="${blob(rust.files.trials, row.trial)}" target="_blank">See the code it compiled ↗</a>`);
     } else {
       checks.push(`❌ No fix in the list compiled ${where}.`);
@@ -605,18 +643,18 @@ function chipHtml(view) {
       checks.push(`${esc(runText(row.run))} ${test ? `<details><summary>The test</summary><pre>${esc(test)}</pre></details>`
         : `<a href="${blob(rust.files.runs, row.test)}" target="_blank">See the test ↗</a>`}`);
     }
-    checks.push(`On aws-crypto-tools-rust at <a href="https://github.com/aws/aws-crypto-tools-rust/tree/${rust.rust_commit}" target="_blank">`
-      + `${rust.rust_commit.slice(0, 7)}</a> with rustc ${esc(rust.rustc)}. <a href="${workflowLink(PARTS.rust.workflow)}" target="_blank">CI runs it every day ↗</a>`);
+    checks.push(`aws-crypto-tools-rust <a href="https://github.com/aws/aws-crypto-tools-rust/tree/${rust.rust_commit}" target="_blank">`
+      + `${rust.rust_commit.slice(0, 7)}</a>, rustc ${esc(rust.rustc)}. <a href="${workflowLink(PARTS.rust.workflow)}" target="_blank">CI runs it every day ↗</a>`);
   } else {
     checks.push("⚙ Written from the release's signature. Not compiled or run.");
   }
   const rule = expected(key, row);
   if (rule) checks.push(`${rule.ok ? "✅" : "⚠"} Rule: ${esc(rule.text)}`);
   if (risk(row)) checks.push(`⚠ ${esc(risk(row))}`);
-  return `<h2>${typeLink(l, type)}</h2>`
-    + `<div class="sub">${esc(langName(l))} · ${esc(a.name)} · ${esc(optionName(key, l))} · ${esc(held)} · ${typeLink(l, type, "explore this type →")}</div>`
-    + aboutHtml(l, type)
-    + `<h3>Code</h3><pre>${esc(code)}</pre><h3>Checks</h3><ul>${checks.map(c => `<li>${c}</li>`).join("")}</ul>`;
+  return `<h2>${esc(type)}</h2>`
+    + `<div class="sub">${esc(langName(l))} · ${esc(a.name)} · ${esc(optionName(key, l))} · ${typeLink(l, type, "explore this type →")}</div>`
+    + `<p class="level">${levelText(row, l)}</p><pre>${esc(have + call)}</pre>`
+    + aboutHtml(l, type) + `<ul class="checks">${checks.map(c => `<li>${c}</li>`).join("")}</ul>`;
 }
 
 // Every option that one type shows up on, in one language.
@@ -633,31 +671,34 @@ function usesOf(l, type) {
   return out;
 }
 
-function usesTable(l, uses) {
-  if (!uses.length) return `<p class="sub">No option takes it.</p>`;
-  return "<table><tr><th>API</th><th>Option</th><th>Takes it</th></tr>" + uses.map(({ a, o, row }) =>
-    `<tr><td>${esc(a.name)}</td><td><a class="go" data-go="chip" data-key="${esc(o.key)}" data-lang="${l}" data-type="${esc(row.type)}">`
-    + `${esc(o.names[l] || o.name)}</a></td><td><span class="chip b${level(row.calls)}">${esc(LEVEL[level(row.calls)])}</span> <code>${esc(row.code.split("\n").pop())}</code></td></tr>`).join("") + "</table>";
+// A small graph: what a type belongs to, on the left, and each option it goes into, on the right.
+function graphHtml(l, left, middle, uses) {
+  const targets = uses.length ? uses.map(({ a, o, row }) =>
+    `<a class="node opt go" data-go="chip" data-key="${esc(o.key)}" data-lang="${l}" data-type="${esc(row.type)}">`
+    + `<span class="chip b${level(row.calls)}">${esc(LEVEL[level(row.calls)])}</span> ${esc(a.name)} · <b>${esc(o.names[l] || o.name)}</b>`
+    + `${row.type !== middle ? ` <small>as ${esc(row.type)}</small>` : ""}</a>`).join("") : `<span class="ev">No option takes it.</span>`;
+  return `<div class="graph">${left ? `<div class="col">${left}</div><span class="arrow">→</span>` : ""}`
+    + `<div class="col"><div class="node me">${esc(middle)}</div></div><span class="arrow">→</span><div class="col">${targets}</div></div>`;
 }
 
-// A type in the explorer: what it is, what it belongs to, how to build it, and every option it shows up on.
+// A type in the explorer: what it is, how to make one, and the options it goes into.
 function typeHtml(view) {
   const { lang: l, type } = view;
   const base = baseType(type);
-  let html = `<h2>${esc(type)}</h2><div class="sub">${esc(langName(l))} · type explorer</div>` + aboutHtml(l, type);
+  const example = l === "rust" ? ((rust || {}).examples || {})[type] : null;
+  const found = l === "rust" ? handleOf(base) : null;
+  const left = found ? groupLink(found[0], found[1].group) : "";
+  let html = `<h2>${esc(type)} <span class="sub">${esc(langName(l))}</span></h2>` + aboutHtml(l, type);
+  html += example ? `<h3>Make one</h3><pre>${esc(example)}</pre>` : "";
+  const uses = usesOf(l, type).sort((x, y) => x.a.name.localeCompare(y.a.name) || x.o.name.localeCompare(y.o.name));
+  html += `<h3>Where it goes</h3>` + graphHtml(l, left ? `<div class="node grp">${left}</div>` : "", type, uses);
   if (l === "rust") {
-    const found = handleOf(base);
-    if (found) {
-      const [handle, info] = found;
-      html += `<h3>Part of</h3><p>${groupLink(handle, info.group)}: ${info.members.map(m => typeLink(l, m)).join(", ") || "none built in"}. `
-        + `Each one converts into ${typeLink(l, handle)}, which holds any of them.</p>`;
-    }
-    const builds = Object.values(catalog).flat().find(a => a.calls.rust && a.calls.rust.split("::")[0] === base);
-    if (builds) html += `<h3>Build one</h3><p><code>${esc(builds.calls.rust)}</code>: <a class="go" data-go="api" data-lib="${builds.lib}" data-id="${esc(builds.id)}">open the ${esc(builds.name)} tab</a></p>`;
     const forms = [base, `&${base}`, `Arc<${base}>`].filter(t => t !== type && usesOf(l, t).length);
-    if (forms.length) html += `<h3>Also held as</h3><p>${forms.map(t => typeLink(l, t)).join(", ")}</p>`;
+    if (forms.length) html += `<p class="sub">Also held as ${forms.map(t => typeLink(l, t)).join(", ")}.</p>`;
+    const builds = Object.values(catalog).flat().find(a => a.calls.rust && a.calls.rust.split("::")[0] === base);
+    if (builds) html += `<p class="sub">Its own options are on the <a class="go" data-go="api" data-lib="${builds.lib}" data-id="${esc(builds.id)}">${esc(builds.name)}</a> tab.</p>`;
   }
-  return html + `<h3>Where it shows up</h3>` + usesTable(l, usesOf(l, type));
+  return html;
 }
 
 // A group of types, like every keyring, and the options that take any of them.
@@ -666,10 +707,11 @@ function groupHtml(view) {
   const uses = [view.handle, ...info.members].flatMap(t => usesOf("rust", t))
     .filter((u, i, all) => all.findIndex(x => x.o.key === u.o.key) === i)
     .sort((x, y) => x.a.name.localeCompare(y.a.name) || x.o.name.localeCompare(y.o.name));
-  return `<h2>${esc(info.group)}</h2><div class="sub">Rust · type explorer</div>`
-    + `<h3>Built in</h3><ul>${info.members.map(m => `<li>${typeLink("rust", m)}</li>`).join("") || "<li>None. Customers write their own.</li>"}</ul>`
-    + `<h3>Any of them</h3><p>${typeLink("rust", view.handle)} holds any of them, including one a customer writes.</p>`
-    + `<h3>Where they show up</h3>` + usesTable("rust", uses);
+  const members = info.members.map(m => `<div class="node">${typeLink("rust", m)}</div>`).join("")
+    || `<span class="ev">None built in. Customers write their own.</span>`;
+  return `<h2>${esc(info.group)} <span class="sub">Rust</span></h2>`
+    + `<p class="sub">Each one converts into ${typeLink("rust", view.handle)}, which holds any of them.</p>`
+    + graphHtml("rust", members, view.handle, uses);
 }
 
 // Every type on the page, for one language, by what it is.
@@ -682,15 +724,23 @@ function typesHtml(view) {
       (byKind[kind] = byKind[kind] || new Set()).add(r.type);
     }
   }
-  let html = `<h2>Type explorer</h2><div class="sub">${LANGS.map(([n, x]) => x === l ? `<b>${n}</b>` : `<a class="go" data-go="types" data-lang="${x}">${n}</a>`).join(" · ")}</div>`;
+  let html = `<h2>Type explorer <span class="sub">${esc(langName(l))}</span></h2>`;
   if (l === "rust") {
-    html += "<h3>Groups</h3><ul>" + Object.entries((rust || {}).handles || {}).map(([h, info]) =>
-      `<li>${groupLink(h, info.group)}: ${info.members.map(m => typeLink(l, m)).join(", ") || "none built in"}</li>`).join("") + "</ul>";
+    html += "<h3>Groups</h3><p>" + Object.entries((rust || {}).handles || {}).map(([h, info]) => groupLink(h, info.group)).join(" · ") + "</p>";
   }
   for (const [kind, types] of Object.entries(byKind).sort()) {
-    html += `<h3>${esc(kind)}</h3><p>${[...types].sort().map(t => typeLink(l, t)).join(", ")}</p>`;
+    html += `<h3>${esc(kind)}</h3><p>${[...types].sort().map(t => typeLink(l, t)).join(" · ")}</p>`;
   }
   return html;
+}
+
+// The main view when the type explorer is open: the page on top of its history, and a way back.
+function explorerView() {
+  const view = explorer[explorer.length - 1];
+  const back = explorer.length > 1 ? `<button class="tool" data-xback>← Back</button> ` : "";
+  const body = { types: typesHtml, type: typeHtml, group: groupHtml }[view.show](view);
+  return `<div class="crumbs">${back}<a class="go" data-x="types" data-lang="${view.lang || "rust"}">All types</a>`
+    + ` · <a class="go" data-xclose>Back to the options</a></div>` + body;
 }
 
 // How each part of this page is made.
@@ -720,7 +770,7 @@ function renderPane() {
     $("main").classList.remove("open");
     return;
   }
-  const body = { chip: chipHtml, customers: customersHtml, how: howHtml, types: typesHtml, type: typeHtml, group: groupHtml }[view.show](view);
+  const body = { chip: chipHtml, customers: customersHtml, how: howHtml }[view.show](view);
   $("detail").innerHTML = `<button class="close" data-close title="Close">×</button>`
     + (pane.length > 1 ? `<button class="tool back" data-back>← Back</button>` : "") + body;
   $("main").classList.add("open");
@@ -741,7 +791,24 @@ function draw() {
   $("langs").innerHTML = LANGS.map(([n, l]) => `<button data-lang="${l}" class="${l === lang ? "on" : ""}">${n}</button>`).join("")
     + `<button data-lang="compare" class="${lang === "compare" ? "on" : ""}">Compare languages</button>`
     + toggle + `<label class="tool">Load proposals… <input type="file" id="load" accept=".json"></label>`;
-  $("view").innerHTML = lang === "compare" ? compareView() : mapView();
+  $("view").innerHTML = mode === "explorer" ? explorerView() : lang === "compare" ? compareView() : mapView();
+  $("explore").className = "tool" + (mode === "explorer" ? " on" : "");
+}
+
+// Opens a type, a group or the index in the type explorer, which takes over the main view.
+function explore(view) {
+  mode = "explorer";
+  explorer.push(view);
+  draw();
+}
+
+// Shows the options of one API, like the Raw AES keyring's.
+function showApi(l, id) {
+  lib = l;
+  api = Math.max(0, currentApis().findIndex(a => a.id === id));
+  mode = "options";
+  lang = lang === "compare" ? "rust" : lang;
+  draw();
 }
 
 function foot() {
@@ -761,6 +828,7 @@ $("libs").addEventListener("click", e => {
   if (!button) return;
   lib = button.dataset.lib;
   api = 0;
+  mode = "options";
   pane = [];
   renderPane();
   draw();
@@ -769,6 +837,7 @@ $("apis").addEventListener("click", e => {
   const button = e.target.closest("button");
   if (!button) return;
   api = Number(button.dataset.api);
+  mode = "options";
   pane = [];
   renderPane();
   draw();
@@ -786,6 +855,8 @@ $("langs").addEventListener("click", e => {
     return;
   }
   lang = button.dataset.lang;
+  if (mode === "explorer" && lang !== "compare") explorer.push({ show: "types", lang });
+  else mode = "options";
   pane = [];
   renderPane();
   draw();
@@ -795,9 +866,38 @@ $("langs").addEventListener("change", e => {
   if (file) file.text().then(text => useProposals(JSON.parse(text)));
 });
 $("how").addEventListener("click", () => openPane({ show: "how" }));
-$("explore").addEventListener("click", () => openPane({ show: "types", lang: lang === "compare" ? "rust" : lang }));
+$("explore").addEventListener("click", () => {
+  if (mode === "explorer") {
+    mode = "options";
+    draw();
+  } else {
+    explore({ show: "types", lang: lang === "compare" ? "rust" : lang });
+  }
+});
+// A click on a link that moves the explorer or opens an API. Returns whether it was one.
+function navigate(e) {
+  const d = (e.target.closest("[data-x], [data-xback], [data-xclose], [data-go]") || {}).dataset;
+  if (!d) return false;
+  if ("xback" in d) {
+    explorer.pop();
+    draw();
+  } else if ("xclose" in d) {
+    mode = "options";
+    draw();
+  } else if (d.x) {
+    explore({ show: d.x, lang: d.lang || "rust", type: d.type, handle: d.handle });
+  } else if (d.go === "api") {
+    showApi(d.lib, d.id);
+  } else if (d.go === "chip") {
+    openPane({ show: "chip", key: d.key, lang: d.lang, type: d.type });
+  } else {
+    return false;
+  }
+  return true;
+}
 const unselect = () => { for (const s of document.querySelectorAll(".chip.sel, .cust.sel")) s.classList.remove("sel"); };
 $("view").addEventListener("click", e => {
+  if (navigate(e)) return;
   const prop = e.target.closest(".prop");
   if (prop) {
     proposed.has(prop.dataset.prop) ? proposed.delete(prop.dataset.prop) : proposed.add(prop.dataset.prop);
@@ -840,17 +940,7 @@ $("detail").addEventListener("click", e => {
     renderPane();
     return;
   }
-  const go = e.target.closest("[data-go]");
-  if (!go) return;
-  const d = go.dataset;
-  if (d.go === "api") {
-    lib = d.lib;
-    api = currentApis().findIndex(a => a.id === d.id);
-    lang = "rust";
-    draw();
-    return;
-  }
-  openPane({ show: d.go, lang: d.lang, type: d.type, handle: d.handle, key: d.key }, true);
+  navigate(e);
 });
 $("detail").addEventListener("toggle", e => {
   const id = e.target.dataset && e.target.dataset.id;
