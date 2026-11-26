@@ -1068,7 +1068,8 @@ CHEAT_ADDED = [
      "An implication counts as both the code and the test for a requirement."),
     (r"^\.github/", r"continue-on-error:\s*true", "cheat-continue-on-error", "A failing step no longer fails",
      "With continue-on-error, this step can fail and the job still passes."),
-    (r"^\.github/", r"(diff-cover|branch_gate|llvm-cov|mutate\.py).*(--exclude|--sample)\b|^\s*--exclude\b",
+    # Only on the line that runs the check: other tools take --exclude too, this one included.
+    (r"^\.github/", r"(diff-cover|branch_gate|llvm-cov|mutate\.py).*(--exclude|--sample)\b",
      "cheat-check-narrowed", "A check covers less", "This leaves code out of a check."),
     (r"(^|/)scripts/smithy-conformance/.*\.toml$", r"^\s*accepted\s*=|status\s*=\s*\"(accepted|deferred)\"",
      "cheat-deviation", "Conformance deviation", "A deviation lets code differ from the Smithy model."),

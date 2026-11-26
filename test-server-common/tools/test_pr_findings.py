@@ -222,6 +222,14 @@ class Findings(unittest.TestCase):
         self.assertEqual(self.pr.missing, [])
 
 
+class Narrowed(unittest.TestCase):
+    def test_an_exclude_on_a_check_is_a_note_but_one_on_another_tool_is_not(self):
+        workflow = "      run: diff-cover lcov.info --exclude '*/a/*'\n        --exclude '*/test-server/*' --fuzz-count 20"
+        replies = github({f"{PR}/files": [{"filename": ".github/workflows/ci.yml", "status": "modified", "patch": added(workflow)}]})
+        _, findings = build(replies)
+        self.assertEqual([(f["kind"], f["line"]) for f in findings if f["check"] == "cheat"], [("cheat-check-narrowed", 1)])
+
+
 class Missing(unittest.TestCase):
     def test_a_code_change_with_no_mutation_results_or_api_types_says_so(self):
         replies = github()
