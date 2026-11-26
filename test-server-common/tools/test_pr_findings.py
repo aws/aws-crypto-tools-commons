@@ -126,7 +126,10 @@ class FakeGitHub:
 
     def get(self, path, raw=False, accept=None):
         if path.endswith("/zip"):
-            return self.replies[f"zip:{int(path.split('/')[-2])}"]
+            got = self.replies[f"zip:{int(path.split('/')[-2])}"]
+            if isinstance(got, Exception):
+                raise got
+            return got
         if path not in self.replies:
             raise RuntimeError(f"GitHub 404 for GET {path}")
         return self.replies[path]
@@ -236,6 +239,24 @@ class Missing(unittest.TestCase):
         replies[f"repos/{REPO}/actions/runs/50/artifacts"] = {"artifacts": [artifact(2, "local-coverage-mpl")]}
         pr, _ = build(replies)
         self.assertEqual(pr.missing, ["mutation results", "API types"])
+
+
+class Attempts(unittest.TestCase):
+    def test_an_artifact_from_an_earlier_attempt_of_the_run_is_left_out_when_the_newest_attempt_uploaded_one(self):
+        replies = github()
+        replies[f"repos/{REPO}/actions/runs?head_sha={HEAD}"]["workflow_runs"][0]["run_started_at"] = "2026-11-26T00:00:06Z"
+        replies[f"repos/{REPO}/actions/runs/50/artifacts"]["artifacts"].append(artifact(13, "mpl-test-server-reports"))
+        replies["zip:13"] = zipped({"mpl/test-server/tests/build/test-results/test/TEST-a.b.KTest.xml":
+                                    '<testsuite><testcase classname="a.b.KTest" name="[k] it fails rust-v1"/></testsuite>'})
+        _, findings = build(replies)
+        self.assertNotIn("test-server-case-failed", by_kind(findings))
+
+    def test_an_artifact_github_cannot_serve_is_an_error_and_the_rest_still_count(self):
+        replies = github({"zip:5": RuntimeError("GitHub 500 for GET .../zip: Failed to generate URL to download artifact")})
+        pr, findings = build(replies)
+        self.assertEqual(len(pr.errors), 1)
+        self.assertIn("mpl-test-server-reports: GitHub 500", pr.errors[0])
+        self.assertIn("mutant-survived", by_kind(findings))
 
 
 class NewestReport(unittest.TestCase):

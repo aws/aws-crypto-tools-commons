@@ -560,7 +560,7 @@ class PR:
         else:
             self.runs = gh.pages(f"repos/{repo}/actions/runs?head_sha={self.head}", "workflow_runs")
         self.texts, self.base_texts = {}, {}
-        self.read, self.missing, self.ci_commit = collections.defaultdict(list), [], None
+        self.read, self.missing, self.errors, self.ci_commit = collections.defaultdict(list), [], [], None
         self.local, self.server = collections.defaultdict(dict), collections.defaultdict(dict)
         self.branches = collections.defaultdict(dict)
         self.mutants = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -607,13 +607,16 @@ class PR:
                 by_name[a["name"]].append(a)
         out = []
         for arts in by_name.values():
+            # A run that ran again keeps the earlier attempts' artifacts, and GitHub may no longer serve them.
+            current = [a for a in arts if a["created_at"] >= (a["attempt_start"] or "")]
+            arts = current or arts
             newest = max(arts, key=lambda a: a["created_at"])
             out += [newest] if whole else [a for a in arts if a["run"] == newest["run"]]
         return out
 
     def _load(self):
         self.merge_base = self._merge_base()
-        self._arts = [{**a, "run": r["id"]} for r in self.runs
+        self._arts = [{**a, "run": r["id"], "attempt_start": r.get("run_started_at")} for r in self.runs
                       for a in self.gh.pages(f"repos/{self.repo}/actions/runs/{r['id']}/artifacts", "artifacts")
                       if not a["expired"]]
         for f in self.files:
@@ -626,12 +629,21 @@ class PR:
         self._read_conformance()
         self._read_api()
 
+    def zip(self, art):
+        try:
+            return artifact_zip(self.gh, self.repo, art)
+        except RuntimeError as e:
+            self.errors.append(f"{art['name']}: {e}")
+            return None
+
     def _seen(self, commit):
         self.ci_commit = self.ci_commit or commit
 
     def _read_reach(self):
         for art in self.artifacts(r"^duvet-test-reach-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             name = next((x for x in z.namelist() if x.endswith(".json")), None)
             if not name:
                 continue
@@ -651,7 +663,9 @@ class PR:
 
     def _read_mutants(self):
         for art in self.artifacts(r"^mutation-results-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             name = next((x for x in z.namelist() if x.endswith("results.json")), None)
             if not name:
                 continue
@@ -664,13 +678,17 @@ class PR:
 
     def _read_coverage(self):
         for art in self.artifacts(r"^local-coverage-"):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             self.read["local coverage"].append(art["name"][len("local-coverage-"):])
             for name in z.namelist():
                 if name.endswith(".lcov"):
                     parse_lcov(z.read(name).decode(), self.local, self.branches, self.wanted)
         for art in self.artifacts(r"^per-test-coverage-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             for name in z.namelist():
                 if name.endswith(".jsonl"):
                     parse_per_test(z.read(name).decode(), self.repo, self.wanted, self.tests)
@@ -680,7 +698,9 @@ class PR:
                                     ("fuzz", r"-test-server-fuzz-reports$", self.fuzz)):
             for art in self.artifacts(pattern):
                 product = re.sub(r"-test-server(-fuzz)?-reports$", "", art["name"])
-                z = artifact_zip(self.gh, self.repo, art)
+                z = self.zip(art)
+                if z is None:
+                    continue
                 names = z.namelist()
                 got = into.setdefault(product, {"product": product, "cases": 0, "failed": [], "run": art["run"]})
                 for name in [x for x in names if re.search(r"test-results/.*TEST-[^/]*\.xml$", x)]:
@@ -702,7 +722,9 @@ class PR:
 
     def _read_conformance(self):
         for art in self.artifacts(r"^smithy-conformance-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             names = z.namelist()
             md = next((z.read(x).decode() for x in names if x.endswith("report.md")), "")
             findings = next((json.loads(z.read(x)) for x in names if x.endswith("findings.json")), [])
@@ -716,7 +738,9 @@ class PR:
         """rust-api.json and types-rust.json at the head commit, and rust-api.json at the merge base."""
         for name, part in (("api-types-rust", "head"), ("api-types-rust-base", "base")):
             for art in self.artifacts(f"^{name}$", whole=True):
-                z = artifact_zip(self.gh, self.repo, art)
+                z = self.zip(art)
+                if z is None:
+                    continue
                 for file in z.namelist():
                     for want in ("rust-api.json", "types-rust.json", "expectations.json"):
                         if file.endswith(want):
@@ -1180,7 +1204,7 @@ def build(args):
     out = {"schema": 1, "repository": repo, "pr": n, "title": pr.pr["title"], "head": pr.head,
            "base_ref": pr.base_ref, "ci_commit": pr.ci_commit, "runs": [r["id"] for r in pr.runs],
            "dashboard": pr.dashboard(args.dashboard), "read": dict(pr.read), "missing": pr.missing,
-           "findings": findings}
+           "errors": pr.errors, "findings": findings}
     text = json.dumps(out, indent=1) + "\n"
     if args.out:
         Path(args.out).write_text(text)
@@ -1203,6 +1227,8 @@ def summary_text(data):
         lines.append(f"  {f['level']:5} {f['kind']:26} {where}  {f['what']}")
     if data["missing"]:
         lines.append("  missing: " + ", ".join(data["missing"]))
+    for e in data.get("errors", []):
+        lines.append(f"  could not read {e}")
     return "\n".join(lines)
 
 
@@ -1219,6 +1245,8 @@ def summary_markdown(data):
                    f"{f['what'].replace('|', '/')} [Dashboard]({f['links']['dashboard']}) |")
     if data["missing"]:
         out += ["", f"No results yet for: {', '.join(data['missing'])}."]
+    if data.get("errors"):
+        out += ["", "Could not read: " + "; ".join(data["errors"])]
     out += ["", f"[All of it on the dashboard]({data['dashboard']})", ""]
     return "\n".join(out)
 
