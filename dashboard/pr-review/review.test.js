@@ -72,6 +72,13 @@ test("public items: a new method names its impl's type, a removed and re-added o
   assert.deepStrictEqual(R.publicItems("mpl/src/k.rs", rows, text).map(i => [i.side, i.kind, i.name, i.owner, i.line]), [
     ["added", "struct", "KBuilder", null, 1], ["added", "fn", "key_id", "KBuilder", 4], ["changed", "fn", "grant", "KBuilder", 7]]);
   assert.deepStrictEqual(R.publicItems("mpl/tests/k.rs", rows, text), []);
+  assert.deepStrictEqual(R.publicItems("mpl/test-server/src/k.rs", rows, text), []);
+});
+
+test("a public use is named by its path", () => {
+  const rows = [{ kind: "add", new: 1, text: "pub use crate::aws_kms::keyring::{AwsKmsKeyring, AwsKmsKeyringBuilder};" }];
+  assert.deepStrictEqual(R.publicItems("mpl/src/keyring/mod.rs", rows, rows[0].text).map(i => [i.kind, i.name]),
+    [["use", "crate::aws_kms::keyring::{AwsKmsKeyring, AwsKmsKeyringBuilder}"]]);
 });
 
 const API = (id, options, span) => ({ lib: "mpl", id, name: id, span, options });
