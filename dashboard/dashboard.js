@@ -280,9 +280,7 @@ class GitHubDashboard {
         }
 
         if (section === 'api-examples') {
-            // The frame gets the dashboard's query string, so ?ref=<branch> reaches the types page's links.
-            const frame = document.getElementById('apiExamplesFrame');
-            if (!frame.getAttribute('src')) frame.src = 'api-examples/types.html' + window.location.search;
+            this.loadFrame(document.getElementById('apiExamplesFrame'), 'api-examples/types.html');
             return;
         }
 
