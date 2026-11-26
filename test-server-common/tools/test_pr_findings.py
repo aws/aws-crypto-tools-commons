@@ -163,15 +163,15 @@ class Findings(unittest.TestCase):
         self.assertEqual((f["file"], f["line"], f["level"], f["why"]), ("mpl/src/k.rs", 5, "block", []))
         self.assertEqual(f["evidence"]["tests_above"], ["aws-crypto-mpl::t::checks"])
 
-    def test_a_branch_no_test_takes_names_the_condition_and_its_side(self):
+    def test_an_untested_branch_names_the_condition_and_its_side(self):
         (f,) = self.kinds["branch-not-taken"]
-        self.assertEqual(f["line"], 4)
-        self.assertEqual(f["why"], ["No test makes `id.len() >= LIMIT` true."])
+        self.assertEqual((f["line"], f["title"], f["what"], f["why"]),
+                         (4, "Untested branch", "No test makes `id.len() >= LIMIT` true.", []))
 
     def test_a_surviving_mutant_says_what_changed_why_no_test_saw_it_and_how_to_try_it(self):
         (f,) = self.kinds["mutant-survived"]
-        self.assertEqual(f["what"], "`>=` became `>` here, and all 3 tests that run this line still passed.")
-        self.assertEqual(f["why"], ["The two differ only when `id.len()` equals `LIMIT`, and no test has that."])
+        self.assertEqual(f["what"], "Changing `>=` to `>` still passes all 3 tests.")
+        self.assertEqual(f["why"], ["They differ only when `id.len()` equals `LIMIT`, and no test checks that."])
         self.assertEqual(f["patch"], ["        if id.len() >= LIMIT {", "        if id.len() > LIMIT {"])
         self.assertEqual(f["rerun"], ['cd "$RUST/mpl" && cargo test --all-features'])
 
@@ -180,8 +180,9 @@ class Findings(unittest.TestCase):
 
     def test_a_duvet_test_that_misses_its_code_says_where_the_test_went(self):
         (f,) = self.kinds["duvet-test-misses-code"]
-        self.assertEqual((f["file"], f["line"]), ("mpl/src/k.rs", 9))
-        self.assertEqual(f["why"][1:], ["It runs, but never reaches lines 9-9."])
+        self.assertEqual((f["file"], f["line"], f["end_line"]), ("mpl/src/k.rs", 9, None))
+        self.assertEqual(f["what"], "The test at KTest.java:30 runs, but never reaches line 9.")
+        self.assertEqual(f["why"], ["It cites “It MUST check.”"])
         self.assertIn("make -C mpl/test-server orchestrate", f["rerun"][0])
 
     def test_failed_test_server_and_fuzz_cases_are_findings_on_no_line_with_a_rerun(self):
@@ -278,6 +279,22 @@ class NewestReport(unittest.TestCase):
         self.assertNotIn("mutant-survived", by_kind(findings))
 
 
+class Span(unittest.TestCase):
+    def test_a_duvet_test_that_misses_several_lines_covers_them_in_one_comment_within_one_hunk(self):
+        reach = json.loads(json.dumps(REACH))
+        reach["findings"][0]["implementations"][0]["region"] = [9, 14]
+        pr, findings = build(github({"zip:4": zipped({"mpl-rust.json": json.dumps(reach)})}))
+        (f,) = [f for f in findings if f["kind"] == "duvet-test-misses-code"]
+        # The file has 11 lines, so the comment ends at the last line the diff has.
+        self.assertEqual((f["line"], f["end_line"]), (9, 11))
+        self.assertEqual(f["what"], "The test at KTest.java:30 runs, but never reaches lines 9-14.")
+
+    def test_a_span_stops_where_the_diff_does(self):
+        pr, _ = build(github({f"{PR}/files": [{"filename": "mpl/src/k.rs", "status": "modified",
+                                               "patch": "@@ -1,2 +1,2 @@\n a\n+b\n@@ -9,2 +9,2 @@\n c\n+d"}]}))
+        self.assertEqual(pr.span_end("mpl/src/k.rs", 1, 10), 2)
+
+
 class Keys(unittest.TestCase):
     def test_two_findings_with_the_same_text_in_one_file_get_different_keys(self):
         source = "fn a() {\n    x();\n}\nfn b() {\n    x();\n}"
@@ -320,9 +337,9 @@ class Words(unittest.TestCase):
     def test_each_mutant_kind_has_its_own_reason(self):
         line = "    if a == b {"
         self.assertEqual(pf.mutant_words({"kind": "binary", "description": "replace == with !=", "column": 10}, line, 2)[1],
-                         "No test depends on the result of this comparison.")
+                         "No test depends on this comparison.")
         self.assertEqual(pf.mutant_words({"kind": "condition", "description": "replace the condition with true"}, line, 2)[1],
-                         "No test checks what happens when this condition is false.")
+                         "No test checks the false case.")
         self.assertEqual(pf.mutant_words({"kind": "fn_value", "description": "replace the body of f with Ok(())"}, line, 2)[1],
                          "No test checks what `f` returns.")
 
@@ -404,6 +421,15 @@ class Plan(unittest.TestCase):
             plan = pf.plan(self.data, [comment(self.line["key"])], {1: closed})
             self.assertEqual(plan["reopen"], [closed])
 
+    def test_a_comment_on_several_lines_is_found_again_by_its_first_and_last_line(self):
+        f = {**self.line, "end_line": 7}
+        data = {**self.data, "findings": [f]}
+        again = {**comment(f["key"]), "start_line": 5, "line": 7}
+        plan = pf.plan(data, [again], {1: thread()})
+        self.assertEqual((plan["create"], plan["close"]), ([], []))
+        plan = pf.plan(data, [comment(f["key"])], {1: thread()})
+        self.assertEqual(([x["key"] for x in plan["create"]], plan["close"]), ([f["key"]], [thread()]))
+
     def test_a_finding_that_moved_lines_gets_a_new_comment_and_the_old_thread_is_closed(self):
         plan = pf.plan(self.data, [comment(self.line["key"], line=3)], {1: thread()})
         self.assertIn(self.line["key"], [f["key"] for f in plan["create"]])
@@ -450,7 +476,10 @@ class Recorder:
     """A stand-in GitHub that records each GraphQL mutation and refuses the ones named."""
 
     def __init__(self, refuse=()):
-        self.refuse, self.ran = set(refuse), []
+        self.refuse, self.ran, self.sent = set(refuse), [], []
+
+    def request(self, method, path, body=None):
+        self.sent.append((method, path, body))
 
     def graphql(self, query, **variables):
         name = query.split("{")[1].split("(")[0].strip()
@@ -467,10 +496,28 @@ class Apply(unittest.TestCase):
         pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": two, "reopen": [], "hide": [], "summaries": []})
         self.assertEqual(gh.ran, [("minimizeComment", "C1", "RESOLVED"), ("minimizeComment", "C2", "RESOLVED")])
 
+    def test_a_finding_on_several_lines_is_posted_on_all_of_them(self):
+        gh = Recorder()
+        f = {**findings_data()["findings"][0], "file": "mpl/src/k.rs", "line": 9, "end_line": 11}
+        pf.apply(gh, {"repository": REPO, "pr": 7, "head": HEAD}, {"create": [f], "update": [], "close": [], "reopen": [],
+                                                                    "hide": [], "summary": "s", "summaries": []})
+        (method, path, body), = gh.sent
+        self.assertEqual((method, path), ("POST", f"repos/{REPO}/pulls/7/reviews"))
+        posted = body["comments"][0]
+        self.assertEqual((posted["start_line"], posted["start_side"], posted["line"]), (9, "RIGHT", 11))
+
     def test_a_comment_to_hide_is_hidden_as_outdated(self):
         gh = Recorder()
         pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": [], "reopen": [], "hide": [thread()], "summaries": []})
         self.assertEqual(gh.ran, [("minimizeComment", "C1", "OUTDATED")])
+
+
+class Short(unittest.TestCase):
+    def test_a_comment_whose_title_says_it_all_is_the_title_and_the_links(self):
+        _, findings = build()
+        f = next(f for f in findings if f["kind"] == "line-not-run")
+        self.assertEqual(pf.comment_body(f).split("\n")[:3], ["**No test runs this line** (blocks merging)", "",
+                                                               f"[View in dashboard]({f['links']['dashboard']}) · [CI run](https://ci/run/50)"])
 
 
 class Dashboard(unittest.TestCase):
@@ -488,8 +535,8 @@ class Body(unittest.TestCase):
         self.assertIn("[View in dashboard](https://aws.github.io/aws-crypto-tools-commons/"
                       "?pr=aws/aws-crypto-tools-rust%237&line=mpl/src/k.rs:4#pr-review) · "
                       "[Mutation testing (mpl)](https://ci/1)", body)
-        self.assertNotIn("Run it locally", body)
-        self.assertNotIn("Ask AI", body)
+        for gone in ("Run it locally", "Ask AI", "**Fix:**", "👎"):
+            self.assertNotIn(gone, body)
         # The what says how many tests ran against the mutant; a second count of tests would not match it.
         self.assertNotIn("tests run this line", body)
         self.assertEqual(pf.marker_of(body)["key"], f["key"])
