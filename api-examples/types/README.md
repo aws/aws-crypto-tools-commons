@@ -12,7 +12,7 @@ Nobody needs to run these by hand. Three workflows run every day, and the page l
 
 So a new keyring or setter on Rust main, or in a new release of another language, shows on the page the next day. The copies of `types-rust.json`, `types-others.json` and `usage.json` in `dashboard/api-examples/` are what the page shows without a token.
 
-`api-examples-types.yml` also runs on demand with `rust-ref` set to a pull request's head commit. The PR review page (`dashboard/pr-review`) starts that run, finds it by its name, `API types for Rust <commit>`, and compares its `rust-api.json` with main's. Each option in `rust-api.json` has the lines of its setter (`span`), so that page can tell which option a changed line belongs to. The types page skips these runs, unless it is opened with `?run=<run id>`. `?api=mpl|aws-kms-keyring` opens one API.
+A pull request in aws-crypto-tools-rust reads its own API in its own CI with `rust_api.py` and `compile_rust_types.py`, and uploads it as `api-types-rust`, and the merge base's as `api-types-rust-base`. The PR Review tab compares the two. Each option in `rust-api.json` has the lines of its setter (`span`), so that tab can tell which option a changed line belongs to. The types page shows a Rust pull request's API when `?pr=` or the dashboard's shared PR box names one. `?api=mpl|aws-kms-keyring` opens one API.
 
 ## What people write
 

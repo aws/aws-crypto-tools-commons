@@ -1,21 +1,14 @@
 # Every day, reads every Rust API and option on aws-crypto-tools-rust main, compiles each held type on each
 # option, runs some of those calls, and uploads the results as api-types-rust. The types page
 # (dashboard/api-examples/types.html) loads the newest successful run's artifact.
-# The PR review page (dashboard/pr-review) starts a run with rust-ref set to a pull request's head commit,
-# and compares that run's rust-api.json with main's.
+# A pull request in aws-crypto-tools-rust reads its own API in its own CI, with these same scripts.
 
 name: API examples types
-# The PR review page finds the run made for a pull request's head commit by this name.
-run-name: API types for Rust ${{ inputs.rust-ref || 'main' }}
 
 on:
   schedule:
     - cron: "41 6 * * *"
   workflow_dispatch:
-    inputs:
-      rust-ref:
-        description: The aws-crypto-tools-rust branch, tag or commit to read
-        default: main
   push:
     branches:
       - main
@@ -39,27 +32,12 @@ jobs:
         with:
           persist-credentials: false
 
-      # Without an input, as on a schedule, this is the Rust repo's default branch.
+      # The Rust repo's default branch.
       - uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-rust
-          ref: ${{ inputs.rust-ref }}
           path: .types-rust
           persist-credentials: false
-
-      # The steps below build the ref, which runs its build scripts. Only a commit on a branch of
-      # aws/aws-crypto-tools-rust gets built: only that repo's writers can push one. A pull request from a
-      # fork has its head on no branch there.
-      # A clone of only the commits is enough to see which branches hold one, and takes about a second.
-      - name: Check that the Rust ref is on a branch of aws/aws-crypto-tools-rust
-        if: inputs.rust-ref != ''
-        run: |
-          sha=$(git -C .types-rust rev-parse HEAD)
-          git clone -q --bare --filter=tree:0 --no-tags https://github.com/aws/aws-crypto-tools-rust.git "$RUNNER_TEMP/rust-branches"
-          if [ -z "$(git -C "$RUNNER_TEMP/rust-branches" branch --contains "$sha" 2>/dev/null)" ]; then
-            echo "::error::$sha is on no branch of aws/aws-crypto-tools-rust, so this run does not build it."
-            exit 1
-          fi
 
       - uses: actions/setup-python@v5
         with:
