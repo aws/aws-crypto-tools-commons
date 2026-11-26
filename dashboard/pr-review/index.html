@@ -243,6 +243,7 @@ async function load() {
     mine.data.checks = [...latest.values()];
     mine.runs = runs;
     mine.short = shortPaths(mine.files.map(f => f.filename));
+    mine.comments = comments;
     for (const c of comments) addComment(mine, c);
     mine.loading.delete("pr");
     render();
@@ -307,7 +308,7 @@ async function loadArtifacts(s) {
   const arts = s.arts;
   // A second read, after the reader opens a file the PR does not change, starts over with that file added.
   Object.assign(s.data, { mutants: null, local: null, server: null, branches: null, tests: null, servers: null, reach: null,
-    conformance: null });
+    conformance: null, findings: null });
   s.read = {};
   const wanted = new Set([...s.files.map(f => f.filename), ...s.extra]);
   const tag = hash([...wanted].sort().join("\n"));
@@ -430,6 +431,15 @@ async function loadArtifacts(s) {
         s.data.conformance.push({ crate: art.name.replace("smithy-conformance-", ""), ...got });
       }
     }),
+    // What the PR findings job found, the same findings it commented on the PR.
+    part("PR findings", async () => {
+      const art = newestByName(arts, /^pr-findings$/)[0];
+      if (!art) return;
+      s.data.findings = await readArtifact(s.repo, art, "findings", async (zip, entries) => {
+        const e = entries.find(x => x.name.endsWith("findings.json"));
+        return e ? JSON.parse(await zipText(zip, e)) : null;
+      });
+    }),
     // The pull request's own CI reads its API at the head commit and at the merge base.
     part("API", async () => {
       const [head, base] = ["api-types-rust", "api-types-rust-base"].map(n => newestByName(arts, new RegExp(`^${n}$`))[0]);
@@ -494,7 +504,8 @@ function render() {
     return;
   }
   // While artifacts are still loading, missing results are not news yet.
-  s.flags = findFlags(s.files, s.data).filter(f => !(s.loading.size && (f.id === "no-coverage" || f.id === "no-mutants")));
+  s.flags = s.data.findings ? flagsFromFindings(s.data.findings)
+    : findFlags(s.files, s.data).filter(f => !(s.loading.size && (f.id === "no-coverage" || f.id === "no-mutants")));
   const scrollFiles = $("files").scrollTop, scrollPane = $("detail").scrollTop, typed = $("where") ? $("where").value : "";
   $("top").innerHTML = topHtml(s);
   $("files").innerHTML = filesHtml(s);
@@ -597,7 +608,8 @@ function readHtml(s) {
     ["Mutation testing", "../test-servers/mutation.html"], ["Checks by language", "../test-servers/pr-report.html"]]
     .map(([name, page]) => `<a href="${page}?run=${url}" target="_blank">${name}</a>`);
   const moved = s.moved.size ? `<div class="read warn">${plural(s.moved.size, "changed file")} also change${s.moved.size === 1 ? "s" : ""} in the merge CI ran on, so ${s.moved.size === 1 ? "its" : "their"} marks may be a few lines off: ${esc([...s.moved].map(fileName).join(", "))}.</div>` : "";
-  return `<div class="read">Read: ${parts.join(" · ")}</div><div class="read">Open: ${pages.join(" · ")} · <a href="#" data-ask-pr>Ask an AI about this PR</a></div>${moved}`;
+  const from = d.findings ? `<div class="read">These are the findings the PR findings job commented on the PR. <a href="#" data-noise>Which findings are not useful?</a></div>` : "";
+  return `${from}<div class="read">Read: ${parts.join(" · ")}</div><div class="read">Open: ${pages.join(" · ")} · <a href="#" data-ask-pr>Ask an AI about this PR</a></div>${moved}${noiseHtml(s)}`;
 }
 
 function errorsHtml(s) {
@@ -714,6 +726,7 @@ function paneHtml(s, f, row) {
   let h = `<button class="close" data-close title="Close">×</button><h3>${esc(file)}:${line}</h3><pre class="code">${esc(row.text)}</pre>`;
   if (side === "add") h += `<div class="sub"><a href="${esc(blobUrl(s, file, line))}" target="_blank">Open on GitHub</a>${row.kind === "ctx" ? " · this PR does not change this line" : ""}</div>`;
   else h += `<div class="sub">This PR removes this line.</div>`;
+  h += findingsHtml(s, file, line, side === "del" ? "LEFT" : "RIGHT");
   if (side === "add") h += evidenceHtml(s, f, line, ev);
   h += commentsHtml(s, f, row, line, ev.comments);
   h += `<h4>Ask an AI</h4><div class="sub">Paste this into your agent. The library-pr-review skill reads the same CI artifacts as this page, and the code.</div>
@@ -771,6 +784,61 @@ function evidenceHtml(s, f, line, ev) {
       + ev.api.map(a => `<li>${esc(a.apiName)}${a.option ? `: option <code>${esc(a.option)}</code>` : ""} · ${typesLink(s, "its types", a.lib, a.api)}</li>`).join("") + `</ul>`;
   }
   return h;
+}
+
+// The findings on this line: what, why, the fix and how to run it locally, and a button that marks the
+// finding's comment 👎, which is how the noisy kinds of finding are counted.
+function findingsHtml(s, file, line, side) {
+  const found = findingsAt(s.data.findings, file, line, side);
+  if (!found.length) return "";
+  return `<h4>What CI found here</h4>` + found.map(f => {
+    const comment = (s.comments || []).find(c => !c.in_reply_to_id && (markerOf(c.body) || {}).key === f.key);
+    const down = comment && comment.reactions ? comment.reactions["-1"] || 0 : 0;
+    const button = comment ? `<button class="tool" data-down="${comment.id}" title="Marks the comment on the PR with 👎">👎 Not useful${down ? ` (${down})` : ""}</button>` : "";
+    const patch = f.patch ? `<pre class="code">-${esc(f.patch[0])}\n+${esc(f.patch[1])}</pre>` : "";
+    const rerun = f.rerun && f.rerun.length ? `<details><summary class="sub">Run it locally</summary>${patch}<pre class="code">${esc(f.rerun.join("\n"))}</pre></details>` : "";
+    return `<div class="comment"><b class="${f.level === "block" ? "bad" : "warn"}">${esc(f.title)}</b> <small class="sub">${f.level === "block" ? "blocks merging" : "note"}</small>
+      <div>${esc(f.what)}</div>${f.why.map(w => `<div class="sub">${esc(w)}</div>`).join("")}${f.fix ? `<div><b>Fix:</b> ${esc(f.fix)}</div>` : ""}${rerun}
+      ${button}${comment ? ` <a href="${esc(comment.html_url)}" target="_blank">comment on GitHub</a>` : ""}</div>`;
+  }).join("");
+}
+
+// How often each kind of findings comment got 👎 on the repository's recent pull requests.
+function noiseHtml(s) {
+  if (!s.noise) return "";
+  if (s.noise === "loading") return `<div class="read">Reading the findings comments on ${esc(s.repo)}'s pull requests…</div>`;
+  if (s.noise.error) return `<div class="read bad">Could not read the comments: ${esc(s.noise.error)}</div>`;
+  const rows = s.noise.rows.map(r => `<tr><td><code>${esc(r.kind)}</code></td><td>${r.comments}</td><td>${r.down}</td><td>${r.up}</td></tr>`).join("");
+  return `<div class="read">Findings comments on the newest ${plural(s.noise.read, "review comment")} of ${esc(s.repo)}. To stop one kind, add <code>--off &lt;kind&gt;</code> to the post step of the repository's PR findings job.</div>
+    <table class="diff" style="width:auto"><tbody><tr class="hunk"><td>kind</td><td>comments</td><td>👎</td><td>👍</td></tr>${rows || `<tr><td colspan="4">none yet</td></tr>`}</tbody></table>`;
+}
+
+async function loadNoise(s) {
+  s.noise = "loading";
+  render();
+  try {
+    const comments = [];
+    for (let page = 1; page <= 5; page++) {
+      const got = await ghJson(`repos/${s.repo}/pulls/comments?sort=created&direction=desc&per_page=100&page=${page}`);
+      comments.push(...got);
+      if (got.length < 100) break;
+    }
+    s.noise = { rows: noise(comments), read: comments.length };
+  } catch (e) {
+    s.noise = { error: e.message || String(e) };
+  }
+  render();
+}
+
+async function markNotUseful(s, id) {
+  try {
+    await send("POST", `repos/${s.repo}/pulls/comments/${id}/reactions`, { content: "-1" });
+    const c = s.comments.find(x => x.id === id);
+    c.reactions = { ...(c.reactions || {}), "-1": ((c.reactions || {})["-1"] || 0) + 1 };
+  } catch (e) {
+    s.errors.push(`👎: ${e.message}`);
+  }
+  render();
 }
 
 function commentsHtml(s, f, row, line, comments) {
@@ -869,6 +937,10 @@ $("top").addEventListener("click", e => {
     state.askPr = !state.askPr;
     return render();
   }
+  if (e.target.closest("[data-noise]")) {
+    e.preventDefault();
+    return state.noise ? (state.noise = null, render()) : loadNoise(state);
+  }
   const copy = e.target.closest("[data-copy-pr]");
   if (copy) {
     if (navigator.clipboard) navigator.clipboard.writeText($("pr-prompt").value);
@@ -905,6 +977,8 @@ $("detail").addEventListener("click", e => {
   const go = e.target.closest("[data-goto]");
   if (go) { e.preventDefault(); const [fi, ri] = go.dataset.goto.split(":").map(Number); return select(fi, ri); }
   if (e.target.closest("[data-post]")) return postComment();
+  const down = e.target.closest("[data-down]");
+  if (down) return markNotUseful(state, +down.dataset.down);
   const reply = e.target.closest("[data-reply]");
   if (reply) { state.composing = { reply: +reply.dataset.reply, text: $("comment").value || "" }; return render(); }
   if (e.target.closest("[data-cancel-reply]")) { state.composing = { text: $("comment").value || "" }; return render(); }

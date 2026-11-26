@@ -302,6 +302,67 @@ function lineEvidence(data, file, line, side = "add") {
   };
 }
 
-const exported = { FAILED_CHECK, CODE_FILE, TEST_FILE, TEST_SERVER_CODE, BAD_MUTANT, parsePR, diffRows, annotations, testFunctions, shortTest,
+// ---------- the PR findings job ----------
+// The PR's CI writes findings.json (test-server-common/tools/pr_findings.py) and comments each finding on its
+// line. When the page has that file, its flags are the same ones the comments show.
+
+// Each finding kind's flag: its id, and the flag's text for n findings.
+const FINDING_FLAGS = [
+  [/^check-failed$/, "checks", n => `${n} check${n === 1 ? "" : "s"} failed`],
+  [/^line-not-run$/, "lines", n => `${n} changed line${n === 1 ? "" : "s"} run in no test`],
+  [/^branch-not-taken$/, "branches", n => `${n} changed line${n === 1 ? " has a branch" : "s have branches"} no test takes`],
+  [/^mutant-/, "mutants", n => `${n} mutant${n === 1 ? "" : "s"} no test catches`],
+  [/^duvet-test-misses-code$/, "reach", n => `${n} duvet test${n === 1 ? " never runs the code it cites" : "s never run the code they cite"}`],
+  [/^test-server-case-failed$/, "servers", n => `${n} test server case${n === 1 ? "" : "s"} failed`],
+  [/^fuzz-case-failed$/, "fuzz", n => `${n} fuzz case${n === 1 ? "" : "s"} failed`],
+  [/^conformance-open$/, "conformance", n => `Smithy conformance: ${n} open finding${n === 1 ? "" : "s"}`],
+  [/^api-/, "api", () => "The public API changes"],
+  [/^cheat-/, "cheat", n => `${n} change${n === 1 ? " weakens" : "s weaken"} the checks`],
+];
+
+// The page's flags from findings.json, one per kind of finding, blocking ones first.
+function flagsFromFindings(data) {
+  const flags = new Map();
+  for (const f of (data && data.findings) || []) {
+    const [, id, text] = FINDING_FLAGS.find(([kind]) => kind.test(f.kind)) || [null, f.check, () => f.title];
+    if (!flags.has(id)) flags.set(id, { id, level: f.level === "block" ? "bad" : "note", text, lines: [], items: [], count: 0 });
+    const flag = flags.get(id);
+    flag.count++;
+    if (f.file) flag.lines.push({ file: f.file, line: f.line });
+    else flag.items.push(f.what);
+    if (f.level === "block") flag.level = "bad";
+  }
+  for (const m of (data && data.missing) || []) flags.set(`missing:${m}`, { id: `missing:${m}`, level: "note", text: () => `No ${m} on this commit yet`, lines: [], items: [], count: 1 });
+  return [...flags.values()].map(f => ({ ...f, text: f.text(f.count) }))
+    .sort((a, b) => (a.level === "bad" ? 0 : 1) - (b.level === "bad" ? 0 : 1));
+}
+
+// The findings on one line, on the head commit's side, or on the base side for a removed line.
+function findingsAt(data, file, line, side = "RIGHT") {
+  return ((data && data.findings) || []).filter(f => f.file === file && f.line === line && (f.side || "RIGHT") === side);
+}
+
+// The key, kind and check a findings comment carries.
+function markerOf(body) {
+  const m = String(body || "").match(/<!-- pr-findings (\{.*?\}) -->/);
+  try { return m ? JSON.parse(m[1]) : null; } catch (e) { return null; }
+}
+
+// How useful each kind of findings comment was: [{kind, comments, down, up}], the most 👎 first.
+function noise(comments) {
+  const by = new Map();
+  for (const c of comments) {
+    const m = !c.in_reply_to_id && markerOf(c.body);
+    if (!m) continue;
+    const row = by.get(m.kind) || { kind: m.kind, comments: 0, down: 0, up: 0 };
+    row.comments++;
+    row.down += (c.reactions && c.reactions["-1"]) || 0;
+    row.up += (c.reactions && c.reactions["+1"]) || 0;
+    by.set(m.kind, row);
+  }
+  return [...by.values()].sort((a, b) => b.down / b.comments - a.down / a.comments || b.down - a.down);
+}
+
+const exported = { FAILED_CHECK, FINDING_FLAGS, flagsFromFindings, findingsAt, markerOf, noise, CODE_FILE, TEST_FILE, TEST_SERVER_CODE, BAD_MUTANT, parsePR, diffRows, annotations, testFunctions, shortTest,
   junitId, shortPaths, publicItems, apiDiff, apiAt, lineRun, branchesMissed, findFlags, lineEvidence };
 if (typeof module !== "undefined") module.exports = exported;

@@ -27,6 +27,8 @@ The tab lists only what needs a look: failed checks, changed lines no test runs,
 
 It reads the artifacts that the PR's CI runs upload: `mutation-results-*`, `local-coverage-*`, `per-test-coverage-*`, `*-test-server-reports`, `duvet-test-reach-*` and `smithy-conformance-*`. For an aws-crypto-tools-rust PR, its CI also uploads `api-types-rust` and `api-types-rust-base`, the API at the head commit and at the merge base, which the tab compares. `?ref=<commons branch>` goes on to the API Examples page in its links.
 
+A repository whose CI runs `test-server-common/tools/pr_findings.py` gets the same findings as review comments on each pull request, one on each line, with why no test caught it and how to run it locally. Its `pr-findings` artifact holds them as `findings.json`, and when a PR has one, the tab's flags are those findings. A 👎 on a findings comment, or the tab's Not useful button, marks it not useful, and "Which findings are not useful?" counts the 👎 of each kind on the repository's recent pull requests.
+
 A click on a line opens its side pane, where a review comment posts to GitHub as you. That needs a token that can write pull requests. No AI runs on the page. "Ask an AI" gives a prompt for the library-pr-review skill, which reads the same artifacts.
 
 `node --test dashboard/pr-review/review.test.js` runs its tests.
