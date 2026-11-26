@@ -13,7 +13,9 @@ Usage:
   pr_findings.py post <findings.json> [--off <kind>]... [--dry-run]
       Puts each finding that sits on a line of the diff on that line, as a review comment from the
       token's account. A finding that changed has its comment edited. A comment whose finding is gone
-      gets a "Fixed" line, and its thread is resolved.
+      gets a "Fixed" line, and its thread is resolved. A token without contents: write cannot resolve
+      a thread, so then the comment is hidden as resolved. A comment is marked fixed only when the run
+      read its check's results for that comment's project.
   pr_findings.py line <owner/repo#N> <file>:<line> [--run <id>]...
       Prints everything CI found on one line, changed or not.
 
@@ -22,7 +24,9 @@ The token comes from GH_TOKEN or GITHUB_TOKEN, or else from `gh auth token`.
 findings.json:
   {"schema": 1, "repository", "pr", "title", "head", "base_ref", "ci_commit", "runs": [<run id>],
    "dashboard": <the PR's page on the dashboard>, "read": {<check>: [<what was read>]},
-   "missing": [<what had no results>], "findings": [<finding>]}
+   "missing": [<what had no results>], "checked": {<check>: [<project folder>]}, "findings": [<finding>]}
+  checked lists, for each check that comments on lines, the project folders whose results the run read,
+  and "" when the check covers the whole pull request.
   A finding:
   {"key", "check", "kind", "level", "file", "line", "side", "title", "what", "why": [<sentence>],
    "fix", "evidence": {...}, "patch": [<old line>, <new line>] or null, "rerun": [<shell command>],
@@ -560,7 +564,9 @@ class PR:
         else:
             self.runs = gh.pages(f"repos/{repo}/actions/runs?head_sha={self.head}", "workflow_runs")
         self.texts, self.base_texts = {}, {}
-        self.read, self.missing, self.ci_commit = collections.defaultdict(list), [], None
+        self.read, self.missing, self.errors, self.ci_commit = collections.defaultdict(list), [], [], None
+        # For each check, the project folders whose results were read.
+        self.checked = collections.defaultdict(set)
         self.local, self.server = collections.defaultdict(dict), collections.defaultdict(dict)
         self.branches = collections.defaultdict(dict)
         self.mutants = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -595,7 +601,7 @@ class PR:
         return self.base_texts[file]
 
     def artifacts(self, pattern, whole=False):
-        """For each artifact name that matches, every artifact of that name from the newest run that has one.
+        """For each artifact name that matches, every artifact of that name from the newest run attempt that has one.
 
         A run can upload several artifacts under one name, one per job, and all of them are its results.
         With whole, each artifact is a whole report, such as one crate's mutation results, and only the
@@ -607,15 +613,29 @@ class PR:
                 by_name[a["name"]].append(a)
         out = []
         for arts in by_name.values():
+            # A run keeps the artifacts of its earlier attempts, and GitHub may no longer serve them. A rerun
+            # of some jobs uploads only theirs, so each name comes from the newest attempt that uploaded it.
             newest = max(arts, key=lambda a: a["created_at"])
-            out += [newest] if whole else [a for a in arts if a["run"] == newest["run"]]
+            out += [newest] if whole else [a for a in arts if (a["run"], a["attempt"]) == (newest["run"], newest["attempt"])]
         return out
+
+    def _attempt_starts(self, run):
+        """When each attempt of a run started, the first attempt first."""
+        n = run.get("run_attempt") or 1
+        if n == 1:
+            return [run.get("run_started_at") or ""]
+        return [self.gh.get(f"repos/{self.repo}/actions/runs/{run['id']}/attempts/{k}")["run_started_at"]
+                for k in range(1, n + 1)]
 
     def _load(self):
         self.merge_base = self._merge_base()
-        self._arts = [{**a, "run": r["id"]} for r in self.runs
-                      for a in self.gh.pages(f"repos/{self.repo}/actions/runs/{r['id']}/artifacts", "artifacts")
-                      if not a["expired"]]
+        self._arts = []
+        for r in self.runs:
+            starts = self._attempt_starts(r)
+            for a in self.gh.pages(f"repos/{self.repo}/actions/runs/{r['id']}/artifacts", "artifacts"):
+                if not a["expired"]:
+                    attempt = sum(s <= a["created_at"] for s in starts)
+                    self._arts.append({**a, "run": r["id"], "attempt": attempt})
         for f in self.files:
             if CODE_FILE.search(f["file"]) and f["status"] != "removed" and self.text(f["file"]) is not None:
                 self.blocks[f["file"]] = annotations(self.texts[f["file"]])
@@ -625,19 +645,31 @@ class PR:
         self._read_servers()
         self._read_conformance()
         self._read_api()
+        # The notes on changes that weaken the checks come from the diff, which every run reads.
+        self.checked["cheat"].add("")
+
+    def zip(self, art):
+        try:
+            return artifact_zip(self.gh, self.repo, art)
+        except RuntimeError as e:
+            self.errors.append(f"{art['name']}: {e}")
+            return None
 
     def _seen(self, commit):
         self.ci_commit = self.ci_commit or commit
 
     def _read_reach(self):
         for art in self.artifacts(r"^duvet-test-reach-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             name = next((x for x in z.namelist() if x.endswith(".json")), None)
             if not name:
                 continue
             report = json.loads(z.read(name))
             self._seen(report.get("commit"))
             self.read["duvet test reach"].append(f"{report['library']} ({plural(len(report['findings']), 'annotation')})")
+            self.checked["reach"].add(artifact_folder(art["name"]))
             for i, f in enumerate(report["findings"]):
                 for imp in f.get("implementations") or []:
                     if imp.get("region"):
@@ -651,26 +683,35 @@ class PR:
 
     def _read_mutants(self):
         for art in self.artifacts(r"^mutation-results-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             name = next((x for x in z.namelist() if x.endswith("results.json")), None)
             if not name:
                 continue
             res = json.loads(z.read(name))
             self._seen(res["summary"].get("commit"))
             self.read["mutation"].append(f"{res['summary'].get('library')} ({plural(len(res['mutants']), 'mutant')})")
+            self.checked["mutation"].add(artifact_folder(art["name"]))
             for m in res["mutants"]:
                 if m["file"] in self.wanted and m["status"] != "not_sampled":
                     self.mutants[m["file"]][m["line"]].append(m)
 
     def _read_coverage(self):
         for art in self.artifacts(r"^local-coverage-"):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             self.read["local coverage"].append(art["name"][len("local-coverage-"):])
             for name in z.namelist():
                 if name.endswith(".lcov"):
                     parse_lcov(z.read(name).decode(), self.local, self.branches, self.wanted)
+                    self.checked["lines"].add(artifact_folder(art["name"]))
+                    self.checked["branches"].add(artifact_folder(art["name"]))
         for art in self.artifacts(r"^per-test-coverage-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             for name in z.namelist():
                 if name.endswith(".jsonl"):
                     parse_per_test(z.read(name).decode(), self.repo, self.wanted, self.tests)
@@ -680,7 +721,9 @@ class PR:
                                     ("fuzz", r"-test-server-fuzz-reports$", self.fuzz)):
             for art in self.artifacts(pattern):
                 product = re.sub(r"-test-server(-fuzz)?-reports$", "", art["name"])
-                z = artifact_zip(self.gh, self.repo, art)
+                z = self.zip(art)
+                if z is None:
+                    continue
                 names = z.namelist()
                 got = into.setdefault(product, {"product": product, "cases": 0, "failed": [], "run": art["run"]})
                 for name in [x for x in names if re.search(r"test-results/.*TEST-[^/]*\.xml$", x)]:
@@ -702,7 +745,9 @@ class PR:
 
     def _read_conformance(self):
         for art in self.artifacts(r"^smithy-conformance-", whole=True):
-            z = artifact_zip(self.gh, self.repo, art)
+            z = self.zip(art)
+            if z is None:
+                continue
             names = z.namelist()
             md = next((z.read(x).decode() for x in names if x.endswith("report.md")), "")
             findings = next((json.loads(z.read(x)) for x in names if x.endswith("findings.json")), [])
@@ -716,13 +761,17 @@ class PR:
         """rust-api.json and types-rust.json at the head commit, and rust-api.json at the merge base."""
         for name, part in (("api-types-rust", "head"), ("api-types-rust-base", "base")):
             for art in self.artifacts(f"^{name}$", whole=True):
-                z = artifact_zip(self.gh, self.repo, art)
+                z = self.zip(art)
+                if z is None:
+                    continue
                 for file in z.namelist():
                     for want in ("rust-api.json", "types-rust.json", "expectations.json"):
                         if file.endswith(want):
                             self.api[f"{part}:{want}"] = json.loads(z.read(file))
         if self.api:
             self.read["API"].append("head" + (" and base" if "base:rust-api.json" in self.api else ""))
+        if "head:rust-api.json" in self.api and "base:rust-api.json" in self.api:
+            self.checked["api"].add("")
 
     # ----- looking up -----
     def changed(self, file):
@@ -780,6 +829,21 @@ def finding(check, kind, level, title, what, file=None, line=None, side="RIGHT",
 
 def project_of(file):
     return file.split("/")[0]
+
+
+# The C++ shim has its own coverage, but its files are in the ESDK's folder.
+FOLDERS = {"cpp-shim": "esdk/shims/aws-esdk-cpp"}
+
+
+def artifact_folder(name):
+    """The folder of the project a per-project artifact is about: "duvet-test-reach-mpl-rust" -> "mpl"."""
+    project = re.sub(r"^(local-coverage|mutation-results|duvet-test-reach)-|-rust$", "", name)
+    return FOLDERS.get(project, project)
+
+
+def folder_of(file):
+    """The folder of the project file is in, the way artifact_folder names it."""
+    return next((f for f in FOLDERS.values() if file.startswith(f + "/")), project_of(file))
 
 
 def feature_flags(project):
@@ -1180,7 +1244,8 @@ def build(args):
     out = {"schema": 1, "repository": repo, "pr": n, "title": pr.pr["title"], "head": pr.head,
            "base_ref": pr.base_ref, "ci_commit": pr.ci_commit, "runs": [r["id"] for r in pr.runs],
            "dashboard": pr.dashboard(args.dashboard), "read": dict(pr.read), "missing": pr.missing,
-           "findings": findings}
+           "checked": {check: sorted(folders) for check, folders in pr.checked.items()},
+           "errors": pr.errors, "findings": findings}
     text = json.dumps(out, indent=1) + "\n"
     if args.out:
         Path(args.out).write_text(text)
@@ -1203,6 +1268,8 @@ def summary_text(data):
         lines.append(f"  {f['level']:5} {f['kind']:26} {where}  {f['what']}")
     if data["missing"]:
         lines.append("  missing: " + ", ".join(data["missing"]))
+    for e in data.get("errors", []):
+        lines.append(f"  could not read {e}")
     return "\n".join(lines)
 
 
@@ -1219,6 +1286,8 @@ def summary_markdown(data):
                    f"{f['what'].replace('|', '/')} [Dashboard]({f['links']['dashboard']}) |")
     if data["missing"]:
         out += ["", f"No results yet for: {', '.join(data['missing'])}."]
+    if data.get("errors"):
+        out += ["", "Could not read: " + "; ".join(data["errors"])]
     out += ["", f"[All of it on the dashboard]({data['dashboard']})", ""]
     return "\n".join(out)
 
@@ -1274,36 +1343,47 @@ def marker_of(body):
 FIXED = re.compile(r"\n\n✓ Fixed in `[0-9a-f]{7}`\.$")
 
 
+def read_here(data, check, file):
+    """Whether this run read the results that a finding of check on file comes from."""
+    folders = data.get("checked", {}).get(check, [])
+    return "" in folders or folder_of(file or "") in folders
+
+
 def plan(data, comments, threads, off=(), login="github-actions[bot]"):
     """What to do so the PR's comments match the findings.
 
-    comments: the PR's review comments; threads: {first comment id: {"id", "resolved"}}; login: the account
+    comments: the PR's review comments; threads: {first comment id: {"id", "resolved", "comment", "hidden"}},
+    where comment is the first comment's node id and hidden says that comment is hidden; login: the account
     that posts, whose comments with a marker are the ones to keep up to date.
-    Returns {"create": [finding], "update": [(comment id, body)], "resolve": [thread id],
-    "unresolve": [thread id]}.
+    Returns {"create": [finding], "update": [(comment id, body)], "close": [thread], "reopen": [thread]}.
     """
     wanted = {f["key"]: f for f in data["findings"] if f["file"] and f["kind"] not in off}
     ours = [c for c in comments if not c.get("in_reply_to_id") and marker_of(c.get("body"))
             and (c.get("user") or {}).get("login") == login]
-    actions = {"create": [], "update": [], "resolve": [], "unresolve": []}
+    actions = {"create": [], "update": [], "close": [], "reopen": []}
     seen = set()
     for c in sorted(ours, key=lambda c: c["id"], reverse=True):
-        key, thread = marker_of(c["body"])["key"], threads.get(c["id"], {})
-        f = wanted.get(key)
+        marker, thread = marker_of(c["body"]), threads.get(c["id"])
+        f = wanted.get(marker["key"])
         same_place = f and c.get("line") == f["line"] and c.get("path") == f["file"] and (c.get("side") or "RIGHT") == f["side"]
-        if f and key not in seen and same_place:
-            seen.add(key)
+        if f and marker["key"] not in seen and same_place:
+            seen.add(marker["key"])
             body = comment_body(data, f)
             if c["body"] != body:
                 actions["update"].append((c["id"], body))
-            if thread.get("resolved"):
-                actions["unresolve"].append(thread["id"])
+            if thread and (thread["resolved"] or thread["hidden"]):
+                actions["reopen"].append(thread)
             continue
-        # The finding is gone, moved, or has a newer comment: mark this one fixed and close its thread.
-        if thread and not thread.get("resolved"):
-            if not f and not FIXED.search(c["body"]):
+        if not thread or thread["resolved"] or thread["hidden"] or marker.get("kind") in off:
+            continue
+        if not f:
+            # A finding is also missing when the run did not read its check's results, and that is no fix.
+            if not read_here(data, marker.get("check"), c.get("path")):
+                continue
+            if not FIXED.search(c["body"]):
                 actions["update"].append((c["id"], c["body"] + f"\n\n✓ Fixed in `{data['head'][:7]}`."))
-            actions["resolve"].append(thread["id"])
+        # The finding is gone, moved, or has a newer comment.
+        actions["close"].append(thread)
     actions["create"] = [f for key, f in wanted.items() if key not in seen]
     return actions
 
@@ -1311,7 +1391,7 @@ def plan(data, comments, threads, off=(), login="github-actions[bot]"):
 THREADS = """query($owner: String!, $name: String!, $n: Int!, $after: String) {
   repository(owner: $owner, name: $name) { pullRequest(number: $n) {
     reviewThreads(first: 100, after: $after) { pageInfo { hasNextPage endCursor }
-      nodes { id isResolved comments(first: 1) { nodes { databaseId } } } } } } }"""
+      nodes { id isResolved comments(first: 1) { nodes { databaseId id isMinimized } } } } } } }"""
 
 
 def threads_of(gh, repo, n):
@@ -1320,11 +1400,26 @@ def threads_of(gh, repo, n):
     while True:
         got = gh.graphql(THREADS, owner=owner, name=name, n=n, after=after)["repository"]["pullRequest"]["reviewThreads"]
         for t in got["nodes"]:
-            if t["comments"]["nodes"]:
-                out[t["comments"]["nodes"][0]["databaseId"]] = {"id": t["id"], "resolved": t["isResolved"]}
+            for first in t["comments"]["nodes"]:
+                out[first["databaseId"]] = {"id": t["id"], "resolved": t["isResolved"], "comment": first["id"],
+                                            "hidden": first["isMinimized"]}
         if not got["pageInfo"]["hasNextPage"]:
             return out
         after = got["pageInfo"]["endCursor"]
+
+
+# The changes to a findings comment's thread, by GraphQL mutation.
+MUTATIONS = {
+    "resolveReviewThread": "resolveReviewThread(input: {threadId: $id}) { thread { id } }",
+    "unresolveReviewThread": "unresolveReviewThread(input: {threadId: $id}) { thread { id } }",
+    "minimizeComment": "minimizeComment(input: {subjectId: $id, classifier: RESOLVED}) { minimizedComment { isMinimized } }",
+    "unminimizeComment": "unminimizeComment(input: {subjectId: $id}) { unminimizedComment { isMinimized } }",
+}
+
+
+def refused(e):
+    """Whether GitHub refused the token, as it refuses the read-only token of a pull request from a fork."""
+    return " 403 " in str(e) or "Resource not accessible" in str(e)
 
 
 def post(args):
@@ -1334,12 +1429,18 @@ def post(args):
     comments = gh.pages(f"repos/{repo}/pulls/{n}/comments")
     threads = threads_of(gh, repo, n)
     actions = plan(data, comments, threads, off=set(args.off), login=args.login)
-    print(f"create {len(actions['create'])}, edit {len(actions['update'])}, resolve {len(actions['resolve'])}, "
-          f"reopen {len(actions['unresolve'])}")
+    print(f"create {len(actions['create'])}, edit {len(actions['update'])}, close {len(actions['close'])}, "
+          f"reopen {len(actions['reopen'])}")
     if args.dry_run:
         for f in actions["create"]:
             print(f"--- would comment on {f['file']}:{f['line']} ({f['side']})\n{comment_body(data, f)}\n")
         return
+    apply(gh, data, actions)
+
+
+def apply(gh, data, actions):
+    """Makes the changes that plan returned."""
+    repo, n = data["repository"], data["pr"]
     try:
         if actions["create"]:
             blocks = sum(f["level"] == "block" for f in actions["create"])
@@ -1351,6 +1452,8 @@ def post(args):
             try:
                 gh.request("POST", f"repos/{repo}/pulls/{n}/reviews", review)
             except RuntimeError as e:
+                if refused(e):
+                    raise
                 # One bad line fails the whole review, so each comment is tried alone.
                 print(f"the review failed ({e}); posting each comment alone")
                 for c in review["comments"]:
@@ -1360,16 +1463,38 @@ def post(args):
                         print(f"could not comment on {c['path']}:{c['line']}: {one}")
         for cid, body in actions["update"]:
             gh.request("PATCH", f"repos/{repo}/pulls/comments/{cid}", {"body": body})
-        for tid in actions["resolve"]:
-            gh.graphql("mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { id } } }", id=tid)
-        for tid in actions["unresolve"]:
-            gh.graphql("mutation($id: ID!) { unresolveReviewThread(input: {threadId: $id}) { thread { id } } }", id=tid)
     except RuntimeError as e:
         # A pull request from a fork gets a read-only token, so its comments stay in the findings artifact.
-        if " 403 " in str(e) or "Resource not accessible" in str(e):
+        if refused(e):
             print(f"::notice::This run cannot comment on the PR ({e}). The findings are in the pr-findings artifact.")
             return
         raise
+    refusals = set()
+
+    def run(name, node):
+        """Runs one mutation, and returns False when GitHub refuses it to this token."""
+        if name in refusals:
+            return False
+        try:
+            gh.graphql(f"mutation($id: ID!) {{ {MUTATIONS[name]} }}", id=node)
+            return True
+        except RuntimeError as e:
+            if not refused(e):
+                raise
+            print(f"GitHub refused {name} to this token: {e}")
+            refusals.add(name)
+            return False
+
+    for t in actions["close"]:
+        # GitHub resolves a thread only for a token with contents: write, which the PR findings job does
+        # not get. Hiding the comment as resolved folds it away the same way.
+        if not run("resolveReviewThread", t["id"]):
+            run("minimizeComment", t["comment"])
+    for t in actions["reopen"]:
+        if t["hidden"]:
+            run("unminimizeComment", t["comment"])
+        if t["resolved"]:
+            run("unresolveReviewThread", t["id"])
 
 
 def line(args):

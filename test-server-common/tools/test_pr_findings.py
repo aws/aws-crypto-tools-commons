@@ -126,7 +126,10 @@ class FakeGitHub:
 
     def get(self, path, raw=False, accept=None):
         if path.endswith("/zip"):
-            return self.replies[f"zip:{int(path.split('/')[-2])}"]
+            got = self.replies[f"zip:{int(path.split('/')[-2])}"]
+            if isinstance(got, Exception):
+                raise got
+            return got
         if path not in self.replies:
             raise RuntimeError(f"GitHub 404 for GET {path}")
         return self.replies[path]
@@ -238,6 +241,43 @@ class Missing(unittest.TestCase):
         self.assertEqual(pr.missing, ["mutation results", "API types"])
 
 
+def attempts(replies, *starts):
+    """Makes run 50 a run with one attempt per start second."""
+    run = replies[f"repos/{REPO}/actions/runs?head_sha={HEAD}"]["workflow_runs"][0]
+    run.update(run_attempt=len(starts), run_started_at=f"2026-11-26T00:00:{starts[-1]:02d}Z")
+    for k, s in enumerate(starts, 1):
+        replies[f"repos/{REPO}/actions/runs/50/attempts/{k}"] = {"run_started_at": f"2026-11-26T00:00:{s:02d}Z"}
+
+
+class Attempts(unittest.TestCase):
+    def setUp(self):
+        # Attempt 1 uploaded artifacts 1-9, with a failed case in 5. Attempt 2 ran the test server again.
+        self.replies = github()
+        self.replies[f"repos/{REPO}/actions/runs/50/artifacts"]["artifacts"].append(artifact(13, "mpl-test-server-reports"))
+        self.replies["zip:13"] = zipped({"mpl/test-server/tests/build/test-results/test/TEST-a.b.KTest.xml":
+                                         '<testsuite><testcase classname="a.b.KTest" name="[k] it fails rust-v1"/></testsuite>'})
+
+    def test_an_artifact_from_an_earlier_attempt_of_the_run_is_left_out_when_the_newest_attempt_uploaded_one(self):
+        attempts(self.replies, 0, 10)
+        _, findings = build(self.replies)
+        self.assertNotIn("test-server-case-failed", by_kind(findings))
+
+    def test_a_name_the_newest_attempt_did_not_upload_comes_from_the_newest_attempt_that_did(self):
+        # Attempt 3 ran only the PR findings job, and GitHub no longer serves attempt 1's copy.
+        attempts(self.replies, 0, 10, 20)
+        self.replies["zip:5"] = RuntimeError("GitHub 500 for GET .../zip: Failed to generate URL to download artifact")
+        pr, findings = build(self.replies)
+        self.assertEqual(pr.errors, [])
+        self.assertNotIn("test-server-case-failed", by_kind(findings))
+
+    def test_an_artifact_github_cannot_serve_is_an_error_and_the_rest_still_count(self):
+        replies = github({"zip:5": RuntimeError("GitHub 500 for GET .../zip: Failed to generate URL to download artifact")})
+        pr, findings = build(replies)
+        self.assertEqual(len(pr.errors), 1)
+        self.assertIn("mpl-test-server-reports: GitHub 500", pr.errors[0])
+        self.assertIn("mutant-survived", by_kind(findings))
+
+
 class NewestReport(unittest.TestCase):
     def test_only_the_newest_copy_of_a_whole_report_counts(self):
         replies = github()
@@ -297,16 +337,27 @@ class Api(unittest.TestCase):
         self.assertEqual(words[-1], "It takes text as is, but the rule says: Text is not a key.")
 
 
-def comment(key, line=5, path="mpl/src/k.rs", login="github-actions[bot]", cid=1, body=None, side="RIGHT"):
+def comment(key, line=5, path="mpl/src/k.rs", login="github-actions[bot]", cid=1, body=None, side="RIGHT",
+            kind="line-not-run", check="lines"):
+    marker = json.dumps({"key": key, "kind": kind, "check": check})
     return {"id": cid, "line": line, "path": path, "side": side, "user": {"login": login},
-            "body": body or ("old text\n" + pf.MARKER + json.dumps({"key": key}) + " -->")}
+            "body": body or ("old text\n" + pf.MARKER + marker + " -->")}
+
+
+def thread(resolved=False, hidden=False):
+    return {"id": "T1", "resolved": resolved, "comment": "C1", "hidden": hidden}
+
+
+def findings_data(replies=None):
+    pr, findings = build(replies)
+    return {"repository": REPO, "pr": 7, "head": HEAD, "findings": findings,
+            "checked": {check: sorted(folders) for check, folders in pr.checked.items()}}
 
 
 class Plan(unittest.TestCase):
     def setUp(self):
-        _, findings = build()
-        self.data = {"repository": REPO, "pr": 7, "head": HEAD, "findings": findings}
-        self.line = next(f for f in findings if f["kind"] == "line-not-run")
+        self.data = findings_data()
+        self.line = next(f for f in self.data["findings"] if f["kind"] == "line-not-run")
 
     def test_a_new_finding_gets_a_comment(self):
         plan = pf.plan(self.data, [], {})
@@ -314,29 +365,70 @@ class Plan(unittest.TestCase):
         self.assertFalse(any(f["file"] is None for f in plan["create"]))
 
     def test_a_finding_with_a_comment_on_its_line_gets_that_comment_edited_not_a_new_one(self):
-        plan = pf.plan(self.data, [comment(self.line["key"])], {1: {"id": "T1", "resolved": False}})
+        plan = pf.plan(self.data, [comment(self.line["key"])], {1: thread()})
         self.assertNotIn(self.line["key"], [f["key"] for f in plan["create"]])
         self.assertEqual(plan["update"], [(1, pf.comment_body(self.data, self.line))])
 
-    def test_a_comment_whose_finding_is_gone_is_marked_fixed_and_its_thread_resolved(self):
-        plan = pf.plan(self.data, [comment("gone")], {1: {"id": "T1", "resolved": False}})
-        self.assertEqual(plan["resolve"], ["T1"])
+    def test_a_comment_whose_finding_is_gone_is_marked_fixed_and_its_thread_closed(self):
+        plan = pf.plan(self.data, [comment("gone")], {1: thread()})
+        self.assertEqual(plan["close"], [thread()])
         self.assertTrue(plan["update"][0][1].endswith("\n\n✓ Fixed in `aaaaaaa`."))
 
-    def test_a_finding_that_comes_back_reopens_its_thread(self):
-        plan = pf.plan(self.data, [comment(self.line["key"])], {1: {"id": "T1", "resolved": True}})
-        self.assertEqual(plan["unresolve"], ["T1"])
+    def test_a_gone_finding_is_not_called_fixed_when_the_run_did_not_read_its_check_for_that_project(self):
+        data = findings_data(github({"zip:1": RuntimeError("GitHub 500 for GET .../zip: Failed to generate URL")}))
+        plan = pf.plan(data, [comment("gone", line=4, kind="mutant-survived", check="mutation")], {1: thread()})
+        self.assertEqual((plan["close"], plan["update"]), ([], []))
 
-    def test_a_finding_that_moved_lines_gets_a_new_comment_and_the_old_thread_is_resolved(self):
-        plan = pf.plan(self.data, [comment(self.line["key"], line=3)], {1: {"id": "T1", "resolved": False}})
+    def test_a_fixed_comment_that_is_already_hidden_is_left_alone(self):
+        body = comment("gone")["body"] + "\n\n✓ Fixed in `aaaaaaa`."
+        plan = pf.plan(self.data, [comment("gone", body=body)], {1: thread(hidden=True)})
+        self.assertEqual((plan["close"], plan["update"]), ([], []))
+
+    def test_a_finding_that_comes_back_reopens_its_thread_and_shows_its_hidden_comment(self):
+        for closed in (thread(resolved=True), thread(hidden=True)):
+            plan = pf.plan(self.data, [comment(self.line["key"])], {1: closed})
+            self.assertEqual(plan["reopen"], [closed])
+
+    def test_a_finding_that_moved_lines_gets_a_new_comment_and_the_old_thread_is_closed(self):
+        plan = pf.plan(self.data, [comment(self.line["key"], line=3)], {1: thread()})
         self.assertIn(self.line["key"], [f["key"] for f in plan["create"]])
-        self.assertEqual(plan["resolve"], ["T1"])
+        self.assertEqual(plan["close"], [thread()])
 
     def test_other_accounts_comments_and_kinds_turned_off_are_left_alone(self):
-        plan = pf.plan(self.data, [comment("gone", login="someone")], {1: {"id": "T1", "resolved": False}},
-                       off={"line-not-run"})
-        self.assertEqual(plan["resolve"], [])
+        comments = [comment("gone", login="someone"), comment(self.line["key"], cid=2)]
+        plan = pf.plan(self.data, comments, {1: thread(), 2: thread()}, off={"line-not-run"})
+        self.assertEqual((plan["close"], plan["update"]), ([], []))
         self.assertNotIn(self.line["key"], [f["key"] for f in plan["create"]])
+
+
+class Folders(unittest.TestCase):
+    def test_a_cpp_shim_file_needs_the_shims_own_coverage_and_not_the_esdks(self):
+        shim = "esdk/shims/aws-esdk-cpp/src/lib.rs"
+        self.assertFalse(pf.read_here({"checked": {"lines": ["esdk"]}}, "lines", shim))
+        self.assertTrue(pf.read_here({"checked": {"lines": [pf.artifact_folder("local-coverage-cpp-shim")]}},
+                                     "lines", shim))
+
+
+class Recorder:
+    """A stand-in GitHub that records each GraphQL mutation and refuses the ones named."""
+
+    def __init__(self, refuse=()):
+        self.refuse, self.ran = set(refuse), []
+
+    def graphql(self, query, **variables):
+        name = query.split("{")[1].split("(")[0].strip()
+        if name in self.refuse:
+            raise RuntimeError(f"GitHub GraphQL: [{{'type': 'FORBIDDEN', 'path': ['{name}'], "
+                               "'message': 'Resource not accessible by integration'}]")
+        self.ran.append((name, variables["id"]))
+
+
+class Apply(unittest.TestCase):
+    def test_a_token_that_may_not_resolve_threads_hides_each_fixed_comment_as_resolved(self):
+        gh = Recorder(refuse={"resolveReviewThread"})
+        two = [thread(), {**thread(), "id": "T2", "comment": "C2"}]
+        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": two, "reopen": []})
+        self.assertEqual(gh.ran, [("minimizeComment", "C1"), ("minimizeComment", "C2")])
 
 
 class Body(unittest.TestCase):
