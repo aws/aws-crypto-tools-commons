@@ -52,7 +52,7 @@ FIX_CODE = {
     "path": [("x", "base"), ("std::fs::read(x).unwrap()", "base"), ("&std::fs::read(x).unwrap()", "base")],
     "reader": [("x", "base"), (READ_ALL, "base"), ("&" + READ_ALL, "base")],
     "number": [("x", "base"), ("x.into()", "base"), ("x.try_into().unwrap()", "base"),
-               ("std::time::Duration::from_secs(x.into())", "base"),
+               ("std::time::Duration::from_secs(x)", "base"), ("std::time::Duration::from_secs(x.into())", "base"),
                ("std::time::Duration::from_secs(x.try_into().unwrap())", "base")],
     "duration": [("x", "base"), ("x.as_secs()", "base"), ("x.as_secs().try_into().unwrap()", "base")],
     "list": [("x", "base"), ("&x", "base"), ("Some(x)", "set"), ("Some(x.to_vec())", "set"),

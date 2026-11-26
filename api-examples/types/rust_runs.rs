@@ -1351,8 +1351,19 @@ async fn run_110() {
 
 #[tokio::test]
 async fn run_111() {
-    // mpl/HierarchicalKeyring.ttl: u16 passed as .ttl(std::time::Duration::from_secs(x.into()))
+    // mpl/HierarchicalKeyring.ttl: u64 passed as .ttl(std::time::Duration::from_secs(x))
     let mut r = Report::new("run_111");
+    let Ok(x) = u64::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u64"); return; };
+    let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
+    let built = pre.ttl(std::time::Duration::from_secs(x));
+    let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
+    check_getter(&mut r, result, |k| k.ttl() == ttl());
+}
+
+#[tokio::test]
+async fn run_112() {
+    // mpl/HierarchicalKeyring.ttl: u16 passed as .ttl(std::time::Duration::from_secs(x.into()))
+    let mut r = Report::new("run_112");
     let Ok(x) = u16::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u16"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
@@ -1361,21 +1372,10 @@ async fn run_111() {
 }
 
 #[tokio::test]
-async fn run_112() {
-    // mpl/HierarchicalKeyring.ttl: u32 passed as .ttl(std::time::Duration::from_secs(x.into()))
-    let mut r = Report::new("run_112");
-    let Ok(x) = u32::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u32"); return; };
-    let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
-    let built = pre.ttl(std::time::Duration::from_secs(x.into()));
-    let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;
-    check_getter(&mut r, result, |k| k.ttl() == ttl());
-}
-
-#[tokio::test]
 async fn run_113() {
-    // mpl/HierarchicalKeyring.ttl: u64 passed as .ttl(std::time::Duration::from_secs(x.into()))
+    // mpl/HierarchicalKeyring.ttl: u32 passed as .ttl(std::time::Duration::from_secs(x.into()))
     let mut r = Report::new("run_113");
-    let Ok(x) = u64::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u64"); return; };
+    let Ok(x) = u32::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u32"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
     let result = built.key_store(key_store().await).branch_key_id(BRANCH_KEY_ID).build().await;

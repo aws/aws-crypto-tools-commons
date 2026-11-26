@@ -6,7 +6,7 @@
     "trials": "api-examples/types/rust_trials.rs",
     "runs": "api-examples/types/rust_runs.rs"
   },
-  "note": "Rust: 2,543 tries compiled and 142 calls run on aws-crypto-tools-rust at e77da77 with rustc 1.99.1. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25.",
+  "note": "Rust: 2,660 tries compiled and 142 calls run on aws-crypto-tools-rust at e77da77 with rustc 1.99.1. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25.",
   "apis": [
     {
       "lib": "mpl",
@@ -829,12 +829,12 @@
         "test": 1342
       },
       {
-        "type": "u16",
-        "calls": 2,
-        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "type": "u64",
+        "calls": 1,
+        "code": ".ttl(std::time::Duration::from_secs(x))",
         "kind": "number",
-        "trial": 250,
-        "fix": "std::time::Duration::from_secs(x.into())",
+        "trial": 236,
+        "fix": "std::time::Duration::from_secs(x)",
         "run": {
           "builds": true,
           "same": true
@@ -842,11 +842,11 @@
         "test": 1353
       },
       {
-        "type": "u32",
+        "type": "u16",
         "calls": 2,
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 240,
+        "trial": 255,
         "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
@@ -855,11 +855,11 @@
         "test": 1364
       },
       {
-        "type": "u64",
+        "type": "u32",
         "calls": 2,
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 235,
+        "trial": 243,
         "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
@@ -872,7 +872,7 @@
         "calls": 2,
         "code": ".ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 245,
+        "trial": 249,
         "fix": "std::time::Duration::from_secs(x.into())",
         "run": {
           "builds": true,
@@ -885,7 +885,7 @@
         "calls": 3,
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 266,
+        "trial": 274,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
@@ -898,7 +898,7 @@
         "calls": 3,
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 256,
+        "trial": 262,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
@@ -911,7 +911,7 @@
         "calls": 3,
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 261,
+        "trial": 268,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
@@ -924,7 +924,7 @@
         "calls": 3,
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 271,
+        "trial": 280,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
@@ -937,7 +937,7 @@
         "calls": 3,
         "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 231,
+        "trial": 232,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())",
         "run": {
           "builds": true,
@@ -952,7 +952,7 @@
         "calls": 0,
         "code": ".branch_key_id(x)",
         "kind": "text",
-        "trial": 308,
+        "trial": 317,
         "fix": "x",
         "run": {
           "builds": true,
@@ -965,7 +965,7 @@
         "calls": 0,
         "code": ".branch_key_id(x)",
         "kind": "text",
-        "trial": 272,
+        "trial": 281,
         "fix": "x",
         "run": {
           "builds": true,
@@ -978,7 +978,7 @@
         "calls": 0,
         "code": ".branch_key_id(x)",
         "kind": "text",
-        "trial": 299,
+        "trial": 308,
         "fix": "x",
         "run": {
           "builds": true,
@@ -991,7 +991,7 @@
         "calls": 0,
         "code": ".set_branch_key_id(x)",
         "kind": "optional text",
-        "trial": 331,
+        "trial": 340,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1004,7 +1004,7 @@
         "calls": 0,
         "code": ".branch_key_id(x)",
         "kind": "text",
-        "trial": 281,
+        "trial": 290,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1017,7 +1017,7 @@
         "calls": 0,
         "code": ".branch_key_id(x)",
         "kind": "text",
-        "trial": 290,
+        "trial": 299,
         "fix": "x",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
@@ -1029,7 +1029,7 @@
         "calls": 1,
         "code": ".set_branch_key_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 327,
+        "trial": 336,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1042,7 +1042,7 @@
         "calls": 1,
         "code": ".set_branch_key_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 337,
+        "trial": 346,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1055,7 +1055,7 @@
         "calls": 1,
         "code": ".branch_key_id(x.to_string())",
         "kind": "text",
-        "trial": 320,
+        "trial": 329,
         "fix": "x.to_string()",
         "run": {
           "builds": true,
@@ -1070,7 +1070,7 @@
         "calls": 0,
         "code": ".branch_key_id_supplier(x)",
         "kind": "component",
-        "trial": 341,
+        "trial": 350,
         "fix": "x"
       },
       {
@@ -1078,7 +1078,7 @@
         "calls": 1,
         "code": ".branch_key_id_supplier(x.clone())",
         "kind": "component",
-        "trial": 352,
+        "trial": 361,
         "fix": "x.clone()"
       }
     ],
@@ -1088,7 +1088,7 @@
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 359,
+        "trial": 368,
         "fix": "x"
       },
       {
@@ -1096,7 +1096,7 @@
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 386,
+        "trial": 395,
         "fix": "x"
       },
       {
@@ -1104,7 +1104,7 @@
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 440,
+        "trial": 449,
         "fix": "x"
       },
       {
@@ -1112,7 +1112,7 @@
         "calls": 0,
         "code": ".cache(x)",
         "kind": "component",
-        "trial": 413,
+        "trial": 422,
         "fix": "x"
       },
       {
@@ -1120,7 +1120,7 @@
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 370,
+        "trial": 379,
         "fix": "x.clone()"
       },
       {
@@ -1128,7 +1128,7 @@
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 397,
+        "trial": 406,
         "fix": "x.clone()"
       },
       {
@@ -1136,7 +1136,7 @@
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 451,
+        "trial": 460,
         "fix": "x.clone()"
       },
       {
@@ -1144,7 +1144,7 @@
         "calls": 1,
         "code": ".cache(x.clone())",
         "kind": "component",
-        "trial": 424,
+        "trial": 433,
         "fix": "x.clone()"
       },
       {
@@ -1152,7 +1152,7 @@
         "calls": 1,
         "code": ".cache((*x).clone())",
         "kind": "component",
-        "trial": 380,
+        "trial": 389,
         "fix": "(*x).clone()"
       },
       {
@@ -1160,7 +1160,7 @@
         "calls": 1,
         "code": ".cache((*x).clone())",
         "kind": "component",
-        "trial": 407,
+        "trial": 416,
         "fix": "(*x).clone()"
       },
       {
@@ -1168,7 +1168,7 @@
         "calls": 1,
         "code": ".cache((*x).clone())",
         "kind": "component",
-        "trial": 434,
+        "trial": 443,
         "fix": "(*x).clone()"
       }
     ],
@@ -1178,7 +1178,7 @@
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 494,
+        "trial": 503,
         "fix": "x"
       },
       {
@@ -1186,7 +1186,7 @@
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 458,
+        "trial": 467,
         "fix": "x"
       },
       {
@@ -1194,7 +1194,7 @@
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 485,
+        "trial": 494,
         "fix": "x"
       },
       {
@@ -1202,7 +1202,7 @@
         "calls": 0,
         "code": ".set_partition_id(x)",
         "kind": "optional text",
-        "trial": 517,
+        "trial": 526,
         "fix": "x"
       },
       {
@@ -1210,7 +1210,7 @@
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 467,
+        "trial": 476,
         "fix": "x"
       },
       {
@@ -1218,7 +1218,7 @@
         "calls": 0,
         "code": ".partition_id(x)",
         "kind": "text",
-        "trial": 476,
+        "trial": 485,
         "fix": "x"
       },
       {
@@ -1226,7 +1226,7 @@
         "calls": 1,
         "code": ".set_partition_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 513,
+        "trial": 522,
         "fix": "x.map(Into::into)"
       },
       {
@@ -1234,7 +1234,7 @@
         "calls": 1,
         "code": ".set_partition_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 523,
+        "trial": 532,
         "fix": "x.map(Into::into)"
       },
       {
@@ -1242,7 +1242,7 @@
         "calls": 1,
         "code": ".partition_id(x.to_string())",
         "kind": "text",
-        "trial": 506,
+        "trial": 515,
         "fix": "x.to_string()"
       }
     ],
@@ -1252,7 +1252,7 @@
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 563,
+        "trial": 572,
         "fix": "x"
       },
       {
@@ -1260,7 +1260,7 @@
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 527,
+        "trial": 536,
         "fix": "x"
       },
       {
@@ -1268,7 +1268,7 @@
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 554,
+        "trial": 563,
         "fix": "x"
       },
       {
@@ -1276,7 +1276,7 @@
         "calls": 0,
         "code": ".set_key_namespace(x)",
         "kind": "optional text",
-        "trial": 586,
+        "trial": 595,
         "fix": "x"
       },
       {
@@ -1284,7 +1284,7 @@
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 536,
+        "trial": 545,
         "fix": "x"
       },
       {
@@ -1292,7 +1292,7 @@
         "calls": 0,
         "code": ".key_namespace(x)",
         "kind": "text",
-        "trial": 545,
+        "trial": 554,
         "fix": "x"
       },
       {
@@ -1300,7 +1300,7 @@
         "calls": 1,
         "code": ".set_key_namespace(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 582,
+        "trial": 591,
         "fix": "x.map(Into::into)"
       },
       {
@@ -1308,7 +1308,7 @@
         "calls": 1,
         "code": ".set_key_namespace(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 592,
+        "trial": 601,
         "fix": "x.map(Into::into)"
       },
       {
@@ -1316,7 +1316,7 @@
         "calls": 1,
         "code": ".key_namespace(x.to_string())",
         "kind": "text",
-        "trial": 575,
+        "trial": 584,
         "fix": "x.to_string()"
       }
     ],
@@ -1326,7 +1326,7 @@
         "calls": 0,
         "code": ".key_name(x)",
         "kind": "text",
-        "trial": 632,
+        "trial": 641,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1339,7 +1339,7 @@
         "calls": 0,
         "code": ".key_name(x)",
         "kind": "text",
-        "trial": 596,
+        "trial": 605,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1352,7 +1352,7 @@
         "calls": 0,
         "code": ".key_name(x)",
         "kind": "text",
-        "trial": 623,
+        "trial": 632,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1365,7 +1365,7 @@
         "calls": 0,
         "code": ".set_key_name(x)",
         "kind": "optional text",
-        "trial": 655,
+        "trial": 664,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1378,7 +1378,7 @@
         "calls": 0,
         "code": ".key_name(x)",
         "kind": "text",
-        "trial": 605,
+        "trial": 614,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1391,7 +1391,7 @@
         "calls": 0,
         "code": ".key_name(x)",
         "kind": "text",
-        "trial": 614,
+        "trial": 623,
         "fix": "x",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
@@ -1403,7 +1403,7 @@
         "calls": 1,
         "code": ".set_key_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 651,
+        "trial": 660,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1416,7 +1416,7 @@
         "calls": 1,
         "code": ".set_key_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 661,
+        "trial": 670,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1429,7 +1429,7 @@
         "calls": 1,
         "code": ".key_name(x.to_string())",
         "kind": "text",
-        "trial": 644,
+        "trial": 653,
         "fix": "x.to_string()",
         "run": {
           "builds": true,
@@ -1444,7 +1444,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "bytes",
-        "trial": 665,
+        "trial": 674,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1457,7 +1457,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "text",
-        "trial": 771,
+        "trial": 780,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1470,7 +1470,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "bytes",
-        "trial": 715,
+        "trial": 724,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1483,7 +1483,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "bytes",
-        "trial": 685,
+        "trial": 694,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1496,7 +1496,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "bytes",
-        "trial": 695,
+        "trial": 704,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1509,7 +1509,7 @@
         "calls": 0,
         "code": ".set_wrapping_key(x)",
         "kind": "optional bytes",
-        "trial": 734,
+        "trial": 743,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1522,7 +1522,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "text",
-        "trial": 780,
+        "trial": 789,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1535,7 +1535,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "bytes",
-        "trial": 675,
+        "trial": 684,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1548,7 +1548,7 @@
         "calls": 0,
         "code": ".wrapping_key(x)",
         "kind": "bytes",
-        "trial": 705,
+        "trial": 714,
         "fix": "x",
         "run": {
           "builds": true,
@@ -1561,7 +1561,7 @@
         "calls": 1,
         "code": ".wrapping_key(x.clone())",
         "kind": "text",
-        "trial": 809,
+        "trial": 818,
         "fix": "x.clone()",
         "run": {
           "builds": true,
@@ -1574,7 +1574,7 @@
         "calls": 1,
         "code": ".wrapping_key(x.to_string())",
         "kind": "text",
-        "trial": 801,
+        "trial": 810,
         "fix": "x.to_string()",
         "run": {
           "builds": true,
@@ -1587,7 +1587,7 @@
         "calls": 1,
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional bytes",
-        "trial": 726,
+        "trial": 735,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1600,7 +1600,7 @@
         "calls": 1,
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 826,
+        "trial": 835,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1613,7 +1613,7 @@
         "calls": 1,
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional bytes",
-        "trial": 753,
+        "trial": 762,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1626,7 +1626,7 @@
         "calls": 1,
         "code": ".set_wrapping_key(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 831,
+        "trial": 840,
         "fix": "x.map(Into::into)",
         "run": {
           "builds": true,
@@ -1639,7 +1639,7 @@
         "calls": 1,
         "code": ".wrapping_key(x.to_string())",
         "kind": "text",
-        "trial": 819,
+        "trial": 828,
         "fix": "x.to_string()",
         "run": {
           "builds": true,
@@ -1652,7 +1652,7 @@
         "calls": 1,
         "code": ".wrapping_key(x.to_string())",
         "kind": "text",
-        "trial": 792,
+        "trial": 801,
         "fix": "x.to_string()",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
@@ -1664,7 +1664,7 @@
         "calls": 2,
         "code": ".wrapping_key(std::fs::read(x).unwrap())",
         "kind": "path",
-        "trial": 844,
+        "trial": 853,
         "fix": "std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
@@ -1677,7 +1677,7 @@
         "calls": 2,
         "code": ".wrapping_key(x.bytes().unwrap())",
         "kind": "stream",
-        "trial": 762,
+        "trial": 771,
         "fix": "x.bytes().unwrap()",
         "run": {
           "builds": true,
@@ -1690,7 +1690,7 @@
         "calls": 2,
         "code": ".wrapping_key(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 749,
+        "trial": 758,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
@@ -1703,7 +1703,7 @@
         "calls": 2,
         "code": ".wrapping_key(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 839,
+        "trial": 848,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": true,
@@ -1716,7 +1716,7 @@
         "calls": 2,
         "code": ".wrapping_key(std::fs::read(x).unwrap())",
         "kind": "path",
-        "trial": 841,
+        "trial": 850,
         "fix": "std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
@@ -1729,7 +1729,7 @@
         "calls": 2,
         "code": ".wrapping_key(x.bytes().unwrap())",
         "kind": "stream",
-        "trial": 767,
+        "trial": 776,
         "fix": "x.bytes().unwrap()",
         "run": {
           "builds": true,
@@ -1742,7 +1742,7 @@
         "calls": 3,
         "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
-        "trial": 847,
+        "trial": 856,
         "fix": "{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "builds": true,
@@ -1755,7 +1755,7 @@
         "calls": 3,
         "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
-        "trial": 850,
+        "trial": 859,
         "fix": "{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "skipped": "needs a network connection"
@@ -1769,7 +1769,7 @@
         "calls": 0,
         "code": ".wrapping_alg(x)",
         "kind": "named",
-        "trial": 852,
+        "trial": 861,
         "fix": "x"
       },
       {
@@ -1777,7 +1777,7 @@
         "calls": 1,
         "code": ".wrapping_alg(x.clone())",
         "kind": "named",
-        "trial": 857,
+        "trial": 866,
         "fix": "x.clone()"
       }
     ],
@@ -1787,7 +1787,7 @@
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 860,
+        "trial": 869,
         "fix": "x"
       },
       {
@@ -1795,7 +1795,7 @@
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 878,
+        "trial": 887,
         "fix": "x"
       },
       {
@@ -1803,7 +1803,7 @@
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 896,
+        "trial": 905,
         "fix": "x"
       },
       {
@@ -1811,7 +1811,7 @@
         "calls": 0,
         "code": "::new(x)",
         "kind": "component",
-        "trial": 914,
+        "trial": 923,
         "fix": "x"
       },
       {
@@ -1819,7 +1819,7 @@
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 868,
+        "trial": 877,
         "fix": "x.clone()"
       },
       {
@@ -1827,7 +1827,7 @@
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 886,
+        "trial": 895,
         "fix": "x.clone()"
       },
       {
@@ -1835,7 +1835,7 @@
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 904,
+        "trial": 913,
         "fix": "x.clone()"
       },
       {
@@ -1843,7 +1843,7 @@
         "calls": 1,
         "code": "::new(x.clone())",
         "kind": "component",
-        "trial": 922,
+        "trial": 931,
         "fix": "x.clone()"
       },
       {
@@ -1851,7 +1851,7 @@
         "calls": 1,
         "code": "::new((*x).clone())",
         "kind": "component",
-        "trial": 875,
+        "trial": 884,
         "fix": "(*x).clone()"
       },
       {
@@ -1859,7 +1859,7 @@
         "calls": 1,
         "code": "::new((*x).clone())",
         "kind": "component",
-        "trial": 893,
+        "trial": 902,
         "fix": "(*x).clone()"
       },
       {
@@ -1867,7 +1867,7 @@
         "calls": 1,
         "code": "::new((*x).clone())",
         "kind": "component",
-        "trial": 911,
+        "trial": 920,
         "fix": "(*x).clone()"
       }
     ],
@@ -1877,7 +1877,7 @@
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 962,
+        "trial": 971,
         "fix": "x"
       },
       {
@@ -1885,7 +1885,7 @@
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 926,
+        "trial": 935,
         "fix": "x"
       },
       {
@@ -1893,7 +1893,7 @@
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 953,
+        "trial": 962,
         "fix": "x"
       },
       {
@@ -1901,7 +1901,7 @@
         "calls": 0,
         "code": ".set_ddb_table_name(x)",
         "kind": "optional text",
-        "trial": 985,
+        "trial": 994,
         "fix": "x"
       },
       {
@@ -1909,7 +1909,7 @@
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 935,
+        "trial": 944,
         "fix": "x"
       },
       {
@@ -1917,7 +1917,7 @@
         "calls": 0,
         "code": ".ddb_table_name(x)",
         "kind": "text",
-        "trial": 944,
+        "trial": 953,
         "fix": "x"
       },
       {
@@ -1925,7 +1925,7 @@
         "calls": 1,
         "code": ".set_ddb_table_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 981,
+        "trial": 990,
         "fix": "x.map(Into::into)"
       },
       {
@@ -1933,7 +1933,7 @@
         "calls": 1,
         "code": ".set_ddb_table_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 991,
+        "trial": 1000,
         "fix": "x.map(Into::into)"
       },
       {
@@ -1941,7 +1941,7 @@
         "calls": 1,
         "code": ".ddb_table_name(x.to_string())",
         "kind": "text",
-        "trial": 974,
+        "trial": 983,
         "fix": "x.to_string()"
       }
     ],
@@ -1951,7 +1951,7 @@
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1031,
+        "trial": 1040,
         "fix": "x"
       },
       {
@@ -1959,7 +1959,7 @@
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 995,
+        "trial": 1004,
         "fix": "x"
       },
       {
@@ -1967,7 +1967,7 @@
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1022,
+        "trial": 1031,
         "fix": "x"
       },
       {
@@ -1975,7 +1975,7 @@
         "calls": 0,
         "code": ".set_logical_key_store_name(x)",
         "kind": "optional text",
-        "trial": 1054,
+        "trial": 1063,
         "fix": "x"
       },
       {
@@ -1983,7 +1983,7 @@
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1004,
+        "trial": 1013,
         "fix": "x"
       },
       {
@@ -1991,7 +1991,7 @@
         "calls": 0,
         "code": ".logical_key_store_name(x)",
         "kind": "text",
-        "trial": 1013,
+        "trial": 1022,
         "fix": "x"
       },
       {
@@ -1999,7 +1999,7 @@
         "calls": 1,
         "code": ".set_logical_key_store_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1050,
+        "trial": 1059,
         "fix": "x.map(Into::into)"
       },
       {
@@ -2007,7 +2007,7 @@
         "calls": 1,
         "code": ".set_logical_key_store_name(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1060,
+        "trial": 1069,
         "fix": "x.map(Into::into)"
       },
       {
@@ -2015,7 +2015,7 @@
         "calls": 1,
         "code": ".logical_key_store_name(x.to_string())",
         "kind": "text",
-        "trial": 1043,
+        "trial": 1052,
         "fix": "x.to_string()"
       }
     ],
@@ -2025,7 +2025,7 @@
         "calls": 0,
         "code": ".kms_configuration(x)",
         "kind": "named",
-        "trial": 1064,
+        "trial": 1073,
         "fix": "x"
       },
       {
@@ -2033,7 +2033,7 @@
         "calls": 1,
         "code": ".kms_configuration(x.clone())",
         "kind": "named",
-        "trial": 1069,
+        "trial": 1078,
         "fix": "x.clone()"
       }
     ],
@@ -2043,7 +2043,7 @@
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1108,
+        "trial": 1117,
         "fix": "x"
       },
       {
@@ -2051,7 +2051,7 @@
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1072,
+        "trial": 1081,
         "fix": "x"
       },
       {
@@ -2059,7 +2059,7 @@
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1099,
+        "trial": 1108,
         "fix": "x"
       },
       {
@@ -2067,7 +2067,7 @@
         "calls": 0,
         "code": ".set_id(x)",
         "kind": "optional text",
-        "trial": 1131,
+        "trial": 1140,
         "fix": "x"
       },
       {
@@ -2075,7 +2075,7 @@
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1081,
+        "trial": 1090,
         "fix": "x"
       },
       {
@@ -2083,7 +2083,7 @@
         "calls": 0,
         "code": ".id(x)",
         "kind": "text",
-        "trial": 1090,
+        "trial": 1099,
         "fix": "x"
       },
       {
@@ -2091,7 +2091,7 @@
         "calls": 1,
         "code": ".set_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1127,
+        "trial": 1136,
         "fix": "x.map(Into::into)"
       },
       {
@@ -2099,7 +2099,7 @@
         "calls": 1,
         "code": ".set_id(x.map(Into::into))",
         "kind": "optional text",
-        "trial": 1137,
+        "trial": 1146,
         "fix": "x.map(Into::into)"
       },
       {
@@ -2107,7 +2107,7 @@
         "calls": 1,
         "code": ".id(x.to_string())",
         "kind": "text",
-        "trial": 1120,
+        "trial": 1129,
         "fix": "x.to_string()"
       }
     ],
@@ -2117,7 +2117,7 @@
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1177,
+        "trial": 1186,
         "fix": "x"
       },
       {
@@ -2125,7 +2125,7 @@
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1141,
+        "trial": 1150,
         "fix": "x"
       },
       {
@@ -2133,7 +2133,7 @@
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1168,
+        "trial": 1177,
         "fix": "x"
       },
       {
@@ -2141,7 +2141,7 @@
         "calls": 0,
         "code": ".set_grant_tokens(x)",
         "kind": "optional list",
-        "trial": 1225,
+        "trial": 1234,
         "fix": "x"
       },
       {
@@ -2149,7 +2149,7 @@
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1150,
+        "trial": 1159,
         "fix": "x"
       },
       {
@@ -2157,7 +2157,7 @@
         "calls": 0,
         "code": ".set_grant_tokens(Some(x))",
         "kind": "list",
-        "trial": 1222,
+        "trial": 1231,
         "fix": "Some(x)"
       },
       {
@@ -2165,7 +2165,7 @@
         "calls": 0,
         "code": ".grant_tokens(x)",
         "kind": "text",
-        "trial": 1159,
+        "trial": 1168,
         "fix": "x"
       },
       {
@@ -2173,7 +2173,7 @@
         "calls": 1,
         "code": ".set_grant_tokens(Some(x.to_vec()))",
         "kind": "list",
-        "trial": 1218,
+        "trial": 1227,
         "fix": "Some(x.to_vec())"
       },
       {
@@ -2181,7 +2181,7 @@
         "calls": 1,
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
-        "trial": 1198,
+        "trial": 1207,
         "fix": "x.unwrap()"
       },
       {
@@ -2189,7 +2189,7 @@
         "calls": 1,
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
-        "trial": 1208,
+        "trial": 1217,
         "fix": "x.unwrap()"
       },
       {
@@ -2197,7 +2197,7 @@
         "calls": 1,
         "code": ".grant_tokens(x.unwrap())",
         "kind": "optional text",
-        "trial": 1203,
+        "trial": 1212,
         "fix": "x.unwrap()"
       },
       {
@@ -2205,7 +2205,7 @@
         "calls": 1,
         "code": ".grant_tokens(x.to_string())",
         "kind": "text",
-        "trial": 1189,
+        "trial": 1198,
         "fix": "x.to_string()"
       },
       {
@@ -2213,7 +2213,7 @@
         "calls": 4,
         "code": ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
         "kind": "list",
-        "trial": 1214,
+        "trial": 1223,
         "fix": "Some(x.iter().map(|s| s.to_string()).collect())"
       }
     ],
@@ -2223,7 +2223,7 @@
         "calls": 0,
         "code": ".kms_client(x)",
         "kind": "named",
-        "trial": 1227,
+        "trial": 1236,
         "fix": "x"
       },
       {
@@ -2231,7 +2231,7 @@
         "calls": 1,
         "code": ".kms_client(aws_sdk_kms::Client::new(x))",
         "kind": "ctor",
-        "trial": 1246,
+        "trial": 1255,
         "fix": "aws_sdk_kms::Client::new(x)"
       },
       {
@@ -2239,7 +2239,7 @@
         "calls": 1,
         "code": ".kms_client(x.clone())",
         "kind": "named",
-        "trial": 1232,
+        "trial": 1241,
         "fix": "x.clone()"
       },
       {
@@ -2247,7 +2247,7 @@
         "calls": 1,
         "code": ".kms_client((*x).clone())",
         "kind": "named",
-        "trial": 1237,
+        "trial": 1246,
         "fix": "(*x).clone()"
       },
       {
@@ -2255,7 +2255,7 @@
         "calls": 1,
         "code": ".kms_client(aws_sdk_kms::Client::new(&x))",
         "kind": "ctor",
-        "trial": 1244,
+        "trial": 1253,
         "fix": "aws_sdk_kms::Client::new(&x)"
       },
       {
@@ -2263,7 +2263,7 @@
         "calls": 1,
         "code": ".kms_client(aws_sdk_kms::Client::from_conf(x))",
         "kind": "ctor",
-        "trial": 1241,
+        "trial": 1250,
         "fix": "aws_sdk_kms::Client::from_conf(x)"
       }
     ],
@@ -2273,7 +2273,7 @@
         "calls": 0,
         "code": ".ddb_client(x)",
         "kind": "named",
-        "trial": 1247,
+        "trial": 1256,
         "fix": "x"
       },
       {
@@ -2281,7 +2281,7 @@
         "calls": 1,
         "code": ".ddb_client(aws_sdk_dynamodb::Client::new(x))",
         "kind": "ctor",
-        "trial": 1266,
+        "trial": 1275,
         "fix": "aws_sdk_dynamodb::Client::new(x)"
       },
       {
@@ -2289,7 +2289,7 @@
         "calls": 1,
         "code": ".ddb_client(x.clone())",
         "kind": "named",
-        "trial": 1252,
+        "trial": 1261,
         "fix": "x.clone()"
       },
       {
@@ -2297,7 +2297,7 @@
         "calls": 1,
         "code": ".ddb_client((*x).clone())",
         "kind": "named",
-        "trial": 1257,
+        "trial": 1266,
         "fix": "(*x).clone()"
       },
       {
@@ -2305,7 +2305,7 @@
         "calls": 1,
         "code": ".ddb_client(aws_sdk_dynamodb::Client::new(&x))",
         "kind": "ctor",
-        "trial": 1264,
+        "trial": 1273,
         "fix": "aws_sdk_dynamodb::Client::new(&x)"
       },
       {
@@ -2313,7 +2313,7 @@
         "calls": 1,
         "code": ".ddb_client(aws_sdk_dynamodb::Client::from_conf(x))",
         "kind": "ctor",
-        "trial": 1261,
+        "trial": 1270,
         "fix": "aws_sdk_dynamodb::Client::from_conf(x)"
       }
     ],
@@ -2323,7 +2323,7 @@
         "calls": 0,
         "code": ".entry_capacity(x)",
         "kind": "number",
-        "trial": 1267,
+        "trial": 1276,
         "fix": "x"
       },
       {
@@ -2331,7 +2331,7 @@
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1288,
+        "trial": 1301,
         "fix": "x.into()"
       },
       {
@@ -2339,7 +2339,7 @@
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1283,
+        "trial": 1295,
         "fix": "x.into()"
       },
       {
@@ -2347,7 +2347,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1304,
+        "trial": 1320,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2355,7 +2355,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1294,
+        "trial": 1308,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2363,7 +2363,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1299,
+        "trial": 1314,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2371,7 +2371,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1309,
+        "trial": 1326,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2379,7 +2379,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1279,
+        "trial": 1290,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2387,7 +2387,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1274,
+        "trial": 1284,
         "fix": "x.try_into().unwrap()"
       }
     ],
@@ -2397,7 +2397,7 @@
         "calls": 0,
         "code": ".entry_capacity(x)",
         "kind": "number",
-        "trial": 1312,
+        "trial": 1330,
         "fix": "x"
       },
       {
@@ -2405,7 +2405,7 @@
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1333,
+        "trial": 1355,
         "fix": "x.into()"
       },
       {
@@ -2413,7 +2413,7 @@
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1328,
+        "trial": 1349,
         "fix": "x.into()"
       },
       {
@@ -2421,7 +2421,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1349,
+        "trial": 1374,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2429,7 +2429,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1339,
+        "trial": 1362,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2437,7 +2437,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1344,
+        "trial": 1368,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2445,7 +2445,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1354,
+        "trial": 1380,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2453,7 +2453,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1324,
+        "trial": 1344,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2461,7 +2461,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1319,
+        "trial": 1338,
         "fix": "x.try_into().unwrap()"
       }
     ],
@@ -2471,7 +2471,7 @@
         "calls": 0,
         "code": ".entry_pruning_tail_size(x)",
         "kind": "number",
-        "trial": 1357,
+        "trial": 1384,
         "fix": "x"
       },
       {
@@ -2479,7 +2479,7 @@
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1378,
+        "trial": 1409,
         "fix": "x.into()"
       },
       {
@@ -2487,7 +2487,7 @@
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1373,
+        "trial": 1403,
         "fix": "x.into()"
       },
       {
@@ -2495,7 +2495,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1394,
+        "trial": 1428,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2503,7 +2503,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1384,
+        "trial": 1416,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2511,7 +2511,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1389,
+        "trial": 1422,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2519,7 +2519,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1399,
+        "trial": 1434,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2527,7 +2527,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1369,
+        "trial": 1398,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2535,7 +2535,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1364,
+        "trial": 1392,
         "fix": "x.try_into().unwrap()"
       }
     ],
@@ -2545,7 +2545,7 @@
         "calls": 0,
         "code": ".entry_capacity(x)",
         "kind": "number",
-        "trial": 1402,
+        "trial": 1438,
         "fix": "x"
       },
       {
@@ -2553,7 +2553,7 @@
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1423,
+        "trial": 1463,
         "fix": "x.into()"
       },
       {
@@ -2561,7 +2561,7 @@
         "calls": 1,
         "code": ".entry_capacity(x.into())",
         "kind": "number",
-        "trial": 1418,
+        "trial": 1457,
         "fix": "x.into()"
       },
       {
@@ -2569,7 +2569,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1439,
+        "trial": 1482,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2577,7 +2577,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1429,
+        "trial": 1470,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2585,7 +2585,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1434,
+        "trial": 1476,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2593,7 +2593,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1444,
+        "trial": 1488,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2601,7 +2601,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1414,
+        "trial": 1452,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2609,7 +2609,7 @@
         "calls": 2,
         "code": ".entry_capacity(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1409,
+        "trial": 1446,
         "fix": "x.try_into().unwrap()"
       }
     ],
@@ -2619,7 +2619,7 @@
         "calls": 0,
         "code": ".entry_pruning_tail_size(x)",
         "kind": "number",
-        "trial": 1447,
+        "trial": 1492,
         "fix": "x"
       },
       {
@@ -2627,7 +2627,7 @@
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1468,
+        "trial": 1517,
         "fix": "x.into()"
       },
       {
@@ -2635,7 +2635,7 @@
         "calls": 1,
         "code": ".entry_pruning_tail_size(x.into())",
         "kind": "number",
-        "trial": 1463,
+        "trial": 1511,
         "fix": "x.into()"
       },
       {
@@ -2643,7 +2643,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1484,
+        "trial": 1536,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2651,7 +2651,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1474,
+        "trial": 1524,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2659,7 +2659,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1479,
+        "trial": 1530,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2667,7 +2667,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1489,
+        "trial": 1542,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2675,7 +2675,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1459,
+        "trial": 1506,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2683,7 +2683,7 @@
         "calls": 2,
         "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1454,
+        "trial": 1500,
         "fix": "x.try_into().unwrap()"
       }
     ],
@@ -2693,15 +2693,23 @@
         "calls": 0,
         "code": ".grace_period(x)",
         "kind": "duration",
-        "trial": 1492,
+        "trial": 1546,
         "fix": "x"
+      },
+      {
+        "type": "u64",
+        "calls": 1,
+        "code": ".grace_period(std::time::Duration::from_secs(x))",
+        "kind": "number",
+        "trial": 1558,
+        "fix": "std::time::Duration::from_secs(x)"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1518,
+        "trial": 1577,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2709,15 +2717,7 @@
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1508,
-        "fix": "std::time::Duration::from_secs(x.into())"
-      },
-      {
-        "type": "u64",
-        "calls": 2,
-        "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
-        "kind": "number",
-        "trial": 1503,
+        "trial": 1565,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2725,7 +2725,7 @@
         "calls": 2,
         "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1513,
+        "trial": 1571,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2733,7 +2733,7 @@
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1534,
+        "trial": 1596,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2741,7 +2741,7 @@
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1524,
+        "trial": 1584,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2749,7 +2749,7 @@
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1529,
+        "trial": 1590,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2757,7 +2757,7 @@
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1539,
+        "trial": 1602,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2765,7 +2765,7 @@
         "calls": 3,
         "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1499,
+        "trial": 1554,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
@@ -2775,15 +2775,23 @@
         "calls": 0,
         "code": ".grace_interval(x)",
         "kind": "duration",
-        "trial": 1540,
+        "trial": 1603,
         "fix": "x"
+      },
+      {
+        "type": "u64",
+        "calls": 1,
+        "code": ".grace_interval(std::time::Duration::from_secs(x))",
+        "kind": "number",
+        "trial": 1615,
+        "fix": "std::time::Duration::from_secs(x)"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1566,
+        "trial": 1634,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2791,15 +2799,7 @@
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1556,
-        "fix": "std::time::Duration::from_secs(x.into())"
-      },
-      {
-        "type": "u64",
-        "calls": 2,
-        "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
-        "kind": "number",
-        "trial": 1551,
+        "trial": 1622,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2807,7 +2807,7 @@
         "calls": 2,
         "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1561,
+        "trial": 1628,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2815,7 +2815,7 @@
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1582,
+        "trial": 1653,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2823,7 +2823,7 @@
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1572,
+        "trial": 1641,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2831,7 +2831,7 @@
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1577,
+        "trial": 1647,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2839,7 +2839,7 @@
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1587,
+        "trial": 1659,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2847,7 +2847,7 @@
         "calls": 3,
         "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1547,
+        "trial": 1611,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
@@ -2857,7 +2857,7 @@
         "calls": 0,
         "code": ".fan_out(x)",
         "kind": "number",
-        "trial": 1588,
+        "trial": 1660,
         "fix": "x"
       },
       {
@@ -2865,7 +2865,7 @@
         "calls": 1,
         "code": ".fan_out(x.into())",
         "kind": "number",
-        "trial": 1609,
+        "trial": 1685,
         "fix": "x.into()"
       },
       {
@@ -2873,7 +2873,7 @@
         "calls": 1,
         "code": ".fan_out(x.into())",
         "kind": "number",
-        "trial": 1604,
+        "trial": 1679,
         "fix": "x.into()"
       },
       {
@@ -2881,7 +2881,7 @@
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1625,
+        "trial": 1704,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2889,7 +2889,7 @@
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1615,
+        "trial": 1692,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2897,7 +2897,7 @@
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1620,
+        "trial": 1698,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2905,7 +2905,7 @@
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1630,
+        "trial": 1710,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2913,7 +2913,7 @@
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1600,
+        "trial": 1674,
         "fix": "x.try_into().unwrap()"
       },
       {
@@ -2921,7 +2921,7 @@
         "calls": 2,
         "code": ".fan_out(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1595,
+        "trial": 1668,
         "fix": "x.try_into().unwrap()"
       }
     ],
@@ -2931,15 +2931,23 @@
         "calls": 0,
         "code": ".in_flight_ttl(x)",
         "kind": "duration",
-        "trial": 1633,
+        "trial": 1714,
         "fix": "x"
+      },
+      {
+        "type": "u64",
+        "calls": 1,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x))",
+        "kind": "number",
+        "trial": 1726,
+        "fix": "std::time::Duration::from_secs(x)"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1659,
+        "trial": 1745,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2947,15 +2955,7 @@
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1649,
-        "fix": "std::time::Duration::from_secs(x.into())"
-      },
-      {
-        "type": "u64",
-        "calls": 2,
-        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
-        "kind": "number",
-        "trial": 1644,
+        "trial": 1733,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2963,7 +2963,7 @@
         "calls": 2,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1654,
+        "trial": 1739,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -2971,7 +2971,7 @@
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1675,
+        "trial": 1764,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2979,7 +2979,7 @@
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1665,
+        "trial": 1752,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2987,7 +2987,7 @@
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1670,
+        "trial": 1758,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -2995,7 +2995,7 @@
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1680,
+        "trial": 1770,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -3003,7 +3003,7 @@
         "calls": 3,
         "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1640,
+        "trial": 1722,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
@@ -3013,15 +3013,23 @@
         "calls": 0,
         "code": ".sleep(x)",
         "kind": "duration",
-        "trial": 1681,
+        "trial": 1771,
         "fix": "x"
+      },
+      {
+        "type": "u64",
+        "calls": 1,
+        "code": ".sleep(std::time::Duration::from_secs(x))",
+        "kind": "number",
+        "trial": 1783,
+        "fix": "std::time::Duration::from_secs(x)"
       },
       {
         "type": "u16",
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1707,
+        "trial": 1802,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -3029,15 +3037,7 @@
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1697,
-        "fix": "std::time::Duration::from_secs(x.into())"
-      },
-      {
-        "type": "u64",
-        "calls": 2,
-        "code": ".sleep(std::time::Duration::from_secs(x.into()))",
-        "kind": "number",
-        "trial": 1692,
+        "trial": 1790,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -3045,7 +3045,7 @@
         "calls": 2,
         "code": ".sleep(std::time::Duration::from_secs(x.into()))",
         "kind": "number",
-        "trial": 1702,
+        "trial": 1796,
         "fix": "std::time::Duration::from_secs(x.into())"
       },
       {
@@ -3053,7 +3053,7 @@
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1723,
+        "trial": 1821,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -3061,7 +3061,7 @@
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1713,
+        "trial": 1809,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -3069,7 +3069,7 @@
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1718,
+        "trial": 1815,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -3077,7 +3077,7 @@
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1728,
+        "trial": 1827,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       },
       {
@@ -3085,7 +3085,7 @@
         "calls": 3,
         "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
         "kind": "number",
-        "trial": 1688,
+        "trial": 1779,
         "fix": "std::time::Duration::from_secs(x.try_into().unwrap())"
       }
     ],
@@ -3095,7 +3095,7 @@
         "calls": 0,
         "code": ".commitment_policy(x)",
         "kind": "named",
-        "trial": 1729,
+        "trial": 1828,
         "fix": "x"
       },
       {
@@ -3103,7 +3103,7 @@
         "calls": 1,
         "code": ".commitment_policy(x.clone())",
         "kind": "named",
-        "trial": 1734,
+        "trial": 1833,
         "fix": "x.clone()"
       }
     ],
@@ -3113,7 +3113,7 @@
         "calls": 0,
         "code": ".max_encrypted_data_keys(x)",
         "kind": "number",
-        "trial": 1737,
+        "trial": 1836,
         "fix": "x",
         "run": {
           "builds": true,
@@ -3126,7 +3126,7 @@
         "calls": 1,
         "code": ".max_encrypted_data_keys(x.into())",
         "kind": "number",
-        "trial": 1758,
+        "trial": 1861,
         "fix": "x.into()",
         "run": {
           "builds": true,
@@ -3139,7 +3139,7 @@
         "calls": 1,
         "code": ".max_encrypted_data_keys(x.into())",
         "kind": "number",
-        "trial": 1753,
+        "trial": 1855,
         "fix": "x.into()",
         "run": {
           "builds": true,
@@ -3152,7 +3152,7 @@
         "calls": 2,
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1774,
+        "trial": 1880,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3165,7 +3165,7 @@
         "calls": 2,
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1764,
+        "trial": 1868,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3178,7 +3178,7 @@
         "calls": 2,
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1769,
+        "trial": 1874,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3191,7 +3191,7 @@
         "calls": 2,
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1779,
+        "trial": 1886,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3204,7 +3204,7 @@
         "calls": 2,
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1749,
+        "trial": 1850,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3217,7 +3217,7 @@
         "calls": 2,
         "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 1744,
+        "trial": 1844,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3232,7 +3232,7 @@
         "calls": 0,
         "code": ".encrypt().plaintext(x)",
         "kind": "bytes",
-        "trial": 1782,
+        "trial": 1890,
         "fix": "x",
         "run": {
           "copies": false,
@@ -3246,7 +3246,7 @@
         "calls": 0,
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
-        "trial": 1803,
+        "trial": 1911,
         "fix": "&x",
         "run": {
           "copies": false,
@@ -3260,7 +3260,7 @@
         "calls": 0,
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
-        "trial": 1813,
+        "trial": 1921,
         "fix": "&x",
         "run": {
           "copies": false,
@@ -3274,7 +3274,7 @@
         "calls": 0,
         "code": ".encrypt().set_plaintext(x)",
         "kind": "optional bytes",
-        "trial": 1842,
+        "trial": 1950,
         "fix": "x",
         "run": {
           "copies": false,
@@ -3288,7 +3288,7 @@
         "calls": 0,
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
-        "trial": 1793,
+        "trial": 1901,
         "fix": "&x",
         "run": {
           "copies": false,
@@ -3302,7 +3302,7 @@
         "calls": 0,
         "code": ".encrypt().plaintext(&x)",
         "kind": "bytes",
-        "trial": 1823,
+        "trial": 1931,
         "fix": "&x",
         "run": {
           "skipped": "the value is not 32 bytes"
@@ -3314,7 +3314,7 @@
         "calls": 1,
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
-        "trial": 1929,
+        "trial": 2037,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -3328,7 +3328,7 @@
         "calls": 1,
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
-        "trial": 1893,
+        "trial": 2001,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -3342,7 +3342,7 @@
         "calls": 1,
         "code": ".encrypt().plaintext(x.as_ref())",
         "kind": "bytes",
-        "trial": 1837,
+        "trial": 1945,
         "fix": "x.as_ref()",
         "run": {
           "copies": false,
@@ -3356,7 +3356,7 @@
         "calls": 1,
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
-        "trial": 1920,
+        "trial": 2028,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -3370,7 +3370,7 @@
         "calls": 1,
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
-        "trial": 1902,
+        "trial": 2010,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -3384,7 +3384,7 @@
         "calls": 1,
         "code": ".encrypt().plaintext(x.as_bytes())",
         "kind": "text",
-        "trial": 1938,
+        "trial": 2046,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -3398,7 +3398,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
         "kind": "path",
-        "trial": 1962,
+        "trial": 2070,
         "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
@@ -3411,7 +3411,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.bytes().unwrap())",
         "kind": "stream",
-        "trial": 1879,
+        "trial": 1987,
         "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
@@ -3425,7 +3425,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 1866,
+        "trial": 1974,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "copies": false,
@@ -3439,7 +3439,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 1946,
+        "trial": 2054,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "copies": false,
@@ -3453,7 +3453,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 1875,
+        "trial": 1983,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
@@ -3466,7 +3466,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 1956,
+        "trial": 2064,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": true,
@@ -3479,7 +3479,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 1951,
+        "trial": 2059,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": true,
@@ -3492,7 +3492,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 1857,
+        "trial": 1965,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
@@ -3505,7 +3505,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
         "kind": "path",
-        "trial": 1959,
+        "trial": 2067,
         "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
@@ -3518,7 +3518,7 @@
         "calls": 2,
         "code": ".encrypt().plaintext(x.bytes().unwrap())",
         "kind": "stream",
-        "trial": 1884,
+        "trial": 1992,
         "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
@@ -3532,7 +3532,7 @@
         "calls": 3,
         "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
-        "trial": 1965,
+        "trial": 2073,
         "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "builds": true,
@@ -3545,7 +3545,7 @@
         "calls": 3,
         "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
-        "trial": 1968,
+        "trial": 2076,
         "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "skipped": "needs a network connection"
@@ -3566,7 +3566,7 @@
         "calls": 0,
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 1988,
+        "trial": 2096,
         "fix": "x, y",
         "run": {
           "builds": true,
@@ -3579,7 +3579,7 @@
         "calls": 0,
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 1976,
+        "trial": 2084,
         "fix": "x, y",
         "run": {
           "builds": true,
@@ -3592,7 +3592,7 @@
         "calls": 0,
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 1985,
+        "trial": 2093,
         "fix": "x, y",
         "run": {
           "builds": true,
@@ -3605,7 +3605,7 @@
         "calls": 0,
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 1979,
+        "trial": 2087,
         "fix": "x, y",
         "run": {
           "builds": true,
@@ -3618,7 +3618,7 @@
         "calls": 0,
         "code": ".encrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 1982,
+        "trial": 2090,
         "fix": "x, y",
         "run": {
           "skipped": "a char holds one letter, not the whole value"
@@ -3630,7 +3630,7 @@
         "calls": 1,
         "code": ".encrypt().set_encryption_context(Some(x.into()))",
         "kind": "map",
-        "trial": 1972,
+        "trial": 2080,
         "fix": "Some(x.into())",
         "run": {
           "builds": true,
@@ -3643,7 +3643,7 @@
         "calls": 2,
         "code": ".encrypt().encryption_context(x.to_string(), y.to_string())",
         "kind": "pair",
-        "trial": 1993,
+        "trial": 2101,
         "fix": "x.to_string(), y.to_string()",
         "run": {
           "builds": true,
@@ -3658,7 +3658,7 @@
         "calls": 0,
         "code": ".encrypt().algorithm_suite_id(x)",
         "kind": "named",
-        "trial": 1994,
+        "trial": 2102,
         "fix": "x"
       },
       {
@@ -3666,7 +3666,7 @@
         "calls": 1,
         "code": ".encrypt().algorithm_suite_id(x.clone())",
         "kind": "named",
-        "trial": 1999,
+        "trial": 2107,
         "fix": "x.clone()"
       }
     ],
@@ -3676,7 +3676,7 @@
         "calls": 0,
         "code": ".encrypt().frame_length(x)",
         "kind": "number",
-        "trial": 2012,
+        "trial": 2122,
         "fix": "x",
         "run": {
           "builds": true,
@@ -3689,7 +3689,7 @@
         "calls": 1,
         "code": ".encrypt().frame_length(x.into())",
         "kind": "number",
-        "trial": 2023,
+        "trial": 2135,
         "fix": "x.into()",
         "run": {
           "builds": true,
@@ -3702,7 +3702,7 @@
         "calls": 1,
         "code": ".encrypt().frame_length(x.into())",
         "kind": "number",
-        "trial": 2018,
+        "trial": 2129,
         "fix": "x.into()",
         "run": {
           "builds": true,
@@ -3715,7 +3715,7 @@
         "calls": 2,
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 2039,
+        "trial": 2154,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3728,7 +3728,7 @@
         "calls": 2,
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 2029,
+        "trial": 2142,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3741,7 +3741,7 @@
         "calls": 2,
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 2034,
+        "trial": 2148,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3754,7 +3754,7 @@
         "calls": 2,
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 2044,
+        "trial": 2160,
         "fix": "x.try_into().unwrap()",
         "run": {
           "skipped": "the value does not fit in an i8"
@@ -3766,7 +3766,7 @@
         "calls": 2,
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 2009,
+        "trial": 2118,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3779,7 +3779,7 @@
         "calls": 2,
         "code": ".encrypt().frame_length(x.try_into().unwrap())",
         "kind": "number",
-        "trial": 2004,
+        "trial": 2112,
         "fix": "x.try_into().unwrap()",
         "run": {
           "builds": true,
@@ -3794,7 +3794,7 @@
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2047,
+        "trial": 2164,
         "fix": "x"
       },
       {
@@ -3802,7 +3802,7 @@
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2074,
+        "trial": 2191,
         "fix": "x"
       },
       {
@@ -3810,7 +3810,7 @@
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2101,
+        "trial": 2218,
         "fix": "x"
       },
       {
@@ -3818,7 +3818,7 @@
         "calls": 0,
         "code": ".encrypt().keyring(x)",
         "kind": "component",
-        "trial": 2128,
+        "trial": 2245,
         "fix": "x"
       },
       {
@@ -3826,7 +3826,7 @@
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2058,
+        "trial": 2175,
         "fix": "x.clone()"
       },
       {
@@ -3834,7 +3834,7 @@
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2085,
+        "trial": 2202,
         "fix": "x.clone()"
       },
       {
@@ -3842,7 +3842,7 @@
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2112,
+        "trial": 2229,
         "fix": "x.clone()"
       },
       {
@@ -3850,7 +3850,7 @@
         "calls": 1,
         "code": ".encrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2139,
+        "trial": 2256,
         "fix": "x.clone()"
       },
       {
@@ -3858,7 +3858,7 @@
         "calls": 1,
         "code": ".encrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2068,
+        "trial": 2185,
         "fix": "(*x).clone()"
       },
       {
@@ -3866,7 +3866,7 @@
         "calls": 1,
         "code": ".encrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2095,
+        "trial": 2212,
         "fix": "(*x).clone()"
       },
       {
@@ -3874,7 +3874,7 @@
         "calls": 1,
         "code": ".encrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2122,
+        "trial": 2239,
         "fix": "(*x).clone()"
       }
     ],
@@ -3884,7 +3884,7 @@
         "calls": 0,
         "code": ".encrypt().cmm(x)",
         "kind": "component",
-        "trial": 2146,
+        "trial": 2263,
         "fix": "x"
       },
       {
@@ -3892,7 +3892,7 @@
         "calls": 0,
         "code": ".encrypt().cmm(x)",
         "kind": "component",
-        "trial": 2173,
+        "trial": 2290,
         "fix": "x"
       },
       {
@@ -3900,7 +3900,7 @@
         "calls": 1,
         "code": ".encrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2157,
+        "trial": 2274,
         "fix": "x.clone()"
       },
       {
@@ -3908,7 +3908,7 @@
         "calls": 1,
         "code": ".encrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2184,
+        "trial": 2301,
         "fix": "x.clone()"
       },
       {
@@ -3916,7 +3916,7 @@
         "calls": 1,
         "code": ".encrypt().cmm((*x).clone())",
         "kind": "component",
-        "trial": 2167,
+        "trial": 2284,
         "fix": "(*x).clone()"
       }
     ],
@@ -3926,7 +3926,7 @@
         "calls": 0,
         "code": ".decrypt().ciphertext(x)",
         "kind": "bytes",
-        "trial": 2191,
+        "trial": 2308,
         "fix": "x",
         "run": {
           "copies": false,
@@ -3940,7 +3940,7 @@
         "calls": 0,
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
-        "trial": 2212,
+        "trial": 2329,
         "fix": "&x",
         "run": {
           "copies": false,
@@ -3954,7 +3954,7 @@
         "calls": 0,
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
-        "trial": 2222,
+        "trial": 2339,
         "fix": "&x",
         "run": {
           "copies": false,
@@ -3968,7 +3968,7 @@
         "calls": 0,
         "code": ".decrypt().set_ciphertext(x)",
         "kind": "optional bytes",
-        "trial": 2251,
+        "trial": 2368,
         "fix": "x",
         "run": {
           "copies": false,
@@ -3982,7 +3982,7 @@
         "calls": 0,
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
-        "trial": 2202,
+        "trial": 2319,
         "fix": "&x",
         "run": {
           "copies": false,
@@ -3996,7 +3996,7 @@
         "calls": 0,
         "code": ".decrypt().ciphertext(&x)",
         "kind": "bytes",
-        "trial": 2232,
+        "trial": 2349,
         "fix": "&x",
         "run": {
           "skipped": "the value is not 32 bytes"
@@ -4008,7 +4008,7 @@
         "calls": 1,
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
-        "trial": 2338,
+        "trial": 2455,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -4022,7 +4022,7 @@
         "calls": 1,
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
-        "trial": 2302,
+        "trial": 2419,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -4036,7 +4036,7 @@
         "calls": 1,
         "code": ".decrypt().ciphertext(x.as_ref())",
         "kind": "bytes",
-        "trial": 2246,
+        "trial": 2363,
         "fix": "x.as_ref()",
         "run": {
           "copies": false,
@@ -4050,7 +4050,7 @@
         "calls": 1,
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
-        "trial": 2329,
+        "trial": 2446,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -4064,7 +4064,7 @@
         "calls": 1,
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
-        "trial": 2311,
+        "trial": 2428,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -4078,7 +4078,7 @@
         "calls": 1,
         "code": ".decrypt().ciphertext(x.as_bytes())",
         "kind": "text",
-        "trial": 2347,
+        "trial": 2464,
         "fix": "x.as_bytes()",
         "run": {
           "copies": false,
@@ -4092,7 +4092,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
         "kind": "path",
-        "trial": 2371,
+        "trial": 2488,
         "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
@@ -4105,7 +4105,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.bytes().unwrap())",
         "kind": "stream",
-        "trial": 2288,
+        "trial": 2405,
         "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
@@ -4119,7 +4119,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 2275,
+        "trial": 2392,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "copies": false,
@@ -4133,7 +4133,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 2355,
+        "trial": 2472,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "copies": false,
@@ -4147,7 +4147,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 2284,
+        "trial": 2401,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
@@ -4160,7 +4160,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 2365,
+        "trial": 2482,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": false,
@@ -4173,7 +4173,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
         "kind": "optional text",
-        "trial": 2360,
+        "trial": 2477,
         "fix": "x.unwrap().as_bytes()",
         "run": {
           "builds": false,
@@ -4186,7 +4186,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
         "kind": "optional bytes",
-        "trial": 2266,
+        "trial": 2383,
         "fix": "x.unwrap().as_ref()",
         "run": {
           "builds": true,
@@ -4199,7 +4199,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
         "kind": "path",
-        "trial": 2368,
+        "trial": 2485,
         "fix": "&std::fs::read(x).unwrap()",
         "run": {
           "builds": true,
@@ -4212,7 +4212,7 @@
         "calls": 2,
         "code": ".decrypt().ciphertext(x.bytes().unwrap())",
         "kind": "stream",
-        "trial": 2293,
+        "trial": 2410,
         "fix": "x.bytes().unwrap()",
         "run": {
           "copies": false,
@@ -4226,7 +4226,7 @@
         "calls": 3,
         "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
-        "trial": 2374,
+        "trial": 2491,
         "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "builds": true,
@@ -4239,7 +4239,7 @@
         "calls": 3,
         "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
         "kind": "reader",
-        "trial": 2377,
+        "trial": 2494,
         "fix": "&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }",
         "run": {
           "skipped": "needs a network connection"
@@ -4260,7 +4260,7 @@
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2397,
+        "trial": 2514,
         "fix": "x, y"
       },
       {
@@ -4268,7 +4268,7 @@
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2385,
+        "trial": 2502,
         "fix": "x, y"
       },
       {
@@ -4276,7 +4276,7 @@
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2394,
+        "trial": 2511,
         "fix": "x, y"
       },
       {
@@ -4284,7 +4284,7 @@
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2388,
+        "trial": 2505,
         "fix": "x, y"
       },
       {
@@ -4292,7 +4292,7 @@
         "calls": 0,
         "code": ".decrypt().encryption_context(x, y)",
         "kind": "pair",
-        "trial": 2391,
+        "trial": 2508,
         "fix": "x, y"
       },
       {
@@ -4300,7 +4300,7 @@
         "calls": 1,
         "code": ".decrypt().set_encryption_context(Some(x.into()))",
         "kind": "map",
-        "trial": 2381,
+        "trial": 2498,
         "fix": "Some(x.into())"
       },
       {
@@ -4308,7 +4308,7 @@
         "calls": 2,
         "code": ".decrypt().encryption_context(x.to_string(), y.to_string())",
         "kind": "pair",
-        "trial": 2402,
+        "trial": 2519,
         "fix": "x.to_string(), y.to_string()"
       }
     ],
@@ -4318,7 +4318,7 @@
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2403,
+        "trial": 2520,
         "fix": "x"
       },
       {
@@ -4326,7 +4326,7 @@
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2430,
+        "trial": 2547,
         "fix": "x"
       },
       {
@@ -4334,7 +4334,7 @@
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2457,
+        "trial": 2574,
         "fix": "x"
       },
       {
@@ -4342,7 +4342,7 @@
         "calls": 0,
         "code": ".decrypt().keyring(x)",
         "kind": "component",
-        "trial": 2484,
+        "trial": 2601,
         "fix": "x"
       },
       {
@@ -4350,7 +4350,7 @@
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2414,
+        "trial": 2531,
         "fix": "x.clone()"
       },
       {
@@ -4358,7 +4358,7 @@
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2441,
+        "trial": 2558,
         "fix": "x.clone()"
       },
       {
@@ -4366,7 +4366,7 @@
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2468,
+        "trial": 2585,
         "fix": "x.clone()"
       },
       {
@@ -4374,7 +4374,7 @@
         "calls": 1,
         "code": ".decrypt().keyring(x.clone())",
         "kind": "component",
-        "trial": 2495,
+        "trial": 2612,
         "fix": "x.clone()"
       },
       {
@@ -4382,7 +4382,7 @@
         "calls": 1,
         "code": ".decrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2424,
+        "trial": 2541,
         "fix": "(*x).clone()"
       },
       {
@@ -4390,7 +4390,7 @@
         "calls": 1,
         "code": ".decrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2451,
+        "trial": 2568,
         "fix": "(*x).clone()"
       },
       {
@@ -4398,7 +4398,7 @@
         "calls": 1,
         "code": ".decrypt().keyring((*x).clone())",
         "kind": "component",
-        "trial": 2478,
+        "trial": 2595,
         "fix": "(*x).clone()"
       }
     ],
@@ -4408,7 +4408,7 @@
         "calls": 0,
         "code": ".decrypt().cmm(x)",
         "kind": "component",
-        "trial": 2502,
+        "trial": 2619,
         "fix": "x"
       },
       {
@@ -4416,7 +4416,7 @@
         "calls": 0,
         "code": ".decrypt().cmm(x)",
         "kind": "component",
-        "trial": 2529,
+        "trial": 2646,
         "fix": "x"
       },
       {
@@ -4424,7 +4424,7 @@
         "calls": 1,
         "code": ".decrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2513,
+        "trial": 2630,
         "fix": "x.clone()"
       },
       {
@@ -4432,7 +4432,7 @@
         "calls": 1,
         "code": ".decrypt().cmm(x.clone())",
         "kind": "component",
-        "trial": 2540,
+        "trial": 2657,
         "fix": "x.clone()"
       },
       {
@@ -4440,7 +4440,7 @@
         "calls": 1,
         "code": ".decrypt().cmm((*x).clone())",
         "kind": "component",
-        "trial": 2523,
+        "trial": 2640,
         "fix": "(*x).clone()"
       }
     ]
