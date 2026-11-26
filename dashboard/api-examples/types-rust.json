@@ -1,0 +1,6454 @@
+{
+  "generated_by": "api-examples/types/compile_rust_types.py",
+  "rust_commit": "e77da7789ee19d516e44d4b4b389942290b7a0b2",
+  "rustc": "1.99.1",
+  "files": {
+    "trials": "api-examples/types/rust_trials.rs",
+    "runs": "api-examples/types/rust_runs.rs"
+  },
+  "note": "Rust: 2,543 tries compiled and 142 calls run on aws-crypto-tools-rust at e77da77 with rustc 1.99.1. Types: api-examples/types/rust-types.json, from 174 crates pinned on 2026-11-25.",
+  "apis": [
+    {
+      "lib": "mpl",
+      "id": "aws-kms-keyring",
+      "name": "AWS KMS keyring",
+      "group": "Keyrings",
+      "call": "AwsKmsKeyring::builder()",
+      "options": [
+        {
+          "key": "mpl|aws-kms-keyring|kmsKeyId",
+          "rust_key": "mpl/AwsKmsKeyring.kms_key_id",
+          "name": "kms_key_id",
+          "takes": "impl Into<String>",
+          "doc": "The AWS KMS key: a key ARN, key ID, alias name, or alias ARN."
+        },
+        {
+          "key": "mpl|aws-kms-keyring|kmsClient",
+          "rust_key": "mpl/AwsKmsKeyring.kms_client",
+          "name": "kms_client",
+          "takes": "impl Into<Client>",
+          "doc": "The AWS KMS client, in the key's region."
+        },
+        {
+          "key": "mpl|aws-kms-keyring|grantTokens",
+          "rust_key": "mpl/AwsKmsKeyring.grant_tokens",
+          "name": "grant_tokens",
+          "takes": "impl Into<String>",
+          "doc": "Add a grant token, sent with every AWS KMS request."
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "hierarchical-keyring",
+      "name": "Hierarchical keyring",
+      "group": "Keyrings",
+      "call": "HierarchicalKeyring::builder()",
+      "options": [
+        {
+          "key": "mpl|hierarchical-keyring|keyStore",
+          "rust_key": "mpl/HierarchicalKeyring.key_store",
+          "name": "key_store",
+          "takes": "impl IntoShared<SharedKeyStore>",
+          "doc": "The key store."
+        },
+        {
+          "key": "mpl|hierarchical-keyring|ttlSeconds",
+          "rust_key": "mpl/HierarchicalKeyring.ttl",
+          "name": "ttl",
+          "takes": "Duration",
+          "doc": "The TTL for cached branch-key materials."
+        },
+        {
+          "key": "mpl|hierarchical-keyring|branchKeyId",
+          "rust_key": "mpl/HierarchicalKeyring.branch_key_id",
+          "name": "branch_key_id",
+          "takes": "impl Into<String>",
+          "doc": "A static branch key id."
+        },
+        {
+          "key": "mpl|hierarchical-keyring|branchKeyIdSupplier",
+          "rust_key": "mpl/HierarchicalKeyring.branch_key_id_supplier",
+          "name": "branch_key_id_supplier",
+          "takes": "impl IntoShared<SharedBranchKeyIdSupplier>",
+          "doc": "A [`BranchKeyIdSupplier`]."
+        },
+        {
+          "key": "mpl|hierarchical-keyring|cache",
+          "rust_key": "mpl/HierarchicalKeyring.cache",
+          "name": "cache",
+          "takes": "impl IntoShared<SharedCmc>",
+          "doc": "The cache for branch key materials."
+        },
+        {
+          "key": "mpl|hierarchical-keyring|partitionId",
+          "rust_key": "mpl/HierarchicalKeyring.partition_id",
+          "name": "partition_id",
+          "takes": "impl Into<String>",
+          "doc": "The partition id."
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "raw-aes-keyring",
+      "name": "Raw AES keyring",
+      "group": "Keyrings",
+      "call": "RawAesKeyring::builder()",
+      "options": [
+        {
+          "key": "mpl|raw-aes-keyring|keyNamespace",
+          "rust_key": "mpl/RawAesKeyring.key_namespace",
+          "name": "key_namespace",
+          "takes": "impl Into<String>",
+          "doc": "Set the key namespace, which becomes the key provider ID of each EDK this keyring produces."
+        },
+        {
+          "key": "mpl|raw-aes-keyring|keyName",
+          "rust_key": "mpl/RawAesKeyring.key_name",
+          "name": "key_name",
+          "takes": "impl Into<String>",
+          "doc": "Set the key name, which this keyring serializes into the key provider information of each EDK."
+        },
+        {
+          "key": "mpl|raw-aes-keyring|wrappingKey",
+          "rust_key": "mpl/RawAesKeyring.wrapping_key",
+          "name": "wrapping_key",
+          "takes": "impl Into<Vec<u8>>",
+          "doc": "Set the wrapping key."
+        },
+        {
+          "key": "mpl|raw-aes-keyring|wrappingAlg",
+          "rust_key": "mpl/RawAesKeyring.wrapping_alg",
+          "name": "wrapping_alg",
+          "takes": "AesWrappingAlg",
+          "doc": "Set the wrapping algorithm."
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "default-cmm",
+      "name": "Default CMM",
+      "group": "CMMs",
+      "call": "DefaultCmm",
+      "options": [
+        {
+          "key": "mpl|default-cmm|keyring",
+          "rust_key": "mpl/DefaultCmm.keyring",
+          "name": "keyring",
+          "takes": "impl IntoShared<SharedKeyring>",
+          "doc": "Construct a `DefaultCmm` wrapping the given keyring."
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "dynamo-db-key-store",
+      "name": "DynamoDB key store",
+      "group": "Key stores",
+      "call": "DynamoDbKeyStore::builder()",
+      "options": [
+        {
+          "key": "mpl|dynamo-db-key-store|ddbTableName",
+          "rust_key": "mpl/DynamoDbKeyStore.ddb_table_name",
+          "name": "ddb_table_name",
+          "takes": "impl Into<String>",
+          "doc": "Set the DynamoDB table name that backs this key store."
+        },
+        {
+          "key": "mpl|dynamo-db-key-store|logicalKeyStoreName",
+          "rust_key": "mpl/DynamoDbKeyStore.logical_key_store_name",
+          "name": "logical_key_store_name",
+          "takes": "impl Into<String>",
+          "doc": "Set the logical name cryptographically bound to all keys in the"
+        },
+        {
+          "key": "mpl|dynamo-db-key-store|kmsConfiguration",
+          "rust_key": "mpl/DynamoDbKeyStore.kms_configuration",
+          "name": "kms_configuration",
+          "takes": "impl Into<KmsConfiguration>",
+          "doc": "Set the KMS key configuration governing encryption and decryption."
+        },
+        {
+          "key": "mpl|dynamo-db-key-store|id",
+          "rust_key": "mpl/DynamoDbKeyStore.id",
+          "name": "id",
+          "takes": "impl Into<String>",
+          "doc": "Set the key store identifier."
+        },
+        {
+          "key": "mpl|dynamo-db-key-store|grantTokens",
+          "rust_key": "mpl/DynamoDbKeyStore.grant_tokens",
+          "name": "grant_tokens",
+          "takes": "impl Into<String>",
+          "doc": "Appends an item to the AWS KMS grant tokens. Defaults to none."
+        },
+        {
+          "key": "mpl|dynamo-db-key-store|kmsClient",
+          "rust_key": "mpl/DynamoDbKeyStore.kms_client",
+          "name": "kms_client",
+          "takes": "impl Into<Client>",
+          "doc": "Set the AWS KMS client. Defaults to a client for the Region parsed"
+        },
+        {
+          "key": "mpl|dynamo-db-key-store|ddbClient",
+          "rust_key": "mpl/DynamoDbKeyStore.ddb_client",
+          "name": "ddb_client",
+          "takes": "impl Into<Client>",
+          "doc": "Set the Amazon DynamoDB client. Defaults to a client for the Region"
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "default-cmc",
+      "name": "Default CMC",
+      "group": "Caches",
+      "call": "DefaultCmc::builder()",
+      "options": [
+        {
+          "key": "mpl|default-cmc|entryCapacity",
+          "rust_key": "mpl/DefaultCmc.entry_capacity",
+          "name": "entry_capacity",
+          "takes": "usize",
+          "doc": "Set the maximum number of entries. Required."
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "local-cmc",
+      "name": "Local CMC",
+      "group": "Caches",
+      "call": "LocalCmc::builder()",
+      "options": [
+        {
+          "key": "mpl|local-cmc|entryCapacity",
+          "rust_key": "mpl/LocalCmc.entry_capacity",
+          "name": "entry_capacity",
+          "takes": "usize",
+          "doc": "Set the maximum number of entries. Required."
+        },
+        {
+          "key": "mpl|local-cmc|entryPruningTailSize",
+          "rust_key": "mpl/LocalCmc.entry_pruning_tail_size",
+          "name": "entry_pruning_tail_size",
+          "takes": "usize",
+          "doc": "Set how many least-recently-used entries each get checks for expired entries to evict."
+        }
+      ]
+    },
+    {
+      "lib": "mpl",
+      "id": "storm-tracking-cmc",
+      "name": "Storm tracking CMC",
+      "group": "Caches",
+      "call": "StormTrackingCmc::builder()",
+      "options": [
+        {
+          "key": "mpl|storm-tracking-cmc|entryCapacity",
+          "rust_key": "mpl/StormTrackingCmc.entry_capacity",
+          "name": "entry_capacity",
+          "takes": "usize",
+          "doc": "Set the maximum number of entries. Defaults to 1000."
+        },
+        {
+          "key": "mpl|storm-tracking-cmc|entryPruningTailSize",
+          "rust_key": "mpl/StormTrackingCmc.entry_pruning_tail_size",
+          "name": "entry_pruning_tail_size",
+          "takes": "usize",
+          "doc": "Set how many least-recently-used entries each get checks for expired entries to evict."
+        },
+        {
+          "key": "mpl|storm-tracking-cmc|gracePeriod",
+          "rust_key": "mpl/StormTrackingCmc.grace_period",
+          "name": "grace_period",
+          "takes": "Duration",
+          "doc": "Set how long before an entry expires the cache sends one caller to refresh it."
+        },
+        {
+          "key": "mpl|storm-tracking-cmc|graceInterval",
+          "rust_key": "mpl/StormTrackingCmc.grace_interval",
+          "name": "grace_interval",
+          "takes": "Duration",
+          "doc": "Set how long one caller has to refresh an entry before another caller may try."
+        },
+        {
+          "key": "mpl|storm-tracking-cmc|fanOut",
+          "rust_key": "mpl/StormTrackingCmc.fan_out",
+          "name": "fan_out",
+          "takes": "usize",
+          "doc": "Set the maximum number of refreshes in flight at once."
+        },
+        {
+          "key": "mpl|storm-tracking-cmc|inFlightTtl",
+          "rust_key": "mpl/StormTrackingCmc.in_flight_ttl",
+          "name": "in_flight_ttl",
+          "takes": "Duration",
+          "doc": "Set how long a caller waits for another caller's refresh before failing."
+        },
+        {
+          "key": "mpl|storm-tracking-cmc|sleep",
+          "rust_key": "mpl/StormTrackingCmc.sleep",
+          "name": "sleep",
+          "takes": "Duration",
+          "doc": "Set how long a waiting caller sleeps between checks of the cache."
+        }
+      ]
+    },
+    {
+      "lib": "esdk",
+      "id": "client",
+      "name": "Client",
+      "group": "Client",
+      "call": "Client::builder()",
+      "options": [
+        {
+          "key": "esdk|client|commitmentPolicy",
+          "rust_key": "esdk/Client.commitment_policy",
+          "name": "commitment_policy",
+          "takes": "EsdkCommitmentPolicy",
+          "doc": "Set the commitment policy."
+        },
+        {
+          "key": "esdk|client|maxEncryptedDataKeys",
+          "rust_key": "esdk/Client.max_encrypted_data_keys",
+          "name": "max_encrypted_data_keys",
+          "takes": "usize",
+          "doc": "Set the maximum number of encrypted data keys per message."
+        }
+      ]
+    },
+    {
+      "lib": "esdk",
+      "id": "encrypt",
+      "name": "Encrypt",
+      "group": "Client",
+      "call": "client",
+      "options": [
+        {
+          "key": "esdk|encrypt|plaintext",
+          "rust_key": "esdk/encrypt.plaintext",
+          "name": "plaintext",
+          "takes": "&[u8]",
+          "doc": "The data to encrypt."
+        },
+        {
+          "key": "esdk|encrypt|encryptionContext",
+          "rust_key": "esdk/encrypt.encryption_context",
+          "name": "encryption_context",
+          "takes": "impl Into<String>, impl Into<String>",
+          "doc": "Key-value pairs bound to the message."
+        },
+        {
+          "key": "esdk|encrypt|algorithmSuiteId",
+          "rust_key": "esdk/encrypt.algorithm_suite_id",
+          "name": "algorithm_suite_id",
+          "takes": "EsdkAlgorithmSuiteId",
+          "doc": "The algorithm suite to encrypt with."
+        },
+        {
+          "key": "esdk|encrypt|frameLength",
+          "rust_key": "esdk/encrypt.frame_length",
+          "name": "frame_length",
+          "takes": "u32",
+          "doc": "Bytes of plaintext per frame. Must be greater than 0. Default is 4096."
+        },
+        {
+          "key": "esdk|encrypt|keyring",
+          "rust_key": "esdk/encrypt.keyring",
+          "name": "keyring",
+          "takes": "impl IntoShared<SharedKeyring>",
+          "doc": "The keyring that protects the message's data key."
+        },
+        {
+          "key": "esdk|encrypt|materialsManager",
+          "rust_key": "esdk/encrypt.cmm",
+          "name": "cmm",
+          "takes": "impl IntoShared<SharedCmm>",
+          "doc": "The cryptographic materials manager (CMM) that supplies the message's data key."
+        }
+      ]
+    },
+    {
+      "lib": "esdk",
+      "id": "decrypt",
+      "name": "Decrypt",
+      "group": "Client",
+      "call": "client",
+      "options": [
+        {
+          "key": "esdk|decrypt|ciphertext",
+          "rust_key": "esdk/decrypt.ciphertext",
+          "name": "ciphertext",
+          "takes": "&[u8]",
+          "doc": "The encrypted message to decrypt."
+        },
+        {
+          "key": "esdk|decrypt|encryptionContext",
+          "rust_key": "esdk/decrypt.encryption_context",
+          "name": "encryption_context",
+          "takes": "impl Into<String>, impl Into<String>",
+          "doc": "Key-value pairs the message's encryption context must contain."
+        },
+        {
+          "key": "esdk|decrypt|keyring",
+          "rust_key": "esdk/decrypt.keyring",
+          "name": "keyring",
+          "takes": "impl IntoShared<SharedKeyring>",
+          "doc": "The keyring that protects the message's data key."
+        },
+        {
+          "key": "esdk|decrypt|materialsManager",
+          "rust_key": "esdk/decrypt.cmm",
+          "name": "cmm",
+          "takes": "impl IntoShared<SharedCmm>",
+          "doc": "The cryptographic materials manager (CMM) that supplies the message's data key."
+        }
+      ]
+    }
+  ],
+  "rows": {
+    "mpl|aws-kms-keyring|kmsKeyId": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 40,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1140
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 4,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1152
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 31,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1164
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_kms_key_id(x)",
+        "kind": "optional text",
+        "trial": 63,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1175
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 13,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1187
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".kms_key_id(x)",
+        "kind": "text",
+        "trial": 22,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1198
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_kms_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 59,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1205
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_kms_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 69,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1218
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".kms_key_id(x.to_string())",
+        "kind": "text",
+        "trial": 52,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1230
+      }
+    ],
+    "mpl|aws-kms-keyring|kmsClient": [
+      {
+        "type": "kms::Client",
+        "calls": 0,
+        "code": ".kms_client(x)",
+        "kind": "named",
+        "trial": 73,
+        "run": {
+          "builds": true
+        },
+        "test": 1072
+      },
+      {
+        "type": "&SdkConfig",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::new(x))",
+        "kind": "ctor",
+        "trial": 92,
+        "run": {
+          "builds": true
+        },
+        "test": 1083
+      },
+      {
+        "type": "&kms::Client",
+        "calls": 1,
+        "code": ".kms_client(x.clone())",
+        "kind": "named",
+        "trial": 78,
+        "run": {
+          "builds": true
+        },
+        "test": 1095
+      },
+      {
+        "type": "Arc<kms::Client>",
+        "calls": 1,
+        "code": ".kms_client((*x).clone())",
+        "kind": "named",
+        "trial": 83,
+        "run": {
+          "builds": true
+        },
+        "test": 1107
+      },
+      {
+        "type": "SdkConfig",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::new(&x))",
+        "kind": "ctor",
+        "trial": 90,
+        "run": {
+          "builds": true
+        },
+        "test": 1118
+      },
+      {
+        "type": "kms::Config",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::from_conf(x))",
+        "kind": "ctor",
+        "trial": 87,
+        "run": {
+          "builds": true
+        },
+        "test": 1129
+      }
+    ],
+    "mpl|aws-kms-keyring|grantTokens": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 129,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 923
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 93,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 935
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 120,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 947
+      },
+      {
+        "type": "Option<Vec<String>>",
+        "calls": 0,
+        "code": ".set_grant_tokens(x)",
+        "kind": "optional list",
+        "trial": 177,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 958
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 102,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 970
+      },
+      {
+        "type": "Vec<String>",
+        "calls": 0,
+        "code": ".set_grant_tokens(Some(x))",
+        "kind": "list",
+        "trial": 174,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 981
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 111,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 992
+      },
+      {
+        "type": "&[String]",
+        "calls": 1,
+        "code": ".set_grant_tokens(Some(x.to_vec()))",
+        "kind": "list",
+        "trial": 170,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 999
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 150,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1011
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 160,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1024
+      },
+      {
+        "type": "Option<String>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 155,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1036
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".grant_tokens(x.to_string())",
+        "kind": "text",
+        "trial": 141,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1048
+      },
+      {
+        "type": "&[&str]",
+        "calls": 4,
+        "code": ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
+        "kind": "list",
+        "trial": 166,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1059
+      }
+    ],
+    "mpl|hierarchical-keyring|keyStore": [
+      {
+        "type": "DynamoDbKeyStore",
+        "calls": 0,
+        "code": ".key_store(x)",
+        "kind": "component",
+        "trial": 179
+      },
+      {
+        "type": "SharedKeyStore",
+        "calls": 0,
+        "code": ".key_store(x)",
+        "kind": "component",
+        "trial": 206
+      },
+      {
+        "type": "&DynamoDbKeyStore",
+        "calls": 1,
+        "code": ".key_store(x.clone())",
+        "kind": "component",
+        "trial": 190
+      },
+      {
+        "type": "&SharedKeyStore",
+        "calls": 1,
+        "code": ".key_store(x.clone())",
+        "kind": "component",
+        "trial": 217
+      },
+      {
+        "type": "Arc<DynamoDbKeyStore>",
+        "calls": 1,
+        "code": ".key_store((*x).clone())",
+        "kind": "component",
+        "trial": 200
+      }
+    ],
+    "mpl|hierarchical-keyring|ttlSeconds": [
+      {
+        "type": "Duration",
+        "calls": 0,
+        "code": ".ttl(x)",
+        "kind": "duration",
+        "trial": 224,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1342
+      },
+      {
+        "type": "u16",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 250,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1353
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 240,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1364
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 235,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1375
+      },
+      {
+        "type": "u8",
+        "calls": 2,
+        "code": ".ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 245,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1386
+      },
+      {
+        "type": "i16",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 266,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1397
+      },
+      {
+        "type": "i32",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 256,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1408
+      },
+      {
+        "type": "i64",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 261,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1419
+      },
+      {
+        "type": "i8",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 271,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1430
+      },
+      {
+        "type": "usize",
+        "calls": 3,
+        "code": ".ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 231,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1441
+      }
+    ],
+    "mpl|hierarchical-keyring|branchKeyId": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 308,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1241
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 272,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1253
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 299,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1265
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_branch_key_id(x)",
+        "kind": "optional text",
+        "trial": 331,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1276
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 281,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1288
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".branch_key_id(x)",
+        "kind": "text",
+        "trial": 290,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1299
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_branch_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 327,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1306
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_branch_key_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 337,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1319
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".branch_key_id(x.to_string())",
+        "kind": "text",
+        "trial": 320,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1331
+      }
+    ],
+    "mpl|hierarchical-keyring|branchKeyIdSupplier": [
+      {
+        "type": "SharedBranchKeyIdSupplier",
+        "calls": 0,
+        "code": ".branch_key_id_supplier(x)",
+        "kind": "component",
+        "trial": 341
+      },
+      {
+        "type": "&SharedBranchKeyIdSupplier",
+        "calls": 1,
+        "code": ".branch_key_id_supplier(x.clone())",
+        "kind": "component",
+        "trial": 352
+      }
+    ],
+    "mpl|hierarchical-keyring|cache": [
+      {
+        "type": "DefaultCmc",
+        "calls": 0,
+        "code": ".cache(x)",
+        "kind": "component",
+        "trial": 359
+      },
+      {
+        "type": "LocalCmc",
+        "calls": 0,
+        "code": ".cache(x)",
+        "kind": "component",
+        "trial": 386
+      },
+      {
+        "type": "SharedCmc",
+        "calls": 0,
+        "code": ".cache(x)",
+        "kind": "component",
+        "trial": 440
+      },
+      {
+        "type": "StormTrackingCmc",
+        "calls": 0,
+        "code": ".cache(x)",
+        "kind": "component",
+        "trial": 413
+      },
+      {
+        "type": "&DefaultCmc",
+        "calls": 1,
+        "code": ".cache(x.clone())",
+        "kind": "component",
+        "trial": 370
+      },
+      {
+        "type": "&LocalCmc",
+        "calls": 1,
+        "code": ".cache(x.clone())",
+        "kind": "component",
+        "trial": 397
+      },
+      {
+        "type": "&SharedCmc",
+        "calls": 1,
+        "code": ".cache(x.clone())",
+        "kind": "component",
+        "trial": 451
+      },
+      {
+        "type": "&StormTrackingCmc",
+        "calls": 1,
+        "code": ".cache(x.clone())",
+        "kind": "component",
+        "trial": 424
+      },
+      {
+        "type": "Arc<DefaultCmc>",
+        "calls": 1,
+        "code": ".cache((*x).clone())",
+        "kind": "component",
+        "trial": 380
+      },
+      {
+        "type": "Arc<LocalCmc>",
+        "calls": 1,
+        "code": ".cache((*x).clone())",
+        "kind": "component",
+        "trial": 407
+      },
+      {
+        "type": "Arc<StormTrackingCmc>",
+        "calls": 1,
+        "code": ".cache((*x).clone())",
+        "kind": "component",
+        "trial": 434
+      }
+    ],
+    "mpl|hierarchical-keyring|partitionId": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".partition_id(x)",
+        "kind": "text",
+        "trial": 494
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".partition_id(x)",
+        "kind": "text",
+        "trial": 458
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".partition_id(x)",
+        "kind": "text",
+        "trial": 485
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_partition_id(x)",
+        "kind": "optional text",
+        "trial": 517
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".partition_id(x)",
+        "kind": "text",
+        "trial": 467
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".partition_id(x)",
+        "kind": "text",
+        "trial": 476
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_partition_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 513
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_partition_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 523
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".partition_id(x.to_string())",
+        "kind": "text",
+        "trial": 506
+      }
+    ],
+    "mpl|raw-aes-keyring|keyNamespace": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".key_namespace(x)",
+        "kind": "text",
+        "trial": 563
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".key_namespace(x)",
+        "kind": "text",
+        "trial": 527
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".key_namespace(x)",
+        "kind": "text",
+        "trial": 554
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_key_namespace(x)",
+        "kind": "optional text",
+        "trial": 586
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".key_namespace(x)",
+        "kind": "text",
+        "trial": 536
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".key_namespace(x)",
+        "kind": "text",
+        "trial": 545
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_key_namespace(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 582
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_key_namespace(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 592
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".key_namespace(x.to_string())",
+        "kind": "text",
+        "trial": 575
+      }
+    ],
+    "mpl|raw-aes-keyring|keyName": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 632,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1452
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 596,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1464
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 623,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1476
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_key_name(x)",
+        "kind": "optional text",
+        "trial": 655,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1487
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 605,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1499
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".key_name(x)",
+        "kind": "text",
+        "trial": 614,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1510
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_key_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 651,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1517
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_key_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 661,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1530
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".key_name(x.to_string())",
+        "kind": "text",
+        "trial": 644,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1542
+      }
+    ],
+    "mpl|raw-aes-keyring|wrappingKey": [
+      {
+        "type": "&[u8]",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 665,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1553
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "text",
+        "trial": 771,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1565
+      },
+      {
+        "type": "Blob",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 715,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1577
+      },
+      {
+        "type": "Box<[u8]>",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 685,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1588
+      },
+      {
+        "type": "Bytes",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 695,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1599
+      },
+      {
+        "type": "Option<Vec<u8>>",
+        "calls": 0,
+        "code": ".set_wrapping_key(x)",
+        "kind": "optional bytes",
+        "trial": 734,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1610
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "text",
+        "trial": 780,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1622
+      },
+      {
+        "type": "Vec<u8>",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 675,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1633
+      },
+      {
+        "type": "[u8; 32]",
+        "calls": 0,
+        "code": ".wrapping_key(x)",
+        "kind": "bytes",
+        "trial": 705,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1644
+      },
+      {
+        "type": "&String",
+        "calls": 1,
+        "code": ".wrapping_key(x.clone())",
+        "kind": "text",
+        "trial": 809,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1656
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 1,
+        "code": ".wrapping_key(x.to_string())",
+        "kind": "text",
+        "trial": 801,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1668
+      },
+      {
+        "type": "Option<&[u8]>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional bytes",
+        "trial": 726,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1679
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 826,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1692
+      },
+      {
+        "type": "Option<Blob>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional bytes",
+        "trial": 753,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1705
+      },
+      {
+        "type": "Option<String>",
+        "calls": 1,
+        "code": ".set_wrapping_key(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 831,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1717
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".wrapping_key(x.to_string())",
+        "kind": "text",
+        "trial": 819,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1729
+      },
+      {
+        "type": "char",
+        "calls": 1,
+        "code": ".wrapping_key(x.to_string())",
+        "kind": "text",
+        "trial": 792,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 1740
+      },
+      {
+        "type": "&Path",
+        "calls": 2,
+        "code": ".wrapping_key(std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 844,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1747
+      },
+      {
+        "type": "ByteStream",
+        "calls": 2,
+        "code": ".wrapping_key(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 762,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1759
+      },
+      {
+        "type": "Option<&Blob>",
+        "calls": 2,
+        "code": ".wrapping_key(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 749,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1770
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 2,
+        "code": ".wrapping_key(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 839,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1783
+      },
+      {
+        "type": "PathBuf",
+        "calls": 2,
+        "code": ".wrapping_key(std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 841,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1795
+      },
+      {
+        "type": "SdkBody",
+        "calls": 2,
+        "code": ".wrapping_key(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 767,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1806
+      },
+      {
+        "type": "File",
+        "calls": 3,
+        "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 847,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 1817
+      },
+      {
+        "type": "TcpStream",
+        "calls": 3,
+        "code": ".wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 850,
+        "run": {
+          "skipped": "needs a network connection"
+        },
+        "test": 1828
+      }
+    ],
+    "mpl|raw-aes-keyring|wrappingAlg": [
+      {
+        "type": "AesWrappingAlg",
+        "calls": 0,
+        "code": ".wrapping_alg(x)",
+        "kind": "named",
+        "trial": 852
+      },
+      {
+        "type": "&AesWrappingAlg",
+        "calls": 1,
+        "code": ".wrapping_alg(x.clone())",
+        "kind": "named",
+        "trial": 857
+      }
+    ],
+    "mpl|default-cmm|keyring": [
+      {
+        "type": "AwsKmsKeyring",
+        "calls": 0,
+        "code": "::new(x)",
+        "kind": "component",
+        "trial": 860
+      },
+      {
+        "type": "HierarchicalKeyring",
+        "calls": 0,
+        "code": "::new(x)",
+        "kind": "component",
+        "trial": 878
+      },
+      {
+        "type": "RawAesKeyring",
+        "calls": 0,
+        "code": "::new(x)",
+        "kind": "component",
+        "trial": 896
+      },
+      {
+        "type": "SharedKeyring",
+        "calls": 0,
+        "code": "::new(x)",
+        "kind": "component",
+        "trial": 914
+      },
+      {
+        "type": "&AwsKmsKeyring",
+        "calls": 1,
+        "code": "::new(x.clone())",
+        "kind": "component",
+        "trial": 868
+      },
+      {
+        "type": "&HierarchicalKeyring",
+        "calls": 1,
+        "code": "::new(x.clone())",
+        "kind": "component",
+        "trial": 886
+      },
+      {
+        "type": "&RawAesKeyring",
+        "calls": 1,
+        "code": "::new(x.clone())",
+        "kind": "component",
+        "trial": 904
+      },
+      {
+        "type": "&SharedKeyring",
+        "calls": 1,
+        "code": "::new(x.clone())",
+        "kind": "component",
+        "trial": 922
+      },
+      {
+        "type": "Arc<AwsKmsKeyring>",
+        "calls": 1,
+        "code": "::new((*x).clone())",
+        "kind": "component",
+        "trial": 875
+      },
+      {
+        "type": "Arc<HierarchicalKeyring>",
+        "calls": 1,
+        "code": "::new((*x).clone())",
+        "kind": "component",
+        "trial": 893
+      },
+      {
+        "type": "Arc<RawAesKeyring>",
+        "calls": 1,
+        "code": "::new((*x).clone())",
+        "kind": "component",
+        "trial": 911
+      }
+    ],
+    "mpl|dynamo-db-key-store|ddbTableName": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".ddb_table_name(x)",
+        "kind": "text",
+        "trial": 962
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".ddb_table_name(x)",
+        "kind": "text",
+        "trial": 926
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".ddb_table_name(x)",
+        "kind": "text",
+        "trial": 953
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_ddb_table_name(x)",
+        "kind": "optional text",
+        "trial": 985
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".ddb_table_name(x)",
+        "kind": "text",
+        "trial": 935
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".ddb_table_name(x)",
+        "kind": "text",
+        "trial": 944
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_ddb_table_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 981
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_ddb_table_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 991
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".ddb_table_name(x.to_string())",
+        "kind": "text",
+        "trial": 974
+      }
+    ],
+    "mpl|dynamo-db-key-store|logicalKeyStoreName": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".logical_key_store_name(x)",
+        "kind": "text",
+        "trial": 1031
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".logical_key_store_name(x)",
+        "kind": "text",
+        "trial": 995
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".logical_key_store_name(x)",
+        "kind": "text",
+        "trial": 1022
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_logical_key_store_name(x)",
+        "kind": "optional text",
+        "trial": 1054
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".logical_key_store_name(x)",
+        "kind": "text",
+        "trial": 1004
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".logical_key_store_name(x)",
+        "kind": "text",
+        "trial": 1013
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_logical_key_store_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 1050
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_logical_key_store_name(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 1060
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".logical_key_store_name(x.to_string())",
+        "kind": "text",
+        "trial": 1043
+      }
+    ],
+    "mpl|dynamo-db-key-store|kmsConfiguration": [
+      {
+        "type": "KmsConfiguration",
+        "calls": 0,
+        "code": ".kms_configuration(x)",
+        "kind": "named",
+        "trial": 1064
+      },
+      {
+        "type": "&KmsConfiguration",
+        "calls": 1,
+        "code": ".kms_configuration(x.clone())",
+        "kind": "named",
+        "trial": 1069
+      }
+    ],
+    "mpl|dynamo-db-key-store|id": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".id(x)",
+        "kind": "text",
+        "trial": 1108
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".id(x)",
+        "kind": "text",
+        "trial": 1072
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".id(x)",
+        "kind": "text",
+        "trial": 1099
+      },
+      {
+        "type": "Option<String>",
+        "calls": 0,
+        "code": ".set_id(x)",
+        "kind": "optional text",
+        "trial": 1131
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".id(x)",
+        "kind": "text",
+        "trial": 1081
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".id(x)",
+        "kind": "text",
+        "trial": 1090
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".set_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 1127
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".set_id(x.map(Into::into))",
+        "kind": "optional text",
+        "trial": 1137
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".id(x.to_string())",
+        "kind": "text",
+        "trial": 1120
+      }
+    ],
+    "mpl|dynamo-db-key-store|grantTokens": [
+      {
+        "type": "&String",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 1177
+      },
+      {
+        "type": "&str",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 1141
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 1168
+      },
+      {
+        "type": "Option<Vec<String>>",
+        "calls": 0,
+        "code": ".set_grant_tokens(x)",
+        "kind": "optional list",
+        "trial": 1225
+      },
+      {
+        "type": "String",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 1150
+      },
+      {
+        "type": "Vec<String>",
+        "calls": 0,
+        "code": ".set_grant_tokens(Some(x))",
+        "kind": "list",
+        "trial": 1222
+      },
+      {
+        "type": "char",
+        "calls": 0,
+        "code": ".grant_tokens(x)",
+        "kind": "text",
+        "trial": 1159
+      },
+      {
+        "type": "&[String]",
+        "calls": 1,
+        "code": ".set_grant_tokens(Some(x.to_vec()))",
+        "kind": "list",
+        "trial": 1218
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 1198
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 1208
+      },
+      {
+        "type": "Option<String>",
+        "calls": 1,
+        "code": ".grant_tokens(x.unwrap())",
+        "kind": "optional text",
+        "trial": 1203
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".grant_tokens(x.to_string())",
+        "kind": "text",
+        "trial": 1189
+      },
+      {
+        "type": "&[&str]",
+        "calls": 4,
+        "code": ".set_grant_tokens(Some(x.iter().map(|s| s.to_string()).collect()))",
+        "kind": "list",
+        "trial": 1214
+      }
+    ],
+    "mpl|dynamo-db-key-store|kmsClient": [
+      {
+        "type": "kms::Client",
+        "calls": 0,
+        "code": ".kms_client(x)",
+        "kind": "named",
+        "trial": 1227
+      },
+      {
+        "type": "&SdkConfig",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::new(x))",
+        "kind": "ctor",
+        "trial": 1246
+      },
+      {
+        "type": "&kms::Client",
+        "calls": 1,
+        "code": ".kms_client(x.clone())",
+        "kind": "named",
+        "trial": 1232
+      },
+      {
+        "type": "Arc<kms::Client>",
+        "calls": 1,
+        "code": ".kms_client((*x).clone())",
+        "kind": "named",
+        "trial": 1237
+      },
+      {
+        "type": "SdkConfig",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::new(&x))",
+        "kind": "ctor",
+        "trial": 1244
+      },
+      {
+        "type": "kms::Config",
+        "calls": 1,
+        "code": ".kms_client(aws_sdk_kms::Client::from_conf(x))",
+        "kind": "ctor",
+        "trial": 1241
+      }
+    ],
+    "mpl|dynamo-db-key-store|ddbClient": [
+      {
+        "type": "dynamodb::Client",
+        "calls": 0,
+        "code": ".ddb_client(x)",
+        "kind": "named",
+        "trial": 1247
+      },
+      {
+        "type": "&SdkConfig",
+        "calls": 1,
+        "code": ".ddb_client(aws_sdk_dynamodb::Client::new(x))",
+        "kind": "ctor",
+        "trial": 1266
+      },
+      {
+        "type": "&dynamodb::Client",
+        "calls": 1,
+        "code": ".ddb_client(x.clone())",
+        "kind": "named",
+        "trial": 1252
+      },
+      {
+        "type": "Arc<dynamodb::Client>",
+        "calls": 1,
+        "code": ".ddb_client((*x).clone())",
+        "kind": "named",
+        "trial": 1257
+      },
+      {
+        "type": "SdkConfig",
+        "calls": 1,
+        "code": ".ddb_client(aws_sdk_dynamodb::Client::new(&x))",
+        "kind": "ctor",
+        "trial": 1264
+      },
+      {
+        "type": "dynamodb::Config",
+        "calls": 1,
+        "code": ".ddb_client(aws_sdk_dynamodb::Client::from_conf(x))",
+        "kind": "ctor",
+        "trial": 1261
+      }
+    ],
+    "mpl|default-cmc|entryCapacity": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".entry_capacity(x)",
+        "kind": "number",
+        "trial": 1267
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".entry_capacity(x.into())",
+        "kind": "number",
+        "trial": 1288
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".entry_capacity(x.into())",
+        "kind": "number",
+        "trial": 1283
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1304
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1294
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1299
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1309
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1279
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1274
+      }
+    ],
+    "mpl|local-cmc|entryCapacity": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".entry_capacity(x)",
+        "kind": "number",
+        "trial": 1312
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".entry_capacity(x.into())",
+        "kind": "number",
+        "trial": 1333
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".entry_capacity(x.into())",
+        "kind": "number",
+        "trial": 1328
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1349
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1339
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1344
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1354
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1324
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1319
+      }
+    ],
+    "mpl|local-cmc|entryPruningTailSize": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".entry_pruning_tail_size(x)",
+        "kind": "number",
+        "trial": 1357
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".entry_pruning_tail_size(x.into())",
+        "kind": "number",
+        "trial": 1378
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".entry_pruning_tail_size(x.into())",
+        "kind": "number",
+        "trial": 1373
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1394
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1384
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1389
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1399
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1369
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1364
+      }
+    ],
+    "mpl|storm-tracking-cmc|entryCapacity": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".entry_capacity(x)",
+        "kind": "number",
+        "trial": 1402
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".entry_capacity(x.into())",
+        "kind": "number",
+        "trial": 1423
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".entry_capacity(x.into())",
+        "kind": "number",
+        "trial": 1418
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1439
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1429
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1434
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1444
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1414
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".entry_capacity(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1409
+      }
+    ],
+    "mpl|storm-tracking-cmc|entryPruningTailSize": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".entry_pruning_tail_size(x)",
+        "kind": "number",
+        "trial": 1447
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".entry_pruning_tail_size(x.into())",
+        "kind": "number",
+        "trial": 1468
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".entry_pruning_tail_size(x.into())",
+        "kind": "number",
+        "trial": 1463
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1484
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1474
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1479
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1489
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1459
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".entry_pruning_tail_size(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1454
+      }
+    ],
+    "mpl|storm-tracking-cmc|gracePeriod": [
+      {
+        "type": "Duration",
+        "calls": 0,
+        "code": ".grace_period(x)",
+        "kind": "duration",
+        "trial": 1492
+      },
+      {
+        "type": "u16",
+        "calls": 2,
+        "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1518
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1508
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1503
+      },
+      {
+        "type": "u8",
+        "calls": 2,
+        "code": ".grace_period(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1513
+      },
+      {
+        "type": "i16",
+        "calls": 3,
+        "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1534
+      },
+      {
+        "type": "i32",
+        "calls": 3,
+        "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1524
+      },
+      {
+        "type": "i64",
+        "calls": 3,
+        "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1529
+      },
+      {
+        "type": "i8",
+        "calls": 3,
+        "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1539
+      },
+      {
+        "type": "usize",
+        "calls": 3,
+        "code": ".grace_period(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1499
+      }
+    ],
+    "mpl|storm-tracking-cmc|graceInterval": [
+      {
+        "type": "Duration",
+        "calls": 0,
+        "code": ".grace_interval(x)",
+        "kind": "duration",
+        "trial": 1540
+      },
+      {
+        "type": "u16",
+        "calls": 2,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1566
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1556
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1551
+      },
+      {
+        "type": "u8",
+        "calls": 2,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1561
+      },
+      {
+        "type": "i16",
+        "calls": 3,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1582
+      },
+      {
+        "type": "i32",
+        "calls": 3,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1572
+      },
+      {
+        "type": "i64",
+        "calls": 3,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1577
+      },
+      {
+        "type": "i8",
+        "calls": 3,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1587
+      },
+      {
+        "type": "usize",
+        "calls": 3,
+        "code": ".grace_interval(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1547
+      }
+    ],
+    "mpl|storm-tracking-cmc|fanOut": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".fan_out(x)",
+        "kind": "number",
+        "trial": 1588
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".fan_out(x.into())",
+        "kind": "number",
+        "trial": 1609
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".fan_out(x.into())",
+        "kind": "number",
+        "trial": 1604
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".fan_out(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1625
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".fan_out(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1615
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".fan_out(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1620
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".fan_out(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1630
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".fan_out(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1600
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".fan_out(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1595
+      }
+    ],
+    "mpl|storm-tracking-cmc|inFlightTtl": [
+      {
+        "type": "Duration",
+        "calls": 0,
+        "code": ".in_flight_ttl(x)",
+        "kind": "duration",
+        "trial": 1633
+      },
+      {
+        "type": "u16",
+        "calls": 2,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1659
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1649
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1644
+      },
+      {
+        "type": "u8",
+        "calls": 2,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1654
+      },
+      {
+        "type": "i16",
+        "calls": 3,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1675
+      },
+      {
+        "type": "i32",
+        "calls": 3,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1665
+      },
+      {
+        "type": "i64",
+        "calls": 3,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1670
+      },
+      {
+        "type": "i8",
+        "calls": 3,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1680
+      },
+      {
+        "type": "usize",
+        "calls": 3,
+        "code": ".in_flight_ttl(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1640
+      }
+    ],
+    "mpl|storm-tracking-cmc|sleep": [
+      {
+        "type": "Duration",
+        "calls": 0,
+        "code": ".sleep(x)",
+        "kind": "duration",
+        "trial": 1681
+      },
+      {
+        "type": "u16",
+        "calls": 2,
+        "code": ".sleep(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1707
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".sleep(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1697
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".sleep(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1692
+      },
+      {
+        "type": "u8",
+        "calls": 2,
+        "code": ".sleep(std::time::Duration::from_secs(x.into()))",
+        "kind": "number",
+        "trial": 1702
+      },
+      {
+        "type": "i16",
+        "calls": 3,
+        "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1723
+      },
+      {
+        "type": "i32",
+        "calls": 3,
+        "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1713
+      },
+      {
+        "type": "i64",
+        "calls": 3,
+        "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1718
+      },
+      {
+        "type": "i8",
+        "calls": 3,
+        "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1728
+      },
+      {
+        "type": "usize",
+        "calls": 3,
+        "code": ".sleep(std::time::Duration::from_secs(x.try_into().unwrap()))",
+        "kind": "number",
+        "trial": 1688
+      }
+    ],
+    "esdk|client|commitmentPolicy": [
+      {
+        "type": "EsdkCommitmentPolicy",
+        "calls": 0,
+        "code": ".commitment_policy(x)",
+        "kind": "named",
+        "trial": 1729
+      },
+      {
+        "type": "&EsdkCommitmentPolicy",
+        "calls": 1,
+        "code": ".commitment_policy(x.clone())",
+        "kind": "named",
+        "trial": 1734
+      }
+    ],
+    "esdk|client|maxEncryptedDataKeys": [
+      {
+        "type": "usize",
+        "calls": 0,
+        "code": ".max_encrypted_data_keys(x)",
+        "kind": "number",
+        "trial": 1737,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 11
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".max_encrypted_data_keys(x.into())",
+        "kind": "number",
+        "trial": 1758,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 22
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".max_encrypted_data_keys(x.into())",
+        "kind": "number",
+        "trial": 1753,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 33
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1774,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 44
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1764,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 55
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1769,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 66
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1779,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 77
+      },
+      {
+        "type": "u32",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1749,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 88
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".max_encrypted_data_keys(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 1744,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 99
+      }
+    ],
+    "esdk|encrypt|plaintext": [
+      {
+        "type": "&[u8]",
+        "calls": 0,
+        "code": ".encrypt().plaintext(x)",
+        "kind": "bytes",
+        "trial": 1782,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 607
+      },
+      {
+        "type": "Box<[u8]>",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 1803,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 622
+      },
+      {
+        "type": "Bytes",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 1813,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 636
+      },
+      {
+        "type": "Option<&[u8]>",
+        "calls": 0,
+        "code": ".encrypt().set_plaintext(x)",
+        "kind": "optional bytes",
+        "trial": 1842,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 650
+      },
+      {
+        "type": "Vec<u8>",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 1793,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 666
+      },
+      {
+        "type": "[u8; 32]",
+        "calls": 0,
+        "code": ".encrypt().plaintext(&x)",
+        "kind": "bytes",
+        "trial": 1823,
+        "run": {
+          "skipped": "the value is not 32 bytes"
+        },
+        "test": 680
+      },
+      {
+        "type": "&String",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 1929,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 695
+      },
+      {
+        "type": "&str",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 1893,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 710
+      },
+      {
+        "type": "Blob",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_ref())",
+        "kind": "bytes",
+        "trial": 1837,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 725
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 1920,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 739
+      },
+      {
+        "type": "String",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 1902,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 753
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".encrypt().plaintext(x.as_bytes())",
+        "kind": "text",
+        "trial": 1938,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 767
+      },
+      {
+        "type": "&Path",
+        "calls": 2,
+        "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 1962,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 781
+      },
+      {
+        "type": "ByteStream",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 1879,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 792
+      },
+      {
+        "type": "Option<&Blob>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 1866,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 806
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 1946,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 822
+      },
+      {
+        "type": "Option<Blob>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 1875,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 838
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 1956,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 849
+      },
+      {
+        "type": "Option<String>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 1951,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 860
+      },
+      {
+        "type": "Option<Vec<u8>>",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 1857,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 871
+      },
+      {
+        "type": "PathBuf",
+        "calls": 2,
+        "code": ".encrypt().plaintext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 1959,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 882
+      },
+      {
+        "type": "SdkBody",
+        "calls": 2,
+        "code": ".encrypt().plaintext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 1884,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 892
+      },
+      {
+        "type": "File",
+        "calls": 3,
+        "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 1965,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 906
+      },
+      {
+        "type": "TcpStream",
+        "calls": 3,
+        "code": ".encrypt().plaintext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 1968,
+        "run": {
+          "skipped": "needs a network connection"
+        },
+        "test": 916
+      },
+      {
+        "type": "char",
+        "calls": null,
+        "code": "",
+        "kind": "text",
+        "trial": null
+      }
+    ],
+    "esdk|encrypt|encryptionContext": [
+      {
+        "type": "(&String, &String)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1988,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 426
+      },
+      {
+        "type": "(&str, &str)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1976,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 440
+      },
+      {
+        "type": "(Cow<str>, Cow<str>)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1985,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 454
+      },
+      {
+        "type": "(String, String)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1979,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 466
+      },
+      {
+        "type": "(char, char)",
+        "calls": 0,
+        "code": ".encrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 1982,
+        "run": {
+          "skipped": "a char holds one letter, not the whole value"
+        },
+        "test": 478
+      },
+      {
+        "type": "HashMap<String, String>",
+        "calls": 1,
+        "code": ".encrypt().set_encryption_context(Some(x.into()))",
+        "kind": "map",
+        "trial": 1972,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 485
+      },
+      {
+        "type": "(Zeroizing<String>, Zeroizing<String>)",
+        "calls": 2,
+        "code": ".encrypt().encryption_context(x.to_string(), y.to_string())",
+        "kind": "pair",
+        "trial": 1993,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 496
+      }
+    ],
+    "esdk|encrypt|algorithmSuiteId": [
+      {
+        "type": "EsdkAlgorithmSuiteId",
+        "calls": 0,
+        "code": ".encrypt().algorithm_suite_id(x)",
+        "kind": "named",
+        "trial": 1994
+      },
+      {
+        "type": "&EsdkAlgorithmSuiteId",
+        "calls": 1,
+        "code": ".encrypt().algorithm_suite_id(x.clone())",
+        "kind": "named",
+        "trial": 1999
+      }
+    ],
+    "esdk|encrypt|frameLength": [
+      {
+        "type": "u32",
+        "calls": 0,
+        "code": ".encrypt().frame_length(x)",
+        "kind": "number",
+        "trial": 2012,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 508
+      },
+      {
+        "type": "u16",
+        "calls": 1,
+        "code": ".encrypt().frame_length(x.into())",
+        "kind": "number",
+        "trial": 2023,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 519
+      },
+      {
+        "type": "u8",
+        "calls": 1,
+        "code": ".encrypt().frame_length(x.into())",
+        "kind": "number",
+        "trial": 2018,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 530
+      },
+      {
+        "type": "i16",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 2039,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 541
+      },
+      {
+        "type": "i32",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 2029,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 552
+      },
+      {
+        "type": "i64",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 2034,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 563
+      },
+      {
+        "type": "i8",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 2044,
+        "run": {
+          "skipped": "the value does not fit in an i8"
+        },
+        "test": 574
+      },
+      {
+        "type": "u64",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 2009,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 585
+      },
+      {
+        "type": "usize",
+        "calls": 2,
+        "code": ".encrypt().frame_length(x.try_into().unwrap())",
+        "kind": "number",
+        "trial": 2004,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 596
+      }
+    ],
+    "esdk|encrypt|keyring": [
+      {
+        "type": "AwsKmsKeyring",
+        "calls": 0,
+        "code": ".encrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2047
+      },
+      {
+        "type": "HierarchicalKeyring",
+        "calls": 0,
+        "code": ".encrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2074
+      },
+      {
+        "type": "RawAesKeyring",
+        "calls": 0,
+        "code": ".encrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2101
+      },
+      {
+        "type": "SharedKeyring",
+        "calls": 0,
+        "code": ".encrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2128
+      },
+      {
+        "type": "&AwsKmsKeyring",
+        "calls": 1,
+        "code": ".encrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2058
+      },
+      {
+        "type": "&HierarchicalKeyring",
+        "calls": 1,
+        "code": ".encrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2085
+      },
+      {
+        "type": "&RawAesKeyring",
+        "calls": 1,
+        "code": ".encrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2112
+      },
+      {
+        "type": "&SharedKeyring",
+        "calls": 1,
+        "code": ".encrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2139
+      },
+      {
+        "type": "Arc<AwsKmsKeyring>",
+        "calls": 1,
+        "code": ".encrypt().keyring((*x).clone())",
+        "kind": "component",
+        "trial": 2068
+      },
+      {
+        "type": "Arc<HierarchicalKeyring>",
+        "calls": 1,
+        "code": ".encrypt().keyring((*x).clone())",
+        "kind": "component",
+        "trial": 2095
+      },
+      {
+        "type": "Arc<RawAesKeyring>",
+        "calls": 1,
+        "code": ".encrypt().keyring((*x).clone())",
+        "kind": "component",
+        "trial": 2122
+      }
+    ],
+    "esdk|encrypt|materialsManager": [
+      {
+        "type": "DefaultCmm",
+        "calls": 0,
+        "code": ".encrypt().cmm(x)",
+        "kind": "component",
+        "trial": 2146
+      },
+      {
+        "type": "SharedCmm",
+        "calls": 0,
+        "code": ".encrypt().cmm(x)",
+        "kind": "component",
+        "trial": 2173
+      },
+      {
+        "type": "&DefaultCmm",
+        "calls": 1,
+        "code": ".encrypt().cmm(x.clone())",
+        "kind": "component",
+        "trial": 2157
+      },
+      {
+        "type": "&SharedCmm",
+        "calls": 1,
+        "code": ".encrypt().cmm(x.clone())",
+        "kind": "component",
+        "trial": 2184
+      },
+      {
+        "type": "Arc<DefaultCmm>",
+        "calls": 1,
+        "code": ".encrypt().cmm((*x).clone())",
+        "kind": "component",
+        "trial": 2167
+      }
+    ],
+    "esdk|decrypt|ciphertext": [
+      {
+        "type": "&[u8]",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(x)",
+        "kind": "bytes",
+        "trial": 2191,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 110
+      },
+      {
+        "type": "Box<[u8]>",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 2212,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 125
+      },
+      {
+        "type": "Bytes",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 2222,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 139
+      },
+      {
+        "type": "Option<&[u8]>",
+        "calls": 0,
+        "code": ".decrypt().set_ciphertext(x)",
+        "kind": "optional bytes",
+        "trial": 2251,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 153
+      },
+      {
+        "type": "Vec<u8>",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 2202,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 169
+      },
+      {
+        "type": "[u8; 32]",
+        "calls": 0,
+        "code": ".decrypt().ciphertext(&x)",
+        "kind": "bytes",
+        "trial": 2232,
+        "run": {
+          "skipped": "the value is not 32 bytes"
+        },
+        "test": 183
+      },
+      {
+        "type": "&String",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 2338,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 198
+      },
+      {
+        "type": "&str",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 2302,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 213
+      },
+      {
+        "type": "Blob",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_ref())",
+        "kind": "bytes",
+        "trial": 2246,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 228
+      },
+      {
+        "type": "Cow<str>",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 2329,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 242
+      },
+      {
+        "type": "String",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 2311,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 256
+      },
+      {
+        "type": "Zeroizing<String>",
+        "calls": 1,
+        "code": ".decrypt().ciphertext(x.as_bytes())",
+        "kind": "text",
+        "trial": 2347,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 270
+      },
+      {
+        "type": "&Path",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 2371,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 284
+      },
+      {
+        "type": "ByteStream",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 2288,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 295
+      },
+      {
+        "type": "Option<&Blob>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 2275,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 309
+      },
+      {
+        "type": "Option<&str>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 2355,
+        "run": {
+          "copies": false,
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 325
+      },
+      {
+        "type": "Option<Blob>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 2284,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 341
+      },
+      {
+        "type": "Option<Cow<str>>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 2365,
+        "run": {
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 352
+      },
+      {
+        "type": "Option<String>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_bytes())",
+        "kind": "optional text",
+        "trial": 2360,
+        "run": {
+          "builds": false,
+          "error": "Serialization(SerializationError { message: \"input appears to be Base64-encoded. The ESDK expects raw binary message format, not Base64\" })"
+        },
+        "test": 363
+      },
+      {
+        "type": "Option<Vec<u8>>",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.unwrap().as_ref())",
+        "kind": "optional bytes",
+        "trial": 2266,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 374
+      },
+      {
+        "type": "PathBuf",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(&std::fs::read(x).unwrap())",
+        "kind": "path",
+        "trial": 2368,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 385
+      },
+      {
+        "type": "SdkBody",
+        "calls": 2,
+        "code": ".decrypt().ciphertext(x.bytes().unwrap())",
+        "kind": "stream",
+        "trial": 2293,
+        "run": {
+          "copies": false,
+          "builds": true,
+          "same": true
+        },
+        "test": 395
+      },
+      {
+        "type": "File",
+        "calls": 3,
+        "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 2374,
+        "run": {
+          "builds": true,
+          "same": true
+        },
+        "test": 409
+      },
+      {
+        "type": "TcpStream",
+        "calls": 3,
+        "code": ".decrypt().ciphertext(&{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })",
+        "kind": "reader",
+        "trial": 2377,
+        "run": {
+          "skipped": "needs a network connection"
+        },
+        "test": 419
+      },
+      {
+        "type": "char",
+        "calls": null,
+        "code": "",
+        "kind": "text",
+        "trial": null
+      }
+    ],
+    "esdk|decrypt|encryptionContext": [
+      {
+        "type": "(&String, &String)",
+        "calls": 0,
+        "code": ".decrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 2397
+      },
+      {
+        "type": "(&str, &str)",
+        "calls": 0,
+        "code": ".decrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 2385
+      },
+      {
+        "type": "(Cow<str>, Cow<str>)",
+        "calls": 0,
+        "code": ".decrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 2394
+      },
+      {
+        "type": "(String, String)",
+        "calls": 0,
+        "code": ".decrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 2388
+      },
+      {
+        "type": "(char, char)",
+        "calls": 0,
+        "code": ".decrypt().encryption_context(x, y)",
+        "kind": "pair",
+        "trial": 2391
+      },
+      {
+        "type": "HashMap<String, String>",
+        "calls": 1,
+        "code": ".decrypt().set_encryption_context(Some(x.into()))",
+        "kind": "map",
+        "trial": 2381
+      },
+      {
+        "type": "(Zeroizing<String>, Zeroizing<String>)",
+        "calls": 2,
+        "code": ".decrypt().encryption_context(x.to_string(), y.to_string())",
+        "kind": "pair",
+        "trial": 2402
+      }
+    ],
+    "esdk|decrypt|keyring": [
+      {
+        "type": "AwsKmsKeyring",
+        "calls": 0,
+        "code": ".decrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2403
+      },
+      {
+        "type": "HierarchicalKeyring",
+        "calls": 0,
+        "code": ".decrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2430
+      },
+      {
+        "type": "RawAesKeyring",
+        "calls": 0,
+        "code": ".decrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2457
+      },
+      {
+        "type": "SharedKeyring",
+        "calls": 0,
+        "code": ".decrypt().keyring(x)",
+        "kind": "component",
+        "trial": 2484
+      },
+      {
+        "type": "&AwsKmsKeyring",
+        "calls": 1,
+        "code": ".decrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2414
+      },
+      {
+        "type": "&HierarchicalKeyring",
+        "calls": 1,
+        "code": ".decrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2441
+      },
+      {
+        "type": "&RawAesKeyring",
+        "calls": 1,
+        "code": ".decrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2468
+      },
+      {
+        "type": "&SharedKeyring",
+        "calls": 1,
+        "code": ".decrypt().keyring(x.clone())",
+        "kind": "component",
+        "trial": 2495
+      },
+      {
+        "type": "Arc<AwsKmsKeyring>",
+        "calls": 1,
+        "code": ".decrypt().keyring((*x).clone())",
+        "kind": "component",
+        "trial": 2424
+      },
+      {
+        "type": "Arc<HierarchicalKeyring>",
+        "calls": 1,
+        "code": ".decrypt().keyring((*x).clone())",
+        "kind": "component",
+        "trial": 2451
+      },
+      {
+        "type": "Arc<RawAesKeyring>",
+        "calls": 1,
+        "code": ".decrypt().keyring((*x).clone())",
+        "kind": "component",
+        "trial": 2478
+      }
+    ],
+    "esdk|decrypt|materialsManager": [
+      {
+        "type": "DefaultCmm",
+        "calls": 0,
+        "code": ".decrypt().cmm(x)",
+        "kind": "component",
+        "trial": 2502
+      },
+      {
+        "type": "SharedCmm",
+        "calls": 0,
+        "code": ".decrypt().cmm(x)",
+        "kind": "component",
+        "trial": 2529
+      },
+      {
+        "type": "&DefaultCmm",
+        "calls": 1,
+        "code": ".decrypt().cmm(x.clone())",
+        "kind": "component",
+        "trial": 2513
+      },
+      {
+        "type": "&SharedCmm",
+        "calls": 1,
+        "code": ".decrypt().cmm(x.clone())",
+        "kind": "component",
+        "trial": 2540
+      },
+      {
+        "type": "Arc<DefaultCmm>",
+        "calls": 1,
+        "code": ".decrypt().cmm((*x).clone())",
+        "kind": "component",
+        "trial": 2523
+      }
+    ]
+  },
+  "about": {
+    "&AesWrappingAlg": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "AesWrappingAlg",
+          "text": "An AES-GCM wrapping algorithm, with a 12-byte IV and a 16-byte tag.\nThe wrapping key's length must match the algorithm's key size.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/aes_wrapping_alg.rs#L12"
+        }
+      ]
+    },
+    "&AwsKmsKeyring": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "AwsKmsKeyring",
+          "text": "A keyring that protects each data key with one AWS KMS key.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/aws_kms_keyring.rs#L112"
+        }
+      ],
+      "held": {
+        "text": "You build one with AwsKmsKeyring::builder(), on the AWS KMS keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&DefaultCmc": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "DefaultCmc",
+          "text": "The default Cryptographic Materials Cache. A `StormTrackingCmc` with the defaults documented on `StormTrackingCmcBuilder`,\nexcept for the entry capacity, which you set.\nConstruct with `DefaultCmc::builder`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/default.rs#L26"
+        }
+      ],
+      "held": {
+        "text": "You build one with DefaultCmc::builder(), on the Default CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&DefaultCmm": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "DefaultCmm",
+          "text": "Concrete CMM that uses a single keyring and resolves an algorithm suite\nfrom each input's commitment policy.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/default_cmm.rs#L60"
+        }
+      ],
+      "held": {
+        "text": "You build one with DefaultCmm, on the Default CMM tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&DynamoDbKeyStore": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "DynamoDbKeyStore",
+          "text": "A key store backed by AWS KMS and Amazon DynamoDB. Each key store operation is a method that returns a fluent builder: set the input, then call `send`.\nPass it anywhere a key store is accepted.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/branch_key_store.rs#L65"
+        }
+      ],
+      "held": {
+        "text": "You build one with DynamoDbKeyStore::builder(), on the DynamoDB key store tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&EsdkAlgorithmSuiteId": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "EsdkAlgorithmSuiteId",
+          "text": "ESDK Format Algorithm Suite ENUM.\nIts variants correspond 1:1 to the ESDK rows of the Supported Algorithm Suites table.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/algorithm_suite.rs#L69"
+        }
+      ]
+    },
+    "&EsdkCommitmentPolicy": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "EsdkCommitmentPolicy",
+          "text": "ESDK Format Commitment Policy ENUM. Its variants correspond 1:1 to the\nrows of the ESDK Commitment Policy ENUM table in `commitment-policy.md`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/commitment_policy.rs#L28"
+        }
+      ]
+    },
+    "&HierarchicalKeyring": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "HierarchicalKeyring",
+          "text": "AWS KMS Hierarchical Keyring. Construct with `HierarchicalKeyring::builder`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L270"
+        }
+      ],
+      "held": {
+        "text": "You build one with HierarchicalKeyring::builder(), on the Hierarchical keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&KmsConfiguration": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "KmsConfiguration",
+          "text": "The KMS key configuration for a key store.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/config.rs#L12"
+        }
+      ]
+    },
+    "&LocalCmc": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "LocalCmc",
+          "text": "Concrete in-memory LRU Cryptographic Materials Cache. `LocalCmc` is parameterised by an `entry_capacity` (caller-supplied\nupper bound on the number of stored entries) and an\n`entry_pruning_tail_size` (number of least-recently-used entries the\ncache scans for TTL-expired evictees during pruning).",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/local.rs#L37"
+        }
+      ],
+      "held": {
+        "text": "You build one with LocalCmc::builder(), on the Local CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&Path": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "Path",
+          "text": "A file path. You usually borrow it, as &Path.",
+          "url": "https://doc.rust-lang.org/std/path/struct.Path.html"
+        }
+      ],
+      "held": {
+        "text": "3 of the 100 most-downloaded crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "Attribute::path",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/attr.rs#190"
+          },
+          {
+            "crate": "cc",
+            "item": "CompileCommand::directory",
+            "pos": "return",
+            "url": "https://docs.rs/crate/cc/1.11.3/source/src/logger.rs#134"
+          },
+          {
+            "crate": "tempfile",
+            "item": "TempDir::path",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tempfile/3.27.0/source/src/dir/mod.rs#379"
+          }
+        ]
+      }
+    },
+    "&RawAesKeyring": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "RawAesKeyring",
+          "text": "A keyring that wraps and unwraps data keys with a local AES-GCM wrapping key.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/raw_aes_keyring.rs#L59"
+        }
+      ],
+      "held": {
+        "text": "You build one with RawAesKeyring::builder(), on the Raw AES keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&SdkConfig": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "SdkConfig",
+          "text": "AWS Shared Configuration",
+          "from": "aws-types 1.7.0",
+          "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/sdk_config.rs#117"
+        }
+      ]
+    },
+    "&SharedBranchKeyIdSupplier": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "SharedBranchKeyIdSupplier",
+          "text": "A branch key ID supplier whose concrete type is chosen at runtime.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L195"
+        }
+      ]
+    },
+    "&SharedCmc": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "SharedCmc",
+          "text": "A cache whose concrete type is chosen at runtime. Pass it anywhere a cache is accepted.\nCallers that know their cache's type pass it directly and never need this one.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/mod.rs#L93"
+        }
+      ]
+    },
+    "&SharedCmm": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "SharedCmm",
+          "text": "A CMM whose concrete type is chosen at runtime. Pass it anywhere a CMM is accepted.\nCallers that know their CMM's type pass it directly and never need this one.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/mod.rs#L62"
+        }
+      ]
+    },
+    "&SharedKeyStore": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "SharedKeyStore",
+          "text": "A handle to a key store, with one method per key store operation.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/client_impl.rs#L17"
+        }
+      ]
+    },
+    "&SharedKeyring": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "SharedKeyring",
+          "text": "A keyring whose concrete type is chosen at runtime. Pass it anywhere a keyring is accepted.\nCallers that know their keyring's type pass it directly and never need this one.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/mod.rs#L178"
+        }
+      ]
+    },
+    "&StormTrackingCmc": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "StormTrackingCmc",
+          "text": "Storm-tracking Cryptographic Materials Cache. Wraps a `LocalCmc` and adds grace-period / grace-interval storm\nprotection.  See the module-level docs and\n`spec/framework/storm-tracking-cryptographic-materials-cache.md` for the\nfull behavioral specification.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/storm_tracking.rs#L77"
+        }
+      ],
+      "held": {
+        "text": "You build one with StormTrackingCmc::builder(), on the Storm tracking CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "&String": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "1 of the 100 most-downloaded crates and 2 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "serde_json",
+            "item": "Entry::key",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/map.rs#667"
+          },
+          {
+            "crate": "aws-sdk-s3",
+            "item": "AnalyticsFilter::as_prefix",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/types/_analytics_filter.rs#39"
+          },
+          {
+            "crate": "aws-sdk-dynamodb",
+            "item": "AttributeValue::as_n",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/types/_attribute_value.rs#119"
+          }
+        ]
+      }
+    },
+    "&[&str]": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "[ ]",
+          "text": "Several values in a row, like part of a list.",
+          "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ],
+      "held": {
+        "text": "1 of the 100 most-downloaded crates and 6 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "serde",
+            "item": "AdjacentlyTaggedEnumVariantSeed.variants",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/private/de.rs#3451"
+          },
+          {
+            "crate": "aws-sdk-sts",
+            "item": "WebIdentityTokenSubjectModeType::values",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/types/_web_identity_token_subject_mode_type.rs#79"
+          },
+          {
+            "crate": "aws-sdk-ssooidc",
+            "item": "AccessDeniedExceptionReason::values",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-ssooidc/1.124.0/source/src/types/_access_denied_exception_reason.rs#74"
+          }
+        ]
+      }
+    },
+    "&[String]": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "[ ]",
+          "text": "Several values in a row, like part of a list.",
+          "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "1 of the 100 most-downloaded crates and 6 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "regex",
+            "item": "RegexSet::patterns",
+            "pos": "return",
+            "url": "https://docs.rs/crate/regex/1.13.2/source/src/regexset/bytes.rs#448"
+          },
+          {
+            "crate": "aws-sdk-sts",
+            "item": "AssumeRoleInput::transitive_tag_keys",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/operation/assume_role/_assume_role_input.rs#108"
+          },
+          {
+            "crate": "aws-sdk-ssooidc",
+            "item": "CreateTokenInput::scope",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-ssooidc/1.124.0/source/src/operation/create_token/_create_token_input.rs#61"
+          }
+        ]
+      }
+    },
+    "&[u8]": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "[ ]",
+          "text": "Several values in a row, like part of a list.",
+          "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+        },
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "19 of the 100 most-downloaded crates, 3 of the 26 AWS SDK crates and 20 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "memchr",
+            "item": "Imp::as_slice",
+            "pos": "return",
+            "url": "https://docs.rs/crate/memchr/2.8.3/source/src/cow.rs#90"
+          },
+          {
+            "crate": "serde",
+            "item": "Unexpected::Bytes",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/de/mod.rs#361"
+          },
+          {
+            "crate": "regex-syntax",
+            "item": "Literal::as_bytes",
+            "pos": "return",
+            "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/literal.rs#2064"
+          }
+        ]
+      }
+    },
+    "&dynamodb::Client": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "dynamodb::Client",
+          "text": "Client for Amazon DynamoDB. Client for invoking operations on Amazon DynamoDB. Each operation on Amazon DynamoDB is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+          "from": "aws-sdk-dynamodb 1.140.0",
+          "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/client.rs#92"
+        }
+      ]
+    },
+    "&kms::Client": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "kms::Client",
+          "text": "Client for AWS Key Management Service. Client for invoking operations on AWS Key Management Service. Each operation on AWS Key Management Service is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+          "from": "aws-sdk-kms 1.133.0",
+          "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/client.rs#78"
+        }
+      ]
+    },
+    "&str": {
+      "parts": [
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ],
+      "held": {
+        "text": "26 of the 100 most-downloaded crates, 20 of the 26 AWS SDK crates and 14 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "LitStr::suffix",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#274"
+          },
+          {
+            "crate": "bitflags",
+            "item": "Flag::name",
+            "pos": "return",
+            "url": "https://docs.rs/crate/bitflags/2.13.2/source/src/traits.rs#35"
+          },
+          {
+            "crate": "base64",
+            "item": "Alphabet::as_str",
+            "pos": "return",
+            "url": "https://docs.rs/crate/base64/0.23.1/source/src/alphabet.rs#137"
+          }
+        ]
+      }
+    },
+    "(&String, &String)": {
+      "parts": [
+        {
+          "name": "( , )",
+          "text": "Two values side by side.",
+          "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+        },
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ]
+    },
+    "(&str, &str)": {
+      "parts": [
+        {
+          "name": "( , )",
+          "text": "Two values side by side.",
+          "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+        },
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ]
+    },
+    "(Cow<str>, Cow<str>)": {
+      "parts": [
+        {
+          "name": "( , )",
+          "text": "Two values side by side.",
+          "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+        },
+        {
+          "name": "Cow",
+          "text": "Either borrows a value or owns it. It copies the value only if you change it.",
+          "url": "https://doc.rust-lang.org/std/borrow/enum.Cow.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ]
+    },
+    "(String, String)": {
+      "parts": [
+        {
+          "name": "( , )",
+          "text": "Two values side by side.",
+          "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ]
+    },
+    "(Zeroizing<String>, Zeroizing<String>)": {
+      "parts": [
+        {
+          "name": "( , )",
+          "text": "Two values side by side.",
+          "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+        },
+        {
+          "name": "Zeroizing",
+          "text": "`Zeroizing` is a wrapper for any `Z: Zeroize` type which implements a `Drop` handler which zeroizes dropped values.",
+          "from": "zeroize 1.9.2",
+          "url": "https://docs.rs/crate/zeroize/1.9.2/source/src/lib.rs#584"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ]
+    },
+    "(char, char)": {
+      "parts": [
+        {
+          "name": "( , )",
+          "text": "Two values side by side.",
+          "url": "https://doc.rust-lang.org/std/primitive.tuple.html"
+        },
+        {
+          "name": "char",
+          "text": "One character, like 'a'. Not a whole string.",
+          "url": "https://doc.rust-lang.org/std/primitive.char.html"
+        }
+      ]
+    },
+    "AesWrappingAlg": {
+      "parts": [
+        {
+          "name": "AesWrappingAlg",
+          "text": "An AES-GCM wrapping algorithm, with a 12-byte IV and a 16-byte tag.\nThe wrapping key's length must match the algorithm's key size.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/aes_wrapping_alg.rs#L12"
+        }
+      ]
+    },
+    "Arc<AwsKmsKeyring>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "AwsKmsKeyring",
+          "text": "A keyring that protects each data key with one AWS KMS key.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/aws_kms_keyring.rs#L112"
+        }
+      ],
+      "held": {
+        "text": "You build one with AwsKmsKeyring::builder(), on the AWS KMS keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<DefaultCmc>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "DefaultCmc",
+          "text": "The default Cryptographic Materials Cache. A `StormTrackingCmc` with the defaults documented on `StormTrackingCmcBuilder`,\nexcept for the entry capacity, which you set.\nConstruct with `DefaultCmc::builder`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/default.rs#L26"
+        }
+      ],
+      "held": {
+        "text": "You build one with DefaultCmc::builder(), on the Default CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<DefaultCmm>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "DefaultCmm",
+          "text": "Concrete CMM that uses a single keyring and resolves an algorithm suite\nfrom each input's commitment policy.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/default_cmm.rs#L60"
+        }
+      ],
+      "held": {
+        "text": "You build one with DefaultCmm, on the Default CMM tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<DynamoDbKeyStore>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "DynamoDbKeyStore",
+          "text": "A key store backed by AWS KMS and Amazon DynamoDB. Each key store operation is a method that returns a fluent builder: set the input, then call `send`.\nPass it anywhere a key store is accepted.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/branch_key_store.rs#L65"
+        }
+      ],
+      "held": {
+        "text": "You build one with DynamoDbKeyStore::builder(), on the DynamoDB key store tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<HierarchicalKeyring>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "HierarchicalKeyring",
+          "text": "AWS KMS Hierarchical Keyring. Construct with `HierarchicalKeyring::builder`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L270"
+        }
+      ],
+      "held": {
+        "text": "You build one with HierarchicalKeyring::builder(), on the Hierarchical keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<LocalCmc>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "LocalCmc",
+          "text": "Concrete in-memory LRU Cryptographic Materials Cache. `LocalCmc` is parameterised by an `entry_capacity` (caller-supplied\nupper bound on the number of stored entries) and an\n`entry_pruning_tail_size` (number of least-recently-used entries the\ncache scans for TTL-expired evictees during pruning).",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/local.rs#L37"
+        }
+      ],
+      "held": {
+        "text": "You build one with LocalCmc::builder(), on the Local CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<RawAesKeyring>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "RawAesKeyring",
+          "text": "A keyring that wraps and unwraps data keys with a local AES-GCM wrapping key.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/raw_aes_keyring.rs#L59"
+        }
+      ],
+      "held": {
+        "text": "You build one with RawAesKeyring::builder(), on the Raw AES keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<StormTrackingCmc>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "StormTrackingCmc",
+          "text": "Storm-tracking Cryptographic Materials Cache. Wraps a `LocalCmc` and adds grace-period / grace-interval storm\nprotection.  See the module-level docs and\n`spec/framework/storm-tracking-cryptographic-materials-cache.md` for the\nfull behavioral specification.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/storm_tracking.rs#L77"
+        }
+      ],
+      "held": {
+        "text": "You build one with StormTrackingCmc::builder(), on the Storm tracking CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Arc<dynamodb::Client>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "dynamodb::Client",
+          "text": "Client for Amazon DynamoDB. Client for invoking operations on Amazon DynamoDB. Each operation on Amazon DynamoDB is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+          "from": "aws-sdk-dynamodb 1.140.0",
+          "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/client.rs#92"
+        }
+      ]
+    },
+    "Arc<kms::Client>": {
+      "parts": [
+        {
+          "name": "Arc",
+          "text": "A value that many owners share, even across threads. They can read it but not change it.",
+          "url": "https://doc.rust-lang.org/std/sync/struct.Arc.html"
+        },
+        {
+          "name": "kms::Client",
+          "text": "Client for AWS Key Management Service. Client for invoking operations on AWS Key Management Service. Each operation on AWS Key Management Service is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+          "from": "aws-sdk-kms 1.133.0",
+          "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/client.rs#78"
+        }
+      ]
+    },
+    "AwsKmsKeyring": {
+      "parts": [
+        {
+          "name": "AwsKmsKeyring",
+          "text": "A keyring that protects each data key with one AWS KMS key.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/aws_kms_keyring.rs#L112"
+        }
+      ],
+      "held": {
+        "text": "You build one with AwsKmsKeyring::builder(), on the AWS KMS keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Blob": {
+      "parts": [
+        {
+          "name": "Blob",
+          "text": "Binary Blob Type. Blobs represent protocol-agnostic binary content.",
+          "from": "aws-smithy-types 1.9.5",
+          "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#18"
+        }
+      ],
+      "held": {
+        "text": "2 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": "aws-smithy-types implements AsRef<[u8]> for Blob.",
+        "examples": [
+          {
+            "crate": "aws-smithy-schema",
+            "item": "ShapeDeserializer::read_blob",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-schema/1.2.0/source/src/schema/serde/deserializer.rs#133"
+          },
+          {
+            "crate": "aws-sdk-dynamodb",
+            "item": "AttributeValue::B",
+            "pos": "field",
+            "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/types/_attribute_value.rs#11"
+          }
+        ]
+      }
+    },
+    "Box<[u8]>": {
+      "parts": [
+        {
+          "name": "Box",
+          "text": "Owns one value, kept in its own spot in memory.",
+          "url": "https://doc.rust-lang.org/std/boxed/struct.Box.html"
+        },
+        {
+          "name": "[ ]",
+          "text": "Several values in a row, like part of a list.",
+          "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+        },
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "3 of the 100 most-downloaded crates and 6 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "regex-syntax",
+            "item": "Literal.0",
+            "pos": "field",
+            "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/mod.rs#801"
+          },
+          {
+            "crate": "digest",
+            "item": "DynDigest::finalize_reset",
+            "pos": "return",
+            "url": "https://docs.rs/crate/digest/0.11.3/source/src/digest.rs#142"
+          },
+          {
+            "crate": "time",
+            "item": "OwnedFormatItem::Literal",
+            "pos": "field",
+            "url": "https://docs.rs/crate/time/0.3.55/source/src/format_description/owned_format_item.rs#23"
+          }
+        ]
+      }
+    },
+    "ByteStream": {
+      "parts": [
+        {
+          "name": "ByteStream",
+          "text": "Stream of binary data. `ByteStream` wraps a stream of binary data for ease of use.",
+          "from": "aws-smithy-types 1.9.5",
+          "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/byte_stream.rs#266"
+        }
+      ],
+      "held": {
+        "text": "2 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": "aws-smithy-types implements From<Bytes> for ByteStream, but nothing that lends its bytes, so it is a stream.",
+        "examples": [
+          {
+            "crate": "aws-smithy-types",
+            "item": "FsBuilder::build",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/byte_stream/bytestream_util.rs#181"
+          },
+          {
+            "crate": "aws-sdk-s3",
+            "item": "de_annotation_payload_payload",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/protocol_serde/shape_get_object_annotation_output.rs#2"
+          }
+        ]
+      }
+    },
+    "Bytes": {
+      "parts": [
+        {
+          "name": "Bytes",
+          "text": "A cheaply cloneable and sliceable chunk of contiguous memory.",
+          "from": "bytes 1.12.2",
+          "url": "https://docs.rs/crate/bytes/1.12.2/source/src/bytes.rs#101"
+        }
+      ],
+      "held": {
+        "text": "2 of the 100 most-downloaded crates and 4 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": "bytes implements AsRef<[u8]> for Bytes.",
+        "examples": [
+          {
+            "crate": "bytes",
+            "item": "Buf::copy_to_bytes",
+            "pos": "return",
+            "url": "https://docs.rs/crate/bytes/1.12.2/source/src/buf/buf_impl.rs#2364"
+          },
+          {
+            "crate": "hyper",
+            "item": "Parts.read_buf",
+            "pos": "field",
+            "url": "https://docs.rs/crate/hyper/1.13.0/source/src/client/conn/http1.rs#44"
+          },
+          {
+            "crate": "aws-smithy-types",
+            "item": "Blob::into_bytes",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#65"
+          }
+        ]
+      }
+    },
+    "Cow<str>": {
+      "parts": [
+        {
+          "name": "Cow",
+          "text": "Either borrows a value or owns it. It copies the value only if you change it.",
+          "url": "https://doc.rust-lang.org/std/borrow/enum.Cow.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ],
+      "held": {
+        "text": "8 of the 100 most-downloaded crates, 5 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "serde",
+            "item": "from_utf8_lossy",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/string.rs#5"
+          },
+          {
+            "crate": "rustix",
+            "item": "Arg::to_string_lossy",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rustix/1.1.6/source/src/path/arg.rs#75"
+          },
+          {
+            "crate": "regex",
+            "item": "Regex::replace",
+            "pos": "return",
+            "url": "https://docs.rs/crate/regex/1.13.2/source/src/regex/string.rs#791"
+          }
+        ]
+      }
+    },
+    "DefaultCmc": {
+      "parts": [
+        {
+          "name": "DefaultCmc",
+          "text": "The default Cryptographic Materials Cache. A `StormTrackingCmc` with the defaults documented on `StormTrackingCmcBuilder`,\nexcept for the entry capacity, which you set.\nConstruct with `DefaultCmc::builder`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/default.rs#L26"
+        }
+      ],
+      "held": {
+        "text": "You build one with DefaultCmc::builder(), on the Default CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "DefaultCmm": {
+      "parts": [
+        {
+          "name": "DefaultCmm",
+          "text": "Concrete CMM that uses a single keyring and resolves an algorithm suite\nfrom each input's commitment policy.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/default_cmm.rs#L60"
+        }
+      ],
+      "held": {
+        "text": "You build one with DefaultCmm, on the Default CMM tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Duration": {
+      "parts": [
+        {
+          "name": "Duration",
+          "text": "A span of time, like 5 seconds.",
+          "url": "https://doc.rust-lang.org/std/time/struct.Duration.html"
+        }
+      ],
+      "held": {
+        "text": "3 of the 100 most-downloaded crates, 7 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "socket2",
+            "item": "Socket::tcp_keepalive_time",
+            "pos": "return",
+            "url": "https://docs.rs/crate/socket2/0.6.5/source/src/socket.rs#2247"
+          },
+          {
+            "crate": "rustix",
+            "item": "tcp_keepidle",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rustix/1.1.6/source/src/net/sockopt.rs#1513"
+          },
+          {
+            "crate": "tokio",
+            "item": "Instant::duration_since",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tokio/1.54.1/source/src/time/instant.rs#64"
+          }
+        ]
+      }
+    },
+    "DynamoDbKeyStore": {
+      "parts": [
+        {
+          "name": "DynamoDbKeyStore",
+          "text": "A key store backed by AWS KMS and Amazon DynamoDB. Each key store operation is a method that returns a fluent builder: set the input, then call `send`.\nPass it anywhere a key store is accepted.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/branch_key_store.rs#L65"
+        }
+      ],
+      "held": {
+        "text": "You build one with DynamoDbKeyStore::builder(), on the DynamoDB key store tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "EsdkAlgorithmSuiteId": {
+      "parts": [
+        {
+          "name": "EsdkAlgorithmSuiteId",
+          "text": "ESDK Format Algorithm Suite ENUM.\nIts variants correspond 1:1 to the ESDK rows of the Supported Algorithm Suites table.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/algorithm_suite.rs#L69"
+        }
+      ]
+    },
+    "EsdkCommitmentPolicy": {
+      "parts": [
+        {
+          "name": "EsdkCommitmentPolicy",
+          "text": "ESDK Format Commitment Policy ENUM. Its variants correspond 1:1 to the\nrows of the ESDK Commitment Policy ENUM table in `commitment-policy.md`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/structures/commitment_policy.rs#L28"
+        }
+      ]
+    },
+    "File": {
+      "parts": [
+        {
+          "name": "File",
+          "text": "An open file.",
+          "url": "https://doc.rust-lang.org/std/fs/struct.File.html"
+        }
+      ],
+      "held": {
+        "text": "3 of the 100 most-downloaded crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "Fold::fold_file",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/gen/fold.rs#368"
+          },
+          {
+            "crate": "tokio",
+            "item": "File::open",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tokio/1.54.1/source/src/fs/file.rs#157"
+          },
+          {
+            "crate": "tempfile",
+            "item": "create_named",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tempfile/3.27.0/source/src/file/imp/other.rs#12"
+          }
+        ]
+      }
+    },
+    "HashMap<String, String>": {
+      "parts": [
+        {
+          "name": "HashMap",
+          "text": "A lookup table from keys to values.",
+          "url": "https://doc.rust-lang.org/std/collections/struct.HashMap.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "2 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "aws-sdk-sts",
+            "item": "de_transaction_context_identity_provider_map_type",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/protocol_serde/shape_transaction_context_identity_provider_map_type.rs#2"
+          },
+          {
+            "crate": "aws-smithy-schema",
+            "item": "ShapeDeserializer::read_string_string_map",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-schema/1.2.0/source/src/schema/serde/deserializer.rs#274"
+          }
+        ]
+      }
+    },
+    "HierarchicalKeyring": {
+      "parts": [
+        {
+          "name": "HierarchicalKeyring",
+          "text": "AWS KMS Hierarchical Keyring. Construct with `HierarchicalKeyring::builder`.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L270"
+        }
+      ],
+      "held": {
+        "text": "You build one with HierarchicalKeyring::builder(), on the Hierarchical keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "KmsConfiguration": {
+      "parts": [
+        {
+          "name": "KmsConfiguration",
+          "text": "The KMS key configuration for a key store.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/config.rs#L12"
+        }
+      ]
+    },
+    "LocalCmc": {
+      "parts": [
+        {
+          "name": "LocalCmc",
+          "text": "Concrete in-memory LRU Cryptographic Materials Cache. `LocalCmc` is parameterised by an `entry_capacity` (caller-supplied\nupper bound on the number of stored entries) and an\n`entry_pruning_tail_size` (number of least-recently-used entries the\ncache scans for TTL-expired evictees during pruning).",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/local.rs#L37"
+        }
+      ],
+      "held": {
+        "text": "You build one with LocalCmc::builder(), on the Local CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "Option<&Blob>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "Blob",
+          "text": "Binary Blob Type. Blobs represent protocol-agnostic binary content.",
+          "from": "aws-smithy-types 1.9.5",
+          "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#18"
+        }
+      ],
+      "held": {
+        "text": "3 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": "aws-smithy-types implements AsRef<[u8]> for Blob.",
+        "examples": [
+          {
+            "crate": "aws-sdk-s3",
+            "item": "RecordsEvent::payload",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/types/_records_event.rs#12"
+          },
+          {
+            "crate": "aws-sdk-secretsmanager",
+            "item": "CreateSecretInput::secret_binary",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-secretsmanager/1.129.0/source/src/operation/create_secret/_create_secret_input.rs#97"
+          },
+          {
+            "crate": "aws-sdk-kms",
+            "item": "DecapsulateInput::shared_secret_ciphertext_blob",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/operation/decapsulate/_decapsulate_input.rs#51"
+          }
+        ]
+      }
+    },
+    "Option<&[u8]>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "[ ]",
+          "text": "Several values in a row, like part of a list.",
+          "url": "https://doc.rust-lang.org/std/primitive.slice.html"
+        },
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "5 of the 100 most-downloaded crates, 3 of the 26 AWS SDK crates and 6 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "regex-syntax",
+            "item": "Seq::longest_common_prefix",
+            "pos": "return",
+            "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/literal.rs#1624"
+          },
+          {
+            "crate": "socket2",
+            "item": "SockAddr::as_abstract_namespace",
+            "pos": "return",
+            "url": "https://docs.rs/crate/socket2/0.6.5/source/src/sys/unix.rs#925"
+          },
+          {
+            "crate": "rustix",
+            "item": "SocketAddrUnix::path_bytes",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rustix/1.1.6/source/src/backend/libc/net/addr.rs#174"
+          }
+        ]
+      }
+    },
+    "Option<&str>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "&",
+          "text": "Borrowed. You can read it, but something else owns it.",
+          "url": "https://doc.rust-lang.org/std/primitive.reference.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ],
+      "held": {
+        "text": "13 of the 100 most-downloaded crates, 17 of the 26 AWS SDK crates and 4 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "serde",
+            "item": "content_as_str",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/private/de.rs#222"
+          },
+          {
+            "crate": "serde_derive",
+            "item": "Container::expecting",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde_derive/1.0.229/source/src/internals/attr.rs#613"
+          },
+          {
+            "crate": "serde_json",
+            "item": "Value::as_str",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/value/mod.rs#492"
+          }
+        ]
+      }
+    },
+    "Option<Blob>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "Blob",
+          "text": "Binary Blob Type. Blobs represent protocol-agnostic binary content.",
+          "from": "aws-smithy-types 1.9.5",
+          "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/blob.rs#18"
+        }
+      ],
+      "held": {
+        "text": "4 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": "aws-smithy-types implements AsRef<[u8]> for Blob.",
+        "examples": [
+          {
+            "crate": "aws-smithy-json",
+            "item": "expect_blob_or_null",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-json/0.65.1/source/src/deserialize/token.rs#245"
+          },
+          {
+            "crate": "aws-sdk-s3",
+            "item": "RecordsEvent.payload",
+            "pos": "field",
+            "url": "https://docs.rs/crate/aws-sdk-s3/1.161.0/source/src/types/_records_event.rs#8"
+          },
+          {
+            "crate": "aws-sdk-secretsmanager",
+            "item": "CreateSecretInput.secret_binary",
+            "pos": "field",
+            "url": "https://docs.rs/crate/aws-sdk-secretsmanager/1.129.0/source/src/operation/create_secret/_create_secret_input.rs#36"
+          }
+        ]
+      }
+    },
+    "Option<Cow<str>>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "Cow",
+          "text": "Either borrows a value or owns it. It copies the value only if you change it.",
+          "url": "https://doc.rust-lang.org/std/borrow/enum.Cow.html"
+        },
+        {
+          "name": "str",
+          "text": "Text. You usually borrow it, as &str.",
+          "url": "https://doc.rust-lang.org/std/primitive.str.html"
+        }
+      ],
+      "held": {
+        "text": "2 of the 100 most-downloaded crates and 2 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "log",
+            "item": "Value::to_cow_str",
+            "pos": "return",
+            "url": "https://docs.rs/crate/log/0.4.35/source/src/kv/value.rs#468"
+          },
+          {
+            "crate": "regex",
+            "item": "Replacer::no_expansion",
+            "pos": "return",
+            "url": "https://docs.rs/crate/regex/1.13.2/source/src/regex/string.rs#2518"
+          },
+          {
+            "crate": "aws-smithy-runtime-api",
+            "item": "ConnectorMetadata::version",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-runtime-api/1.22.1/source/src/client/connector_metadata.rs#36"
+          }
+        ]
+      }
+    },
+    "Option<String>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "5 of the 100 most-downloaded crates, 12 of the 26 AWS SDK crates and 2 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "proc-macro2",
+            "item": "Span::source_text",
+            "pos": "return",
+            "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/lib.rs#564"
+          },
+          {
+            "crate": "serde_json",
+            "item": "OwnedRawDeserializer.raw_value",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/raw.rs#532"
+          },
+          {
+            "crate": "tokio",
+            "item": "Lines::next_line",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tokio/1.54.1/source/src/io/util/lines.rs#65"
+          }
+        ]
+      }
+    },
+    "Option<Vec<String>>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "Vec",
+          "text": "A list that can grow. It owns its items.",
+          "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "1 of the 100 most-downloaded crates and 6 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "shlex",
+            "item": "split",
+            "pos": "return",
+            "url": "https://docs.rs/crate/shlex/2.0.1/source/src/lib.rs#100"
+          },
+          {
+            "crate": "aws-sdk-sts",
+            "item": "AssumeRoleInput.transitive_tag_keys",
+            "pos": "field",
+            "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/operation/assume_role/_assume_role_input.rs#37"
+          },
+          {
+            "crate": "aws-sdk-ssooidc",
+            "item": "CreateTokenInput.scope",
+            "pos": "field",
+            "url": "https://docs.rs/crate/aws-sdk-ssooidc/1.124.0/source/src/operation/create_token/_create_token_input.rs#23"
+          }
+        ]
+      }
+    },
+    "Option<Vec<u8>>": {
+      "parts": [
+        {
+          "name": "Option",
+          "text": "A value, or nothing.",
+          "url": "https://doc.rust-lang.org/std/option/enum.Option.html"
+        },
+        {
+          "name": "Vec",
+          "text": "A list that can grow. It owns its items.",
+          "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+        },
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "4 of the 100 most-downloaded crates and 5 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "regex-syntax",
+            "item": "Class::literal",
+            "pos": "return",
+            "url": "https://docs.rs/crate/regex-syntax/0.8.12/source/src/hir/mod.rs#1020"
+          },
+          {
+            "crate": "socket2",
+            "item": "Socket::device",
+            "pos": "return",
+            "url": "https://docs.rs/crate/socket2/0.6.5/source/src/sys/unix.rs#1936"
+          },
+          {
+            "crate": "tokio",
+            "item": "Split::next_segment",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tokio/1.54.1/source/src/io/util/split.rs#61"
+          }
+        ]
+      }
+    },
+    "PathBuf": {
+      "parts": [
+        {
+          "name": "PathBuf",
+          "text": "A file path that you own.",
+          "url": "https://doc.rust-lang.org/std/path/struct.PathBuf.html"
+        }
+      ],
+      "held": {
+        "text": "4 of the 100 most-downloaded crates, 1 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "cc",
+            "item": "Build::create_archive",
+            "pos": "return",
+            "url": "https://docs.rs/crate/cc/1.11.3/source/src/lib.rs#2504"
+          },
+          {
+            "crate": "tokio",
+            "item": "canonicalize",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tokio/1.54.1/source/src/fs/canonicalize.rs#46"
+          },
+          {
+            "crate": "url",
+            "item": "Url::to_file_path",
+            "pos": "return",
+            "url": "https://docs.rs/crate/url/2.5.9/source/src/lib.rs#2725"
+          }
+        ]
+      }
+    },
+    "RawAesKeyring": {
+      "parts": [
+        {
+          "name": "RawAesKeyring",
+          "text": "A keyring that wraps and unwraps data keys with a local AES-GCM wrapping key.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/raw_aes_keyring.rs#L59"
+        }
+      ],
+      "held": {
+        "text": "You build one with RawAesKeyring::builder(), on the Raw AES keyring tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "SdkBody": {
+      "parts": [
+        {
+          "name": "SdkBody",
+          "text": "SdkBody type. This is the Body used for dispatching all HTTP Requests. For handling responses, the type of the body will be controlled by the HTTP stack.",
+          "from": "aws-smithy-types 1.9.5",
+          "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/body.rs#73"
+        }
+      ],
+      "held": {
+        "text": "6 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": "aws-smithy-types implements From<&[u8]> for SdkBody, but nothing that lends its bytes, so it is a stream.",
+        "examples": [
+          {
+            "crate": "aws-smithy-http",
+            "item": "FuturesStreamCompatByteStream::into_inner",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-http/0.64.3/source/src/futures_stream_adapter.rs#30"
+          },
+          {
+            "crate": "aws-smithy-types",
+            "item": "SdkBody::map",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-smithy-types/1.9.5/source/src/body.rs#437"
+          },
+          {
+            "crate": "aws-sdk-sts",
+            "item": "ser_assume_role_input_input_input",
+            "pos": "return",
+            "url": "https://docs.rs/crate/aws-sdk-sts/1.128.0/source/src/protocol_serde/shape_assume_role_input.rs#2"
+          }
+        ]
+      }
+    },
+    "SdkConfig": {
+      "parts": [
+        {
+          "name": "SdkConfig",
+          "text": "AWS Shared Configuration",
+          "from": "aws-types 1.7.0",
+          "url": "https://docs.rs/crate/aws-types/1.7.0/source/src/sdk_config.rs#117"
+        }
+      ]
+    },
+    "SharedBranchKeyIdSupplier": {
+      "parts": [
+        {
+          "name": "SharedBranchKeyIdSupplier",
+          "text": "A branch key ID supplier whose concrete type is chosen at runtime.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/aws_kms/hierarchical_keyring.rs#L195"
+        }
+      ]
+    },
+    "SharedCmc": {
+      "parts": [
+        {
+          "name": "SharedCmc",
+          "text": "A cache whose concrete type is chosen at runtime. Pass it anywhere a cache is accepted.\nCallers that know their cache's type pass it directly and never need this one.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/mod.rs#L93"
+        }
+      ]
+    },
+    "SharedCmm": {
+      "parts": [
+        {
+          "name": "SharedCmm",
+          "text": "A CMM whose concrete type is chosen at runtime. Pass it anywhere a CMM is accepted.\nCallers that know their CMM's type pass it directly and never need this one.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmm/mod.rs#L62"
+        }
+      ]
+    },
+    "SharedKeyStore": {
+      "parts": [
+        {
+          "name": "SharedKeyStore",
+          "text": "A handle to a key store, with one method per key store operation.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/key_store/client_impl.rs#L17"
+        }
+      ]
+    },
+    "SharedKeyring": {
+      "parts": [
+        {
+          "name": "SharedKeyring",
+          "text": "A keyring whose concrete type is chosen at runtime. Pass it anywhere a keyring is accepted.\nCallers that know their keyring's type pass it directly and never need this one.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/keyring/mod.rs#L178"
+        }
+      ]
+    },
+    "StormTrackingCmc": {
+      "parts": [
+        {
+          "name": "StormTrackingCmc",
+          "text": "Storm-tracking Cryptographic Materials Cache. Wraps a `LocalCmc` and adds grace-period / grace-interval storm\nprotection.  See the module-level docs and\n`spec/framework/storm-tracking-cryptographic-materials-cache.md` for the\nfull behavioral specification.",
+          "from": "aws-crypto-mpl",
+          "url": "https://github.com/aws/aws-crypto-tools-rust/blob/e77da7789ee19d516e44d4b4b389942290b7a0b2/mpl/src/cmc/storm_tracking.rs#L77"
+        }
+      ],
+      "held": {
+        "text": "You build one with StormTrackingCmc::builder(), on the Storm tracking CMC tab.",
+        "why": null,
+        "examples": []
+      }
+    },
+    "String": {
+      "parts": [
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "21 of the 100 most-downloaded crates, 15 of the 26 AWS SDK crates and 13 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "LitStr::value",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#152"
+          },
+          {
+            "crate": "rand",
+            "item": "SampleString::sample_string",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rand/0.10.4/source/src/distr/distribution.rs#200"
+          },
+          {
+            "crate": "base64",
+            "item": "SinkTestHelper::encode_to_string",
+            "pos": "return",
+            "url": "https://docs.rs/crate/base64/0.23.1/source/src/chunked_encoder.rs#154"
+          }
+        ]
+      }
+    },
+    "TcpStream": {
+      "parts": [
+        {
+          "name": "TcpStream",
+          "text": "An open network connection.",
+          "url": "https://doc.rust-lang.org/std/net/struct.TcpStream.html"
+        }
+      ],
+      "held": {
+        "text": "2 of the 100 most-downloaded crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "mio",
+            "item": "TcpStream::connect",
+            "pos": "return",
+            "url": "https://docs.rs/crate/mio/1.2.5/source/src/net/tcp/stream.rs#91"
+          },
+          {
+            "crate": "tokio",
+            "item": "TcpSocket::connect",
+            "pos": "return",
+            "url": "https://docs.rs/crate/tokio/1.54.1/source/src/net/tcp/socket.rs#841"
+          },
+          {
+            "crate": "openssl",
+            "item": "Server::connect_tcp",
+            "pos": "return",
+            "url": "https://docs.rs/crate/openssl/0.10.82/source/src/ssl/test/server.rs#42"
+          }
+        ]
+      }
+    },
+    "Vec<String>": {
+      "parts": [
+        {
+          "name": "Vec",
+          "text": "A list that can grow. It owns its items.",
+          "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "1 of the 100 most-downloaded crates, 4 of the 26 AWS SDK crates and 3 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "rustls",
+            "item": "CertificateError::NotValidForNameContext",
+            "pos": "field",
+            "url": "https://docs.rs/crate/rustls/0.23.46/source/src/error.rs#469"
+          },
+          {
+            "crate": "rustls-webpki",
+            "item": "InvalidNameContext.presented",
+            "pos": "field",
+            "url": "https://docs.rs/crate/rustls-webpki/0.103.17/source/src/error.rs#406"
+          },
+          {
+            "crate": "security-framework",
+            "item": "SecCertificate::email_addresses",
+            "pos": "return",
+            "url": "https://docs.rs/crate/security-framework/3.7.0/source/src/certificate.rs#90"
+          }
+        ]
+      }
+    },
+    "Vec<u8>": {
+      "parts": [
+        {
+          "name": "Vec",
+          "text": "A list that can grow. It owns its items.",
+          "url": "https://doc.rust-lang.org/std/vec/struct.Vec.html"
+        },
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "15 of the 100 most-downloaded crates, 6 of the 26 AWS SDK crates and 17 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "LitByteStr::value",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#295"
+          },
+          {
+            "crate": "base64",
+            "item": "decode",
+            "pos": "return",
+            "url": "https://docs.rs/crate/base64/0.23.1/source/src/decode.rs#128"
+          },
+          {
+            "crate": "proc-macro2",
+            "item": "Literal::cstr_value",
+            "pos": "return",
+            "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/lib.rs#1345"
+          }
+        ]
+      }
+    },
+    "Zeroizing<String>": {
+      "parts": [
+        {
+          "name": "Zeroizing",
+          "text": "`Zeroizing` is a wrapper for any `Z: Zeroize` type which implements a `Drop` handler which zeroizes dropped values.",
+          "from": "zeroize 1.9.2",
+          "url": "https://docs.rs/crate/zeroize/1.9.2/source/src/lib.rs#584"
+        },
+        {
+          "name": "String",
+          "text": "Text that you own and can change.",
+          "url": "https://doc.rust-lang.org/std/string/struct.String.html"
+        }
+      ],
+      "held": {
+        "text": "4 of the 50 crypto crates return one or have one as a public field.",
+        "why": "zeroize implements Deref for Zeroizing, so a Zeroizing reads as the value inside it.",
+        "examples": [
+          {
+            "crate": "der",
+            "item": "SecretDocument::to_pem",
+            "pos": "return",
+            "url": "https://docs.rs/crate/der/0.8.3/source/src/document.rs#289"
+          },
+          {
+            "crate": "pkcs8",
+            "item": "EncodePrivateKey::to_pkcs8_pem",
+            "pos": "return",
+            "url": "https://docs.rs/crate/pkcs8/0.11.0/source/src/traits.rs#144"
+          },
+          {
+            "crate": "elliptic-curve",
+            "item": "SecretKey::to_sec1_pem",
+            "pos": "return",
+            "url": "https://docs.rs/crate/elliptic-curve/0.14.3/source/src/secret_key.rs#344"
+          }
+        ]
+      }
+    },
+    "[u8; 32]": {
+      "parts": [
+        {
+          "name": "[ ; 32]",
+          "text": "Exactly 32 values in a row.",
+          "url": "https://doc.rust-lang.org/std/primitive.array.html"
+        },
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "2 of the 100 most-downloaded crates and 6 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "windows-sys",
+            "item": "NDIS_802_11_SSID.Ssid",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/NetworkManagement/Ndis/mod.rs#610"
+          },
+          {
+            "crate": "rand_chacha",
+            "item": "ChaCha::get_seed",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rand_chacha/0.10.0/source/src/guts.rs#105"
+          },
+          {
+            "crate": "rustls-webpki",
+            "item": "LogIdAndTimestamp.log_id",
+            "pos": "field",
+            "url": "https://docs.rs/crate/rustls-webpki/0.103.17/source/src/sct.rs#92"
+          }
+        ]
+      }
+    },
+    "char": {
+      "parts": [
+        {
+          "name": "char",
+          "text": "One character, like 'a'. Not a whole string.",
+          "url": "https://doc.rust-lang.org/std/primitive.char.html"
+        }
+      ],
+      "held": {
+        "text": "9 of the 100 most-downloaded crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "LitChar::value",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#400"
+          },
+          {
+            "crate": "base64",
+            "item": "Symbol::as_char",
+            "pos": "return",
+            "url": "https://docs.rs/crate/base64/0.23.1/source/src/alphabet.rs#189"
+          },
+          {
+            "crate": "proc-macro2",
+            "item": "Punct::as_char",
+            "pos": "return",
+            "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/lib.rs#861"
+          }
+        ]
+      }
+    },
+    "dynamodb::Client": {
+      "parts": [
+        {
+          "name": "dynamodb::Client",
+          "text": "Client for Amazon DynamoDB. Client for invoking operations on Amazon DynamoDB. Each operation on Amazon DynamoDB is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+          "from": "aws-sdk-dynamodb 1.140.0",
+          "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/client.rs#92"
+        }
+      ]
+    },
+    "dynamodb::Config": {
+      "parts": [
+        {
+          "name": "dynamodb::Config",
+          "text": "Configuration for a aws_sdk_dynamodb service client. Service configuration allows for customization of endpoints, region, credentials providers, and retry configuration. Generally, it is constructed automatically for you from a shared configuration loaded by the `aws-config` crate. For example:",
+          "from": "aws-sdk-dynamodb 1.140.0",
+          "url": "https://docs.rs/crate/aws-sdk-dynamodb/1.140.0/source/src/config.rs#19"
+        }
+      ]
+    },
+    "i16": {
+      "parts": [
+        {
+          "name": "i16",
+          "text": "A whole number from -32,768 to 32,767.",
+          "url": "https://doc.rust-lang.org/std/primitive.i16.html"
+        }
+      ],
+      "held": {
+        "text": "7 of the 100 most-downloaded crates, 2 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "windows-sys",
+            "item": "DEVICE_OBJECT.Type",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#47"
+          },
+          {
+            "crate": "serde",
+            "item": "Content::I16",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#19"
+          },
+          {
+            "crate": "bytes",
+            "item": "Buf::get_i16",
+            "pos": "return",
+            "url": "https://docs.rs/crate/bytes/1.12.2/source/src/buf/buf_impl.rs#440"
+          }
+        ]
+      }
+    },
+    "i32": {
+      "parts": [
+        {
+          "name": "i32",
+          "text": "A whole number from -2,147,483,648 to 2,147,483,647.",
+          "url": "https://doc.rust-lang.org/std/primitive.i32.html"
+        }
+      ],
+      "held": {
+        "text": "13 of the 100 most-downloaded crates, 5 of the 26 AWS SDK crates and 1 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "windows-sys",
+            "item": "DEVICE_OBJECT.ReferenceCount",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#49"
+          },
+          {
+            "crate": "serde",
+            "item": "Content::I32",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#20"
+          },
+          {
+            "crate": "serde_json",
+            "item": "Float::mantissa_limit",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/lexical/num.rs#240"
+          }
+        ]
+      }
+    },
+    "i64": {
+      "parts": [
+        {
+          "name": "i64",
+          "text": "A whole number from -2^63 to 2^63 - 1.",
+          "url": "https://doc.rust-lang.org/std/primitive.i64.html"
+        }
+      ],
+      "held": {
+        "text": "10 of the 100 most-downloaded crates, 7 of the 26 AWS SDK crates and 3 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "windows-sys",
+            "item": "FILE_OBJECT.CurrentByteOffset",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#600"
+          },
+          {
+            "crate": "serde",
+            "item": "Unexpected::Signed",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/de/mod.rs#348"
+          },
+          {
+            "crate": "log",
+            "item": "Inner::I64",
+            "pos": "field",
+            "url": "https://docs.rs/crate/log/0.4.35/source/src/kv/value.rs#774"
+          }
+        ]
+      }
+    },
+    "i8": {
+      "parts": [
+        {
+          "name": "i8",
+          "text": "A whole number from -128 to 127.",
+          "url": "https://doc.rust-lang.org/std/primitive.i8.html"
+        }
+      ],
+      "held": {
+        "text": "6 of the 100 most-downloaded crates and 2 of the 26 AWS SDK crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "windows-sys",
+            "item": "DEVICE_OBJECT.StackSize",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#60"
+          },
+          {
+            "crate": "serde",
+            "item": "Content::I8",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#18"
+          },
+          {
+            "crate": "bytes",
+            "item": "Buf::get_i8",
+            "pos": "return",
+            "url": "https://docs.rs/crate/bytes/1.12.2/source/src/buf/buf_impl.rs#349"
+          }
+        ]
+      }
+    },
+    "kms::Client": {
+      "parts": [
+        {
+          "name": "kms::Client",
+          "text": "Client for AWS Key Management Service. Client for invoking operations on AWS Key Management Service. Each operation on AWS Key Management Service is a method on this this struct. `.send()` MUST be invoked on the generated operations to dispatch the request to the service.",
+          "from": "aws-sdk-kms 1.133.0",
+          "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/client.rs#78"
+        }
+      ]
+    },
+    "kms::Config": {
+      "parts": [
+        {
+          "name": "kms::Config",
+          "text": "Configuration for a aws_sdk_kms service client. Service configuration allows for customization of endpoints, region, credentials providers, and retry configuration. Generally, it is constructed automatically for you from a shared configuration loaded by the `aws-config` crate. For example:",
+          "from": "aws-sdk-kms 1.133.0",
+          "url": "https://docs.rs/crate/aws-sdk-kms/1.133.0/source/src/config.rs#19"
+        }
+      ]
+    },
+    "u16": {
+      "parts": [
+        {
+          "name": "u16",
+          "text": "A whole number from 0 to 65,535.",
+          "url": "https://doc.rust-lang.org/std/primitive.u16.html"
+        }
+      ],
+      "held": {
+        "text": "14 of the 100 most-downloaded crates, 3 of the 26 AWS SDK crates and 2 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "windows-sys",
+            "item": "VHF_CONFIG.VendorID",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Devices/HumanInterfaceDevice/mod.rs#28"
+          },
+          {
+            "crate": "serde",
+            "item": "Content::U16",
+            "pos": "field",
+            "url": "https://docs.rs/crate/serde/1.0.229/source/src/core/private/content.rs#14"
+          },
+          {
+            "crate": "serde_json",
+            "item": "Read::decode_hex_escape",
+            "pos": "return",
+            "url": "https://docs.rs/crate/serde_json/1.0.154/source/src/read.rs#89"
+          }
+        ]
+      }
+    },
+    "u32": {
+      "parts": [
+        {
+          "name": "u32",
+          "text": "A whole number from 0 to 4,294,967,295.",
+          "url": "https://doc.rust-lang.org/std/primitive.u32.html"
+        }
+      ],
+      "held": {
+        "text": "24 of the 100 most-downloaded crates, 4 of the 26 AWS SDK crates and 6 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "getrandom",
+            "item": "inner_u32",
+            "pos": "return",
+            "url": "https://docs.rs/crate/getrandom/0.4.3/source/src/backends/hermit.rs#16"
+          },
+          {
+            "crate": "rand_core",
+            "item": "Rng::next_u32",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rand_core/0.10.1/source/src/lib.rs#51"
+          },
+          {
+            "crate": "libc",
+            "item": "siginfo_t::si_pkey",
+            "pos": "return",
+            "url": "https://docs.rs/crate/libc/0.2.191/source/src/new/glibc/sysdeps/unix/linux/bits/types/siginfo_t.rs#218"
+          }
+        ]
+      }
+    },
+    "u64": {
+      "parts": [
+        {
+          "name": "u64",
+          "text": "A whole number from 0 to 2^64 - 1.",
+          "url": "https://doc.rust-lang.org/std/primitive.u64.html"
+        }
+      ],
+      "held": {
+        "text": "25 of the 100 most-downloaded crates, 4 of the 26 AWS SDK crates and 7 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "getrandom",
+            "item": "inner_u64",
+            "pos": "return",
+            "url": "https://docs.rs/crate/getrandom/0.4.3/source/src/backends/hermit.rs#27"
+          },
+          {
+            "crate": "rand_core",
+            "item": "BlockRng::next_u64_from_u32",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rand_core/0.10.1/source/src/block.rs#248"
+          },
+          {
+            "crate": "windows-sys",
+            "item": "OBJECT_ATTRIBUTES64.RootDirectory",
+            "pos": "field",
+            "url": "https://docs.rs/crate/windows-sys/0.61.2/source/src/Windows/Wdk/Foundation/mod.rs#1644"
+          }
+        ]
+      }
+    },
+    "u8": {
+      "parts": [
+        {
+          "name": "u8",
+          "text": "A whole number from 0 to 255. One byte.",
+          "url": "https://doc.rust-lang.org/std/primitive.u8.html"
+        }
+      ],
+      "held": {
+        "text": "18 of the 100 most-downloaded crates and 7 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "syn",
+            "item": "LitByte::value",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/lit.rs#365"
+          },
+          {
+            "crate": "base64",
+            "item": "Symbol::as_u8",
+            "pos": "return",
+            "url": "https://docs.rs/crate/base64/0.23.1/source/src/alphabet.rs#184"
+          },
+          {
+            "crate": "proc-macro2",
+            "item": "unescape_byte",
+            "pos": "return",
+            "url": "https://docs.rs/crate/proc-macro2/1.0.107/source/src/rustc_literal_escaper.rs#211"
+          }
+        ]
+      }
+    },
+    "usize": {
+      "parts": [
+        {
+          "name": "usize",
+          "text": "A whole number from 0 up, as big as a memory address: 2^64 - 1 on most machines.",
+          "url": "https://doc.rust-lang.org/std/primitive.usize.html"
+        }
+      ],
+      "held": {
+        "text": "50 of the 100 most-downloaded crates, 7 of the 26 AWS SDK crates and 22 of the 50 crypto crates return one or have one as a public field.",
+        "why": null,
+        "examples": [
+          {
+            "crate": "hashbrown",
+            "item": "HashMap::capacity",
+            "pos": "return",
+            "url": "https://docs.rs/crate/hashbrown/0.17.2/source/src/map.rs#597"
+          },
+          {
+            "crate": "syn",
+            "item": "Fields::len",
+            "pos": "return",
+            "url": "https://docs.rs/crate/syn/3.0.10/source/src/data.rs#94"
+          },
+          {
+            "crate": "rand_core",
+            "item": "BlockRng::word_offset",
+            "pos": "return",
+            "url": "https://docs.rs/crate/rand_core/0.10.1/source/src/block.rs#211"
+          }
+        ]
+      }
+    }
+  },
+  "handles": {
+    "SharedKeyring": {
+      "group": "Keyrings",
+      "members": [
+        "AwsKmsKeyring",
+        "HierarchicalKeyring",
+        "RawAesKeyring"
+      ]
+    },
+    "SharedCmm": {
+      "group": "CMMs",
+      "members": [
+        "DefaultCmm"
+      ]
+    },
+    "SharedKeyStore": {
+      "group": "Key stores",
+      "members": [
+        "DynamoDbKeyStore"
+      ]
+    },
+    "SharedCmc": {
+      "group": "Caches",
+      "members": [
+        "DefaultCmc",
+        "LocalCmc",
+        "StormTrackingCmc"
+      ]
+    },
+    "SharedBranchKeyIdSupplier": {
+      "group": "Branch key ID suppliers",
+      "members": []
+    }
+  }
+}

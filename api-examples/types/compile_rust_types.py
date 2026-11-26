@@ -5,7 +5,8 @@
 
 It builds one scratch crate that depends on aws-esdk and aws-crypto-mpl from the checkout.
 For each option, it tries each held type with each fix, keeps the cheapest fix that compiled,
-and writes the rows to dashboard/api-examples/types.json.
+and writes the rows to dashboard/api-examples/types-rust.json. CI runs it every day on the Rust repo's
+main branch, and the types page loads that run's results.
 """
 import argparse
 import functools
@@ -14,6 +15,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -23,7 +25,7 @@ import rust_runs
 import rust_types
 
 HERE = Path(__file__).resolve().parent
-PAGE = HERE.parent.parent / "dashboard" / "api-examples" / "types.json"
+PAGE = HERE.parent.parent / "dashboard" / "api-examples" / "types-rust.json"
 
 READ_ALL = "{ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v }"
 # Fixes to try for each kind of held type, as (code, how). A fix's cost is its number of calls (calls.py).
@@ -102,14 +104,28 @@ def kinds_of(opt):
 
 
 def page_key(api, opt):
-    """The page's key for an option, like mpl/RawAesKeyring.wrapping_key or esdk/encrypt.plaintext."""
+    """This script's key for an option, like mpl/RawAesKeyring.wrapping_key or esdk/encrypt.plaintext.
+
+    The proposals skill and rust_runs.py name options this way.
+    """
     return f"{api['lib']}/{api['type']}.{opt['name']}"
+
+
+SMITHY = json.loads((HERE.parent / "smithy-names.json").read_text())["libraries"]
+
+
+def neutral_key(api, opt):
+    """The key every language shares for an option: library, API and Smithy member, like
+    mpl|raw-aes-keyring|wrappingKey. smithy-names.json maps a Rust name that differs, like cmm to materialsManager."""
+    camel = re.sub(r"_(\w)", lambda m: m.group(1).upper(), opt["name"])
+    names = SMITHY.get(api["lib"], {}).get(api["id"], {"aliases": {}})
+    return f"{api['lib']}|{api['id']}|{names['aliases'].get(camel, camel)}"
 
 
 # Each option, with the code that starts its call, the part of that code the page shows as the API's call,
 # and the kinds of held value to try on it.
-OPTIONS = [{"key": page_key(api, opt), "start": api["start"], "strip": api["strip"], "setter": opt["setter"],
-            "set": opt["set"], "ctor": opt["ctor"], "kinds": kinds_of(opt)}
+OPTIONS = [{"key": page_key(api, opt), "neutral": neutral_key(api, opt), "start": api["start"], "strip": api["strip"],
+            "setter": opt["setter"], "set": opt["set"], "ctor": opt["ctor"], "kinds": kinds_of(opt)}
            for api in API["apis"] for opt in api["options"]]
 
 
@@ -174,7 +190,9 @@ class Scratch:
         if failed:
             return "", failed
         if built.returncode != 0:
-            raise SystemExit(built.stderr[-3000:])
+            # The support code names APIs, like the AWS KMS keyring, that this Rust commit may not have.
+            print("the run tests don't build on this commit, so nothing runs:\n" + built.stderr[-2000:], file=sys.stderr)
+            return None, {}
         # The tests write their files to the temp folder. This one is in the crate, so remove() deletes them.
         temp = self.dir / "tmp"
         temp.mkdir(exist_ok=True)
@@ -433,6 +451,8 @@ def run_checks(scratch, rows, trials):
                 modes[name] = "skip" if modes.get(name) == "inline" else "inline"
     else:
         raise SystemExit("the run tests still don't compile:\n" + "\n".join(m for ms in failed.values() for m in ms))
+    if stdout is None:
+        return text
     found = rust_runs.read(stdout)
     by_row = {(key, label): (name, line) for name, (key, label, line) in tests.items()}
     for key, found_rows in rows.items():
@@ -447,6 +467,7 @@ def run_checks(scratch, rows, trials):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--rust-repo", required=True)
+    parser.add_argument("--out", type=Path, default=PAGE)
     args = parser.parse_args()
     rust_repo = str(Path(args.rust_repo).resolve())
     data = json.loads(rust_types.OUT.read_text())
@@ -458,23 +479,6 @@ def main():
     RUNS.write_text(run_checks(scratch, rows, trials))
     scratch.remove()
 
-    page = json.loads(PAGE.read_text())
-    page["rust"] = rows
-    # The page's APIs and options are rust-api.json's, in its order.
-    page["apis"] = [{"name": a["name"], "group": a["group"], "call": a["shown"],
-                     "options": [page_key(a, o) for o in a["options"]]} for a in API["apis"]]
-    page["takes"] = {page_key(a, o): o["takes"] for a in API["apis"] for o in a["options"]}
-    # Where each option's customer calls are in usage.json: its API and its Smithy member name, which
-    # smithy-names.json gives, like cmm -> materialsManager.
-    smithy = json.loads((HERE.parent / "smithy-names.json").read_text())["libraries"]
-    camel = lambda name: re.sub(r"_(\w)", lambda m: m.group(1).upper(), name)  # noqa: E731
-
-    def member(api, opt):
-        names = smithy.get(api["lib"], {}).get(api["id"], {"members": [], "aliases": {}})
-        return names["aliases"].get(camel(opt["name"]), camel(opt["name"]))
-
-    page["usage_keys"] = {page_key(a, o): [f"{a['lib']}|{a['id']}", member(a, o)]
-                          for a in API["apis"] for o in a["options"]}
     lock = json.loads(rust_types.LOCK.read_text())
     sizes = {name: sum(group in c["groups"] for c in lock["crates"]) for name, (group, _, _) in rust_types.LISTS.items()}
     for name, entries in API["docs"].items():
@@ -487,22 +491,33 @@ def main():
         if made and "held" not in entry:
             entry["held"] = {"text": f"You build one with {made['shown']}, on the {made['name']} tab.", "why": None,
                              "examples": []}
-    page.setdefault("about", {})["rust"] = about
     commit = subprocess.run(["git", "-C", rust_repo, "rev-parse", "HEAD"], capture_output=True,
                             text=True, check=True).stdout.strip()
-    page["rust_commit"] = commit
-    # CI installs this version to compile the trials again, because another version may compile other fixes.
-    version = subprocess.run(["rustc", "--version"], capture_output=True, text=True, check=True).stdout
-    page["rustc"] = version.split()[1]
-    page["files"] = {"trials": "api-examples/types/rust_trials.rs", "runs": "api-examples/types/rust_runs.rs",
-                     "check": ".github/workflows/api-examples-types.yml"}
+    rustc = subprocess.run(["rustc", "--version"], capture_output=True, text=True, check=True).stdout.split()[1]
     runs = sum(1 for found in rows.values() for r in found if "run" in r and "skipped" not in r["run"])
-    page["note"] = (f"Rust: {len(trials):,} tries compiled and {runs} calls run on aws-crypto-tools-rust at "
-                    f"{commit[:7]} with rustc {page['rustc']}. Types: api-examples/types/rust-types.json, from "
-                    f"{data['lock']['crates']} crates pinned on {data['lock']['refreshed']}. Other languages: the "
-                    "latest released signatures, not compiled.")
-    page.pop("customers", None)
-    PAGE.write_text(json.dumps(page, indent=2, ensure_ascii=False) + "\n")
+    neutral = {o["key"]: o["neutral"] for o in OPTIONS}
+    out = {
+        "generated_by": "api-examples/types/compile_rust_types.py",
+        "rust_commit": commit,
+        "rustc": rustc,
+        "files": {"trials": "api-examples/types/rust_trials.rs", "runs": "api-examples/types/rust_runs.rs"},
+        "note": (f"Rust: {len(trials):,} tries compiled and {runs} calls run on aws-crypto-tools-rust at {commit[:7]} "
+                 f"with rustc {rustc}. Types: api-examples/types/rust-types.json, from {data['lock']['crates']} "
+                 f"crates pinned on {data['lock']['refreshed']}."),
+        # Each API and option, in rust-api.json's order. key is the one every language shares, and rust_key is
+        # the one the proposals skill uses.
+        "apis": [{"lib": a["lib"], "id": a["id"], "name": a["name"], "group": a["group"], "call": a["shown"],
+                  "options": [{"key": neutral_key(a, o), "rust_key": page_key(a, o), "name": o["name"],
+                               "takes": o["takes"], "doc": o.get("doc", "")} for o in a["options"]]}
+                 for a in API["apis"]],
+        "rows": {neutral[key]: found for key, found in rows.items()},
+        "about": about,
+        # Each shared handle, like SharedKeyring, with its group and the built-in types that convert into it,
+        # for the page's type explorer.
+        "handles": {name: {"group": h["group"], "members": [m.split("::")[-1] for m in h["members"]]}
+                    for name, h in API["handles"].items()},
+    }
+    args.out.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
     print(f"{len(trials)} tries, {len(trials) - len(failed)} compiled, {runs} runs")
 
 

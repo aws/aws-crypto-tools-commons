@@ -474,6 +474,17 @@ def build():
             rows.append(row)
         kinds[kind] = rows
         kept.extend(chosen)
+    # An optional type counts only when the type inside it is held on its own. SdkConfig::app_name() returns an
+    # Option<&AppName> in every AWS SDK crate, but nobody holds an AppName to pass as a value.
+    for kind, rows in kinds.items():
+        if not kind.startswith("optional "):
+            continue
+        alone = {unref(r["type"]) for r in kinds.get(kind[len("optional "):], []) if r["kept"]}
+        for row in rows:
+            if row["kept"] and unref(split_type(row["type"])[1][0]) not in alone:
+                row["kept"] = None
+                row["dropped"] = "the type inside it is not held on its own"
+                kept.remove(row["type"])
     # Where each name in a kept type may live. The compile step tries them in this order.
     paths = {name: sorted(defines[name], key=lambda p: (p.count("::"), p))
              for name in sorted(set(names_in(" ".join(kept)))) if defines.get(name)}
@@ -492,6 +503,7 @@ def build():
             "Borrow, Read or AsyncRead for it with that target. It is a stream when it is made From bytes "
             "but has no such impl.",
             "Of the fixed-size byte arrays, only the most common length is kept.",
+            "An optional type is kept only when the type inside it is kept on its own.",
             "Skips generic types, &mut types, and arrays whose length is a name.",
         ],
         "parse_errors": parse_errors,

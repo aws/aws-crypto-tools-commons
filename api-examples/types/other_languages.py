@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Write example calls for Java, Python, .NET, Go and JavaScript into the dashboard page data.
+"""Write example calls for Java, Python, .NET, Go and JavaScript, for the types page.
 
-  other_languages.py --shipped <folder with the api-examples-*-shipped artifacts>
+  other_languages.py --shipped <folder with the api-examples-*-shipped artifacts> [--out types-others.json]
 
 None of this code is compiled. Each call starts from a released library's own signature, from the
-artifacts that api-examples-shipped.yml uploads. For each value a customer may hold, it picks the
-cheapest conversion to a type the library takes. The held values and conversions are written by hand,
-so the page marks these calls as not compiled.
+artifacts that api-examples-shipped.yml uploads. Every API and option in them shows, so a new keyring
+in a release shows on the next run. For each value a customer may hold, it picks the cheapest
+conversion to a type the library takes. The held values and conversions are written by hand, like
+the Rust types list, so the page marks these calls as not compiled.
 """
 import argparse
 import json
@@ -15,24 +16,14 @@ from pathlib import Path
 
 import calls
 
-PAGE = Path(__file__).resolve().parent.parent.parent / "dashboard" / "api-examples" / "types.json"
+OUT = Path(__file__).resolve().parent.parent.parent / "dashboard" / "api-examples" / "types-others.json"
 
-BYTES = ["bytes", "text", "file / stream"]
-# Page key -> the shipped artifact's API and row, and the kinds of held values to try.
-OPTIONS = {
-    "mpl/RawAesKeyring.wrapping_key": ("raw-aes-keyring", "wrappingKey", BYTES + ["base64 text"]),
-    "mpl/RawAesKeyring.key_name": ("raw-aes-keyring", "keyName", ["text"]),
-    "mpl/AwsKmsKeyring.kms_key_id": ("aws-kms-keyring", "kmsKeyId", ["text"]),
-    "mpl/AwsKmsKeyring.kms_client": ("aws-kms-keyring", "kmsClient", ["the type itself", "what builds it"]),
-    "mpl/AwsKmsKeyring.grant_tokens": ("aws-kms-keyring", "grantTokens", ["list", "text"]),
-    "mpl/HierarchicalKeyring.ttl": ("hierarchical-keyring", "ttlSeconds", ["Duration", "number"]),
-    "mpl/HierarchicalKeyring.branch_key_id": ("hierarchical-keyring", "branchKeyId", ["text"]),
-    "esdk/encrypt.plaintext": ("encrypt", "plaintext", BYTES),
-    "esdk/decrypt.ciphertext": ("decrypt", "ciphertext", BYTES + ["base64 text"]),
-    "esdk/encrypt.encryption_context": ("encrypt", "encryptionContext", ["map", "pairs"]),
-    "esdk/encrypt.frame_length": ("encrypt", "frameLength", ["number"]),
-    "esdk/Client.max_encrypted_data_keys": ("client", "maxEncryptedDataKeys", ["number"]),
-}
+# An option takes the kinds of held value that pass to it as is. It also shows these, which customers
+# often convert: text, base64 text or a file for bytes, and so on.
+MORE_KINDS = {"bytes": ["text", "base64 text", "file / stream"], "map": ["pairs"], "list": ["text"],
+              "the type itself": ["what builds it"]}
+# A number option with one of these words in its name is a span of time, so it is handed a duration too.
+TIME = re.compile(r"ttl|seconds|duration|interval|period|timeout", re.I)
 
 # For each language: held value -> (kind, [(type the library takes, conversion)]).
 # A conversion is code using x, or (setup lines, value) when it needs statements first. A pair uses k and v.
@@ -288,51 +279,78 @@ def template(lang, signature, taken):
     return re.sub(r"\{(\w+): .+\}", r"{\1: {x}}", signature)
 
 
+def rows_for(key, lang, takes):
+    """The rows of one option in one language. takes maps each type the library takes to its call."""
+    held = HELD[lang]
+    as_is = {kind for kind, conversions in held.values() for t, c in conversions if t in takes and c == "x"}
+    kinds = set(as_is) | {k for kind in as_is for k in MORE_KINDS.get(kind, [])}
+    if "number" in kinds and TIME.search(key.split("|")[-1]):
+        kinds.add("Duration")
+    rows = []
+    for label, (kind, conversions) in held.items():
+        if kind not in kinds:
+            continue
+        best = None
+        for taken, conversion in conversions:
+            setup, value = conversion if isinstance(conversion, tuple) else ([], conversion)
+            cost = calls.count("\n".join(setup + [value]))
+            if taken in takes and (best is None or cost < best[0]):
+                best = (cost, "\n".join(setup + [takes[taken].replace("{x}", value)]))
+        cost, code = best if best else (None, "")
+        rows.append({"type": label, "calls": cost, "code": code, "kind": kind})
+    # A type that no held value passes as is, like a keyring interface, shows as itself.
+    covered = {t for _, conversions in held.values() for t, c in conversions if c == "x"}
+    for taken, call in takes.items():
+        if taken not in covered:
+            rows.append({"type": taken, "calls": 0, "code": call.replace("{x}", "x"), "kind": "the type itself"})
+    return sorted(rows, key=lambda r: (r["calls"] is None, r["calls"] or 0, r["type"]))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--shipped", required=True)
+    parser.add_argument("--out", type=Path, default=OUT)
     args = parser.parse_args()
-    # (api, row, language) -> type the library takes -> call template
-    templates = {}
+    # Each API and option, keyed like the Rust ones: library, API and Smithy member.
+    apis, templates, shipped = {}, {}, {}
     for path in sorted(Path(args.shipped).glob("*/*.json")):
         artifact = json.loads(path.read_text())
-        lang = artifact["language"]
+        lang, lib = artifact["language"], artifact["library"]
+        shipped.setdefault(lang, {})[lib] = artifact.get("shipped")
         for api in artifact["apis"]:
+            entry = apis.setdefault((lib, api["id"]), {"lib": lib, "id": api["id"], "name": api["name"],
+                                                       "group": api.get("group", ""), "options": {}})
             for way in api["ways"]:
-                row = way.get("row") or way.get("option")
+                row = way.get("row") or ""
+                if way["kind"] != "setter" or row in ("", "construct"):
+                    continue
+                member = row.removeprefix("extra:")
+                key = f"{lib}|{api['id']}|{member}"
+                opt = entry["options"].setdefault(key, {"key": key, "name": member, "names": {}, "takes": {}})
+                opt["names"].setdefault(lang, way.get("option") or way["id"])
+                found = templates.setdefault((key, lang), {})
                 for taken in way.get("takes", []):
                     t = short_type(taken["type"])
-                    templates.setdefault((api["id"], row, lang), {}).setdefault(t, template(lang, taken["signature"], t))
-    others = {}
-    for key, (api, row, kinds) in OPTIONS.items():
-        for lang, held in HELD.items():
-            takes = templates.get((api, row, lang), {})
-            rows = []
-            for label, (kind, conversions) in held.items():
-                if kind not in kinds or not takes:
-                    continue
-                best = None
-                for taken, conversion in conversions:
-                    setup, value = conversion if isinstance(conversion, tuple) else ([], conversion)
-                    cost = calls.count("\n".join(setup + [value]))
-                    if taken in takes and (best is None or cost < best[0]):
-                        best = (cost, "\n".join(setup + [takes[taken].replace("{x}", value)]))
-                cost, code = best if best else (None, "")
-                rows.append({"type": label, "calls": cost, "code": code, "kind": kind})
-            others.setdefault(key, {})[lang] = sorted(rows, key=lambda r: (r["calls"] is None, r["calls"] or 0, r["type"]))
-    page = json.loads(PAGE.read_text())
-    page["others"] = others
-    about = page.setdefault("about", {})
-    for lang, held in HELD.items():
-        about[lang] = {label: {"parts": [{"name": label, "text": ABOUT[lang][label][0], "url": ABOUT[lang][label][1]}]}
-                       for label in held}
-    # Where each option's customer calls are in usage.json: its API and its Smithy option name.
-    page.setdefault("usage_keys", {}).update(
-        {key: [f"{key.split('/')[0]}|{api}", row] for key, (api, row, _) in OPTIONS.items()})
-    page["others_note"] = ("Java, Python, .NET, Go, JS: calls written from each release's signatures, not compiled. "
-                           "api-examples/types/other_languages.py writes them.")
-    PAGE.write_text(json.dumps(page, indent=2, ensure_ascii=False) + "\n")
-    print(f"wrote {sum(len(r) for langs in others.values() for r in langs.values())} rows")
+                    found.setdefault(t, template(lang, taken["signature"], t))
+                opt["takes"][lang] = " | ".join(found)
+    rows = {}
+    for (key, lang), takes in sorted(templates.items()):
+        if lang in HELD and takes:
+            rows.setdefault(key, {})[lang] = rows_for(key, lang, takes)
+    about = {lang: {label: {"parts": [{"name": label, "text": ABOUT[lang][label][0], "url": ABOUT[lang][label][1]}]}
+                    for label in held} for lang, held in HELD.items()}
+    out = {
+        "generated_by": "api-examples/types/other_languages.py",
+        "note": ("Java, Python, .NET, Go, JS: calls written from each release's signatures, not compiled. "
+                 "api-examples/types/other_languages.py writes them."),
+        "shipped": shipped,
+        "apis": [{**a, "options": list(a["options"].values())} for a in apis.values()],
+        "rows": rows,
+        "about": about,
+    }
+    args.out.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+    print(f"wrote {sum(len(r) for langs in rows.values() for r in langs.values())} rows for "
+          f"{sum(len(a['options']) for a in apis.values())} options in {len(apis)} APIs")
 
 
 if __name__ == "__main__":

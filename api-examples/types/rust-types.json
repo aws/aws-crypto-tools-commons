@@ -16,6 +16,7 @@
   "The Rust list's top 2 types of a kind need only 2 crates.",
   "A third-party type is bytes, text, a path or a reader when its crate implements AsRef, Deref, Borrow, Read or AsyncRead for it with that target. It is a stream when it is made From bytes but has no such impl.",
   "Of the fixed-size byte arrays, only the most common length is kept.",
+  "An optional type is kept only when the type inside it is kept on its own.",
   "Skips generic types, &mut types, and arrays whose length is a name."
  ],
  "parse_errors": 1,
@@ -1881,7 +1882,7 @@
      "aws-sdk-sts",
      "aws-sdk-sso"
     ],
-    "kept": "aws",
+    "kept": null,
     "examples": [
      {
       "crate": "aws-types",
@@ -1908,7 +1909,8 @@
       "line": 116
      }
     ],
-    "why": "aws-types implements AsRef<str> for AppName."
+    "why": "aws-types implements AsRef<str> for AppName.",
+    "dropped": "the type inside it is not held on its own"
    },
    {
     "type": "Option<&SigningRegionSet>",
@@ -1922,7 +1924,7 @@
      "aws-sdk-sts",
      "aws-sdk-s3"
     ],
-    "kept": "aws",
+    "kept": null,
     "examples": [
      {
       "crate": "aws-types",
@@ -1949,7 +1951,8 @@
       "line": 167
      }
     ],
-    "why": "aws-types implements AsRef<str> for SigningRegionSet."
+    "why": "aws-types implements AsRef<str> for SigningRegionSet.",
+    "dropped": "the type inside it is not held on its own"
    }
   ],
   "path": [
@@ -4051,10 +4054,6 @@
   ]
  },
  "paths": {
-  "AppName": [
-   "aws_types::AppName",
-   "aws_types::app_name::AppName"
-  ],
   "Blob": [
    "aws_smithy_types::Blob",
    "aws_smithy_types::blob::Blob"
@@ -4074,25 +4073,11 @@
    "aws_smithy_types::SdkBody",
    "aws_smithy_types::body::SdkBody"
   ],
-  "SigningRegionSet": [
-   "aws_types::SigningRegionSet",
-   "aws_types::region::SigningRegionSet"
-  ],
   "Zeroizing": [
    "zeroize::Zeroizing"
   ]
  },
  "docs": {
-  "AppName": [
-   {
-    "crate": "aws-types",
-    "version": "1.7.0",
-    "path": "aws_types::app_name::AppName",
-    "doc": "App name that can be configured with an AWS SDK client to become part of the user agent string.",
-    "file": "src/app_name.rs",
-    "line": 28
-   }
-  ],
   "Blob": [
    {
     "crate": "aws-smithy-types",
@@ -4147,16 +4132,6 @@
     "doc": "SdkBody type. This is the Body used for dispatching all HTTP Requests. For handling responses, the type of the body will be controlled by the HTTP stack.",
     "file": "src/body.rs",
     "line": 73
-   }
-  ],
-  "SigningRegionSet": [
-   {
-    "crate": "aws-types",
-    "version": "1.7.0",
-    "path": "aws_types::region::SigningRegionSet",
-    "doc": "Generally, user code will not need to interact with `SigningRegionSet`. See `Region`.",
-    "file": "src/region.rs",
-    "line": 94
    }
   ],
   "Zeroizing": [

@@ -1,9 +1,9 @@
-# Read each released ESDK and MPL package, and upload what its API takes as
-# api-examples-<library>-<language>-shipped. The types page's rows for these
-# languages come from these artifacts, through api-examples/types/other_languages.py.
+# Every day, read each released ESDK and MPL package, and upload what its API
+# takes as api-examples-<library>-<language>-shipped.
 # api-examples/read_shipped.py downloads the newest release and writes
 # surface.json, and api-examples/build_api_examples.py turns that into
-# api-examples.json. Nothing is built or tested.
+# api-examples.json. Nothing is built or tested. Then the types job turns all of
+# them into api-types-others, which the types page loads from the newest run.
 
 name: API examples (shipped)
 
@@ -16,6 +16,7 @@ on:
       - "api-examples/read_shipped.py"
       - "api-examples/shipped/**"
       - "api-examples/type-phrases.json"
+      - "api-examples/types/other_languages.py"
       - ".github/workflows/api-examples-shipped.yml"
 
 permissions:
@@ -84,4 +85,35 @@ jobs:
         with:
           name: api-examples-${{ matrix.library }}-${{ matrix.language }}-shipped
           path: ${{ runner.temp }}/out/api-examples.json
+          if-no-files-found: error
+
+  types:
+    name: the other languages' types
+    needs: shipped
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            api-examples
+            dashboard/api-examples
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: api-examples-*-shipped
+          path: ${{ runner.temp }}/shipped
+
+      - name: Write each language's rows
+        working-directory: api-examples/types
+        run: python3 other_languages.py --shipped "$RUNNER_TEMP/shipped" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-types-others
+          path: dashboard/api-examples/types-others.json
           if-no-files-found: error

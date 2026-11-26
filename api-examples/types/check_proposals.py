@@ -36,6 +36,7 @@ from pathlib import Path
 import compile_rust_types as crt
 
 OUT = crt.PAGE.parent / "proposals.json"
+OTHERS = crt.PAGE.parent / "types-others.json"
 PATH_LIKE = re.compile(r"Path|path|FileInfo")
 
 
@@ -84,7 +85,7 @@ def main():
     rust_repo = str(Path(args.rust_repo).resolve())
     proposals = json.loads(Path(args.input).read_text())
     options = proposals["options"]
-    unknown = set(options) - {o[0] for o in crt.OPTIONS}
+    unknown = set(options) - {o["key"] for o in crt.OPTIONS}
     if unknown:
         raise SystemExit(f"unknown options: {sorted(unknown)}")
     rust_specs = {key: spec["rust"] for key, spec in options.items() if spec.get("rust")}
@@ -119,9 +120,10 @@ def main():
             raise SystemExit(f"The Rust code for {key} does not compile:\n" + "\n".join(messages))
 
     today = crt.best_rows(trials, {n for n in failed if n < today_count})
-    page = json.loads(crt.PAGE.read_text())
-    setter_of = {o[0]: o[3] for o in crt.OPTIONS}
-    before_of = {o[0]: (o[1][len(o[2]):] if o[2] else "") for o in crt.OPTIONS}
+    others = json.loads(OTHERS.read_text())["rows"]
+    by_key = {o["key"]: o for o in crt.OPTIONS}
+    # The part of an option's call between the API's call and the setter, like .encrypt() for client.encrypt().
+    before_of = {key: o["start"][len(o["strip"]):] for key, o in by_key.items()}
     compiled = {(key, label, how, glue, name) for n, key, label, _, _, how, glue, name in proposed_trials
                 if n not in failed}
     result = {}
@@ -135,7 +137,7 @@ def main():
             for n, (k, label, _, kind, cost, how, glue, call) in enumerate(trials):
                 if k != key or n in failed:
                     continue
-                real = f"set_{setter_of[key]}" if how == "set" else setter_of[key]
+                real = by_key[key]["set"] if how == "set" else by_key[key]["setter"]
                 if real not in replaced:
                     best.setdefault(label, []).append((cost, False, call))
                 elif (key, label, how, glue, real) not in compiled:
@@ -154,7 +156,7 @@ def main():
                                  "breaks": [f"{call} with {', '.join(sorted(set(labels)))}"
                                             for call, labels in sorted(breaks.items())]}
         for lang, other in (spec.get("other") or {}).items():
-            rows = ((page.get("others") or {}).get(key) or {}).get(lang) or []
+            rows = (others.get(by_key[key]["neutral"]) or {}).get(lang) or []
             languages[lang] = {"signature": other["signature"], "rows": other_rows(rows, other)}
         result[key] = {"why": spec.get("why", ""), "languages": languages}
 

@@ -1239,15 +1239,8 @@ async fn run_100() {
 
 #[tokio::test]
 async fn run_101() {
-    // mpl/AwsKmsKeyring.kms_key_id: Option<&AppName> passed as .set_kms_key_id(x.map(|s| s.to_string()))
-    let mut r = Report::new("run_101");
-    r.skip("an AWS SDK name type, not text");
-}
-
-#[tokio::test]
-async fn run_102() {
     // mpl/HierarchicalKeyring.branch_key_id: &String passed as .branch_key_id(x)
-    let mut r = Report::new("run_102");
+    let mut r = Report::new("run_101");
     let x_owned = BRANCH_KEY_ID.to_string();
     let x: &String = &x_owned;
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
@@ -1257,9 +1250,9 @@ async fn run_102() {
 }
 
 #[tokio::test]
-async fn run_103() {
+async fn run_102() {
     // mpl/HierarchicalKeyring.branch_key_id: &str passed as .branch_key_id(x)
-    let mut r = Report::new("run_103");
+    let mut r = Report::new("run_102");
     let x_owned = BRANCH_KEY_ID.to_string();
     let x: &str = &x_owned;
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
@@ -1269,9 +1262,9 @@ async fn run_103() {
 }
 
 #[tokio::test]
-async fn run_104() {
+async fn run_103() {
     // mpl/HierarchicalKeyring.branch_key_id: Cow<str> passed as .branch_key_id(x)
-    let mut r = Report::new("run_104");
+    let mut r = Report::new("run_103");
     let x = std::borrow::Cow::<str>::Owned(BRANCH_KEY_ID.to_string());
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x);
@@ -1280,9 +1273,9 @@ async fn run_104() {
 }
 
 #[tokio::test]
-async fn run_105() {
+async fn run_104() {
     // mpl/HierarchicalKeyring.branch_key_id: Option<String> passed as .set_branch_key_id(x)
-    let mut r = Report::new("run_105");
+    let mut r = Report::new("run_104");
     let x_inner = BRANCH_KEY_ID.to_string();
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
@@ -1292,9 +1285,9 @@ async fn run_105() {
 }
 
 #[tokio::test]
-async fn run_106() {
+async fn run_105() {
     // mpl/HierarchicalKeyring.branch_key_id: String passed as .branch_key_id(x)
-    let mut r = Report::new("run_106");
+    let mut r = Report::new("run_105");
     let x = BRANCH_KEY_ID.to_string();
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x);
@@ -1303,16 +1296,16 @@ async fn run_106() {
 }
 
 #[tokio::test]
-async fn run_107() {
+async fn run_106() {
     // mpl/HierarchicalKeyring.branch_key_id: char passed as .branch_key_id(x)
-    let mut r = Report::new("run_107");
+    let mut r = Report::new("run_106");
     r.skip("a char holds one letter, not the whole value");
 }
 
 #[tokio::test]
-async fn run_108() {
+async fn run_107() {
     // mpl/HierarchicalKeyring.branch_key_id: Option<&str> passed as .set_branch_key_id(x.map(Into::into))
-    let mut r = Report::new("run_108");
+    let mut r = Report::new("run_107");
     let x_inner_owned = BRANCH_KEY_ID.to_string();
     let x_inner: &str = &x_inner_owned;
     let x = Some(x_inner);
@@ -1323,9 +1316,9 @@ async fn run_108() {
 }
 
 #[tokio::test]
-async fn run_109() {
+async fn run_108() {
     // mpl/HierarchicalKeyring.branch_key_id: Option<Cow<str>> passed as .set_branch_key_id(x.map(Into::into))
-    let mut r = Report::new("run_109");
+    let mut r = Report::new("run_108");
     let x_inner = std::borrow::Cow::<str>::Owned(BRANCH_KEY_ID.to_string());
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
@@ -1335,9 +1328,9 @@ async fn run_109() {
 }
 
 #[tokio::test]
-async fn run_110() {
+async fn run_109() {
     // mpl/HierarchicalKeyring.branch_key_id: Zeroizing<String> passed as .branch_key_id(x.to_string())
-    let mut r = Report::new("run_110");
+    let mut r = Report::new("run_109");
     let x = zeroize::Zeroizing::new(BRANCH_KEY_ID.to_string());
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.branch_key_id(x.to_string());
@@ -1346,16 +1339,9 @@ async fn run_110() {
 }
 
 #[tokio::test]
-async fn run_111() {
-    // mpl/HierarchicalKeyring.branch_key_id: Option<&AppName> passed as .set_branch_key_id(x.map(|s| s.to_string()))
-    let mut r = Report::new("run_111");
-    r.skip("an AWS SDK name type, not text");
-}
-
-#[tokio::test]
-async fn run_112() {
+async fn run_110() {
     // mpl/HierarchicalKeyring.ttl: Duration passed as .ttl(x)
-    let mut r = Report::new("run_112");
+    let mut r = Report::new("run_110");
     let x = std::time::Duration::from_secs(TTL_SECONDS);
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(x);
@@ -1364,9 +1350,9 @@ async fn run_112() {
 }
 
 #[tokio::test]
-async fn run_113() {
+async fn run_111() {
     // mpl/HierarchicalKeyring.ttl: u16 passed as .ttl(std::time::Duration::from_secs(x.into()))
-    let mut r = Report::new("run_113");
+    let mut r = Report::new("run_111");
     let Ok(x) = u16::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u16"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
@@ -1375,9 +1361,9 @@ async fn run_113() {
 }
 
 #[tokio::test]
-async fn run_114() {
+async fn run_112() {
     // mpl/HierarchicalKeyring.ttl: u32 passed as .ttl(std::time::Duration::from_secs(x.into()))
-    let mut r = Report::new("run_114");
+    let mut r = Report::new("run_112");
     let Ok(x) = u32::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u32"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
@@ -1386,9 +1372,9 @@ async fn run_114() {
 }
 
 #[tokio::test]
-async fn run_115() {
+async fn run_113() {
     // mpl/HierarchicalKeyring.ttl: u64 passed as .ttl(std::time::Duration::from_secs(x.into()))
-    let mut r = Report::new("run_115");
+    let mut r = Report::new("run_113");
     let Ok(x) = u64::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u64"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
@@ -1397,9 +1383,9 @@ async fn run_115() {
 }
 
 #[tokio::test]
-async fn run_116() {
+async fn run_114() {
     // mpl/HierarchicalKeyring.ttl: u8 passed as .ttl(std::time::Duration::from_secs(x.into()))
-    let mut r = Report::new("run_116");
+    let mut r = Report::new("run_114");
     let Ok(x) = u8::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a u8"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.into()));
@@ -1408,9 +1394,9 @@ async fn run_116() {
 }
 
 #[tokio::test]
-async fn run_117() {
+async fn run_115() {
     // mpl/HierarchicalKeyring.ttl: i16 passed as .ttl(std::time::Duration::from_secs(x.try_into().unwrap()))
-    let mut r = Report::new("run_117");
+    let mut r = Report::new("run_115");
     let Ok(x) = i16::try_from(TTL_SECONDS) else { r.skip("the value does not fit in an i16"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
@@ -1419,9 +1405,9 @@ async fn run_117() {
 }
 
 #[tokio::test]
-async fn run_118() {
+async fn run_116() {
     // mpl/HierarchicalKeyring.ttl: i32 passed as .ttl(std::time::Duration::from_secs(x.try_into().unwrap()))
-    let mut r = Report::new("run_118");
+    let mut r = Report::new("run_116");
     let Ok(x) = i32::try_from(TTL_SECONDS) else { r.skip("the value does not fit in an i32"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
@@ -1430,9 +1416,9 @@ async fn run_118() {
 }
 
 #[tokio::test]
-async fn run_119() {
+async fn run_117() {
     // mpl/HierarchicalKeyring.ttl: i64 passed as .ttl(std::time::Duration::from_secs(x.try_into().unwrap()))
-    let mut r = Report::new("run_119");
+    let mut r = Report::new("run_117");
     let Ok(x) = i64::try_from(TTL_SECONDS) else { r.skip("the value does not fit in an i64"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
@@ -1441,9 +1427,9 @@ async fn run_119() {
 }
 
 #[tokio::test]
-async fn run_120() {
+async fn run_118() {
     // mpl/HierarchicalKeyring.ttl: i8 passed as .ttl(std::time::Duration::from_secs(x.try_into().unwrap()))
-    let mut r = Report::new("run_120");
+    let mut r = Report::new("run_118");
     let Ok(x) = i8::try_from(TTL_SECONDS) else { r.skip("the value does not fit in an i8"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
@@ -1452,9 +1438,9 @@ async fn run_120() {
 }
 
 #[tokio::test]
-async fn run_121() {
+async fn run_119() {
     // mpl/HierarchicalKeyring.ttl: usize passed as .ttl(std::time::Duration::from_secs(x.try_into().unwrap()))
-    let mut r = Report::new("run_121");
+    let mut r = Report::new("run_119");
     let Ok(x) = usize::try_from(TTL_SECONDS) else { r.skip("the value does not fit in a usize"); return; };
     let pre = aws_crypto_mpl::keyring::HierarchicalKeyring::builder();
     let built = pre.ttl(std::time::Duration::from_secs(x.try_into().unwrap()));
@@ -1463,9 +1449,9 @@ async fn run_121() {
 }
 
 #[tokio::test]
-async fn run_122() {
+async fn run_120() {
     // mpl/RawAesKeyring.key_name: &String passed as .key_name(x)
-    let mut r = Report::new("run_122");
+    let mut r = Report::new("run_120");
     let x_owned = KEY_NAME.to_string();
     let x: &String = &x_owned;
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1475,9 +1461,9 @@ async fn run_122() {
 }
 
 #[tokio::test]
-async fn run_123() {
+async fn run_121() {
     // mpl/RawAesKeyring.key_name: &str passed as .key_name(x)
-    let mut r = Report::new("run_123");
+    let mut r = Report::new("run_121");
     let x_owned = KEY_NAME.to_string();
     let x: &str = &x_owned;
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1487,9 +1473,9 @@ async fn run_123() {
 }
 
 #[tokio::test]
-async fn run_124() {
+async fn run_122() {
     // mpl/RawAesKeyring.key_name: Cow<str> passed as .key_name(x)
-    let mut r = Report::new("run_124");
+    let mut r = Report::new("run_122");
     let x = std::borrow::Cow::<str>::Owned(KEY_NAME.to_string());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.key_name(x);
@@ -1498,9 +1484,9 @@ async fn run_124() {
 }
 
 #[tokio::test]
-async fn run_125() {
+async fn run_123() {
     // mpl/RawAesKeyring.key_name: Option<String> passed as .set_key_name(x)
-    let mut r = Report::new("run_125");
+    let mut r = Report::new("run_123");
     let x_inner = KEY_NAME.to_string();
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1510,9 +1496,9 @@ async fn run_125() {
 }
 
 #[tokio::test]
-async fn run_126() {
+async fn run_124() {
     // mpl/RawAesKeyring.key_name: String passed as .key_name(x)
-    let mut r = Report::new("run_126");
+    let mut r = Report::new("run_124");
     let x = KEY_NAME.to_string();
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.key_name(x);
@@ -1521,16 +1507,16 @@ async fn run_126() {
 }
 
 #[tokio::test]
-async fn run_127() {
+async fn run_125() {
     // mpl/RawAesKeyring.key_name: char passed as .key_name(x)
-    let mut r = Report::new("run_127");
+    let mut r = Report::new("run_125");
     r.skip("a char holds one letter, not the whole value");
 }
 
 #[tokio::test]
-async fn run_128() {
+async fn run_126() {
     // mpl/RawAesKeyring.key_name: Option<&str> passed as .set_key_name(x.map(Into::into))
-    let mut r = Report::new("run_128");
+    let mut r = Report::new("run_126");
     let x_inner_owned = KEY_NAME.to_string();
     let x_inner: &str = &x_inner_owned;
     let x = Some(x_inner);
@@ -1541,9 +1527,9 @@ async fn run_128() {
 }
 
 #[tokio::test]
-async fn run_129() {
+async fn run_127() {
     // mpl/RawAesKeyring.key_name: Option<Cow<str>> passed as .set_key_name(x.map(Into::into))
-    let mut r = Report::new("run_129");
+    let mut r = Report::new("run_127");
     let x_inner = std::borrow::Cow::<str>::Owned(KEY_NAME.to_string());
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1553,9 +1539,9 @@ async fn run_129() {
 }
 
 #[tokio::test]
-async fn run_130() {
+async fn run_128() {
     // mpl/RawAesKeyring.key_name: Zeroizing<String> passed as .key_name(x.to_string())
-    let mut r = Report::new("run_130");
+    let mut r = Report::new("run_128");
     let x = zeroize::Zeroizing::new(KEY_NAME.to_string());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.key_name(x.to_string());
@@ -1564,16 +1550,9 @@ async fn run_130() {
 }
 
 #[tokio::test]
-async fn run_131() {
-    // mpl/RawAesKeyring.key_name: Option<&AppName> passed as .set_key_name(x.map(|s| s.to_string()))
-    let mut r = Report::new("run_131");
-    r.skip("an AWS SDK name type, not text");
-}
-
-#[tokio::test]
-async fn run_132() {
+async fn run_129() {
     // mpl/RawAesKeyring.wrapping_key: &[u8] passed as .wrapping_key(x)
-    let mut r = Report::new("run_132");
+    let mut r = Report::new("run_129");
     let x_owned = key_bytes();
     let x: &[u8] = &x_owned;
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1583,9 +1562,9 @@ async fn run_132() {
 }
 
 #[tokio::test]
-async fn run_133() {
+async fn run_130() {
     // mpl/RawAesKeyring.wrapping_key: &str passed as .wrapping_key(x)
-    let mut r = Report::new("run_133");
+    let mut r = Report::new("run_130");
     let x_owned = key_text();
     let x: &str = &x_owned;
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1595,9 +1574,9 @@ async fn run_133() {
 }
 
 #[tokio::test]
-async fn run_134() {
+async fn run_131() {
     // mpl/RawAesKeyring.wrapping_key: Blob passed as .wrapping_key(x)
-    let mut r = Report::new("run_134");
+    let mut r = Report::new("run_131");
     let x = aws_smithy_types::Blob::new(key_bytes());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x);
@@ -1606,9 +1585,9 @@ async fn run_134() {
 }
 
 #[tokio::test]
-async fn run_135() {
+async fn run_132() {
     // mpl/RawAesKeyring.wrapping_key: Box<[u8]> passed as .wrapping_key(x)
-    let mut r = Report::new("run_135");
+    let mut r = Report::new("run_132");
     let x = key_bytes().into_boxed_slice();
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x);
@@ -1617,9 +1596,9 @@ async fn run_135() {
 }
 
 #[tokio::test]
-async fn run_136() {
+async fn run_133() {
     // mpl/RawAesKeyring.wrapping_key: Bytes passed as .wrapping_key(x)
-    let mut r = Report::new("run_136");
+    let mut r = Report::new("run_133");
     let x = bytes::Bytes::from(key_bytes());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x);
@@ -1628,9 +1607,9 @@ async fn run_136() {
 }
 
 #[tokio::test]
-async fn run_137() {
+async fn run_134() {
     // mpl/RawAesKeyring.wrapping_key: Option<Vec<u8>> passed as .set_wrapping_key(x)
-    let mut r = Report::new("run_137");
+    let mut r = Report::new("run_134");
     let x_inner = key_bytes();
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1640,9 +1619,9 @@ async fn run_137() {
 }
 
 #[tokio::test]
-async fn run_138() {
+async fn run_135() {
     // mpl/RawAesKeyring.wrapping_key: String passed as .wrapping_key(x)
-    let mut r = Report::new("run_138");
+    let mut r = Report::new("run_135");
     let x = key_text();
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x);
@@ -1651,9 +1630,9 @@ async fn run_138() {
 }
 
 #[tokio::test]
-async fn run_139() {
+async fn run_136() {
     // mpl/RawAesKeyring.wrapping_key: Vec<u8> passed as .wrapping_key(x)
-    let mut r = Report::new("run_139");
+    let mut r = Report::new("run_136");
     let x = key_bytes();
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x);
@@ -1662,9 +1641,9 @@ async fn run_139() {
 }
 
 #[tokio::test]
-async fn run_140() {
+async fn run_137() {
     // mpl/RawAesKeyring.wrapping_key: [u8; 32] passed as .wrapping_key(x)
-    let mut r = Report::new("run_140");
+    let mut r = Report::new("run_137");
     let x_bytes = key_bytes();
     let Ok(x) = <[u8; 32]>::try_from(x_bytes.as_slice()) else { r.skip("the value is not 32 bytes"); return; };
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1674,9 +1653,9 @@ async fn run_140() {
 }
 
 #[tokio::test]
-async fn run_141() {
+async fn run_138() {
     // mpl/RawAesKeyring.wrapping_key: &String passed as .wrapping_key(x.clone())
-    let mut r = Report::new("run_141");
+    let mut r = Report::new("run_138");
     let x_owned = key_text();
     let x: &String = &x_owned;
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1686,9 +1665,9 @@ async fn run_141() {
 }
 
 #[tokio::test]
-async fn run_142() {
+async fn run_139() {
     // mpl/RawAesKeyring.wrapping_key: Cow<str> passed as .wrapping_key(x.to_string())
-    let mut r = Report::new("run_142");
+    let mut r = Report::new("run_139");
     let x = std::borrow::Cow::<str>::Owned(key_text());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x.to_string());
@@ -1697,9 +1676,9 @@ async fn run_142() {
 }
 
 #[tokio::test]
-async fn run_143() {
+async fn run_140() {
     // mpl/RawAesKeyring.wrapping_key: Option<&[u8]> passed as .set_wrapping_key(x.map(Into::into))
-    let mut r = Report::new("run_143");
+    let mut r = Report::new("run_140");
     let x_inner_owned = key_bytes();
     let x_inner: &[u8] = &x_inner_owned;
     let x = Some(x_inner);
@@ -1710,9 +1689,9 @@ async fn run_143() {
 }
 
 #[tokio::test]
-async fn run_144() {
+async fn run_141() {
     // mpl/RawAesKeyring.wrapping_key: Option<&str> passed as .set_wrapping_key(x.map(Into::into))
-    let mut r = Report::new("run_144");
+    let mut r = Report::new("run_141");
     let x_inner_owned = key_text();
     let x_inner: &str = &x_inner_owned;
     let x = Some(x_inner);
@@ -1723,9 +1702,9 @@ async fn run_144() {
 }
 
 #[tokio::test]
-async fn run_145() {
+async fn run_142() {
     // mpl/RawAesKeyring.wrapping_key: Option<Blob> passed as .set_wrapping_key(x.map(Into::into))
-    let mut r = Report::new("run_145");
+    let mut r = Report::new("run_142");
     let x_inner = aws_smithy_types::Blob::new(key_bytes());
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1735,9 +1714,9 @@ async fn run_145() {
 }
 
 #[tokio::test]
-async fn run_146() {
+async fn run_143() {
     // mpl/RawAesKeyring.wrapping_key: Option<String> passed as .set_wrapping_key(x.map(Into::into))
-    let mut r = Report::new("run_146");
+    let mut r = Report::new("run_143");
     let x_inner = key_text();
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1747,9 +1726,9 @@ async fn run_146() {
 }
 
 #[tokio::test]
-async fn run_147() {
+async fn run_144() {
     // mpl/RawAesKeyring.wrapping_key: Zeroizing<String> passed as .wrapping_key(x.to_string())
-    let mut r = Report::new("run_147");
+    let mut r = Report::new("run_144");
     let x = zeroize::Zeroizing::new(key_text());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x.to_string());
@@ -1758,16 +1737,16 @@ async fn run_147() {
 }
 
 #[tokio::test]
-async fn run_148() {
+async fn run_145() {
     // mpl/RawAesKeyring.wrapping_key: char passed as .wrapping_key(x.to_string())
-    let mut r = Report::new("run_148");
+    let mut r = Report::new("run_145");
     r.skip("a char holds one letter, not the whole value");
 }
 
 #[tokio::test]
-async fn run_149() {
+async fn run_146() {
     // mpl/RawAesKeyring.wrapping_key: &Path passed as .wrapping_key(std::fs::read(x).unwrap())
-    let mut r = Report::new("run_149");
+    let mut r = Report::new("run_146");
     let x_owned = temp_file(&key_bytes());
     let x: &std::path::Path = &x_owned;
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1777,9 +1756,9 @@ async fn run_149() {
 }
 
 #[tokio::test]
-async fn run_150() {
+async fn run_147() {
     // mpl/RawAesKeyring.wrapping_key: ByteStream passed as .wrapping_key(x.bytes().unwrap())
-    let mut r = Report::new("run_150");
+    let mut r = Report::new("run_147");
     let x = aws_smithy_types::byte_stream::ByteStream::from(key_bytes());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x.bytes().unwrap());
@@ -1788,9 +1767,9 @@ async fn run_150() {
 }
 
 #[tokio::test]
-async fn run_151() {
+async fn run_148() {
     // mpl/RawAesKeyring.wrapping_key: Option<&Blob> passed as .wrapping_key(x.unwrap().as_ref())
-    let mut r = Report::new("run_151");
+    let mut r = Report::new("run_148");
     let x_inner_owned = aws_smithy_types::Blob::new(key_bytes());
     let x_inner: &aws_smithy_types::Blob = &x_inner_owned;
     let x = Some(x_inner);
@@ -1801,9 +1780,9 @@ async fn run_151() {
 }
 
 #[tokio::test]
-async fn run_152() {
+async fn run_149() {
     // mpl/RawAesKeyring.wrapping_key: Option<Cow<str>> passed as .wrapping_key(x.unwrap().as_bytes())
-    let mut r = Report::new("run_152");
+    let mut r = Report::new("run_149");
     let x_inner = std::borrow::Cow::<str>::Owned(key_text());
     let x = Some(x_inner);
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
@@ -1813,9 +1792,9 @@ async fn run_152() {
 }
 
 #[tokio::test]
-async fn run_153() {
+async fn run_150() {
     // mpl/RawAesKeyring.wrapping_key: PathBuf passed as .wrapping_key(std::fs::read(x).unwrap())
-    let mut r = Report::new("run_153");
+    let mut r = Report::new("run_150");
     let x = temp_file(&key_bytes());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(std::fs::read(x).unwrap());
@@ -1824,9 +1803,9 @@ async fn run_153() {
 }
 
 #[tokio::test]
-async fn run_154() {
+async fn run_151() {
     // mpl/RawAesKeyring.wrapping_key: SdkBody passed as .wrapping_key(x.bytes().unwrap())
-    let mut r = Report::new("run_154");
+    let mut r = Report::new("run_151");
     let x = aws_smithy_types::body::SdkBody::from(key_bytes());
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key(x.bytes().unwrap());
@@ -1835,9 +1814,9 @@ async fn run_154() {
 }
 
 #[tokio::test]
-async fn run_155() {
+async fn run_152() {
     // mpl/RawAesKeyring.wrapping_key: File passed as .wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })
-    let mut r = Report::new("run_155");
+    let mut r = Report::new("run_152");
     let x = std::fs::File::open(temp_file(&key_bytes())).unwrap();
     let pre = aws_crypto_mpl::keyring::RawAesKeyring::builder();
     let built = pre.wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v });
@@ -1846,8 +1825,8 @@ async fn run_155() {
 }
 
 #[tokio::test]
-async fn run_156() {
+async fn run_153() {
     // mpl/RawAesKeyring.wrapping_key: TcpStream passed as .wrapping_key({ let mut r = x; let mut v = Vec::new(); std::io::Read::read_to_end(&mut r, &mut v).unwrap(); v })
-    let mut r = Report::new("run_156");
+    let mut r = Report::new("run_153");
     r.skip("needs a network connection");
 }
