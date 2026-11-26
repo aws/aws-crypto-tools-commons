@@ -21,9 +21,11 @@ To add a repository, add an entry to `REPOSITORIES` in `config.js`.
 
 ## PR Review
 
-`pr-review/index.html?pr=owner/repo#N` shows one pull request's diff with what CI found on each changed line: whether a test runs it, branches no test takes, mutants no test catches, the tests that run it, its duvet annotation, and the API option it belongs to. Above the diff it lists only what needs a look. With nothing to look at, it says so in one line.
+`?pr=owner/repo#N#pr-review` on the dashboard opens one pull request on the PR Review tab. The PR goes into the box that the PR Review, Duvet and Test Servers tabs share, so each of them shows it. Pasting another PR into any of them changes it for all of them.
 
-It reads the artifacts that the PR's CI runs upload: `mutation-results-*`, `local-coverage-*`, `per-test-coverage-*`, `*-test-server-reports`, `duvet-test-reach-*` and `smithy-conformance-*`. For an aws-crypto-tools-rust PR, it also compares the API at the PR's head commit with main's. That comes from an `api-examples-types.yml` run with `rust-ref` set to the head commit, which the page can start. `?ref=<commons branch>` picks the branch whose types runs it reads and starts.
+The tab lists only what needs a look: failed checks, changed lines no test runs, branches no test takes, mutants no test catches, duvet tests that miss their code, failed test server cases, open Smithy conformance findings, and API changes. Below that it shows those lines, with two lines around each; GitHub shows the whole diff. With nothing to look at, it says so in one line. The line box, or `&line=<file>:<line>` in the link, opens any other line of the head commit.
+
+It reads the artifacts that the PR's CI runs upload: `mutation-results-*`, `local-coverage-*`, `per-test-coverage-*`, `*-test-server-reports`, `duvet-test-reach-*` and `smithy-conformance-*`. For an aws-crypto-tools-rust PR, its CI also uploads `api-types-rust` and `api-types-rust-base`, the API at the head commit and at the merge base, which the tab compares. `?ref=<commons branch>` goes on to the API Examples page in its links.
 
 A click on a line opens its side pane, where a review comment posts to GitHub as you. That needs a token that can write pull requests. No AI runs on the page. "Ask an AI" gives a prompt for the library-pr-review skill, which reads the same artifacts.
 
