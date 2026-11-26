@@ -116,7 +116,7 @@ const PROPOSALS = {
 
 // Opens the page with these data files. A file that is null fails to load. With `github`, a map from an API path to
 // its reply, the page has a token and reads CI runs from that map.
-async function open(files = {}, search = "", github = null) {
+async function open(files = {}, search = "", github = null, sharedPr = null) {
   const all = { "types-rust.json": RUST, "types-others.json": OTHERS, "usage.json": USAGE, "expectations.json": RULES,
     "proposals.json": null, ...files };
   const els = {};
@@ -135,7 +135,8 @@ async function open(files = {}, search = "", github = null) {
     return { ok: all[name] !== null && all[name] !== undefined, json: async () => structuredClone(all[name]) };
   };
   const localStorage = { getItem: key => (github && key === "github-dashboard-token" ? "a token" : null), setItem() {}, removeItem() {} };
-  new Function("document", "fetch", "location", "localStorage", SCRIPT)(document, fetch, { search }, localStorage);
+  const sessionStorage = { getItem: key => (key === "testServerSource" ? sharedPr : null), setItem() {}, removeItem() {} };
+  new Function("document", "fetch", "location", "localStorage", "sessionStorage", SCRIPT)(document, fetch, { search }, localStorage, sessionStorage);
   await new Promise(resolve => setTimeout(resolve, github ? 200 : 20));
   // A click on an element in #id that matches each selector in `matches`, with that selector's dataset.
   const click = (id, matches) => els[id].on.click({ target: { closest: s => (s in matches ? { dataset: matches[s], classList: { add() {} } } : null) } });
@@ -455,26 +456,50 @@ function zipOf(name, text) {
   return all.buffer.slice(all.byteOffset, all.byteOffset + all.length);
 }
 
-// The types workflow's runs: the daily one on Rust main, and one the PR review page started for a PR's commit.
-const RUNS = "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-types.yml/runs?branch=main&status=success&per_page=30";
-const run = (id, event, display_title) => ({ id, event, display_title, html_url: `https://example.com/runs/${id}`, created_at: "2026-11-26T00:00:00Z", run_number: id });
+// The daily types run on Rust main, and the CI runs of two aws-crypto-tools-rust pull requests: #7, whose CI
+// uploaded its API, and #8, whose CI has not.
+const COMMONS_RUNS = "repos/aws/aws-crypto-tools-commons/actions";
+const RUST_REPO = "repos/aws/aws-crypto-tools-rust";
+const run = (id, repo) => ({ id, html_url: `https://example.com/runs/${id}`, created_at: "2026-11-26T00:00:00Z", run_number: id,
+  repository: { full_name: repo } });
 const artifacts = id => ({ artifacts: [{ id: id * 10, name: "api-types-rust", expired: false }] });
 const CI = {
-  [RUNS]: { workflow_runs: [run(2, "workflow_dispatch", "API types for Rust a12add08"), run(1, "schedule", "API types for Rust main")] },
-  "repos/aws/aws-crypto-tools-commons/actions/runs/2": run(2, "workflow_dispatch", "API types for Rust a12add08"),
-  "repos/aws/aws-crypto-tools-commons/actions/runs/1/artifacts?per_page=100": artifacts(1),
-  "repos/aws/aws-crypto-tools-commons/actions/runs/2/artifacts?per_page=100": artifacts(2),
-  "repos/aws/aws-crypto-tools-commons/actions/artifacts/10/zip": zipOf("types-rust.json", JSON.stringify({ ...RUST, note: "Rust main." })),
-  "repos/aws/aws-crypto-tools-commons/actions/artifacts/20/zip": zipOf("types-rust.json", JSON.stringify({ ...RUST, note: "Rust a12add08." })),
-  "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-shipped.yml/runs?branch=main&status=success&per_page=30": { workflow_runs: [] },
-  "repos/aws/aws-crypto-tools-commons/actions/workflows/api-examples-usage.yml/runs?branch=main&status=success&per_page=30": { workflow_runs: [] },
+  [`${COMMONS_RUNS}/workflows/api-examples-types.yml/runs?branch=main&status=success&per_page=10`]:
+    { workflow_runs: [{ ...run(1, "aws/aws-crypto-tools-commons"), event: "schedule" }] },
+  [`${COMMONS_RUNS}/runs/1/artifacts?per_page=100`]: artifacts(1),
+  [`${COMMONS_RUNS}/artifacts/10/zip`]: zipOf("types-rust.json", JSON.stringify({ ...RUST, note: "Rust main." })),
+  [`${COMMONS_RUNS}/workflows/api-examples-shipped.yml/runs?branch=main&status=success&per_page=10`]: { workflow_runs: [] },
+  [`${COMMONS_RUNS}/workflows/api-examples-usage.yml/runs?branch=main&status=success&per_page=10`]: { workflow_runs: [] },
+  [`${RUST_REPO}/pulls/7`]: { head: { sha: "c7" } },
+  [`${RUST_REPO}/actions/runs?head_sha=c7&per_page=50`]: { workflow_runs: [run(2, "aws/aws-crypto-tools-rust")] },
+  [`${RUST_REPO}/actions/runs/2/artifacts?per_page=100`]: artifacts(2),
+  [`${RUST_REPO}/actions/artifacts/20/zip`]: zipOf("types-rust.json", JSON.stringify({ ...RUST, note: "Rust PR 7." })),
+  [`${RUST_REPO}/pulls/8`]: { head: { sha: "c8" } },
+  [`${RUST_REPO}/actions/runs?head_sha=c8&per_page=50`]: { workflow_runs: [run(3, "aws/aws-crypto-tools-rust")] },
+  [`${RUST_REPO}/actions/runs/3/artifacts?per_page=100`]: { artifacts: [] },
 };
 
-test("the page shows Rust main, not a run that read a pull request's commit, unless ?run= names that run", async () => {
-  assert.match((await open({}, "", CI)).els.foot.textContent, /^Rust main\./);
-  const pr = await open({}, "?run=2", CI);
-  assert.match(pr.els.foot.textContent, /^Rust a12add08\./);
-  assert.match(pr.els.run.innerHTML, /Rust: <a href="https:\/\/example.com\/runs\/2"/);
+test("with no pull request the page shows Rust main from the daily run", async () => {
+  const page = await open({}, "", CI);
+  assert.match(page.els.foot.textContent, /^Rust main\./);
+  assert.match(page.els.run.innerHTML, /Rust: <a href="https:\/\/example.com\/runs\/1"/);
+});
+
+test("a pull request in another repository leaves the page on Rust main", async () => {
+  const page = await open({}, "", CI, "aws/aws-crypto-tools-commons#94");
+  assert.match(page.els.foot.textContent, /^Rust main\./);
+});
+
+test("a Rust pull request in the shared PR box shows its API from its own CI", async () => {
+  const page = await open({}, "", CI, "aws/aws-crypto-tools-rust#7");
+  assert.match(page.els.foot.textContent, /^Rust PR 7\./);
+  assert.match(page.els.run.innerHTML, /Rust: <a href="https:\/\/example.com\/runs\/2" target="_blank">aws-crypto-tools-rust#7's CI<\/a>/);
+});
+
+test("a pull request whose CI has no API types yet shows main's and says why", async () => {
+  const page = await open({}, "?pr=aws%2Faws-crypto-tools-rust%238", CI);
+  assert.match(page.els.foot.textContent, /^Rust main\./);
+  assert.match(page.els.run.innerHTML, /because aws-crypto-tools-rust#8's CI has no API types yet/);
 });
 
 test("?api= opens that API", async () => {

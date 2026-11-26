@@ -148,9 +148,7 @@
 // A row is {type, calls, code, kind}. calls counts the calls in the code, or is null when no fix was found.
 // A Rust row also has trial (its line in rust_trials.rs), test (its line in rust_runs.rs) and run (what the test found).
 const PARTS = {
-  // The PR review page starts runs that read a pull request's commit. Their names say so, and they are skipped
-  // here, unless the page is opened with ?run=<that run's id>.
-  rust: { file: "types-rust.json", workflow: "api-examples-types.yml", artifact: "api-types-rust", title: "API types for Rust main" },
+  rust: { file: "types-rust.json", workflow: "api-examples-types.yml", artifact: "api-types-rust" },
   others: { file: "types-others.json", workflow: "api-examples-shipped.yml", artifact: "api-types-others" },
   // A pull request runs the customer search with one page per search, so only full runs count.
   usage: { file: "usage.json", workflow: "api-examples-usage.yml", artifact: "api-examples-usage", events: ["schedule", "workflow_dispatch"] },
@@ -175,8 +173,15 @@ const COMMONS = "https://github.com/" + COMMONS_REPO;
 // CI runs and links come from this branch of commons. Open the page with ?ref=<branch> to use a branch other than main.
 const QUERY = new URLSearchParams(location.search);
 const REF = QUERY.get("ref") || "main";
-// ?run=<run id> shows the Rust API from that run, like one the PR review page started. ?api=mpl|aws-kms-keyring opens one API.
-const RUN = QUERY.get("run"), OPEN_API = QUERY.get("api");
+const RUST_REPO = "aws/aws-crypto-tools-rust";
+// An aws-crypto-tools-rust pull request, from ?pr= or from the PR box that the dashboard's tabs share, shows the
+// Rust API at its head commit, from its own CI's api-types-rust artifact. ?api=mpl|aws-kms-keyring opens one API.
+const PR = (() => {
+  const text = QUERY.get("pr") || QUERY.get("run") || sessionStorage.getItem("testServerSource") || "";
+  const m = text.match(/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/) || text.match(/^([\w.-]+\/[\w.-]+)#(\d+)$/);
+  return m && m[1] === RUST_REPO ? { repo: m[1], n: +m[2] } : null;
+})();
+const OPEN_API = QUERY.get("api");
 let rust = null, others = null, usage = null, expectations = { rules: {} }, proposals = null;
 const sources = {}, files = {};  // each part's CI run, and the files in its artifact
 let catalog = {}, optionIndex = {};  // library -> APIs, and option key -> {api, option}
@@ -236,19 +241,24 @@ async function entryText(buf, e) {
   return new Response(s).text();
 }
 
-// The files in the newest successful run's artifact, and the run, or null.
-async function fromCi(part) {
-  const runs = part === PARTS.rust && RUN
-    ? [await (await gh(`repos/${COMMONS_REPO}/actions/runs/${encodeURIComponent(RUN)}`)).json()]
-    : (await (await gh(`repos/${COMMONS_REPO}/actions/workflows/${part.workflow}/runs?branch=`
-      + `${encodeURIComponent(REF)}&status=success&per_page=30`)).json()).workflow_runs
-      .filter(r => (!part.events || part.events.includes(r.event))
-        && (!part.title || r.event !== "workflow_dispatch" || r.display_title === part.title));
+// The files in the newest successful run's artifact, and the run, or null. With pr, the run is the newest
+// one on the pull request's head commit that uploaded the artifact.
+async function fromCi(part, pr) {
+  let repo = COMMONS_REPO, runs;
+  if (pr) {
+    repo = PR.repo;
+    const head = (await (await gh(`repos/${repo}/pulls/${PR.n}`)).json()).head.sha;
+    runs = (await (await gh(`repos/${repo}/actions/runs?head_sha=${head}&per_page=50`)).json()).workflow_runs;
+  } else {
+    runs = (await (await gh(`repos/${COMMONS_REPO}/actions/workflows/${part.workflow}/runs?branch=`
+      + `${encodeURIComponent(REF)}&status=success&per_page=10`)).json()).workflow_runs
+      .filter(r => !part.events || part.events.includes(r.event));
+  }
   for (const run of runs) {
-    const arts = (await (await gh(`repos/${COMMONS_REPO}/actions/runs/${run.id}/artifacts?per_page=100`)).json()).artifacts;
+    const arts = (await (await gh(`repos/${repo}/actions/runs/${run.id}/artifacts?per_page=100`)).json()).artifacts;
     const art = arts.find(a => a.name === part.artifact && !a.expired);
     if (!art) continue;
-    const zip = await (await gh(`repos/${COMMONS_REPO}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
+    const zip = await (await gh(`repos/${repo}/actions/artifacts/${art.id}/zip`)).arrayBuffer();
     const entries = {};
     for (const e of zipEntries(zip)) entries[e.name.split("/").pop()] = await entryText(zip, e);
     return { run, entries };
@@ -262,9 +272,11 @@ async function loadPart(name) {
   const part = PARTS[name];
   if (token()) {
     try {
-      const found = await fromCi(part);
+      // A pull request's API, or main's when its CI has not read it yet.
+      const found = (part === PARTS.rust && PR && await fromCi(part, PR)) || await fromCi(part, null);
       if (found && found.entries[part.file]) {
-        sources[name] = { url: found.run.html_url, at: found.run.created_at, number: found.run.run_number };
+        sources[name] = { url: found.run.html_url, at: found.run.created_at, number: found.run.run_number,
+          pr: found.run.repository && found.run.repository.full_name === RUST_REPO };
         files[name] = found.entries;
         return JSON.parse(found.entries[part.file]);
       }
@@ -828,7 +840,10 @@ function foot() {
   $("foot").textContent = parts.filter(Boolean).join(" ");
   const from = (label, name) => sources[name]
     ? `${label}: <a href="${esc(sources[name].url)}" target="_blank">CI ${ago(sources[name].at)}</a>` : `${label}: committed copy`;
-  $("run").innerHTML = [from("Rust", "rust"), from("Others", "others"), from("Customers", "usage")].join(" · ");
+  const pr = PR && `${PR.repo.split("/")[1]}#${PR.n}`;
+  const rustFrom = PR && sources.rust && sources.rust.pr ? `Rust: <a href="${esc(sources.rust.url)}" target="_blank">${esc(pr)}'s CI</a>`
+    : PR ? `${from("Rust", "rust")}, because ${esc(pr)}'s CI has no API types yet` : from("Rust", "rust");
+  $("run").innerHTML = [rustFrom, from("Others", "others"), from("Customers", "usage")].join(" · ");
 }
 
 // ---------- clicks ----------
