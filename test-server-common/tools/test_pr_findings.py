@@ -474,6 +474,8 @@ class Body(unittest.TestCase):
                       "[Mutation testing (mpl)](https://ci/1)", body)
         self.assertNotIn("Run it locally", body)
         self.assertNotIn("Ask AI", body)
+        # The what says how many tests ran against the mutant; a second count of tests would not match it.
+        self.assertNotIn("tests run this line", body)
         self.assertEqual(pf.marker_of(body)["key"], f["key"])
 
 
