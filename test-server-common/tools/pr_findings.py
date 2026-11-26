@@ -16,7 +16,8 @@ Usage:
       gets a "Fixed" line, and its thread is resolved. A token without contents: write cannot resolve
       a thread, so then the comment is hidden as resolved. A comment is marked fixed only when the run
       read its check's results for that comment's project. A comment of a kind turned off with --off,
-      or of a check this script no longer has, is hidden as outdated.
+      or of a check this script no longer has, is hidden as outdated. Each review that posted comments
+      gets its summary line set to the newest counts and dashboard link.
   pr_findings.py line <owner/repo#N> <file>:<line> [--run <id>]...
       Prints everything CI found on one line, changed or not.
 
@@ -1290,18 +1291,37 @@ def read_here(data, check, file):
     return "" in folders or folder_of(file or "") in folders
 
 
-def plan(data, comments, threads, off=(), login="github-actions[bot]"):
+SUMMARY = re.compile(r"^CI found (\d+ things?|nothing) to look at")
+
+
+def summary_body(data, off=()):
+    """The body of a review that posts findings comments. Each run sets every such review's body to it."""
+    shown = [f for f in data["findings"] if f["file"] and f["kind"] not in off]
+    link = f"[View in dashboard]({data['dashboard']})"
+    if not shown:
+        return f"CI found nothing to look at on `{data['head'][:7]}`. {link}"
+    blocks = sum(f["level"] == "block" for f in shown)
+    return f"CI found {plural(len(shown), 'thing')} to look at on `{data['head'][:7]}` ({blocks} blocking). {link}"
+
+
+def plan(data, comments, threads, off=(), login="github-actions[bot]", reviews=()):
     """What to do so the PR's comments match the findings.
 
     comments: the PR's review comments; threads: {first comment id: {"id", "resolved", "comment", "hidden"}},
     where comment is the first comment's node id and hidden says that comment is hidden; login: the account
-    that posts, whose comments with a marker are the ones to keep up to date.
-    Returns {"create": [finding], "update": [(comment id, body)], "close": [thread], "reopen": [thread]}.
+    that posts, whose comments with a marker are the ones to keep up to date; reviews: the PR's reviews.
+    Returns {"create": [finding], "update": [(comment id, body)], "close": [thread], "reopen": [thread],
+    "hide": [thread], "summary": <the body of a new review>, "summaries": [(review id, body)]}.
     """
     wanted = {f["key"]: f for f in data["findings"] if f["file"] and f["kind"] not in off}
     ours = [c for c in comments if not c.get("in_reply_to_id") and marker_of(c.get("body"))
             and (c.get("user") or {}).get("login") == login]
-    actions = {"create": [], "update": [], "close": [], "reopen": [], "hide": []}
+    summary = summary_body(data, off)
+    # A review's body is the summary of the run that posted it; its counts and link go stale.
+    summaries = [(r["id"], summary) for r in reviews if (r.get("user") or {}).get("login") == login
+                 and SUMMARY.match(r.get("body") or "") and r["body"] != summary]
+    actions = {"create": [], "update": [], "close": [], "reopen": [], "hide": [], "summary": summary,
+               "summaries": summaries}
     seen = set()
     for c in sorted(ours, key=lambda c: c["id"], reverse=True):
         marker, thread = marker_of(c["body"]), threads.get(c["id"])
@@ -1375,9 +1395,10 @@ def post(args):
     repo, n = data["repository"], data["pr"]
     comments = gh.pages(f"repos/{repo}/pulls/{n}/comments")
     threads = threads_of(gh, repo, n)
-    actions = plan(data, comments, threads, off=set(args.off), login=args.login)
+    reviews = gh.pages(f"repos/{repo}/pulls/{n}/reviews")
+    actions = plan(data, comments, threads, off=set(args.off), login=args.login, reviews=reviews)
     print(f"create {len(actions['create'])}, edit {len(actions['update'])}, close {len(actions['close'])}, "
-          f"reopen {len(actions['reopen'])}, hide {len(actions['hide'])}")
+          f"reopen {len(actions['reopen'])}, hide {len(actions['hide'])}, summaries {len(actions['summaries'])}")
     if args.dry_run:
         for f in actions["create"]:
             print(f"--- would comment on {f['file']}:{f['line']} ({f['side']})\n{comment_body(f)}\n")
@@ -1390,10 +1411,7 @@ def apply(gh, data, actions):
     repo, n = data["repository"], data["pr"]
     try:
         if actions["create"]:
-            blocks = sum(f["level"] == "block" for f in actions["create"])
-            body = (f"CI found {plural(len(actions['create']), 'thing')} to look at on `{data['head'][:7]}`"
-                    f" ({blocks} blocking). [View in dashboard]({data['dashboard']})")
-            review = {"commit_id": data["head"], "event": "COMMENT", "body": body,
+            review = {"commit_id": data["head"], "event": "COMMENT", "body": actions["summary"],
                       "comments": [{"path": f["file"], "line": f["line"], "side": f["side"],
                                     "body": comment_body(f)} for f in actions["create"]]}
             try:
@@ -1410,6 +1428,8 @@ def apply(gh, data, actions):
                         print(f"could not comment on {c['path']}:{c['line']}: {one}")
         for cid, body in actions["update"]:
             gh.request("PATCH", f"repos/{repo}/pulls/comments/{cid}", {"body": body})
+        for rid, body in actions["summaries"]:
+            gh.request("PUT", f"repos/{repo}/pulls/{n}/reviews/{rid}", {"body": body})
     except RuntimeError as e:
         # A pull request from a fork gets a read-only token, so its comments stay in the findings artifact.
         if refused(e):

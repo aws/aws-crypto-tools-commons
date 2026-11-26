@@ -365,7 +365,7 @@ def thread(resolved=False, hidden=False):
 
 def findings_data(replies=None):
     pr, findings = build(replies)
-    return {"repository": REPO, "pr": 7, "head": HEAD, "findings": findings,
+    return {"repository": REPO, "pr": 7, "head": HEAD, "findings": findings, "dashboard": "https://dash/?pr=7#pr-review",
             "checked": {check: sorted(folders) for check, folders in pr.checked.items()}}
 
 
@@ -422,6 +422,22 @@ class Plan(unittest.TestCase):
         self.assertNotIn(self.line["key"], [f["key"] for f in plan["create"]])
 
 
+class Summaries(unittest.TestCase):
+    def test_the_summary_of_each_review_the_bot_posted_gets_the_newest_counts_and_link(self):
+        data = findings_data()
+        now = pf.summary_body(data)
+        reviews = [{"id": 1, "user": {"login": "github-actions[bot]"}, "body": "CI found 12 things to look at on `577efb8` (6 blocking). [View in dashboard](https://old)"},
+                   {"id": 2, "user": {"login": "github-actions[bot]"}, "body": now},
+                   {"id": 3, "user": {"login": "someone"}, "body": "CI found 1 thing to look at, says a person"},
+                   {"id": 4, "user": {"login": "github-actions[bot]"}, "body": "Another bot review"}]
+        self.assertEqual(pf.plan(data, [], {}, reviews=reviews)["summaries"], [(1, now)])
+        self.assertEqual(now, "CI found 5 things to look at on `aaaaaaa` (4 blocking). [View in dashboard](https://dash/?pr=7#pr-review)")
+
+    def test_with_no_comments_left_the_summary_says_so(self):
+        data = {**findings_data(), "findings": []}
+        self.assertEqual(pf.summary_body(data), "CI found nothing to look at on `aaaaaaa`. [View in dashboard](https://dash/?pr=7#pr-review)")
+
+
 class Folders(unittest.TestCase):
     def test_a_cpp_shim_file_needs_the_shims_own_coverage_and_not_the_esdks(self):
         shim = "esdk/shims/aws-esdk-cpp/src/lib.rs"
@@ -448,12 +464,12 @@ class Apply(unittest.TestCase):
     def test_a_token_that_may_not_resolve_threads_hides_each_fixed_comment_as_resolved(self):
         gh = Recorder(refuse={"resolveReviewThread"})
         two = [thread(), {**thread(), "id": "T2", "comment": "C2"}]
-        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": two, "reopen": [], "hide": []})
+        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": two, "reopen": [], "hide": [], "summaries": []})
         self.assertEqual(gh.ran, [("minimizeComment", "C1", "RESOLVED"), ("minimizeComment", "C2", "RESOLVED")])
 
     def test_a_comment_to_hide_is_hidden_as_outdated(self):
         gh = Recorder()
-        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": [], "reopen": [], "hide": [thread()]})
+        pf.apply(gh, {"repository": REPO, "pr": 7}, {"create": [], "update": [], "close": [], "reopen": [], "hide": [thread()], "summaries": []})
         self.assertEqual(gh.ran, [("minimizeComment", "C1", "OUTDATED")])
 
 
