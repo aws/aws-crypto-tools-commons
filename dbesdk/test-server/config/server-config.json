@@ -87,13 +87,13 @@
       "libraryRepository": {
         "name": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "branch": "main",
+        "branch": "dbesdk-native-java-unverified",
         "path": "test-server/dbesdk"
       },
       "serverLocation": {
         "repository": "aws-crypto-tools-java",
         "url": "git@github.com:aws/aws-crypto-tools-java.git",
-        "ref": "main",
+        "ref": "dbesdk-native-java-unverified",
         "path": "test-server/dbesdk"
       }
     }
