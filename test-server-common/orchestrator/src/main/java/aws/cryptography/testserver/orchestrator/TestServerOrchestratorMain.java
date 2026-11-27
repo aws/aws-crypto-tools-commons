@@ -251,6 +251,14 @@ public final class TestServerOrchestratorMain {
             System.exit(EXIT_USAGE);
             return;
         }
+        String dryRunArg = cli.getOrDefault("dryRun", "false").trim();
+        if (!dryRunArg.equals("true") && !dryRunArg.equals("false")) {
+            System.err.println("TestServerOrchestrator: dryRun must be true or false");
+            System.err.println(usage());
+            System.exit(EXIT_USAGE);
+            return;
+        }
+        boolean dryRun = Boolean.parseBoolean(dryRunArg);
 
         TestServerOrchestrator orchestrator = new TestServerOrchestrator(
             set,
@@ -265,7 +273,8 @@ public final class TestServerOrchestratorMain {
             .withOverlayLanguages(overlayLanguages)
             .withLanguages(languages)
             .withStopAfter(stopAfter)
-            .withFocus(focus);
+            .withFocus(focus)
+            .withDryRun(dryRun);
 
         System.out.println("==> TestServerOrchestrator run");
         System.out.println("    context: " + describeContext(context));
@@ -290,6 +299,9 @@ public final class TestServerOrchestratorMain {
         }
         if (stopAfter != TestServerOrchestrator.StopAfter.NONE) {
             System.out.println("    stopAfter: " + stopAfter.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        if (dryRun) {
+            System.out.println("    dryRun: true");
         }
         if (context.kind() == RunContext.Kind.LANGUAGE) {
             System.out.println("    languageRepoRoot: " + context.languageRepoRoot());
@@ -415,7 +427,8 @@ public final class TestServerOrchestratorMain {
             + " [languages=<lang>,...]"
             + " [focus=<lang>,...]"
             + " [workingTreeLanguages=<lang>,...]"
-            + " [stopAfter=none|materialize|launch]";
+            + " [stopAfter=none|materialize|launch]"
+            + " [dryRun=true (with languages=<one lang>)]";
     }
 
     /**

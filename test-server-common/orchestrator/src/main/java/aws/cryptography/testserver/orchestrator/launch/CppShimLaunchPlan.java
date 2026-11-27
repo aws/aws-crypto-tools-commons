@@ -11,21 +11,24 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The C++-shim {@code Language_Server} launch plan: builds the rpcv2Cbor server
- * that ships in aws-crypto-tools-rust ({@code esdk-cpp-test-server/}) and runs
- * every operation through the {@code aws-esdk-cpp} C++ facade, from the run's
- * <em>resolved</em> sources.
+ * that ships in aws-crypto-tools-rust ({@code esdk/shims/aws-esdk-cpp/test-server/})
+ * and runs every operation through the {@code aws-esdk-cpp} C++ facade, from the
+ * run's <em>resolved</em> sources.
  *
  * <ol>
- *   <li><b>Resolve.</b> The server directory (the {@code esdk-cpp-test-server}
- *       path within the materialized aws-crypto-tools-rust clone) comes from the
- *       {@link MaterializedSources}; the {@code esdk/shims/aws-esdk-cpp} shim and
- *       the sibling {@code esdk} / MPL crates it depends on live in the same
- *       clone. A missing component is a {@code RESOLVE} launch failure.</li>
- *   <li><b>Build the shim.</b> {@code cargo build --release} in
- *       {@code esdk/shims/aws-esdk-cpp}; the server's cdylib link requires it.
+ *   <li><b>Resolve.</b> The server directory (the {@code test-server/} crate
+ *       inside the {@code aws-esdk-cpp} shim) comes from the
+ *       {@link MaterializedSources}; the shim is the server's parent directory
+ *       (the same contract the server's build script uses), and the sibling
+ *       {@code esdk} / MPL crates it depends on live in the same clone. A
+ *       missing component is a {@code RESOLVE} launch failure.</li>
+ *   <li><b>Build the shim.</b> {@code cargo build --release} in the shim
+ *       directory; the server's cdylib link requires it.
  *       This step is built into the shim's own {@code target/} (its
  *       {@code CARGO_TARGET_DIR} is cleared) so the server's build script finds
  *       the cdylib where it looks for it.</li>
@@ -55,13 +58,6 @@ public final class CppShimLaunchPlan implements Launcher {
      */
     private final String serverBinaryName;
 
-    /**
-     * The aws-cpp shim directory, relative to the clone root:
-     * {@code <product>/shims/aws-<product>-cpp}. Each SDK's aws-crypto-tools-rust
-     * checkout lays its shim out on this convention.
-     */
-    private final String shimRelativePath;
-
     /** The default cargo target directory (relative to the server crate). */
     static final String DEFAULT_TARGET_DIR = "target";
 
@@ -78,9 +74,7 @@ public final class CppShimLaunchPlan implements Launcher {
     /**
      * @param workDirectory scratch directory owned by this plan; hosts the
      *                      server log
-     * @param product       the SDK product identifier — the shim path is
-     *                      {@code <product>/shims/aws-<product>-cpp} and the
-     *                      binary is
+     * @param product       the SDK product identifier — the binary is
      *                      {@code target/release/<product>-cpp-test-server}
      */
     public CppShimLaunchPlan(Path workDirectory, String product) {
@@ -89,8 +83,8 @@ public final class CppShimLaunchPlan implements Launcher {
 
     /**
      * @param workDirectory      scratch directory owned by this plan
-     * @param product            the SDK product identifier (drives shim
-     *                           path and binary name)
+     * @param product            the SDK product identifier (drives the
+     *                           binary and shim library names)
      * @param cargo              the cargo executable
      * @param subprocessLauncher the shared launch machinery (injectable
      *                           readiness timeout for tests)
@@ -113,7 +107,6 @@ public final class CppShimLaunchPlan implements Launcher {
         this.cargo = cargo;
         this.subprocessLauncher = subprocessLauncher;
         this.serverBinaryName = product + "-cpp-test-server";
-        this.shimRelativePath = product + "/shims/aws-" + product + "-cpp";
         this.product = product;
     }
 
@@ -122,17 +115,17 @@ public final class CppShimLaunchPlan implements Launcher {
             throws ServerLaunchException {
         String language = entry.language();
 
-        // 1. Resolve the materialized server directory. The shim and the library
-        //    crate are within the same clone, so only the server component is
-        //    resolved here.
+        // 1. Resolve the materialized server directory. The server crate ships at
+        //    test-server/ inside the aws-esdk-cpp shim (its build script resolves
+        //    the shim as its parent), so the shim directory is the server's parent.
         MaterializedSources.Success resolved = sources.successOf(ComponentId.server(language))
             .orElseThrow(() -> missingComponent(language, ComponentId.server(language)));
         Path serverDir = resolved.directory();
-        Path shimDir = serverDir.getParent().resolve(shimRelativePath);
-        if (!Files.isDirectory(shimDir)) {
+        Path shimDir = serverDir.getParent();
+        if (shimDir == null || !Files.isRegularFile(shimDir.resolve("Cargo.toml"))) {
             throw new ServerLaunchException(language, ServerLaunchException.Category.RESOLVE,
                 "the " + language + " Language_Server launch requires the aws-esdk-cpp shim at "
-                    + shimDir + ", but that directory is not present in the resolved sources");
+                    + shimDir + ", but no crate manifest is present there");
         }
 
         try {
@@ -151,12 +144,18 @@ public final class CppShimLaunchPlan implements Launcher {
         Path binary = targetDirectory(serverDir).resolve("release").resolve(serverBinaryName);
         Path shimLibrary = shimDir.resolve(DEFAULT_TARGET_DIR).resolve("release")
             .resolve(System.mapLibraryName("aws_" + product + "_cpp"));
+        Optional<Path> coverage = Coverage.start(entry, sources, "llvm", Map.of("objects", List.of(
+            shimLibrary.toAbsolutePath().normalize().toString(),
+            binary.toAbsolutePath().normalize().toString())));
+        Map<String, String> buildEnvironment = coverage.isPresent()
+            ? Map.of("RUSTFLAGS", RustLaunchPlan.COVERAGE_RUSTFLAGS) : Map.of();
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(), List.of(binary, shimLibrary))) {
             runBuildStep(language, "cargo build --release (aws-esdk-cpp shim)",
-                buildCommand(cargo), shimDir, true);
+                buildCommand(cargo), shimDir, true, buildEnvironment);
 
             // 3. Build the server.
-            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false);
+            runBuildStep(language, "cargo build --release", buildCommand(cargo), serverDir, false,
+                buildEnvironment);
             stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
@@ -172,6 +171,9 @@ public final class CppShimLaunchPlan implements Launcher {
             server.environment().get(libraryPathVariable)));
         server.redirectErrorStream(true);
         server.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
+        // The instrumented shim library and server each write a profile here when the server exits.
+        coverage.ifPresent(dir -> server.environment().put("LLVM_PROFILE_FILE",
+            dir.resolve("%p-%m.profraw").toString()));
         return subprocessLauncher.launch(language, entry.port(), server);
     }
 
@@ -229,14 +231,15 @@ public final class CppShimLaunchPlan implements Launcher {
     }
 
     /**
-     * Run the synchronous build to completion in {@code buildDir}. A build that
+     * Run the synchronous build to completion in {@code buildDir}, with
+     * {@code environment} added to the inherited one. A build that
      * cannot start, is interrupted, or exits non-zero is a {@code BUILD} launch
      * failure naming the step and carrying the tool output. When
      * {@code clearCargoTargetDir} is set, {@code CARGO_TARGET_DIR} is removed
      * from the step's environment so the output lands in {@code buildDir/target}.
      */
     private void runBuildStep(String language, String step, List<String> command, Path buildDir,
-            boolean clearCargoTargetDir) throws ServerLaunchException {
+            boolean clearCargoTargetDir, Map<String, String> environment) throws ServerLaunchException {
         Instant startedAt = Instant.now();
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
@@ -245,6 +248,7 @@ public final class CppShimLaunchPlan implements Launcher {
             if (clearCargoTargetDir) {
                 builder.environment().remove("CARGO_TARGET_DIR");
             }
+            builder.environment().putAll(environment);
 
             Process process;
             try {

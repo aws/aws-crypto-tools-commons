@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The Node.js {@code Language_Server} launch plan: builds the rpcv2Cbor server
@@ -147,10 +149,14 @@ public final class NodeLaunchPlan implements Launcher {
 
         // 3. Launch: node <server>/build/src/main.js <port> via the shared
         //    probe/spawn/readiness/teardown.
+        Optional<Path> coverage = Coverage.start(entry, sources, "v8", Map.of());
         ProcessBuilder process = new ProcessBuilder(serverCommand(node, serverDir, entry.port()));
         process.directory(serverDir.toFile());
         process.redirectErrorStream(true);
         process.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
+        // Node writes the V8 coverage of every script it ran here when the server exits.
+        coverage.ifPresent(dir -> process.environment().put("NODE_V8_COVERAGE",
+            dir.resolve("v8").toString()));
         return subprocessLauncher.launch(language, entry.port(), process);
     }
 

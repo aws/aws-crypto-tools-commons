@@ -28,9 +28,9 @@
 # JOBS: `plan` keys each heavy server (net, rust, rust-cpp, rust-dafny, go)
 # on its commit and lists the ones with no prebuilt binary; `prebuild`
 # compiles only those, one runner each, and publishes each binary as an
-# artifact named by its key; `esdk-test-server` does its setup and the light
-# server builds in parallel with `prebuild`, waits for it, fetches every
-# heavy binary into its clones, and runs the Tests. The build stamps make
+# artifact named by its key; `esdk-test-server` starts once `prebuild` has
+# finished (or was skipped because nothing needed building), builds the light
+# servers, fetches every heavy binary into its clones, and runs the Tests. The build stamps make
 # every fetched server launch without rebuilding.
 #
 # Prebuilt binaries are artifacts, found by name in the calling repository and
@@ -71,21 +71,6 @@
 # target via --release on modern JDKs; JDK 17 is still provisioned here for
 # the test-vectors stub install (its `jar` tool) and as the documented
 # 17-class toolchain should explicit wiring be added later.
-#
-# PRIVATE JAVA-REPO CLONE AUTH (LANGUAGE_REPO_PAT secret): the Commons_Run
-# clones aws-crypto-tools-java per the Java Configuration_Entry's
-# Server_Location (`git clone git@github.com:aws/aws-crypto-tools-java.git`,
-# the SSH URL from config/server-config.json). aws-crypto-tools-java is a
-# PRIVATE repo, and in GitHub Actions the default GITHUB_TOKEN / checkout
-# token only grants access to THIS repo — so that cross-repo clone fails
-# without extra auth. The "Configure git auth" step below rewrites the SSH URL
-# to authenticated HTTPS for the duration of the job via git insteadOf, using
-# the LANGUAGE_REPO_PAT secret with READ-ONLY scope (Requirement 6.6): a
-# fine-grained PAT with `Contents: Read` on aws-crypto-tools-java, or a
-# classic PAT with `repo`. This is the mirror image of the Java repo
-# workflow's COMMONS_REPO_PAT pattern. (aws-encryption-sdk-python is PUBLIC
-# and cloned via its HTTPS URL, so it needs no auth and is untouched by the
-# SSH-URL rewrite.)
 #
 # AWS/KMS (ONLINE, REQUIRED): the KMS_Scenarios are REQUIRED and call real AWS
 # KMS, so the orchestrated run cannot pass without usable credentials
@@ -165,12 +150,14 @@ on:
           restores them.
         type: boolean
         default: false
-    secrets:
-      repo-pat:
+      runner:
         description: >-
-          Read-only token for the private repositories the run clones
-          (aws-crypto-tools-commons, aws-crypto-tools-rust, ...).
-        required: true
+          Runner label for every job. Defaults to this repo's CodeBuild runner.
+          Callers from another repo must pass their own
+          codebuild-<project>-<run_id>-<run_attempt> label, because a CodeBuild
+          project only picks up jobs from the repo it is connected to.
+        type: string
+        default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
 
 # Callers must grant these.
 permissions:
@@ -183,8 +170,6 @@ permissions:
   id-token: write
 
 env:
-  # The language repository whose checkout replaces its configured branch.
-  LANGUAGE_REPOSITORY: ${{ inputs.language-repository || (github.repository != 'aws/aws-crypto-tools-commons' && github.repository || '') }}
   CHECKOUT_LANGUAGES: ${{ inputs.checkout-languages || inputs.focus }}
   # Dependency caches (cargo, Gradle/Maven, npm, pip, NuGet, Go, C)
   # are written only from the default branch, so every branch restores the
@@ -193,12 +178,47 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  # Resolves the refs every job checks out, including any Test-Server-Override
+  # lines in the pull request description (.github/scripts/resolve-test-server-refs.sh).
+  resolve:
+    name: resolve refs
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      commons_ref: ${{ steps.refs.outputs.commons_ref }}
+      language_repository: ${{ steps.refs.outputs.language_repository }}
+      language_ref: ${{ steps.refs.outputs.language_ref }}
+      language_branches: ${{ steps.refs.outputs.language_branches }}
+    steps:
+      - name: Check out the resolve script
+        uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-commons
+          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
+          sparse-checkout: .github/scripts
+      - name: Resolve refs
+        id: refs
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          EVENT_BODY: ${{ github.event.pull_request.body }}
+          INPUT_COMMONS_REF: ${{ inputs.commons-ref }}
+          INPUT_LANGUAGE_REPOSITORY: ${{ inputs.language-repository }}
+          INPUT_LANGUAGE_REF: ${{ inputs.language-ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/resolve-test-server-refs.sh resolve
+
   # Resolves each heavy server's key and lists the servers with no prebuilt
   # binary, so the prebuild job compiles only those.
   plan:
     name: find servers to prebuild
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    needs: resolve
+    env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
     outputs:
+      platform: ${{ steps.platform.outputs.platform }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       overlay: ${{ steps.keys.outputs.overlay }}
       esdk_dir: ${{ steps.keys.outputs.esdk_dir }}
@@ -231,16 +251,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+          ref: ${{ needs.resolve.outputs.commons_ref }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -253,54 +276,24 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
-          # Transpile outputs (restored or generated) inside the mpl submodule.
-          git -C language-repo config submodule.mpl.ignore untracked
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
-      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
-        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) and aws-crypto-tools-rust (the
-        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/server-config.json).
-        # GitHub Actions' default token only reaches THIS repo, so that
-        # cross-repo private clone needs its own credential. We supply a
-        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
-        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/server-config.json or the Makefile changes. The public
-        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
-        #
-        # SECURITY NOTES:
-        #   - The PAT is passed only via the step `env:` below (never inlined
-        #     in the script), and GitHub automatically masks the secret value
-        #     in logs. We do NOT use `set -x`, so the configured URL is not
-        #     echoed.
-        #   - The token is written only to the ephemeral runner's global git
-        #     config (~/.gitconfig), which is discarded when the job ends.
-        #   - This rewrite is CI-ONLY. Local development is unaffected and
-        #     keeps using the SSH URL as-is.
-        #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
-        #     with `Contents: Read` on each repo, or a classic PAT with the
-        #     `repo` scope).
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
-            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
-            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
-            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
-            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
-            echo "'repo' scope)." >&2
-            exit 1
-          fi
-          # Rewrite the SSH URL used in config/server-config.json to
-          # authenticated HTTPS so `git clone git@github.com:aws/...`
-          # transparently becomes an authenticated HTTPS clone.
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Identify the runner platform
+        # Keys every prebuilt output and dependency cache: binaries link
+        # against the runner's glibc.
+        id: platform
+        run: echo "platform=$RUNNER_OS-glibc$(getconf GNU_LIBC_VERSION | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Resolve the prebuilt-server keys and paths
         # Each key is the server's branch tip; each path list is the server's
@@ -308,6 +301,7 @@ jobs:
         # (<repo>@<sanitized ref>-<8-hex hash>).
         id: keys
         env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -323,7 +317,8 @@ jobs:
           own=""
           if [ -n "$LANGUAGE_REPOSITORY" ]; then
             own=$(basename "$LANGUAGE_REPOSITORY")
-            echo "overlay=workingTreeOverlay.$own=$GITHUB_WORKSPACE/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
+            # Each job substitutes its own workspace path for @GITHUB_WORKSPACE@.
+            echo "overlay=workingTreeOverlay.$own=@GITHUB_WORKSPACE@/language-repo${CHECKOUT_LANGUAGES:+ workingTreeLanguages=$CHECKOUT_LANGUAGES}" >> "$GITHUB_OUTPUT"
           fi
           # Whether $1 builds from the checkout.
           from_checkout() {
@@ -352,7 +347,7 @@ jobs:
             local name="$1" language="$2" key="$3" src="" paths; shift 3
             from_checkout "$language" && src="$own-src-"
             paths=$(printf '%s\n' "$@" | sha256sum | cut -c1-8)
-            echo "key_$name=${RUNNER_OS}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
+            echo "key_$name=${PLATFORM}-out-$name-$paths-$src$key" >> "$GITHUB_OUTPUT"
             { echo "paths_$name<<EOF"; printf '%s\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"
           }
           esdk=$(clone net); rust=$(clone rust); rustcpp=$(clone rust-cpp)
@@ -377,23 +372,25 @@ jobs:
             "$esdk/AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/mpl/*/runtimes/go/ImplementationFromDafny-go" \
             "$esdk/AwsEncryptionSDK/.esdk-transpile-go-build-stamp"
-          emit rustdafny rust-dafny "$esdk_tip" \
+          emit rustdafny rust-dafny "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/rust/target/release/esdk-test-server" \
             "$esdk/esdk-test-servers/rust/.esdk-build-stamp"
-          emit go go "$esdk_tip" \
+          # "-coverage": built with line coverage on, so apart from older
+          # prebuilt servers built without it.
+          emit go go "$esdk_tip-coverage" \
             "$esdk/esdk-test-servers/go/esdk-test-server" \
             "$esdk/esdk-test-servers/go/.esdk-build-stamp"
-          emit rust rust "$(tip rust)" \
-            "$rust/esdk-test-server/target/release/esdk-test-server" \
-            "$rust/esdk-test-server/.esdk-build-stamp"
-          emit rustcpp rust-cpp "$(tip rust-cpp)" \
-            "$rustcpp/esdk-cpp-test-server/target/release/esdk-cpp-test-server" \
+          emit rust rust "$(tip rust)-coverage" \
+            "$rust/esdk/test-server/target/release/esdk-test-server" \
+            "$rust/esdk/test-server/.esdk-build-stamp"
+          emit rustcpp rust-cpp "$(tip rust-cpp)-coverage" \
+            "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/target/release/esdk-cpp-test-server" \
             "$rustcpp/esdk/shims/aws-esdk-cpp/target/release/libaws_esdk_cpp.so" \
-            "$rustcpp/esdk-cpp-test-server/.esdk-build-stamp"
+            "$rustcpp/esdk/shims/aws-esdk-cpp/test-server/.esdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
           ws() { local name="$1"; shift; { echo "ws_$name<<EOF"; printf '%s -> target\n' "$@"; echo "EOF"; } >> "$GITHUB_OUTPUT"; }
-          ws rust "$rust/esdk-test-server"
-          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk-cpp-test-server"
+          ws rust "$rust/esdk/test-server"
+          ws rustcpp "$rustcpp/esdk/shims/aws-esdk-cpp" "$rustcpp/esdk/shims/aws-esdk-cpp/test-server"
           ws rustdafny "$esdk/esdk-test-servers/rust"
           echo "go_dir=$esdk/esdk-test-servers/go" >> "$GITHUB_OUTPUT"
           for language in java python javascript c; do
@@ -407,7 +404,6 @@ jobs:
         id: matrix
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_net: ${{ steps.keys.outputs.key_net }}
           KEY_rustdafny: ${{ steps.keys.outputs.key_rustdafny }}
           KEY_go: ${{ steps.keys.outputs.key_go }}
@@ -415,14 +411,12 @@ jobs:
           KEY_rustcpp: ${{ steps.keys.outputs.key_rustcpp }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
             local repo id
             for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
-              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+              id=$(GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
                 -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
                 2>/dev/null) || id=""
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
@@ -441,14 +435,15 @@ jobs:
   # Compiles each missing heavy server on its own runner, in parallel, and
   # caches its binary; the test job restores it and runs it there.
   prebuild:
-    needs: plan
+    needs: [resolve, plan]
     if: needs.plan.outputs.matrix != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     strategy:
       fail-fast: false
       matrix:
         language: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       AWS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       AWS_DEFAULT_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
       GRADLE_OPTS: -Dorg.gradle.daemon=false
@@ -457,20 +452,35 @@ jobs:
       OUT_KEY: ${{ matrix.language == 'net' && needs.plan.outputs.key_net || matrix.language == 'rust-dafny' && needs.plan.outputs.key_rustdafny || matrix.language == 'go' && needs.plan.outputs.key_go || matrix.language == 'rust' && needs.plan.outputs.key_rust || needs.plan.outputs.key_rustcpp }}
       OUT_PATHS: ${{ matrix.language == 'net' && needs.plan.outputs.paths_net || matrix.language == 'rust-dafny' && needs.plan.outputs.paths_rustdafny || matrix.language == 'go' && needs.plan.outputs.paths_go || matrix.language == 'rust' && needs.plan.outputs.paths_rust || needs.plan.outputs.paths_rustcpp }}
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+          ref: ${{ needs.resolve.outputs.commons_ref }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -483,8 +493,14 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
-          # Transpile outputs (restored or generated) inside the mpl submodule.
-          git -C language-repo config submodule.mpl.ignore untracked
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Set up JDK 17 (Temurin) for the smithy-dafny Gradle steps
         # Installed before JDK 21 so JAVA_HOME stays on 21 for the orchestrator.
@@ -510,14 +526,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-v2-${{ hashFiles(
+          key: ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-v2-
+            ${{ needs.plan.outputs.platform }}-gradle-v2-
 
       - name: Set up Go (Go server; aws-lc-sys native builds)
         if: matrix.language != 'net'
@@ -527,10 +543,10 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: startsWith(matrix.language, 'rust')
-        run: |
-          set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          components: rustfmt
 
       - name: Set up .NET (the Dafny tool; .NET library build)
         if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
@@ -539,6 +555,16 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
 
       - name: Install Dafny (4.10.0 for the Rust transpile, 4.9.0 otherwise)
         if: contains(fromJSON('["net","rust-dafny","go"]'), matrix.language)
@@ -553,56 +579,14 @@ jobs:
         if: matrix.language == 'go'
         run: go install golang.org/x/tools/cmd/goimports@v0.36.0
 
-      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
-        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) and aws-crypto-tools-rust (the
-        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/server-config.json).
-        # GitHub Actions' default token only reaches THIS repo, so that
-        # cross-repo private clone needs its own credential. We supply a
-        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
-        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/server-config.json or the Makefile changes. The public
-        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
-        #
-        # SECURITY NOTES:
-        #   - The PAT is passed only via the step `env:` below (never inlined
-        #     in the script), and GitHub automatically masks the secret value
-        #     in logs. We do NOT use `set -x`, so the configured URL is not
-        #     echoed.
-        #   - The token is written only to the ephemeral runner's global git
-        #     config (~/.gitconfig), which is discarded when the job ends.
-        #   - This rewrite is CI-ONLY. Local development is unaffected and
-        #     keeps using the SSH URL as-is.
-        #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
-        #     with `Contents: Read` on each repo, or a classic PAT with the
-        #     `repo` scope).
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
-            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
-            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
-            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
-            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
-            echo "'repo' scope)." >&2
-            exit 1
-          fi
-          # Rewrite the SSH URL used in config/server-config.json to
-          # authenticated HTTPS so `git clone git@github.com:aws/...`
-          # transparently becomes an authenticated HTTPS clone.
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Materialize the ${{ matrix.language }} sources
         # The caches below restore into the clone, so it exists first.
         working-directory: esdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=materialize"
 
       - name: Initialize the Dafny submodules
         # The .NET transpile outputs restore into the submodule checkouts.
@@ -645,6 +629,17 @@ jobs:
         working-directory: ${{ needs.plan.outputs.esdk_dir }}/mpl/smithy-dafny/codegen
         run: ./gradlew --version > /dev/null
 
+      - name: Turn on line coverage
+        # The orchestrator builds and runs each server with coverage on when
+        # TESTSERVER_COVERAGE_DIR is set. The start check's data stays in the
+        # temp directory. RUSTFLAGS matches the Rust launch plan's coverage
+        # build, and goes before the cargo cache, whose key includes it.
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Build the Rust code with line coverage
+        if: startsWith(matrix.language, 'rust')
+        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and each workspace's Cargo.lock; our own crates
         # are cleaned before saving, so every branch reuses the dependencies.
@@ -652,6 +647,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ matrix.language }}
+          key: ${{ needs.plan.outputs.platform }}
           workspaces: ${{ env.PREBUILD_RUST_WORKSPACES }}
           save-if: ${{ env.SAVE_CACHES == 'true' }}
 
@@ -663,9 +659,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-coverage-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ needs.plan.outputs.platform }}-go-coverage-
 
       - name: Restore the NuGet packages
         if: matrix.language == 'net'
@@ -673,9 +669,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
+            ${{ needs.plan.outputs.platform }}-nuget-
 
       - name: Restore the .NET transpile outputs
         id: net-transpile
@@ -689,7 +685,7 @@ jobs:
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=${{ matrix.language }} stopAfter=launch"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=${{ matrix.language }} stopAfter=launch"
 
       - name: Save the .NET transpile outputs
         if: matrix.language == 'net' && steps.net-transpile.outputs.cache-hit != 'true'
@@ -736,24 +732,30 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-go-coverage-${{ hashFiles(format('{0}/go.sum', needs.plan.outputs.go_dir)) }}
 
       - name: Save the NuGet packages
         if: matrix.language == 'net' && env.SAVE_CACHES == 'true' && steps.nuget-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
+          key: ${{ needs.plan.outputs.platform }}-nuget-${{ hashFiles(format('{0}/**/*.csproj', needs.plan.outputs.esdk_dir)) }}
 
-  # Starts alongside the prebuild job; its setup and the light server builds
-  # overlap the heavy builds, and it waits for their outputs just before
-  # the run.
+  # Runs after every prebuild job has finished. The prebuild job is skipped
+  # when the plan finds every server already built, so a skipped prebuild
+  # still lets this job run; a failed or cancelled one does not.
   esdk-test-server:
     name: ${{ inputs.focus && format('test {0} against every server', inputs.focus) || 'test every server pair' }}
-    needs: plan
-    runs-on: ubuntu-latest
+    needs: [resolve, plan, prebuild]
+    if: >-
+      !cancelled()
+      && needs.resolve.result == 'success'
+      && needs.plan.result == 'success'
+      && (needs.prebuild.result == 'success' || needs.prebuild.result == 'skipped')
+    runs-on: ${{ inputs.runner }}
 
     env:
+      LANGUAGE_REPOSITORY: ${{ needs.resolve.outputs.language_repository }}
       OVERLAY: ${{ needs.plan.outputs.overlay }}
       # Default AWS region for the whole job so every step (and every JVM the
       # orchestrator forks) has a region. Overridable via the KMS region
@@ -776,20 +778,59 @@ jobs:
       KMS_CI_ROLE_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_ROLE_ARN || 'arn:aws:iam::370957321024:role/esdk-test-server-ci-kms-role' }}
 
     steps:
+      - name: Keep the server ports out of the ephemeral port range
+        # The kernel gives each outgoing connection a source port from
+        # ip_local_port_range. When that range covers a server's port, a
+        # connection can hold the port just as the server binds it, and the
+        # server fails to start. Reserved ports are never given out that way.
+        run: |
+          if [ -r /proc/sys/net/ipv4/ip_local_port_range ]; then
+            echo "ephemeral port range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+            if [ "$(id -u)" = 0 ]; then sysctl_cmd=(sysctl); else sysctl_cmd=(sudo -n sysctl); fi
+            "${sysctl_cmd[@]}" -w net.ipv4.ip_local_reserved_ports=8090-8120 \
+              || echo "::warning::could not reserve ports 8090-8120; a server can lose its port as it starts"
+          fi
+      - name: Turn on line coverage
+        # Each server that supports it is built and run so it writes its raw
+        # line coverage under this directory (the orchestrator's Coverage).
+        run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
+
+      - name: Download the JaCoCo agent and command line
+        # The Java launch plan runs each Java server with the agent, and
+        # coverage_report.py turns the agent's data into lcov with the
+        # command line.
+        env:
+          JACOCO_VERSION: 0.8.13
+        run: |
+          dir="$RUNNER_TEMP/jacoco"
+          mkdir -p "$dir"
+          base=https://repo1.maven.org/maven2/org/jacoco
+          curl -sSfL -o "$dir/jacocoagent.jar" "$base/org.jacoco.agent/$JACOCO_VERSION/org.jacoco.agent-$JACOCO_VERSION-runtime.jar"
+          curl -sSfL -o "$dir/jacococli.jar" "$base/org.jacoco.cli/$JACOCO_VERSION/org.jacoco.cli-$JACOCO_VERSION-nodeps.jar"
+          printf '%s  %s\n' \
+            47e700ccb0fdb9e27c5241353f8161938f4e53c3561dd35e063c5fe88dc3349b jacocoagent.jar \
+            8f748683833d4dc4d72cea5d6b43f49344687b831e0582c97bcb9b984e3de0a3 jacococli.jar \
+            | (cd "$dir" && sha256sum -c -)
+          echo "TESTSERVER_JACOCO_AGENT=$dir/jacocoagent.jar" >> "$GITHUB_ENV"
+          echo "TESTSERVER_JACOCO_CLI=$dir/jacococli.jar" >> "$GITHUB_ENV"
+
       - name: Check out aws-crypto-tools-commons
         uses: actions/checkout@v4
         with:
           repository: aws/aws-crypto-tools-commons
-          ref: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.sha || inputs.commons-ref }}
-          token: ${{ github.repository == 'aws/aws-crypto-tools-commons' && github.token || secrets.repo-pat }}
+          ref: ${{ needs.resolve.outputs.commons_ref }}
+
+      - name: Point Test-Server-Override repositories at their pull request branches
+        env:
+          LANGUAGE_BRANCHES: ${{ needs.resolve.outputs.language_branches }}
+        run: .github/scripts/resolve-test-server-refs.sh apply
 
       - name: Check out the language repository under test
         if: env.LANGUAGE_REPOSITORY != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.LANGUAGE_REPOSITORY }}
-          ref: ${{ inputs.language-ref || (env.LANGUAGE_REPOSITORY == github.repository && github.sha || '') }}
-          token: ${{ env.LANGUAGE_REPOSITORY == github.repository && github.token || secrets.repo-pat }}
+          ref: ${{ needs.resolve.outputs.language_ref }}
           path: language-repo
 
       - name: Ignore build outputs in the language checkout
@@ -802,8 +843,14 @@ jobs:
             'node_modules/' '*.egg-info/' '*.versionsBackup' 'esdk-test-servers/go/esdk-test-server' \
             'AwsEncryptionSDK/runtimes/go/ImplementationFromDafny-go/' \
             >> language-repo/.git/info/exclude
-          # Transpile outputs (restored or generated) inside the mpl submodule.
-          git -C language-repo config submodule.mpl.ignore untracked
+          # The Dafny builds write inside the submodules (transpile outputs, and the
+          # smithy-dafny Gradle builds' output in nested submodules); those are not
+          # source, and the submodule commits are part of HEAD.
+          git -C language-repo config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null \
+            | while read -r key _; do
+                name=${key#submodule.}; name=${name%.path}
+                git -C language-repo config "submodule.$name.ignore" all
+              done
 
       - name: Set up JDK 17 (Temurin) for the ESDK toolchain
         # First setup-java: exposes JAVA_HOME_17_X64 — used by the
@@ -844,6 +891,18 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
+          # llvm-tools turns the rust server's coverage profile into a report.
+          components: rustfmt, llvm-tools-preview
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
       - name: Set up .NET (for the .NET Language_Server build)
         # The orchestrated run's DotnetLaunchPlan restores and builds the .NET
         # library and server inside the aws-encryption-sdk clone. 6.0 + 8.0
@@ -854,6 +913,27 @@ jobs:
           dotnet-version: |
             6.0.x
             8.0.x
+
+      - name: Select the .NET 8 SDK
+        # The highest installed SDK is not always the one dotnet resolves on
+        # every runner image, so pin the 8.0 feature band for everything under
+        # the runner workspace.
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}\n' > "$RUNNER_WORKSPACE/global.json"
+          dotnet --version
+
+      - name: Install dotnet-coverage
+        # The .NET launch plan runs each .NET server under dotnet-coverage
+        # collect, and coverage_report.py merges its data into a report.
+        env:
+          DOTNET_COVERAGE_VERSION: 18.12.0
+        run: |
+          dir="$RUNNER_TEMP/dotnet-coverage"
+          dotnet tool install dotnet-coverage --version "$DOTNET_COVERAGE_VERSION" --tool-path "$dir"
+          echo "TESTSERVER_DOTNET_COVERAGE=$dir/dotnet-coverage" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_COVERAGE_NOLOGO=1" >> "$GITHUB_ENV"
 
       - name: Restore the Gradle caches (orchestrator + Java server)
         # Gradle: the client-java/tests/orchestrator builds under
@@ -873,60 +953,18 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-gradle-v2-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
               'esdk/test-server/*/gradle/wrapper/gradle-wrapper.properties'
             ) }}
           restore-keys: |
-            ${{ runner.os }}-gradle-v2-
+            ${{ needs.plan.outputs.platform }}-gradle-v2-
 
-      - name: Configure git auth for the private language repos (aws-crypto-tools-java, aws-crypto-tools-rust) (read-only PAT)
-        # WHY: the Commons_Run clones aws-crypto-tools-java (the Java
-        # Language_Server + live Java library) and aws-crypto-tools-rust (the
-        # Rust Language_Server + live aws-esdk) via the SSH URLs in their
-        # Configuration_Entries' Server_Locations (config/server-config.json).
-        # GitHub Actions' default token only reaches THIS repo, so that
-        # cross-repo private clone needs its own credential. We supply a
-        # READ-ONLY PAT (LANGUAGE_REPO_PAT, Requirement 6.6) and rewrite the
-        # SSH URL to authenticated HTTPS via git's insteadOf. Nothing in
-        # config/server-config.json or the Makefile changes. The public
-        # aws-encryption-sdk-python clone uses an HTTPS URL and is unaffected.
-        #
-        # SECURITY NOTES:
-        #   - The PAT is passed only via the step `env:` below (never inlined
-        #     in the script), and GitHub automatically masks the secret value
-        #     in logs. We do NOT use `set -x`, so the configured URL is not
-        #     echoed.
-        #   - The token is written only to the ephemeral runner's global git
-        #     config (~/.gitconfig), which is discarded when the job ends.
-        #   - This rewrite is CI-ONLY. Local development is unaffected and
-        #     keeps using the SSH URL as-is.
-        #   - Required token scope: READ access to the contents of
-        #     aws-crypto-tools-java AND aws-crypto-tools-rust (a fine-grained PAT
-        #     with `Contents: Read` on each repo, or a classic PAT with the
-        #     `repo` scope).
-        env:
-          LANGUAGE_REPO_PAT: ${{ secrets.repo-pat }}
-        run: |
-          set -euo pipefail
-          if [ -z "${LANGUAGE_REPO_PAT:-}" ]; then
-            echo "ERROR: the LANGUAGE_REPO_PAT secret is empty or unset." >&2
-            echo "The private aws-crypto-tools-java and aws-crypto-tools-rust clones the" >&2
-            echo "orchestrated run performs (the Java and Rust Configuration_Entries'" >&2
-            echo "Server_Locations) WILL FAIL without it. Add a repository/org secret named" >&2
-            echo "LANGUAGE_REPO_PAT with read access to the contents of BOTH repos (a" >&2
-            echo "fine-grained PAT with 'Contents: Read' on each, or a classic PAT with the" >&2
-            echo "'repo' scope)." >&2
-            exit 1
-          fi
-          # Rewrite the SSH URL used in config/server-config.json to
-          # authenticated HTTPS so `git clone git@github.com:aws/...`
-          # transparently becomes an authenticated HTTPS clone.
-          git config --global \
-            url."https://x-access-token:${LANGUAGE_REPO_PAT}@github.com/".insteadOf \
-            "git@github.com:"
+      - name: Clone GitHub SSH URLs over HTTPS
+        # server-config.json clones by SSH URL, and the runner has no SSH key.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Resolve language-repo commit pins (cache keys)
         # The materialized-sources caches below are keyed on the resolved tip
@@ -988,7 +1026,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ needs.plan.outputs.platform }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Restore the materialized aws-encryption-sdk-c clone
         # The clone carries the cmake build tree (test-server/.build); on a
@@ -998,7 +1036,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}-coverage
 
       - name: Restore the materialized aws-encryption-sdk-java clone + stamped install
         # The clone carries the server's Gradle outputs, and the local Maven
@@ -1010,7 +1048,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Restore the materialized aws-encryption-sdk-python clone + venv
         # The venv holds editable installs of the clone and its build stamp,
@@ -1021,7 +1059,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 
       - name: Install Smithy CLI
         # `make validate` runs `smithy validate` on the model before the pure
@@ -1086,6 +1124,7 @@ jobs:
         with:
           role-to-assume: ${{ env.KMS_CI_ROLE_ARN }}
           aws-region: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
+          role-duration-seconds: 7200
 
       - name: Verify AWS credentials are active (gates the orchestrated run)
         # The KMS_Scenarios are REQUIRED and call real AWS KMS, so the run
@@ -1116,28 +1155,50 @@ jobs:
         # One download of the awslabs/aws-encryption-sdk-test-vectors
         # awses-decrypt corpora, extracted under $RUNNER_TEMP; every
         # Language_Server then replays them (ReleasedVectorDecryptTests). The
-        # default offline (raw-keyring) positive vectors need no KMS. A corpus
-        # that fails to fetch is skipped, not fatal — the harness runs whatever
-        # is present and skips when none is.
+        # default offline (raw-keyring) vectors need no KMS. Every corpus is
+        # required: a failed fetch fails the job.
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           DIR="$RUNNER_TEMP/released-vectors"
           mkdir -p "$DIR"
           base="https://github.com/awslabs/aws-encryption-sdk-test-vectors/raw/master/vectors/awses-decrypt"
           for corpus in python-1.3.5 python-1.3.7 python-1.3.8 python-2.0.0 python-2.2.0 python-2.3.0; do
-            if curl -fsSL --retry 3 -o "$DIR/$corpus.zip" "$base/$corpus.zip"; then
-              mkdir -p "$DIR/$corpus"
-              unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus" && rm -f "$DIR/$corpus.zip"
-            else
-              echo "::warning::could not fetch $corpus decrypt vectors; skipping that corpus"
-            fi
+            curl -fsSL --retry 5 --retry-all-errors -o "$DIR/$corpus.zip" "$base/$corpus.zip"
+            mkdir -p "$DIR/$corpus"
+            unzip -o -qq "$DIR/$corpus.zip" -d "$DIR/$corpus"
+            rm -f "$DIR/$corpus.zip"
+          done
+          # Messages the Java and Python MasterKeyProvider APIs write today, from the
+          # newest green aws-encryption-sdk Daily CI run. Too large to vendor
+          # (~9 MB of raw-AES ciphertexts each).
+          read -r run_id sha < <(gh run list -R aws/aws-encryption-sdk \
+            --workflow daily_ci.yml --branch mainline --status success -L 1 \
+            --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"') || true
+          if [ -z "${run_id:-}" ]; then
+            echo "::error::no green aws-encryption-sdk Daily CI run to take the MKP corpora from" >&2
+            exit 1
+          fi
+          for writer in java_mkp python_mkp; do
+            for attempt in 1 2 3; do
+              gh run download "$run_id" -R aws/aws-encryption-sdk \
+                -n "ubuntu-22.04_vector_artifact_${writer}_legacy_format_${sha}" \
+                -D "$DIR/daily-${writer}" && break
+              if [ "$attempt" = 3 ]; then
+                echo "::error::could not fetch the $writer decrypt vectors from run $run_id" >&2
+                exit 1
+              fi
+              rm -rf "$DIR/daily-${writer}"
+              sleep 15
+            done
           done
           echo "ESDK_TESTSERVER_DECRYPT_VECTORS_DIR=$DIR" >> "$GITHUB_ENV"
 
       - name: Materialize the java, python, javascript, and c sources
         # The dependency caches below are keyed on these clones' lockfiles.
         working-directory: esdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=java,python,javascript,c stopAfter=materialize"
 
       # Dependency caches, keyed on each language's lockfiles so they carry
       # across branches and commits; only the code under test rebuilds.
@@ -1163,27 +1224,33 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-m2-${{ steps.depkeys.outputs.java }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ needs.plan.outputs.platform }}-m2-
 
       - name: Restore the npm downloads (javascript)
         id: npm-deps
         uses: actions/cache/restore@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
+          key: ${{ needs.plan.outputs.platform }}-npm-${{ steps.depkeys.outputs.javascript }}
           restore-keys: |
-            ${{ runner.os }}-npm-
+            ${{ needs.plan.outputs.platform }}-npm-
 
       - name: Restore the pip downloads (python)
         id: pip-deps
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
+          key: ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
           restore-keys: |
-            ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-
+            ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-
+
+      - name: Install cmake and ccache (c)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake ccache >/dev/null
 
       - name: Resolve the aws-c-common commit (c)
         id: awscc
@@ -1194,7 +1261,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.aws-c-common-install
-          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+          key: ${{ needs.plan.outputs.platform }}-aws-c-common-${{ steps.awscc.outputs.sha }}
 
       - name: Build aws-c-common (c)
         # CLaunchPlan's cmake configure needs an aws-c-common install;
@@ -1211,7 +1278,6 @@ jobs:
       - name: Set up ccache (c)
         run: |
           set -euo pipefail
-          sudo apt-get install -y -qq ccache >/dev/null
           {
             echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/.aws-c-common-install"
             echo "CCACHE_DIR=${{ github.workspace }}/.ccache"
@@ -1224,68 +1290,40 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-coverage-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-ccache-
+            ${{ needs.plan.outputs.platform }}-ccache-coverage-
 
       - name: Build the java, python, javascript, and c servers while the heavy ones build
         # Their build stamps make the orchestrated run skip these builds.
         working-directory: esdk/test-server
         env:
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY languages=java,python,javascript,c stopAfter=launch"
-
-      - name: Wait for the prebuilt servers
-        # Each server the plan found missing is published by its prebuild job;
-        # wait for those jobs to finish.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.plan.outputs.matrix }}
-          # "failed", "done" (every matching prebuild job succeeded), or "wait".
-          STATE: >-
-            [.jobs[] | select(.name | test("(^|/ )prebuild \\(" + $language + "\\)$")) | .conclusion]
-            | if any(. == "failure" or . == "cancelled") then "failed"
-              elif length > 0 and all(. == "success") then "done" else "wait" end
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 2700))
-          for language in $(jq -r '.[]' <<<"$MATRIX"); do
-            while :; do
-              state=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-                | jq -r --arg language "$language" "$STATE")
-              [ "$state" = done ] && break
-              if [ "$state" = failed ]; then echo "::error::the $language server build failed"; exit 1; fi
-              if [ "$SECONDS" -ge "$deadline" ]; then echo "::error::timed out waiting for $language"; exit 1; fi
-              sleep 15
-            done
-            echo "ready after ${SECONDS}s: $language"
-          done
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=java,python,javascript,c stopAfter=launch"
 
       - name: Materialize the sources (clones only)
         # The prebuilt outputs restore into these clones; each server's build
         # stamp then skips its build.
         working-directory: esdk/test-server
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY stopAfter=materialize"
+        run: make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} stopAfter=materialize"
 
       - name: Fetch the prebuilt servers into their clones
         env:
           RUN_TOKEN: ${{ github.token }}
-          REPO_PAT: ${{ secrets.repo-pat }}
           KEY_net: ${{ needs.plan.outputs.key_net }}
           KEY_rustdafny: ${{ needs.plan.outputs.key_rustdafny }}
           KEY_go: ${{ needs.plan.outputs.key_go }}
           KEY_rust: ${{ needs.plan.outputs.key_rust }}
           KEY_rustcpp: ${{ needs.plan.outputs.key_rustcpp }}
+          PATHS_rustcpp: ${{ needs.plan.outputs.paths_rustcpp }}
         run: |
           set -euo pipefail
-          # This run's token reads this repository; the PAT reads commons.
-          token() { if [ "$1" = "$GITHUB_REPOSITORY" ]; then echo "$RUN_TOKEN"; else echo "$REPO_PAT"; fi; }
           # find <key>: the newest unexpired artifact named <key>, as
           # "<repository> <artifact id>", looked up in this repository then commons.
           find() {
             local repo id
             for repo in "$GITHUB_REPOSITORY" aws/aws-crypto-tools-commons; do
-              id=$(GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
+              id=$(GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts?name=$1&per_page=20" \
                 -q '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .id // empty' \
                 2>/dev/null) || id=""
               if [ -n "$id" ]; then echo "$repo $id"; return; fi
@@ -1298,10 +1336,17 @@ jobs:
             [ -n "$found" ] || continue
             read -r repo id <<<"$found"
             echo "$language: $repo artifact $id"
-            GH_TOKEN=$(token "$repo") gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
+            GH_TOKEN=$RUN_TOKEN gh api "repos/$repo/actions/artifacts/$id/zip" > "$RUNNER_TEMP/prebuilt/$language.zip"
             unzip -o -q "$RUNNER_TEMP/prebuilt/$language.zip" -d "$RUNNER_TEMP/prebuilt"
             tar -xzf "$RUNNER_TEMP/prebuilt/$language.tgz"
           done
+          # The rust-cpp server's rpath names the shim directory of the runner
+          # that built it, so name this runner's copy on the library path.
+          while IFS= read -r path; do
+            case "$path" in
+              *.so) echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/$(dirname "$path")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV" ;;
+            esac
+          done <<<"$PATHS_rustcpp"
 
       - name: Check every prebuilt server arrived
         # A server missing here would be built cold inside the test run.
@@ -1344,6 +1389,9 @@ jobs:
           # nine servers building concurrently on a 2-core hosted runner the
           # default 180s starves it out — 900s absorbs the contention.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          # The .NET server allocates heavily per request; the default workstation
+          # GC collects on one thread and keeps the server near one core.
+          DOTNET_gcServer: "1"
           FOCUS: ${{ inputs.focus }}
           ESDK_TESTSERVER_KMS_SYMMETRIC_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_SYMMETRIC_KEY_ARN }}
           ESDK_TESTSERVER_KMS_MRK_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_MRK_ARN }}
@@ -1351,7 +1399,23 @@ jobs:
           ESDK_TESTSERVER_KMS_RSA_KEY_ARN: ${{ vars.ESDK_TEST_SERVER_KMS_RSA_KEY_ARN }}
           ESDK_TESTSERVER_KMS_REGION: ${{ vars.ESDK_TEST_SERVER_KMS_REGION || 'us-west-2' }}
           ESDK_TESTSERVER_DECRYPT_VECTORS_DIR: ${{ env.ESDK_TESTSERVER_DECRYPT_VECTORS_DIR }}
-        run: make orchestrate ORCHESTRATE_ARGS="$OVERLAY ${FOCUS:+focus=$FOCUS}"
+        run: |
+          # The build steps above launch some servers to check they start; one that
+          # outlives its step holds its port, and the run below would talk to it.
+          for port in $(seq 8091 8099); do
+            if fuser -n tcp "$port" > /dev/null 2>&1; then
+              echo "::warning::port $port still in use before the run: $(ss -ltnpH "sport = :$port")"
+              fuser -k -n tcp "$port" > /dev/null 2>&1 || true
+            fi
+          done
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} ${FOCUS:+focus=$FOCUS}"
+
+      - name: Write the line coverage reports
+        # build/coverage/<language>.lcov (paths relative to the library's
+        # repository) and <language>.json (that repository and commit), for
+        # the dashboard to merge with the repository's own test coverage.
+        if: always()
+        run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" esdk/test-server/build/coverage
 
       - name: Upload test reports + Resolution_Record
         # `if: always()`: diagnostics upload, not a subsequent test step —
@@ -1369,6 +1433,7 @@ jobs:
           name: esdk-test-server-reports
           path: |
             esdk/test-server/build/resolution-record.json
+            esdk/test-server/build/coverage
             esdk/test-server/build/launch/*/*.log
             esdk/test-server/tests/build/reports/tests
             esdk/test-server/tests/build/test-results
@@ -1389,35 +1454,35 @@ jobs:
           path: |
             ~/.m2/repository
             !~/.m2/repository/**/0.0.0-testserver-*
-          key: ${{ runner.os }}-m2-${{ steps.depkeys.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-m2-${{ steps.depkeys.outputs.java }}
 
       - name: Save the npm downloads (javascript)
         if: always() && env.SAVE_CACHES == 'true' && steps.npm-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ steps.depkeys.outputs.javascript }}
+          key: ${{ needs.plan.outputs.platform }}-npm-${{ steps.depkeys.outputs.javascript }}
 
       - name: Save the pip downloads (python)
         if: always() && env.SAVE_CACHES == 'true' && steps.pip-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
+          key: ${{ needs.plan.outputs.platform }}-pip-${{ steps.pins.outputs.python_version }}-${{ steps.depkeys.outputs.python }}
 
       - name: Save the aws-c-common install (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.awscc-install.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.aws-c-common-install
-          key: ${{ runner.os }}-aws-c-common-${{ steps.awscc.outputs.sha }}
+          key: ${{ needs.plan.outputs.platform }}-aws-c-common-${{ steps.awscc.outputs.sha }}
 
       - name: Save the C compiler cache (c)
         if: always() && env.SAVE_CACHES == 'true' && steps.ccache-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ needs.plan.outputs.platform }}-ccache-coverage-${{ github.run_id }}
 
       - name: Save the Gradle caches (orchestrator + Java server)
         if: always() && env.SAVE_CACHES == 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
@@ -1427,7 +1492,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: >-
-            ${{ runner.os }}-gradle-v2-${{ hashFiles(
+            ${{ needs.plan.outputs.platform }}-gradle-v2-${{ hashFiles(
               'esdk/test-server/*/build.gradle.kts',
               'esdk/test-server/*/settings.gradle.kts',
               'esdk/test-server/*/gradle.properties',
@@ -1439,14 +1504,14 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-javascript@*
-          key: ${{ runner.os }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
+          key: ${{ needs.plan.outputs.platform }}-sources-v3-javascript-${{ steps.pins.outputs.javascript }}-node22
 
       - name: Save the materialized aws-encryption-sdk-c clone
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-c.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: esdk/test-server/build/sources/aws-encryption-sdk-c@*
-          key: ${{ runner.os }}-sources-v4-c-${{ steps.pins.outputs.c }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v4-c-${{ steps.pins.outputs.c }}-coverage
 
       - name: Save the materialized aws-encryption-sdk-java clone + stamped install
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-java.outputs.cache-hit != 'true'
@@ -1455,7 +1520,7 @@ jobs:
           path: |
             ${{ steps.pins.outputs.java_dir }}
             ~/.m2/repository/**/0.0.0-testserver-${{ steps.pins.outputs.java }}
-          key: ${{ runner.os }}-sources-v2-java-${{ steps.pins.outputs.java }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-java-${{ steps.pins.outputs.java }}
 
       - name: Save the materialized aws-encryption-sdk-python clone + venv
         if: always() && env.SAVE_CACHES == 'true' && steps.sources-python.outputs.cache-hit != 'true'
@@ -1464,5 +1529,5 @@ jobs:
           path: |
             ${{ steps.pins.outputs.python_dir }}
             esdk/test-server/build/launch/python/venv
-          key: ${{ runner.os }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
+          key: ${{ needs.plan.outputs.platform }}-sources-v2-python-${{ steps.pins.outputs.python }}-py${{ steps.pins.outputs.python_version }}
 

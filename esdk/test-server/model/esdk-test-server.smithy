@@ -386,6 +386,11 @@ structure CachingCmmConfig {
 
     /// Optional cap on messages encrypted under a single data key.
     limitMessages: Long
+
+    /// Optional name of a materials cache shared by every client created on the
+    /// same Language_Server with this name; without it, each client has its own
+    /// cache. Caching CMMs sharing a cache and a partitionId share cache entries.
+    sharedCacheName: String
 }
 
 list EncryptionContextKeys {

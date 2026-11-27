@@ -66,6 +66,37 @@ class DotnetLaunchPlanTest {
             DotnetLaunchPlan.serverCommand("dotnet", SERVER, 8097, "bin/Release/net8.0/EsdkTestServer.dll"));
     }
 
+    @Test
+    @DisplayName("with coverage on, the server runs under dotnet-coverage collect")
+    void coverageCommand() {
+        Path directory = Path.of("/coverage/net");
+        List<String> server = DotnetLaunchPlan.serverCommand("dotnet", SERVER, 8097,
+            "bin/Release/net8.0/EsdkTestServer.dll");
+        assertEquals(
+            List.of("/tools/dotnet-coverage", "collect",
+                "--settings", "/coverage/net/coverage.settings.xml",
+                "--output", "/coverage/net/net-1.coverage", "--",
+                "dotnet", SERVER.resolve("bin/Release/net8.0/EsdkTestServer.dll").toString(), "8097"),
+            DotnetLaunchPlan.coverageCommand("/tools/dotnet-coverage", directory, "net-1.coverage", server));
+    }
+
+    @Test
+    @DisplayName("coverage instruments each project's assembly, named by <AssemblyName> or the project file")
+    void coverageAssemblies(@TempDir Path tempDir) throws IOException {
+        Files.createDirectories(tempDir.resolve("tests"));
+        Files.writeString(tempDir.resolve("ESDK.csproj"),
+            "<Project><PropertyGroup><AssemblyName>AWS.Cryptography.EncryptionSDK</AssemblyName></PropertyGroup></Project>");
+        Files.writeString(tempDir.resolve("tests/Tests.csproj"), "<Project></Project>");
+
+        List<String> names = DotnetLaunchPlan.assemblyNames(tempDir);
+
+        assertEquals(List.of("AWS.Cryptography.EncryptionSDK", "Tests"), names);
+        String settings = DotnetLaunchPlan.coverageSettings(names);
+        assertTrue(settings.contains("<ModulePath>.*[\\\\/]AWS\\.Cryptography\\.EncryptionSDK\\.dll$</ModulePath>"),
+            settings);
+        assertTrue(settings.contains("<ModulePath>.*[\\\\/]Tests\\.dll$</ModulePath>"), settings);
+    }
+
     // ------------------------------------------------------------------
     // The dafny-on-PATH gate (pure over a constructed PATH).
     // ------------------------------------------------------------------

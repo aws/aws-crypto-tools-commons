@@ -103,6 +103,11 @@ final class EsdkMessage {
         return ((long) u16(b, i) << 16) | u16(b, i + 2);
     }
 
+    /** Whether {@code algorithmSuiteId} is a key-committing suite. */
+    static boolean isCommitting(int algorithmSuiteId) {
+        return COMMITTING_SUITE_IDS.contains(algorithmSuiteId);
+    }
+
     static boolean isSigning(int algorithmSuiteId) {
         return SIGNING_SUITE_IDS.contains(algorithmSuiteId);
     }

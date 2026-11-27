@@ -9,7 +9,7 @@
     "",
     "The Dafny-runtime Language_Servers (java, net, python, go, rust-dafny) live in",
     "aws-cryptographic-material-providers-library under test-server/<lang>-v<major>-server/.",
-    "The Rust Language_Server lives in aws-crypto-tools-rust under prim-test-server/;",
+    "The Rust Language_Server lives in aws-crypto-tools-rust under prim/test-server/;",
     "configPath names the DIRECTORY holding its per-server trio",
     "(server-config.json/feature-config.json/bug-config.json) co-located with the server."
   ],
@@ -19,7 +19,7 @@
       "language": "rust",
       "majorVersion": 1,
       "port": 8094,
-      "configPath": "prim-test-server",
+      "configPath": "prim/test-server",
       "libraryRepository": {
         "name": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
@@ -30,7 +30,7 @@
         "repository": "aws-crypto-tools-rust",
         "url": "git@github.com:aws/aws-crypto-tools-rust.git",
         "ref": "main",
-        "path": "prim-test-server"
+        "path": "prim/test-server"
       }
     },
     {

@@ -4,13 +4,20 @@ import aws.cryptography.testserver.orchestrator.config.ConfigurationEntry;
 import aws.cryptography.testserver.orchestrator.source.ComponentId;
 import aws.cryptography.testserver.orchestrator.source.MaterializedSources;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * The Go {@code Language_Server} launch plan: builds the rpcv2Cbor server that
@@ -43,10 +50,14 @@ import java.util.Optional;
  *   <li><b>Build.</b> {@code go build -buildvcs=false -o esdk-test-server .} in
  *       the server directory ({@code -buildvcs=false} because the materialized
  *       clone trips Go's git VCS stamping). A non-zero build is a {@code BUILD}
- *       launch failure carrying the tool output.</li>
+ *       launch failure carrying the tool output. With {@link Coverage} on, the
+ *       build adds {@code -cover -coverpkg=} the server's and the library's
+ *       modules.</li>
  *   <li><b>Launch.</b> {@code <server>/esdk-test-server <port>} via the shared
  *       {@link SubprocessLauncher} (port probe, TCP readiness, process-tree
- *       teardown).</li>
+ *       teardown). With coverage on, {@code GOCOVERDIR} is
+ *       {@code <coverage dir>/go/gocover}; the server writes its counters
+ *       there when it exits on SIGTERM.</li>
  * </ol>
  *
  * <p>Command construction is pure ({@code static} builders) so the exact
@@ -166,13 +177,18 @@ public final class GoLaunchPlan implements Launcher {
         // 2. Build: go build -o esdk-test-server . in the server directory.
         //    Skipped when the stamp shows this commit's binary is already built.
         BuildStamp stamp = new BuildStamp(serverDir, product);
+        Optional<Path> libraryDir = sources.directoryOf(ComponentId.library(language));
+        Map<String, String> modules = coverageModules(serverDir, libraryDir);
+        Optional<Path> coverage = Coverage.start(entry, sources, "gocover", Map.of("modules", modules));
+        List<String> build = coverage.isPresent()
+            ? coverageBuildCommand(go, serverBinaryName, modules.keySet())
+            : buildCommand(go, serverBinaryName);
         if (!stamp.upToDate(resolved.commit(), resolved.dirty(),
                 List.of(serverDir.resolve(serverBinaryName)))) {
             if (dafnyProject.isPresent()) {
                 transpile(language, dafnyProject.get(), resolved.dirty());
             }
-            runBuildStep(language, "go build -buildvcs=false -o " + serverBinaryName + " .",
-                buildCommand(go, serverBinaryName), serverDir, Map.of());
+            runBuildStep(language, String.join(" ", build), build, serverDir, Map.of());
             stamp.write(language, resolved.commit(), resolved.dirty());
         }
 
@@ -182,6 +198,18 @@ public final class GoLaunchPlan implements Launcher {
         process.directory(serverDir.toFile());
         process.redirectErrorStream(true);
         process.redirectOutput(workDirectory.resolve(SERVER_LOG_NAME).toFile());
+        if (coverage.isPresent()) {
+            // The -cover binary writes its counters here when main returns.
+            Path counters = coverage.get().resolve("gocover");
+            try {
+                Files.createDirectories(counters);
+            } catch (IOException e) {
+                throw new ServerLaunchException(language, ServerLaunchException.Category.BUILD,
+                    "failed to create the " + language + " coverage directory " + counters
+                        + ": " + e.getMessage(), e);
+            }
+            process.environment().put("GOCOVERDIR", counters.toString());
+        }
         return subprocessLauncher.launch(language, entry.port(), process);
     }
 
@@ -236,6 +264,55 @@ public final class GoLaunchPlan implements Launcher {
         // -buildvcs=false: the server builds from a materialized clone whose git
         // state makes Go's VCS stamping fail (git exits 128).
         return List.of(go, "build", "-buildvcs=false", "-o", serverBinaryName, ".");
+    }
+
+    /**
+     * {@code go build -buildvcs=false -cover -coverpkg=<module>/...,... -o
+     * esdk-test-server .}: counts the statements of every package of
+     * {@code modules}. The server's own module must be one of them, since a
+     * binary whose main package is not instrumented writes no counters.
+     */
+    static List<String> coverageBuildCommand(String go, String serverBinaryName,
+            Collection<String> modules) {
+        String coverpkg = String.join(",", modules.stream().map(m -> m + "/...").toList());
+        return List.of(go, "build", "-buildvcs=false", "-cover", "-coverpkg=" + coverpkg,
+            "-o", serverBinaryName, ".");
+    }
+
+    /**
+     * The Go modules whose line coverage is reported, each mapped to its
+     * directory: the server's module and every module under the library
+     * directory (the library's {@code go.mod} files). The converter maps the
+     * import paths in Go's profile back to files through these directories.
+     */
+    static Map<String, String> coverageModules(Path serverDir, Optional<Path> libraryDir) {
+        Map<String, String> modules = new TreeMap<>();
+        List<Path> goMods = new ArrayList<>();
+        goMods.add(serverDir.resolve("go.mod"));
+        if (libraryDir.isPresent() && Files.isDirectory(libraryDir.get())) {
+            try (Stream<Path> files = Files.walk(libraryDir.get(), 3)) {
+                files.filter(f -> f.getFileName().toString().equals("go.mod")).sorted().forEach(goMods::add);
+            } catch (IOException | UncheckedIOException e) {
+                // No library modules: only the server is reported.
+            }
+        }
+        for (Path goMod : goMods) {
+            modulePath(goMod).ifPresent(module -> modules.put(module,
+                goMod.getParent().toAbsolutePath().normalize().toString()));
+        }
+        return modules;
+    }
+
+    private static final Pattern MODULE_LINE = Pattern.compile("(?m)^module\\s+\"?([^\\s\"]+)\"?");
+
+    /** The {@code module} path a {@code go.mod} declares. */
+    static Optional<String> modulePath(Path goMod) {
+        try {
+            Matcher matcher = MODULE_LINE.matcher(Files.readString(goMod, StandardCharsets.UTF_8));
+            return matcher.find() ? Optional.of(matcher.group(1)) : Optional.empty();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
     }
 
     /** {@code <server>/esdk-test-server <port>}. */

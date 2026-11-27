@@ -2,6 +2,7 @@ package aws.cryptography.testserver.orchestrator.launch;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -48,6 +49,10 @@ public final class SubprocessLauncher {
         "TESTSERVER_READY_TIMEOUT_SECONDS";
 
     private static final Duration READINESS_POLL_INTERVAL = Duration.ofMillis(250);
+
+    /** How many times to start a server whose bind lost the port to another socket. */
+    private static final int MAX_ATTEMPTS = 3;
+    private static final Duration RETRY_DELAY = Duration.ofSeconds(1);
 
     private final Duration readinessTimeout;
 
@@ -104,6 +109,23 @@ public final class SubprocessLauncher {
      */
     public LaunchedServer launch(String language, int port, ProcessBuilder processBuilder)
             throws ServerLaunchException {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return launchOnce(language, port, processBuilder);
+            } catch (PortTakenAtStartup e) {
+                if (attempt >= MAX_ATTEMPTS) {
+                    throw e.failure;
+                }
+                System.out.println("[launch] " + language + ": port " + port
+                    + " was taken for a moment as the server started; retrying ("
+                    + (attempt + 1) + " of " + MAX_ATTEMPTS + ")");
+                Ports.sleep(RETRY_DELAY);
+            }
+        }
+    }
+
+    private LaunchedServer launchOnce(String language, int port, ProcessBuilder processBuilder)
+            throws ServerLaunchException, PortTakenAtStartup {
         // 1. Pre-launch port availability probe — before spawning anything.
         if (!Ports.isBindable(port)) {
             throw new ServerLaunchException(language,
@@ -122,22 +144,31 @@ public final class SubprocessLauncher {
                 "failed to start the " + language + " Language_Server process ("
                     + String.join(" ", processBuilder.command()) + "): " + e.getMessage(), e);
         }
+        Path log = ServerLogs.of(processBuilder);
 
         // 3. Poll readiness: a successful TCP connect to the configured port
         //    is the only reachability signal (Requirement 2.9).
         Instant spawnedAt = Instant.now();
         Instant deadline = spawnedAt.plus(readinessTimeout);
         while (Instant.now().isBefore(deadline)) {
-            if (Ports.acceptsConnection(port)) {
+            if (Ports.acceptsConnection(port) && process.isAlive()) {
                 LaunchTimings.log(language, "server start (spawn to TCP ready)", spawnedAt);
                 URI endpoint = URI.create("http://127.0.0.1:" + port);
-                return LaunchedServer.forProcess(language, port, endpoint, process);
+                return LaunchedServer.forProcess(language, port, endpoint, process, log);
             }
             if (!process.isAlive()) {
-                throw new ServerLaunchException(language,
+                ServerLaunchException failure = new ServerLaunchException(language,
                     ServerLaunchException.Category.BUILD,
                     "the " + language + " Language_Server process exited with code "
-                        + process.exitValue() + " before accepting connections on port " + port);
+                        + process.exitValue() + " before accepting connections on port " + port
+                        + ServerLogs.tail(log));
+                // Another socket can hold the port for a moment (an ephemeral
+                // source port the kernel handed out), so the server's own bind
+                // fails. That is not a fault in the server: start it again.
+                if (ServerLogs.reportsAddressInUse(log)) {
+                    throw new PortTakenAtStartup(failure);
+                }
+                throw failure;
             }
             Ports.sleep(READINESS_POLL_INTERVAL);
         }
@@ -147,6 +178,17 @@ public final class SubprocessLauncher {
         throw new ServerLaunchException(language,
             ServerLaunchException.Category.TIMEOUT,
             "the " + language + " Language_Server did not accept a TCP connection on port "
-                + port + " within " + readinessTimeout.toSeconds() + " seconds of launch");
+                + port + " within " + readinessTimeout.toSeconds() + " seconds of launch"
+                + ServerLogs.tail(log));
+    }
+
+    /** The server's own bind failed because the port was taken; carries the failure to report. */
+    private static final class PortTakenAtStartup extends Exception {
+        private final ServerLaunchException failure;
+
+        PortTakenAtStartup(ServerLaunchException failure) {
+            super(failure.getMessage(), null, false, false);
+            this.failure = failure;
+        }
     }
 }

@@ -31,12 +31,13 @@ class CppShimLaunchPlanTest {
         assumeTrue(new File("/bin/sh").canExecute(), "needs /bin/sh for the stub server");
 
         // A materialized clone laid out as aws-crypto-tools-rust: the server crate
-        // and the shim crate side by side, both already built (stamp current) so
-        // the plan launches without running cargo.
+        // inside the shim crate, both already built (stamp current) so the plan
+        // launches without running cargo.
         Path clone = tempDir.resolve("clone");
-        Path serverDir = Files.createDirectories(clone.resolve("esdk-cpp-test-server"));
-        Path shimRelease = Files.createDirectories(
-            clone.resolve("esdk/shims/aws-esdk-cpp/target/release"));
+        Path shimDir = Files.createDirectories(clone.resolve("esdk/shims/aws-esdk-cpp"));
+        Files.writeString(shimDir.resolve("Cargo.toml"), "");
+        Path serverDir = Files.createDirectories(shimDir.resolve("test-server"));
+        Path shimRelease = Files.createDirectories(shimDir.resolve("target/release"));
         Files.writeString(shimRelease.resolve(System.mapLibraryName("aws_esdk_cpp")), "");
         Path binary = Files.createDirectories(serverDir.resolve("target/release"))
             .resolve("esdk-cpp-test-server");
@@ -52,7 +53,7 @@ class CppShimLaunchPlanTest {
             new SubprocessLauncher(Duration.ofSeconds(2)));
         MaterializedSources sources = new MaterializedSources(List.of(new MaterializedSources.Success(
             ComponentId.server("rust-cpp"),
-            new SourcePlan.Clone("git@github.com:aws/aws-crypto-tools-rust.git", "main", "esdk-cpp-test-server"),
+            new SourcePlan.Clone("git@github.com:aws/aws-crypto-tools-rust.git", "main", "esdk/shims/aws-esdk-cpp/test-server"),
             ResolutionReason.CONFIGURATION_ENTRY, serverDir, COMMIT, "main", null)));
 
         assertThrows(ServerLaunchException.class, () -> plan.launch(

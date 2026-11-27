@@ -44,7 +44,11 @@ final class Ports {
     static boolean acceptsConnection(int port) {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("127.0.0.1", port), CONNECT_TIMEOUT_MILLIS);
-            return true;
+            // When nothing listens on the port and the kernel happens to pick
+            // the same port as this socket's source port, TCP connects the
+            // socket to itself and the connect succeeds. That is not a server.
+            // CI hosts whose ephemeral range covers the server ports hit this.
+            return socket.getLocalPort() != port;
         } catch (IOException e) {
             return false;
         }
