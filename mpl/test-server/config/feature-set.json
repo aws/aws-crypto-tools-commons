@@ -38,6 +38,7 @@
   "product": "mpl",
   "features": [
     "raw-aes",
+    "aws-kms",
     "hierarchical",
     "default-cmm",
     "static-keyring"

@@ -4,6 +4,7 @@ import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AesWrappingAlg;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsHierarchicalKeyringInput;
+import aws.cryptography.mpl.testserver.client.model.CreateAwsKmsKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateCryptographicMaterialsCacheInput;
 import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
 import aws.cryptography.mpl.testserver.client.model.CreateKeyStoreClientInput;
@@ -11,11 +12,13 @@ import aws.cryptography.mpl.testserver.client.model.CreateRawAesKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.CreateStaticKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
+import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import aws.cryptography.mpl.testserver.client.model.KmsConfiguration;
 import aws.cryptography.mpl.testserver.client.model.StaticBranchKeyIdSupplier;
 import aws.cryptography.testserver.tests.ExpectedError;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -58,6 +61,12 @@ final class Mpl {
     RawAesKeyringBuilder rawAesKeyring() {
         throwUnresolvedFailure();
         return new RawAesKeyringBuilder();
+    }
+
+    /** Start building an AWS KMS keyring. */
+    AwsKmsKeyringBuilder awsKmsKeyring() {
+        throwUnresolvedFailure();
+        return new AwsKmsKeyringBuilder();
     }
 
     /**
@@ -125,6 +134,48 @@ final class Mpl {
                 "new materials need a suite and encryption context: implement KeyringTestDefaults in the test class");
         }
         return defaults;
+    }
+
+    /**
+     * The settings of an AWS KMS keyring. {@link #create()} sends them to the MPL.
+     * A setting that the test does not set reaches the MPL as missing.
+     */
+    final class AwsKmsKeyringBuilder {
+        private final CreateAwsKmsKeyringInput.Builder input = CreateAwsKmsKeyringInput.builder();
+
+        private AwsKmsKeyringBuilder() {
+        }
+
+        /** A key ARN, key ID, alias name or alias ARN. */
+        AwsKmsKeyringBuilder kmsKeyId(String kmsKeyId) {
+            input.kmsKeyId(kmsKeyId);
+            return this;
+        }
+
+        /** How the test server builds the keyring's KMS client, such as {@link MockKms#client()}. */
+        AwsKmsKeyringBuilder kmsClient(KmsClientConfig kmsClient) {
+            input.kmsClient(kmsClient);
+            return this;
+        }
+
+        AwsKmsKeyringBuilder grantTokens(List<String> grantTokens) {
+            input.grantTokens(grantTokens);
+            return this;
+        }
+
+        /** Create the keyring, which must succeed. */
+        Keyring create() {
+            CreateAwsKmsKeyringInput request = input.build();
+            return new Keyring(Mpl.this, MplTestServerClients.withRetry(() ->
+                testServer().createAwsKmsKeyring(request)).getKeyringId());
+        }
+
+        /** Create the keyring, which must fail with {@code expected}. */
+        FailureCheck createFailsWith(ExpectedError expected) {
+            CreateAwsKmsKeyringInput request = input.build();
+            return FailureCheck.run(Mpl.this, () -> MplTestServerClients.withRetry(() ->
+                testServer.createAwsKmsKeyring(request)), expected);
+        }
     }
 
     /** The settings of a Raw AES keyring. {@link #create()} sends them to the MPL. */

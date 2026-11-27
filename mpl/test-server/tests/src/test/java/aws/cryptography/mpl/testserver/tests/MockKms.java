@@ -1,5 +1,6 @@
 package aws.cryptography.mpl.testserver.tests;
 
+import aws.cryptography.mpl.testserver.client.model.KmsClientConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -198,6 +199,14 @@ final class MockKms implements AutoCloseable {
 
     String endpoint() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    /**
+     * A KMS client for a keyring that sends its KMS calls here.
+     * The SDK needs a Region to sign requests, and MockKms ignores signatures.
+     */
+    KmsClientConfig client() {
+        return KmsClientConfig.builder().region("us-west-2").endpoint(endpoint()).build();
     }
 
     /**
