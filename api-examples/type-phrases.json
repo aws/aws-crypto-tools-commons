@@ -1,0 +1,15 @@
+{
+  "about": "What a customer has, for each parameter type of a shipped library. build_api_examples.py --shipped looks up each type after it drops package names, so java.nio.ByteBuffer is ByteBuffer and *string is string. A type that is not here shows its own name.",
+  "phrases": {
+    "bytes in memory": ["byte[]", "bytes", "bytearray", "[]byte", "Uint8Array", "Buffer"],
+    "a byte buffer": ["ByteBuffer"],
+    "a memory stream": ["MemoryStream"],
+    "a stream": ["InputStream", "Readable", "ReadableStream", "IOBase", "file"],
+    "an output stream": ["OutputStream"],
+    "a string": ["String", "str", "string"],
+    "a map": ["Map<String, String>", "dict", "dict[str, str]", "Dict[str, str]", "Dictionary<String, String>", "map[string]string", "EncryptionContext"],
+    "a list of strings": ["List<String>", "list[str]", "List[str]", "[]string", "string[]"],
+    "a number": ["int", "Integer", "long", "Long", "Int32", "Int64", "int32", "int64", "number", "positive int"],
+    "true or false": ["boolean", "Boolean", "bool"]
+  }
+}

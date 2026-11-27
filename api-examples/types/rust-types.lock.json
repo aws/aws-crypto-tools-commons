@@ -1,0 +1,1594 @@
+{
+ "refreshed": "2026-11-25",
+ "aws_crypto_tools_rust_commit": "e77da7789ee19d516e44d4b4b389942290b7a0b2",
+ "groups": {
+  "top": "The 100 most-downloaded crates. Their types make the Rust list.",
+  "crypto": "The 50 most-downloaded crates in the cryptography category. Their types make the crypto list.",
+  "aws": "The 25 most-downloaded crates that aws-sdk-rust-ci publishes, plus our dependencies it publishes. Their types make the AWS list.",
+  "ours": "The crates.io dependencies of aws-crypto-mpl and aws-esdk. The compile step needs their type paths and constructors."
+ },
+ "crates": [
+  {
+   "name": "aead",
+   "version": "0.6.1",
+   "downloads": 300377093,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "1973cfbc1a2daf9cf550e74e1f088c28e7f7d8c1e1418fb6c9dc5184b7e84c99"
+  },
+  {
+   "name": "aes",
+   "version": "0.9.4",
+   "downloads": 436074490,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "fc0fc36d7440d015b45468ba08a21e80e056ebbd014c611c6298bb7503e04bd1"
+  },
+  {
+   "name": "aho-corasick",
+   "version": "1.1.5",
+   "downloads": 1446865972,
+   "groups": [
+    "top"
+   ],
+   "cksum": "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
+  },
+  {
+   "name": "anyhow",
+   "version": "1.0.105",
+   "downloads": 1221503602,
+   "groups": [
+    "top"
+   ],
+   "cksum": "2cb931c189b85683d69a5cfad41d4d418671e1ac413dd209f3f2fc31e3cfd902"
+  },
+  {
+   "name": "async-trait",
+   "version": "0.1.92",
+   "downloads": 852299386,
+   "groups": [
+    "ours"
+   ],
+   "cksum": "82f6aeea286b8eb4dd3431a1be1b59d290ace00f5bfd8e2a159bc2a05e2c1667"
+  },
+  {
+   "name": "autocfg",
+   "version": "1.5.1",
+   "downloads": 1626202401,
+   "groups": [
+    "top"
+   ],
+   "cksum": "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+  },
+  {
+   "name": "aws-config",
+   "version": "1.13.3",
+   "downloads": 165583996,
+   "groups": [
+    "aws",
+    "ours"
+   ],
+   "cksum": "5a3a314ce5fe1e5bdfbc6495e5e1f9ad066d34e567b26c41864eef40c22bfe16"
+  },
+  {
+   "name": "aws-credential-types",
+   "version": "1.3.1",
+   "downloads": 170324474,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "576e8da35751dc85409ec1cd15999f692c277a1fbe9336780fe6f15e49dd637d"
+  },
+  {
+   "name": "aws-lc-rs",
+   "version": "1.19.0",
+   "downloads": 335392373,
+   "groups": [
+    "ours"
+   ],
+   "cksum": "048006790404103c488e6c5616b3e7e702a71292aadda08e8f7698a9e0d2eb53"
+  },
+  {
+   "name": "aws-runtime",
+   "version": "1.10.4",
+   "downloads": 161826649,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "de8930c11353c72ae54aa24dc94d692df74d59814839cbaf8069d63dbcb4c519"
+  },
+  {
+   "name": "aws-sdk-dynamodb",
+   "version": "1.140.0",
+   "downloads": 31274073,
+   "groups": [
+    "aws",
+    "ours"
+   ],
+   "cksum": "661040c0a1165acbe71d05b0ad5f718b7535aeff0e442719605f8137a9c03b0e"
+  },
+  {
+   "name": "aws-sdk-kms",
+   "version": "1.133.0",
+   "downloads": 26757086,
+   "groups": [
+    "ours",
+    "aws"
+   ],
+   "cksum": "f4b7155f6147d4f78cb4600e142de8cf390818f3b49d12d7a815f08e9cd24577"
+  },
+  {
+   "name": "aws-sdk-s3",
+   "version": "1.161.0",
+   "downloads": 115751532,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "d9c63e3ca6e56670513469e992759f4a51041603fde329471b29c5c1f5eaeefe"
+  },
+  {
+   "name": "aws-sdk-secretsmanager",
+   "version": "1.129.0",
+   "downloads": 33877698,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "43d14c0a60caaf1f70fdd21fe4d1c4be5ddf5f3e6a467fbec30ffb90a970073a"
+  },
+  {
+   "name": "aws-sdk-sso",
+   "version": "1.122.0",
+   "downloads": 139652142,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "c2dd812c2090bec82fd410ac3fb37e72432c8830eb1293c19d49d1ebd4c30c0e"
+  },
+  {
+   "name": "aws-sdk-ssooidc",
+   "version": "1.124.0",
+   "downloads": 123777767,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "fba228d6f4566858501a057dd1febc225a0f7a22b6f66f1475e2445d72d40621"
+  },
+  {
+   "name": "aws-sdk-sts",
+   "version": "1.128.0",
+   "downloads": 167457689,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "29c357588cdf8c9ae96c0d9930fff757f9b678d06b8f68d8e37a1278fe034912"
+  },
+  {
+   "name": "aws-sigv4",
+   "version": "1.6.6",
+   "downloads": 179450121,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "6c5aa04c533733a77879294f1854c27b3715cc50ea71756d1f6a958702b1a9fb"
+  },
+  {
+   "name": "aws-smithy-async",
+   "version": "1.3.1",
+   "downloads": 178847501,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "de681a9df7ff79823b759ee17061076ec049cd61a8fa28ece4293d89c9f6964e"
+  },
+  {
+   "name": "aws-smithy-checksums",
+   "version": "0.65.1",
+   "downloads": 113236205,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "ab2f2d12a431aab3703d55277278bad45f02208569b11506220b95fdc1ef0507"
+  },
+  {
+   "name": "aws-smithy-eventstream",
+   "version": "0.61.6",
+   "downloads": 125085173,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "14c8a643d0e114cae39e45415e3225793a6396698b7779a0c9e3ede731d8fc71"
+  },
+  {
+   "name": "aws-smithy-http",
+   "version": "0.64.3",
+   "downloads": 216285186,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "19af609dd5edf8b056cd0bb001c706c8b3b1458055328b334ec13d7f46f6aaa8"
+  },
+  {
+   "name": "aws-smithy-http-client",
+   "version": "1.5.3",
+   "downloads": 125388631,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "203e36a754ced29dab0d710dab8c4fecf181d78f229e90fa6e75c6406ecb55a3"
+  },
+  {
+   "name": "aws-smithy-json",
+   "version": "0.65.1",
+   "downloads": 200531159,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "b45f9fc77ffe92c92c341165a01a565bd30c39ecf5aa8c0719b41719009604f9"
+  },
+  {
+   "name": "aws-smithy-observability",
+   "version": "0.3.1",
+   "downloads": 126003113,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "a416257d7b1b0f32a517a470a8c1dd354d8c4aa697ccab81a11a1e6cfb7418e3"
+  },
+  {
+   "name": "aws-smithy-query",
+   "version": "0.64.0",
+   "downloads": 161579305,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "165f6265342a313ad6f7a1ac17a0cdba30c522039d3f41d8d6871ce8a2b34ecd"
+  },
+  {
+   "name": "aws-smithy-runtime",
+   "version": "1.16.4",
+   "downloads": 162916727,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "7ed38b842f93dd8220cc8816750c72ce914b22c6eb3df02beb9632333ccb366d"
+  },
+  {
+   "name": "aws-smithy-runtime-api",
+   "version": "1.22.1",
+   "downloads": 167105238,
+   "groups": [
+    "aws",
+    "ours"
+   ],
+   "cksum": "20b0ce5fd8f8ec576f6737cf9a3a02172fddad2b90b8874577a4647fab11425c"
+  },
+  {
+   "name": "aws-smithy-runtime-api-macros",
+   "version": "1.2.0",
+   "downloads": 59353570,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "ce237f890a2283c9b328955c3b0918d2d5bf66a1cb6ceccd36a0047246fbc6e6"
+  },
+  {
+   "name": "aws-smithy-schema",
+   "version": "1.2.0",
+   "downloads": 50893273,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "f7ef30d39e131651359b60a1c560de9a9502a4c3754172ab2d6e8734fe21bcba"
+  },
+  {
+   "name": "aws-smithy-types",
+   "version": "1.9.5",
+   "downloads": 181843055,
+   "groups": [
+    "aws",
+    "ours"
+   ],
+   "cksum": "2085f9721fb3755821f8db7611a67ed15f4d6fdba6785b4db8ed7cd18eebee0f"
+  },
+  {
+   "name": "aws-smithy-xml",
+   "version": "0.64.1",
+   "downloads": 172608852,
+   "groups": [
+    "aws"
+   ],
+   "cksum": "590fdc1a70546b2f7f2061c42eaf173fb6f26d935330d069edc04dbd8f01d924"
+  },
+  {
+   "name": "aws-types",
+   "version": "1.7.0",
+   "downloads": 175393175,
+   "groups": [
+    "aws",
+    "ours"
+   ],
+   "cksum": "6ba0d970d3947bb064d2ae1d823efa186c1dbde88f88afa8f6549946e5d8deee"
+  },
+  {
+   "name": "base16ct",
+   "version": "1.0.0",
+   "downloads": 325072430,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6"
+  },
+  {
+   "name": "base64",
+   "version": "0.23.1",
+   "downloads": 2069231232,
+   "groups": [
+    "top",
+    "ours"
+   ],
+   "cksum": "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+  },
+  {
+   "name": "base64ct",
+   "version": "1.8.3",
+   "downloads": 530610248,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+  },
+  {
+   "name": "bitflags",
+   "version": "2.13.2",
+   "downloads": 2372216850,
+   "groups": [
+    "top"
+   ],
+   "cksum": "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
+  },
+  {
+   "name": "block-buffer",
+   "version": "0.12.1",
+   "downloads": 1427963217,
+   "groups": [
+    "top",
+    "crypto"
+   ],
+   "cksum": "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
+  },
+  {
+   "name": "bytes",
+   "version": "1.12.2",
+   "downloads": 1336304211,
+   "groups": [
+    "top"
+   ],
+   "cksum": "776dfebd015e2d8732c684a2c71003674ccb49457b539b9e82151ba38e96dd7c"
+  },
+  {
+   "name": "cc",
+   "version": "1.11.3",
+   "downloads": 1587226489,
+   "groups": [
+    "top"
+   ],
+   "cksum": "02f0e023adb368345ce0ca6cdfc0f24a06554468d0e8503e14a0841de79bfa69"
+  },
+  {
+   "name": "cfg-if",
+   "version": "1.0.5",
+   "downloads": 1844734537,
+   "groups": [
+    "top"
+   ],
+   "cksum": "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
+  },
+  {
+   "name": "chacha20",
+   "version": "0.10.2",
+   "downloads": 419010656,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
+  },
+  {
+   "name": "cipher",
+   "version": "0.5.2",
+   "downloads": 498511748,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "e8cf2a2c93cd704877c0858356ed03480ff301ee950b43f1cbe4573b088bfa6c"
+  },
+  {
+   "name": "clap",
+   "version": "4.6.10",
+   "downloads": 1385732128,
+   "groups": [
+    "top"
+   ],
+   "cksum": "50066ca966813ca8957ee15361752f19424a8ff620dbe9c8993d9f99d99b04b3"
+  },
+  {
+   "name": "clap_lex",
+   "version": "1.1.2",
+   "downloads": 1099754203,
+   "groups": [
+    "top"
+   ],
+   "cksum": "e0921b3876b3a1df8a1c9f912e7f94342458022c2e84288015893d83c4d62a79"
+  },
+  {
+   "name": "const-oid",
+   "version": "0.10.3",
+   "downloads": 688026191,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "be95d4a884358a21a199689323c29e9256b4a1b315e22f183d155422041d3a9a"
+  },
+  {
+   "name": "constant_time_eq",
+   "version": "0.6.2",
+   "downloads": 404451301,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "144e7f1de087984240b7816d47f698b414979faa6f40839c5b86d6bd47db57b7"
+  },
+  {
+   "name": "cpufeatures",
+   "version": "0.3.1",
+   "downloads": 1375396880,
+   "groups": [
+    "top"
+   ],
+   "cksum": "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566"
+  },
+  {
+   "name": "crossbeam-utils",
+   "version": "0.8.23",
+   "downloads": 1163285068,
+   "groups": [
+    "top"
+   ],
+   "cksum": "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
+  },
+  {
+   "name": "crypto-bigint",
+   "version": "0.7.11",
+   "downloads": 363659677,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "914c195c4d7fbc5ed7f88d14cbf85914d5c664967658d43404b263913a477e82"
+  },
+  {
+   "name": "crypto-common",
+   "version": "0.2.2",
+   "downloads": 1248355515,
+   "groups": [
+    "top",
+    "crypto"
+   ],
+   "cksum": "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
+  },
+  {
+   "name": "curve25519-dalek",
+   "version": "5.0.0",
+   "downloads": 352488230,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "b5eed333089e2e1c1ac8c6c0398e5e2497b4c9926ca6d0365ed1e099afa5bc23"
+  },
+  {
+   "name": "der",
+   "version": "0.8.3",
+   "downloads": 611881212,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "6a996a108feb8b427a6e12fcf6af4aa83409b79d72c15337d7741368131ee004"
+  },
+  {
+   "name": "digest",
+   "version": "0.11.3",
+   "downloads": 1458321752,
+   "groups": [
+    "top",
+    "crypto"
+   ],
+   "cksum": "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
+  },
+  {
+   "name": "ecdsa",
+   "version": "0.17.0",
+   "downloads": 306065677,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "c0681a4fc24c767085329728d8dfba959af91228aa4610cca4f8ce317ba46ae0"
+  },
+  {
+   "name": "ed25519",
+   "version": "3.0.0",
+   "downloads": 302316720,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a"
+  },
+  {
+   "name": "ed25519-dalek",
+   "version": "3.0.0",
+   "downloads": 290792700,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "6ebaa1a2bf1290ab3bfe5a7b771d050ebffab2711c19a81691c683a5144a25de"
+  },
+  {
+   "name": "either",
+   "version": "1.19.0",
+   "downloads": 1284548794,
+   "groups": [
+    "top"
+   ],
+   "cksum": "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
+  },
+  {
+   "name": "elliptic-curve",
+   "version": "0.14.3",
+   "downloads": 312077634,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "900f37e7e18d74a2347389af6cd69e3a30d5cc9e697f40004865679aa75e9c7c"
+  },
+  {
+   "name": "equivalent",
+   "version": "1.0.3",
+   "downloads": 1121469919,
+   "groups": [
+    "top"
+   ],
+   "cksum": "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
+  },
+  {
+   "name": "errno",
+   "version": "0.3.15",
+   "downloads": 1109557548,
+   "groups": [
+    "top"
+   ],
+   "cksum": "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
+  },
+  {
+   "name": "fastrand",
+   "version": "2.5.0",
+   "downloads": 1176400314,
+   "groups": [
+    "top"
+   ],
+   "cksum": "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
+  },
+  {
+   "name": "futures-channel",
+   "version": "0.3.34",
+   "downloads": 1125244834,
+   "groups": [
+    "top"
+   ],
+   "cksum": "b1f9e3d69d39e4862ffed03ed071a76f9a13ba1d9109d355b0f0aa6b15e393c4"
+  },
+  {
+   "name": "futures-core",
+   "version": "0.3.34",
+   "downloads": 1205105866,
+   "groups": [
+    "top"
+   ],
+   "cksum": "92d699e522242e69e3003b94ecc1f960f3a5e015aa7c5d7486e65ad01dd94f5e"
+  },
+  {
+   "name": "futures-io",
+   "version": "0.3.34",
+   "downloads": 1068821939,
+   "groups": [
+    "top"
+   ],
+   "cksum": "53c0fa8157de1303bfffdaa1cc2a673bfffb60102f76b0ef4441659124373fed"
+  },
+  {
+   "name": "futures-sink",
+   "version": "0.3.34",
+   "downloads": 1125120992,
+   "groups": [
+    "top"
+   ],
+   "cksum": "1944426bf7d03f1d14f708785e4b33efd750b36d48a157b836b3efc15ede8e1d"
+  },
+  {
+   "name": "futures-task",
+   "version": "0.3.34",
+   "downloads": 1187239180,
+   "groups": [
+    "top"
+   ],
+   "cksum": "cd417de3d1d015fc3bfd2b1ea46dfc7bab72ef86f1cc7cc9c78e728b34a6d1fd"
+  },
+  {
+   "name": "futures-util",
+   "version": "0.3.34",
+   "downloads": 1190111823,
+   "groups": [
+    "top"
+   ],
+   "cksum": "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
+  },
+  {
+   "name": "generic-array",
+   "version": "1.4.5",
+   "downloads": 1150102085,
+   "groups": [
+    "top"
+   ],
+   "cksum": "337d46834ee672ab3e48caca2cb0c78cc174fb12b3a68d0d88f99a0519a5e36e"
+  },
+  {
+   "name": "getrandom",
+   "version": "0.4.3",
+   "downloads": 2753012537,
+   "groups": [
+    "top"
+   ],
+   "cksum": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
+  },
+  {
+   "name": "hashbrown",
+   "version": "0.17.2",
+   "downloads": 3253162426,
+   "groups": [
+    "top"
+   ],
+   "cksum": "735eaa21a6a5ffb2e84362faaeb90c05ba8e19797ca30428478cb6ea3a4921bc"
+  },
+  {
+   "name": "heck",
+   "version": "0.5.0",
+   "downloads": 1627913513,
+   "groups": [
+    "top"
+   ],
+   "cksum": "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+  },
+  {
+   "name": "hkdf",
+   "version": "0.13.0",
+   "downloads": 372899809,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "4aaa26c720c68b866f2c96ef5c1264b3e6f473fe5d4ce61cd44bbe913e553018"
+  },
+  {
+   "name": "hmac",
+   "version": "0.13.0",
+   "downloads": 799179894,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "6303bc9732ae41b04cb554b844a762b4115a61bfaa81e3e83050991eeb56863f"
+  },
+  {
+   "name": "http",
+   "version": "1.5.0",
+   "downloads": 1313437774,
+   "groups": [
+    "top"
+   ],
+   "cksum": "918d3568bebf352712bc2ef3d46a8bcf1a75b373be6539de198e9105cbbf9ce0"
+  },
+  {
+   "name": "http-body",
+   "version": "1.1.0",
+   "downloads": 1131828138,
+   "groups": [
+    "top"
+   ],
+   "cksum": "ca2a8f2913ee65f60facd6a5905613afaa448497a0230cc41ce022d93290bc2c"
+  },
+  {
+   "name": "hyper",
+   "version": "1.13.0",
+   "downloads": 1178342176,
+   "groups": [
+    "top"
+   ],
+   "cksum": "229c6ff5584df4c6becbfe00567128bac768c8cd32ebc8a8366bd81ed072e8f3"
+  },
+  {
+   "name": "idna",
+   "version": "1.1.0",
+   "downloads": 1202451437,
+   "groups": [
+    "top"
+   ],
+   "cksum": "3b0875f23caa03898994f6ddc501886a45c7d3d62d04d2d90788d47be1b1e4de"
+  },
+  {
+   "name": "indexmap",
+   "version": "2.14.2",
+   "downloads": 1971985755,
+   "groups": [
+    "top"
+   ],
+   "cksum": "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
+  },
+  {
+   "name": "itertools",
+   "version": "0.15.0",
+   "downloads": 1922025829,
+   "groups": [
+    "top"
+   ],
+   "cksum": "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
+  },
+  {
+   "name": "itoa",
+   "version": "1.0.19",
+   "downloads": 1724190500,
+   "groups": [
+    "top"
+   ],
+   "cksum": "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
+  },
+  {
+   "name": "lazy_static",
+   "version": "1.5.1",
+   "downloads": 1221916125,
+   "groups": [
+    "top"
+   ],
+   "cksum": "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
+  },
+  {
+   "name": "libc",
+   "version": "0.2.191",
+   "downloads": 2063181220,
+   "groups": [
+    "top"
+   ],
+   "cksum": "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
+  },
+  {
+   "name": "linux-raw-sys",
+   "version": "0.12.1",
+   "downloads": 1385564211,
+   "groups": [
+    "top"
+   ],
+   "cksum": "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+  },
+  {
+   "name": "lock_api",
+   "version": "0.5.0",
+   "downloads": 1238668707,
+   "groups": [
+    "top"
+   ],
+   "cksum": "65d91b22da179613dcf4d6ec8349563f52a363f6849e03b00dd0a185ec4a59af"
+  },
+  {
+   "name": "log",
+   "version": "0.4.35",
+   "downloads": 1602962248,
+   "groups": [
+    "top"
+   ],
+   "cksum": "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
+  },
+  {
+   "name": "lru",
+   "version": "0.19.2",
+   "downloads": 466051860,
+   "groups": [
+    "ours"
+   ],
+   "cksum": "d4e2a1b977b42ee8b53a2a4adbd1183431c493f1d1960b7ccd893e2f0b9407ba"
+  },
+  {
+   "name": "md-5",
+   "version": "0.11.0",
+   "downloads": 492246208,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98"
+  },
+  {
+   "name": "memchr",
+   "version": "2.8.3",
+   "downloads": 1822693187,
+   "groups": [
+    "top"
+   ],
+   "cksum": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+  },
+  {
+   "name": "miniz_oxide",
+   "version": "0.9.1",
+   "downloads": 1173253839,
+   "groups": [
+    "top"
+   ],
+   "cksum": "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c"
+  },
+  {
+   "name": "mio",
+   "version": "1.2.5",
+   "downloads": 1320378631,
+   "groups": [
+    "top"
+   ],
+   "cksum": "20521a903f02b0a573cd6840e9d0a5a0cc043d361fe924092cd70f8556cc9c4a"
+  },
+  {
+   "name": "native-tls",
+   "version": "0.2.18",
+   "downloads": 397989348,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "465500e14ea162429d264d44189adc38b199b62b1c21eea9f69e4b73cb03bbf2"
+  },
+  {
+   "name": "num-traits",
+   "version": "0.2.19",
+   "downloads": 1294468870,
+   "groups": [
+    "top"
+   ],
+   "cksum": "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+  },
+  {
+   "name": "once_cell",
+   "version": "1.21.4",
+   "downloads": 1599795578,
+   "groups": [
+    "top"
+   ],
+   "cksum": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+  },
+  {
+   "name": "openssl",
+   "version": "0.10.82",
+   "downloads": 473591178,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "4de8111e94a56adca7ebfe6c365b6d42f99deb69b74b6becacd4204e2f193aa2"
+  },
+  {
+   "name": "openssl-sys",
+   "version": "0.9.118",
+   "downloads": 530629213,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "19c413d6ec9ebaf5e1c829d355cb3e9f783778d700f135be0921d52fce3c60ae"
+  },
+  {
+   "name": "parking_lot",
+   "version": "0.13.0",
+   "downloads": 1327896517,
+   "groups": [
+    "top"
+   ],
+   "cksum": "a9cf937ca4e1d0b7578784559063422fc39ae7c5a00f02471f2614d5486fd226"
+  },
+  {
+   "name": "parking_lot_core",
+   "version": "0.10.0",
+   "downloads": 1360478156,
+   "groups": [
+    "top"
+   ],
+   "cksum": "9cfff060068cc18aa7815010fcaf80c68c7fb9e85fc7f5c0f9bf142c21d19826"
+  },
+  {
+   "name": "pbkdf2",
+   "version": "0.13.0",
+   "downloads": 308428867,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "112d82ceb8c5bf524d9af484d4e4970c9fd5a0cc15ba14ad93dccd28873b0629"
+  },
+  {
+   "name": "pem",
+   "version": "4.0.0",
+   "downloads": 419684251,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "d354a98a3d1251555de99e8fdd8afda05573c31b82f59063a7b0a29b5527f120"
+  },
+  {
+   "name": "pem-rfc7468",
+   "version": "1.0.0",
+   "downloads": 430290829,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "a6305423e0e7738146434843d1694d621cce767262b2a86910beab705e4493d9"
+  },
+  {
+   "name": "percent-encoding",
+   "version": "2.3.2",
+   "downloads": 1155689970,
+   "groups": [
+    "top"
+   ],
+   "cksum": "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+  },
+  {
+   "name": "pin-project-lite",
+   "version": "0.2.18",
+   "downloads": 1316465733,
+   "groups": [
+    "top"
+   ],
+   "cksum": "c938015719552d665fd0553b90d96cd7ff58e83e4c061ca99e6bb78865a72752"
+  },
+  {
+   "name": "pkcs8",
+   "version": "0.11.0",
+   "downloads": 529039934,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "451913da69c775a56034ea8d9003d27ee8948e12443eae7c038ba100a4f21cb7"
+  },
+  {
+   "name": "ppv-lite86",
+   "version": "0.2.21",
+   "downloads": 1115699212,
+   "groups": [
+    "top",
+    "crypto"
+   ],
+   "cksum": "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
+  },
+  {
+   "name": "proc-macro2",
+   "version": "1.0.107",
+   "downloads": 2038056580,
+   "groups": [
+    "top"
+   ],
+   "cksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
+  },
+  {
+   "name": "quote",
+   "version": "1.0.47",
+   "downloads": 2048482009,
+   "groups": [
+    "top"
+   ],
+   "cksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
+  },
+  {
+   "name": "rand",
+   "version": "0.10.4",
+   "downloads": 2291336750,
+   "groups": [
+    "top"
+   ],
+   "cksum": "8f6fa277c67e6ea590466f04c3fe82cb509f0864fe470643e5570de9514a9b11"
+  },
+  {
+   "name": "rand_chacha",
+   "version": "0.10.0",
+   "downloads": 1741380921,
+   "groups": [
+    "top"
+   ],
+   "cksum": "3e6af7f3e25ded52c41df4e0b1af2d047e45896c2f3281792ed68a1c243daedb"
+  },
+  {
+   "name": "rand_core",
+   "version": "0.10.1",
+   "downloads": 2312469600,
+   "groups": [
+    "top"
+   ],
+   "cksum": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+  },
+  {
+   "name": "regex",
+   "version": "1.13.2",
+   "downloads": 1450080130,
+   "groups": [
+    "top"
+   ],
+   "cksum": "9807af0e638c12e753aa1b4e601791bf2a8f71274023c8bbeec12fc149950857"
+  },
+  {
+   "name": "regex-automata",
+   "version": "0.4.19",
+   "downloads": 1570273259,
+   "groups": [
+    "top"
+   ],
+   "cksum": "41d60ef07df457506a0a1a2073112eb4aae5733dbd2813c3da77d1b0fd441158"
+  },
+  {
+   "name": "regex-syntax",
+   "version": "0.8.12",
+   "downloads": 1772010042,
+   "groups": [
+    "top"
+   ],
+   "cksum": "d902046e6a28a1e4c3cab97258a0ce11e994903f01c2d97a9447a0b3df85f4f6"
+  },
+  {
+   "name": "rfc6979",
+   "version": "0.6.0",
+   "downloads": 298045522,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "b4a459cddafb3fe76b31fd8f1108007566c40301feb64dc7b54656eb7388172b"
+  },
+  {
+   "name": "ring",
+   "version": "0.17.14",
+   "downloads": 946801566,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
+  },
+  {
+   "name": "rustc-hash",
+   "version": "2.1.3",
+   "downloads": 1074960105,
+   "groups": [
+    "top"
+   ],
+   "cksum": "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
+  },
+  {
+   "name": "rustix",
+   "version": "1.1.6",
+   "downloads": 1470183654,
+   "groups": [
+    "top"
+   ],
+   "cksum": "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa"
+  },
+  {
+   "name": "rustls",
+   "version": "0.23.46",
+   "downloads": 1171124676,
+   "groups": [
+    "top",
+    "crypto"
+   ],
+   "cksum": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
+  },
+  {
+   "name": "rustls-native-certs",
+   "version": "0.8.5",
+   "downloads": 720020236,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "4a073f5dc7469f984c52ad2752b63b0807745133b6de880b7b64c1ac4c48aec4"
+  },
+  {
+   "name": "rustls-pemfile",
+   "version": "2.2.0",
+   "downloads": 607435827,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
+  },
+  {
+   "name": "rustls-pki-types",
+   "version": "1.16.0",
+   "downloads": 725157356,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "102f35f7de7b06d8c61f1cff6592f5253e0dea431c74867aad5dfd70f44663fb"
+  },
+  {
+   "name": "rustls-webpki",
+   "version": "0.103.17",
+   "downloads": 1027460180,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5"
+  },
+  {
+   "name": "ryu",
+   "version": "1.0.23",
+   "downloads": 1390032807,
+   "groups": [
+    "top"
+   ],
+   "cksum": "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+  },
+  {
+   "name": "scopeguard",
+   "version": "1.2.0",
+   "downloads": 1190670902,
+   "groups": [
+    "top"
+   ],
+   "cksum": "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+  },
+  {
+   "name": "sct",
+   "version": "0.7.1",
+   "downloads": 361311758,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
+  },
+  {
+   "name": "sec1",
+   "version": "0.8.1",
+   "downloads": 307884566,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "d56d437c2f19203ce5f7122e507831de96f3d2d4d3be5af44a0b0a09d8a80e4d"
+  },
+  {
+   "name": "security-framework",
+   "version": "3.7.0",
+   "downloads": 470433292,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "b7f4bc775c73d9a02cde8bf7b2ec4c9d12743edf609006c7facc23998404cd1d"
+  },
+  {
+   "name": "semver",
+   "version": "1.0.28",
+   "downloads": 1254045210,
+   "groups": [
+    "top"
+   ],
+   "cksum": "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+  },
+  {
+   "name": "serde",
+   "version": "1.0.229",
+   "downloads": 1783298132,
+   "groups": [
+    "top"
+   ],
+   "cksum": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+  },
+  {
+   "name": "serde_derive",
+   "version": "1.0.229",
+   "downloads": 1696330125,
+   "groups": [
+    "top"
+   ],
+   "cksum": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+  },
+  {
+   "name": "serde_json",
+   "version": "1.0.154",
+   "downloads": 1690829928,
+   "groups": [
+    "top"
+   ],
+   "cksum": "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
+  },
+  {
+   "name": "sha1",
+   "version": "0.11.0",
+   "downloads": 725192226,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+  },
+  {
+   "name": "sha2",
+   "version": "0.11.2",
+   "downloads": 1301129311,
+   "groups": [
+    "top",
+    "crypto"
+   ],
+   "cksum": "5b0e5c7d67bc53f435386b2130fdc900488c5703770f6d8a4633060e34288a27"
+  },
+  {
+   "name": "shlex",
+   "version": "2.0.1",
+   "downloads": 1160012259,
+   "groups": [
+    "top"
+   ],
+   "cksum": "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+  },
+  {
+   "name": "signature",
+   "version": "3.0.0",
+   "downloads": 579134163,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5"
+  },
+  {
+   "name": "siphasher",
+   "version": "1.0.4",
+   "downloads": 733845538,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
+  },
+  {
+   "name": "slab",
+   "version": "0.4.12",
+   "downloads": 1189866199,
+   "groups": [
+    "top"
+   ],
+   "cksum": "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
+  },
+  {
+   "name": "smallvec",
+   "version": "1.16.6",
+   "downloads": 1529839595,
+   "groups": [
+    "top"
+   ],
+   "cksum": "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
+  },
+  {
+   "name": "socket2",
+   "version": "0.6.5",
+   "downloads": 1554748933,
+   "groups": [
+    "top"
+   ],
+   "cksum": "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
+  },
+  {
+   "name": "spki",
+   "version": "0.8.1",
+   "downloads": 557051816,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "7ef958a98b9d5da290cfc78946e9f3e61e1e62a18db0d92cac0b83cc161491a9"
+  },
+  {
+   "name": "strsim",
+   "version": "0.11.1",
+   "downloads": 1323117435,
+   "groups": [
+    "top"
+   ],
+   "cksum": "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+  },
+  {
+   "name": "subtle",
+   "version": "2.6.1",
+   "downloads": 918551506,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+  },
+  {
+   "name": "syn",
+   "version": "3.0.10",
+   "downloads": 3205387744,
+   "groups": [
+    "top"
+   ],
+   "cksum": "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
+  },
+  {
+   "name": "tempfile",
+   "version": "3.27.0",
+   "downloads": 1041096038,
+   "groups": [
+    "top"
+   ],
+   "cksum": "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+  },
+  {
+   "name": "thiserror",
+   "version": "2.0.21",
+   "downloads": 1946878074,
+   "groups": [
+    "top"
+   ],
+   "cksum": "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
+  },
+  {
+   "name": "thiserror-impl",
+   "version": "2.0.21",
+   "downloads": 1947030508,
+   "groups": [
+    "top"
+   ],
+   "cksum": "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
+  },
+  {
+   "name": "time",
+   "version": "0.3.55",
+   "downloads": 1120715984,
+   "groups": [
+    "top",
+    "ours"
+   ],
+   "cksum": "cdb87b95ec50ddfa440816d227a17b2ccbdda963a316a727fda0fc4334f7d134"
+  },
+  {
+   "name": "tiny-keccak",
+   "version": "2.0.2",
+   "downloads": 296142528,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
+  },
+  {
+   "name": "tokio",
+   "version": "1.54.1",
+   "downloads": 1245731943,
+   "groups": [
+    "top",
+    "ours"
+   ],
+   "cksum": "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
+  },
+  {
+   "name": "tokio-rustls",
+   "version": "0.26.6",
+   "downloads": 986270247,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
+  },
+  {
+   "name": "toml",
+   "version": "1.2.3+spec-1.1.0",
+   "downloads": 1194887964,
+   "groups": [
+    "top"
+   ],
+   "cksum": "26b1f26e9485c1fa43ee89fe76e9f3fb9e2e52bb227f8594b4d687496b83d073"
+  },
+  {
+   "name": "toml_datetime",
+   "version": "1.1.3+spec-1.1.0",
+   "downloads": 1101501430,
+   "groups": [
+    "top"
+   ],
+   "cksum": "173f25c883cd2176a2d8212155638c0a60d484a9d84546d270866f40f56b6e49"
+  },
+  {
+   "name": "toml_edit",
+   "version": "0.25.21+spec-1.1.0",
+   "downloads": 1076741368,
+   "groups": [
+    "top"
+   ],
+   "cksum": "88497dab46de5bf343ec66b05c251e48c6213f3e9170c70a70a823f7abe886a4"
+  },
+  {
+   "name": "tracing",
+   "version": "0.1.44",
+   "downloads": 1098399817,
+   "groups": [
+    "top"
+   ],
+   "cksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+  },
+  {
+   "name": "tracing-core",
+   "version": "0.1.36",
+   "downloads": 1108631125,
+   "groups": [
+    "top"
+   ],
+   "cksum": "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
+  },
+  {
+   "name": "typenum",
+   "version": "1.20.1",
+   "downloads": 1176914921,
+   "groups": [
+    "top"
+   ],
+   "cksum": "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
+  },
+  {
+   "name": "unicode-ident",
+   "version": "1.0.27",
+   "downloads": 1790723079,
+   "groups": [
+    "top"
+   ],
+   "cksum": "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+  },
+  {
+   "name": "universal-hash",
+   "version": "0.6.1",
+   "downloads": 290186119,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "f4987bdc12753382e0bec4a65c50738ffaabc998b9cdd1f952fb5f39b0048a96"
+  },
+  {
+   "name": "url",
+   "version": "2.5.9",
+   "downloads": 1114763285,
+   "groups": [
+    "top"
+   ],
+   "cksum": "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a"
+  },
+  {
+   "name": "uuid",
+   "version": "1.29.3",
+   "downloads": 1037068098,
+   "groups": [
+    "ours"
+   ],
+   "cksum": "3c14b15dffa2f4bd712103e857140aa04a4f2ff6e955c77d7eb8e53ee02a3b64"
+  },
+  {
+   "name": "version_check",
+   "version": "0.9.5",
+   "downloads": 1293380835,
+   "groups": [
+    "top"
+   ],
+   "cksum": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+  },
+  {
+   "name": "windows-sys",
+   "version": "0.61.2",
+   "downloads": 2011742136,
+   "groups": [
+    "top"
+   ],
+   "cksum": "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
+  },
+  {
+   "name": "windows-targets",
+   "version": "0.53.5",
+   "downloads": 1289134146,
+   "groups": [
+    "top"
+   ],
+   "cksum": "4945f9f551b88e0d65f3db0bc25c33b8acea4d9e41163edf90dcd0b19f9069f3"
+  },
+  {
+   "name": "windows_aarch64_gnullvm",
+   "version": "0.53.1",
+   "downloads": 1232340012,
+   "groups": [
+    "top"
+   ],
+   "cksum": "a9d8416fa8b42f5c947f8482c43e7d89e73a173cead56d044f6a56104a6d1b53"
+  },
+  {
+   "name": "windows_aarch64_msvc",
+   "version": "0.53.1",
+   "downloads": 1288396812,
+   "groups": [
+    "top"
+   ],
+   "cksum": "b9d782e804c2f632e395708e99a94275910eb9100b2114651e04744e9b125006"
+  },
+  {
+   "name": "windows_i686_gnu",
+   "version": "0.53.1",
+   "downloads": 1283588851,
+   "groups": [
+    "top"
+   ],
+   "cksum": "960e6da069d81e09becb0ca57a65220ddff016ff2d6af6a223cf372a506593a3"
+  },
+  {
+   "name": "windows_i686_msvc",
+   "version": "0.53.1",
+   "downloads": 1285702936,
+   "groups": [
+    "top"
+   ],
+   "cksum": "1e7ac75179f18232fe9c285163565a57ef8d3c89254a30685b57d83a38d326c2"
+  },
+  {
+   "name": "windows_x86_64_gnu",
+   "version": "0.53.1",
+   "downloads": 1296905811,
+   "groups": [
+    "top"
+   ],
+   "cksum": "9c3842cdd74a865a8066ab39c8a7a473c0778a3f29370b5fd6b4b9aa7df4a499"
+  },
+  {
+   "name": "windows_x86_64_gnullvm",
+   "version": "0.53.1",
+   "downloads": 1232212678,
+   "groups": [
+    "top"
+   ],
+   "cksum": "0ffa179e2d07eee8ad8f57493436566c7cc30ac536a3379fdf008f47f6bb7ae1"
+  },
+  {
+   "name": "windows_x86_64_msvc",
+   "version": "0.53.1",
+   "downloads": 1345968917,
+   "groups": [
+    "top"
+   ],
+   "cksum": "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
+  },
+  {
+   "name": "winnow",
+   "version": "1.0.5",
+   "downloads": 1240999974,
+   "groups": [
+    "top"
+   ],
+   "cksum": "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
+  },
+  {
+   "name": "zerocopy",
+   "version": "0.8.65",
+   "downloads": 1204792350,
+   "groups": [
+    "top"
+   ],
+   "cksum": "32bc8a75f879cd6fe53a6bedf3c28f0e1b914c77424fc2be9e2ec85d7d25aff5"
+  },
+  {
+   "name": "zeroize",
+   "version": "1.9.2",
+   "downloads": 932480681,
+   "groups": [
+    "crypto",
+    "ours"
+   ],
+   "cksum": "85ccff8a4805aba1eaa4cd4afcd49f7557dd2cf5fd79ffc37f8959466effc5aa"
+  },
+  {
+   "name": "zeroize_derive",
+   "version": "1.5.0",
+   "downloads": 361808667,
+   "groups": [
+    "crypto"
+   ],
+   "cksum": "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
+  }
+ ]
+}
