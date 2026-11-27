@@ -525,11 +525,15 @@ jobs:
           ref: ${{ inputs.dbe-ref || (env.DBE_REPOSITORY == github.repository && github.sha || '') }}
           path: .dbe-product-repo
 
-      - name: Set up JDK 21 (Temurin)
+      - name: Set up JDK 8 and 21 (Temurin)
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "21"
+          # The native Java server's MPL build (aws-crypto-tools-java mpl/) compiles
+          # and tests on a Java 8 toolchain; the last version listed (21) is the default.
+          java-version: |
+            8
+            21
 
       - name: Set up the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
