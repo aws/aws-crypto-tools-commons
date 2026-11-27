@@ -79,6 +79,20 @@ on:
           project only picks up jobs from the repo it is connected to.
         type: string
         default: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+      fuzz:
+        description: >-
+          How many random examples to add to each shared input list
+          (TESTSERVER_FUZZ). Empty runs only the fixed examples.
+        type: string
+        default: ""
+      fuzz-seed:
+        description: The seed for the random examples (TESTSERVER_FUZZ_SEED). Empty picks a new one.
+        type: string
+        default: ""
+      report-artifact:
+        description: Name of the uploaded test report artifact.
+        type: string
+        default: dbesdk-test-server-reports
 
 # Callers must grant these.
 permissions:
@@ -98,8 +112,13 @@ env:
   # Dependency caches are written only from the default branch, so every
   # branch restores the same warm set and pull requests never churn the cache
   # store.
-  SAVE_CACHES: ${{ inputs.save-caches || github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  # A run pointed at another repository or ref only restores the caches,
+  # so a manual run can't fill the default branch's caches from other code.
+  SAVE_CACHES: ${{ inputs.save-caches || ((github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && inputs.dbe-repository == '' && inputs.dbe-ref == '' && (inputs.commons-ref == '' || inputs.commons-ref == 'main')) }}
   CARGO_INCREMENTAL: "0"
+  # Every Rust build here measures coverage, and Rust's branch coverage
+  # needs a nightly compiler.
+  RUSTUP_TOOLCHAIN: nightly-2026-10-26
 
 jobs:
   # Resolves each heavy server's key and lists the servers with no prebuilt
@@ -209,7 +228,7 @@ jobs:
           emit net net "$(tip net)" \
             "$net/bin/Release/net8.0" \
             "$net/.dbesdk-build-stamp"
-          emit rust rust "$(tip rust)-coverage" \
+          emit rust rust "$(tip rust)-branch-coverage" \
             "$rust/target/release/dbesdk-test-server" \
             "$rust/.dbesdk-build-stamp"
           # Cargo workspaces per Rust server, for rust-cache.
@@ -310,8 +329,9 @@ jobs:
 
       - name: Set up the Rust toolchain
         if: matrix.language == 'rust'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
           components: rustfmt
 
@@ -376,9 +396,9 @@ jobs:
         # build, and goes before the cargo cache, whose key includes it.
         run: echo "TESTSERVER_COVERAGE_DIR=$RUNNER_TEMP/coverage" >> "$GITHUB_ENV"
 
-      - name: Build the Rust code with line coverage
+      - name: Build the Rust code with line and branch coverage
         if: startsWith(matrix.language, 'rust')
-        run: echo "RUSTFLAGS=-C instrument-coverage" >> "$GITHUB_ENV"
+        run: echo "RUSTFLAGS=-C instrument-coverage -Z coverage-options=branch --cfg testserver_coverage" >> "$GITHUB_ENV"
 
       - name: Restore the cargo registry and compiled dependencies
         # Keyed on the toolchain and the workspace's Cargo.lock; our own crates
@@ -532,8 +552,9 @@ jobs:
           java-version: "21"
 
       - name: Set up the Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           # The CodeBuild runners do not preinstall rustfmt, unlike ubuntu-latest.
           components: rustfmt
 
@@ -728,6 +749,8 @@ jobs:
           # The name SubprocessLauncher reads.
           TESTSERVER_READY_TIMEOUT_SECONDS: "900"
           FOCUS: ${{ inputs.focus }}
+          TESTSERVER_FUZZ: ${{ inputs.fuzz }}
+          TESTSERVER_FUZZ_SEED: ${{ inputs.fuzz-seed }}
         # $OVERLAY already carries the dbe-ref working-tree overlay (and is empty
         # otherwise, in which case each server is cloned per server-config.json),
         # so it is the single source of the overlay — passing DBESDK_DBE_REPO too
@@ -744,9 +767,46 @@ jobs:
       - name: Set up llvm-tools for the coverage reports
         # Turns the Rust servers' coverage profiles into reports.
         if: always()
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           components: llvm-tools-preview
+
+      - name: Pick the Tests the per-test pass records
+        if: inputs.focus != ''
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
+          PRODUCT: dbesdk
+          LANGUAGE_DIR: language-repo
+        run: .github/scripts/select-per-test-tests.sh
+
+      - name: Record the lines each test runs
+        # A second pass over the focus language's own pairs, one test at a time,
+        # so each server's coverage can be split by test. The pass above stays parallel.
+        if: inputs.focus != '' && env.PER_TEST_RUN == 'true'
+        working-directory: dbesdk/test-server
+        env:
+          TESTSERVER_READY_TIMEOUT_SECONDS: "900"
+          TESTSERVER_COVERAGE_DIR: ${{ runner.temp }}/per-test-coverage-raw
+          TESTSERVER_PER_TEST_COVERAGE: "1"
+          FOCUS: ${{ inputs.focus }}
+        run: |
+          # This pass rewrites the JUnit results and the resolution record, and the
+          # uploaded reports must show the full run above, so they are put back after.
+          saved="$RUNNER_TEMP/full-run"
+          kept=(tests/build/test-results build/resolution-record.json ../../test-server-common/orchestrator/build/resolution-record.json)
+          mkdir -p "$saved"
+          for i in "${!kept[@]}"; do
+            if [ -e "${kept[$i]}" ]; then cp -r "${kept[$i]}" "$saved/$i"; fi
+          done
+          status=0
+          make orchestrate ORCHESTRATE_ARGS="${OVERLAY//@GITHUB_WORKSPACE@/$GITHUB_WORKSPACE} languages=$FOCUS ${PER_TEST_TESTS:+tests=$PER_TEST_TESTS}" || status=$?
+          for i in "${!kept[@]}"; do
+            if [ -e "$saved/$i" ]; then rm -rf "${kept[$i]}" && cp -r "$saved/$i" "${kept[$i]}"; fi
+          done
+          exit "$status"
 
       - name: Write the line coverage reports
         # build/coverage/<language>.lcov (paths relative to the library's
@@ -755,16 +815,22 @@ jobs:
         if: always()
         run: python3 test-server-common/tools/coverage_report.py "$RUNNER_TEMP/coverage" dbesdk/test-server/build/coverage
 
+      - name: Write the per-test line coverage
+        # build/per-test-coverage/<language>.jsonl: the lines each test ran.
+        if: always()
+        run: python3 test-server-common/tools/per_test_coverage.py build "$RUNNER_TEMP/per-test-coverage-raw" dbesdk/test-server/build/per-test-coverage
+
       - name: Upload test reports + Resolution_Record
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dbesdk-test-server-reports
+          name: ${{ inputs.report-artifact }}
           path: |
             test-server-common/orchestrator/build/resolution-record.json
             test-server-common/orchestrator/build/launch/*/*.log
             dbesdk/test-server/build/resolution-record.json
             dbesdk/test-server/build/coverage
+            dbesdk/test-server/build/per-test-coverage
             dbesdk/test-server/build/launch/*/*.log
             dbesdk/test-server/tests/build/reports/tests
             dbesdk/test-server/tests/build/test-results

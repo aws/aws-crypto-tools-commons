@@ -1,0 +1,356 @@
+{
+  "generated_by": "api-examples/smithy_names.py",
+  "libraries": {
+    "esdk": {
+      "client": {
+        "aliases": {},
+        "members": [
+          "commitmentPolicy",
+          "maxEncryptedDataKeys",
+          "netV4_0_0_RetryPolicy"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.encryptionSdk#AwsEncryptionSdkConfig"
+      },
+      "decrypt": {
+        "aliases": {
+          "cmm": "materialsManager"
+        },
+        "members": [
+          "ciphertext",
+          "materialsManager",
+          "keyring",
+          "encryptionContext"
+        ],
+        "operations": [
+          "Decrypt"
+        ],
+        "shape": "aws.cryptography.encryptionSdk#DecryptInput"
+      },
+      "encrypt": {
+        "aliases": {
+          "cmm": "materialsManager"
+        },
+        "members": [
+          "plaintext",
+          "encryptionContext",
+          "materialsManager",
+          "keyring",
+          "algorithmSuiteId",
+          "frameLength"
+        ],
+        "operations": [
+          "Encrypt"
+        ],
+        "shape": "aws.cryptography.encryptionSdk#EncryptInput"
+      }
+    },
+    "mpl": {
+      "aws-kms-discovery-keyring": {
+        "aliases": {},
+        "members": [
+          "kmsClient",
+          "discoveryFilter",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsDiscoveryKeyringInput"
+      },
+      "aws-kms-discovery-multi-keyring": {
+        "aliases": {},
+        "members": [
+          "regions",
+          "discoveryFilter",
+          "clientSupplier",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsDiscoveryMultiKeyringInput"
+      },
+      "aws-kms-ecdh-keyring": {
+        "aliases": {},
+        "members": [
+          "KeyAgreementScheme",
+          "curveSpec",
+          "kmsClient",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsEcdhKeyringInput"
+      },
+      "aws-kms-keyring": {
+        "aliases": {},
+        "members": [
+          "kmsKeyId",
+          "kmsClient",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsKeyringInput"
+      },
+      "aws-kms-mrk-discovery-keyring": {
+        "aliases": {},
+        "members": [
+          "kmsClient",
+          "discoveryFilter",
+          "grantTokens",
+          "region"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsMrkDiscoveryKeyringInput"
+      },
+      "aws-kms-mrk-discovery-multi-keyring": {
+        "aliases": {},
+        "members": [
+          "regions",
+          "discoveryFilter",
+          "clientSupplier",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsMrkDiscoveryMultiKeyringInput"
+      },
+      "aws-kms-mrk-keyring": {
+        "aliases": {},
+        "members": [
+          "kmsKeyId",
+          "kmsClient",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsMrkKeyringInput"
+      },
+      "aws-kms-mrk-multi-keyring": {
+        "aliases": {},
+        "members": [
+          "generator",
+          "kmsKeyIds",
+          "clientSupplier",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsMrkMultiKeyringInput"
+      },
+      "aws-kms-multi-keyring": {
+        "aliases": {},
+        "members": [
+          "generator",
+          "kmsKeyIds",
+          "clientSupplier",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsMultiKeyringInput"
+      },
+      "aws-kms-rsa-keyring": {
+        "aliases": {},
+        "members": [
+          "publicKey",
+          "kmsKeyId",
+          "encryptionAlgorithm",
+          "kmsClient",
+          "grantTokens"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsRsaKeyringInput"
+      },
+      "client": {
+        "aliases": {},
+        "members": [],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#MaterialProvidersConfig"
+      },
+      "decryption-materials": {
+        "aliases": {},
+        "members": [
+          "algorithmSuiteId",
+          "encryptionContext",
+          "requiredEncryptionContextKeys"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#InitializeDecryptionMaterialsInput"
+      },
+      "decryption-materials-with-plaintext-data-key": {
+        "aliases": {},
+        "members": [
+          "algorithmSuite",
+          "encryptionContext",
+          "requiredEncryptionContextKeys",
+          "plaintextDataKey",
+          "verificationKey",
+          "symmetricSigningKey"
+        ],
+        "operations": [
+          "DecryptionMaterialsWithPlaintextDataKey"
+        ],
+        "shape": "aws.cryptography.materialProviders#DecryptionMaterials"
+      },
+      "default-client-supplier": {
+        "aliases": {},
+        "members": [],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateDefaultClientSupplierInput"
+      },
+      "default-cmc": {
+        "aliases": {},
+        "members": [
+          "cache"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateCryptographicMaterialsCacheInput"
+      },
+      "default-cmm": {
+        "aliases": {},
+        "members": [
+          "keyring"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateDefaultCryptographicMaterialsManagerInput"
+      },
+      "encryption-materials": {
+        "aliases": {},
+        "members": [
+          "algorithmSuiteId",
+          "encryptionContext",
+          "requiredEncryptionContextKeys",
+          "signingKey",
+          "verificationKey"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#InitializeEncryptionMaterialsInput"
+      },
+      "encryption-materials-has-plaintext-data-key": {
+        "aliases": {},
+        "members": [
+          "algorithmSuite",
+          "encryptionContext",
+          "encryptedDataKeys",
+          "requiredEncryptionContextKeys",
+          "plaintextDataKey",
+          "signingKey",
+          "symmetricSigningKeys"
+        ],
+        "operations": [
+          "EncryptionMaterialsHasPlaintextDataKey"
+        ],
+        "shape": "aws.cryptography.materialProviders#EncryptionMaterials"
+      },
+      "hierarchical-keyring": {
+        "aliases": {
+          "ttl": "ttlSeconds"
+        },
+        "members": [
+          "branchKeyId",
+          "branchKeyIdSupplier",
+          "keyStore",
+          "ttlSeconds",
+          "cache",
+          "partitionId"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateAwsKmsHierarchicalKeyringInput"
+      },
+      "multi-keyring": {
+        "aliases": {},
+        "members": [
+          "generator",
+          "childKeyrings"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateMultiKeyringInput"
+      },
+      "raw-aes-keyring": {
+        "aliases": {},
+        "members": [
+          "keyNamespace",
+          "keyName",
+          "wrappingKey",
+          "wrappingAlg"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateRawAesKeyringInput"
+      },
+      "raw-ecdh-keyring": {
+        "aliases": {},
+        "members": [
+          "KeyAgreementScheme",
+          "curveSpec"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateRawEcdhKeyringInput"
+      },
+      "raw-rsa-keyring": {
+        "aliases": {},
+        "members": [
+          "keyNamespace",
+          "keyName",
+          "paddingScheme",
+          "publicKey",
+          "privateKey"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateRawRsaKeyringInput"
+      },
+      "required-encryption-context-cmm": {
+        "aliases": {},
+        "members": [
+          "underlyingCMM",
+          "keyring",
+          "requiredEncryptionContextKeys"
+        ],
+        "operations": [],
+        "shape": "aws.cryptography.materialProviders#CreateRequiredEncryptionContextCMMInput"
+      },
+      "valid-algorithm-suite-info": {
+        "aliases": {},
+        "members": [
+          "id",
+          "binaryId",
+          "messageVersion",
+          "encrypt",
+          "kdf",
+          "commitment",
+          "signature",
+          "symmetricSignature",
+          "edkWrapping"
+        ],
+        "operations": [
+          "ValidAlgorithmSuiteInfo"
+        ],
+        "shape": "aws.cryptography.materialProviders#AlgorithmSuiteInfo"
+      },
+      "valid-decryption-materials-transition": {
+        "aliases": {},
+        "members": [
+          "start",
+          "stop"
+        ],
+        "operations": [
+          "ValidDecryptionMaterialsTransition"
+        ],
+        "shape": "aws.cryptography.materialProviders#ValidDecryptionMaterialsTransitionInput"
+      },
+      "valid-encryption-materials-transition": {
+        "aliases": {},
+        "members": [
+          "start",
+          "stop"
+        ],
+        "operations": [
+          "ValidEncryptionMaterialsTransition"
+        ],
+        "shape": "aws.cryptography.materialProviders#ValidEncryptionMaterialsTransitionInput"
+      }
+    }
+  },
+  "models": [
+    {
+      "ref": "d34518bddb71e09790a734da08120093149252a3",
+      "repo": "https://github.com/aws/aws-cryptographic-material-providers-library"
+    },
+    {
+      "ref": "99f54cbc6945a5bad1b19d5412bbb9b5e457ff69",
+      "repo": "https://github.com/aws/aws-encryption-sdk"
+    }
+  ]
+}

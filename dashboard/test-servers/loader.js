@@ -321,7 +321,8 @@ function addTestcase(cases, attrs, body, gateLog) {
   }
 }
 
-async function scanXml(stream, cases, gateLog) {
+// Calls each(attributes, body) for every <testcase> in a JUnit XML stream.
+async function scanTestcases(stream, each) {
   let buf = "";
   const reader = stream.getReader();
   for (;;) {
@@ -329,11 +330,12 @@ async function scanXml(stream, cases, gateLog) {
     if (value) buf += value;
     TESTCASE.lastIndex = 0;
     let m, end = 0;
-    while ((m = TESTCASE.exec(buf))) { addTestcase(cases, m[1], m[2], gateLog); end = TESTCASE.lastIndex; }
+    while ((m = TESTCASE.exec(buf))) { each(m[1], m[2]); end = TESTCASE.lastIndex; }
     buf = buf.slice(end);
     if (done) return;
   }
 }
+const scanXml = (stream, cases, gateLog) => scanTestcases(stream, (attrs, body) => addTestcase(cases, attrs, body, gateLog));
 
 async function fetchResults(product, run, progress) {
   // Bump the prefix when the stored shape changes, so old caches are ignored.
@@ -382,18 +384,40 @@ async function fetchResults(product, run, progress) {
 // names that repository and commit. The repository's own CI uploads its local
 // test coverage as local-coverage-<project> artifacts, each one lcov file.
 
-// lcov text -> Map(file -> Map(line -> hits)). Only DA (line) records count.
-function parseLcov(text, into = new Map()) {
-  let lines = null;
+// lcov text -> Map(file -> Map(line -> hits)) from the DA records, and into
+// `branches` Map(file -> Map(line -> Map(branch id -> times taken))) from the
+// BRDA records. A branch on a line that never ran ("-") was taken 0 times.
+function parseLcov(text, into = new Map(), branches = new Map()) {
+  let f = null, lines = null;
   for (const row of text.split("\n")) {
     if (row.startsWith("SF:")) {
-      const f = row.slice(3).trim();
+      f = row.slice(3).trim();
       lines = into.get(f) || new Map();
       into.set(f, lines);
     } else if (lines && row.startsWith("DA:")) {
       const [n, hits] = row.slice(3).split(",");
       lines.set(+n, Math.max(lines.get(+n) || 0, +hits));
-    } else if (row.startsWith("end_of_record")) lines = null;
+    } else if (lines && row.startsWith("BRDA:")) {
+      const [n, block, branch, taken] = row.slice(5).split(",");
+      if (!branches.has(f)) branches.set(f, new Map());
+      const byLine = branches.get(f);
+      if (!byLine.has(+n)) byLine.set(+n, new Map());
+      const id = block + "," + branch, times = taken.trim() === "-" ? 0 : +taken;
+      byLine.get(+n).set(id, Math.max(byLine.get(+n).get(id) || 0, times));
+    } else if (row.startsWith("end_of_record")) { f = null; lines = null; }
+  }
+  return into;
+}
+
+// Adds every file, line and branch of `from` into `into`, keeping the higher count.
+function mergeBranches(into, from) {
+  for (const [f, byLine] of from) {
+    if (!into.has(f)) into.set(f, new Map());
+    for (const [n, ids] of byLine) {
+      const to = into.get(f).get(n) || new Map();
+      for (const [id, t] of ids) to.set(id, Math.max(to.get(id) || 0, t));
+      into.get(f).set(n, to);
+    }
   }
   return into;
 }
@@ -410,8 +434,9 @@ async function zipText(zip, e) {
 
 // A downloaded artifact never changes, so its parsed contents are cached by
 // artifact id and a reload only downloads artifacts it has not seen.
-async function cachedArtifact(repo, art, progress, parse) {
-  const key = `cov2:${repo}:${art.id}`;
+// A page that parses the zip into a different shape passes its own prefix.
+async function cachedArtifact(repo, art, progress, parse, prefix = "cov2") {
+  const key = `${prefix}:${repo}:${art.id}`;
   const hit = await cacheGet(key);
   if (hit) return hit;
   progress(`Downloading ${art.name} (${(art.size_in_bytes / 1e6).toFixed(1)} MB)…`);
@@ -437,24 +462,25 @@ async function localCoverage(repo, commit, run, progress) {
     if (!seen || a.created_at > seen.created_at) newest.set(a.name, { ...a, runUrl:`https://github.com/${repo}/actions/runs/${id}` });
   }
   if (!newest.size) return null;
-  const files = new Map();
+  const files = new Map(), branches = new Map();
   const parts = await Promise.all([...newest.values()].map(a => cachedArtifact(repo, a, progress, async (zip, entries) => {
-    const m = new Map();
-    for (const e of entries.filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), m);
-    return m;
-  })));
+    const m = new Map(), b = new Map();
+    for (const e of entries.filter(e => e.name.endsWith(".lcov"))) parseLcov(await zipText(zip, e), m, b);
+    return { files:m, branches:b };
+  }, "cov3")));
   for (const part of parts) {
-    for (const [f, lines] of part) {
+    for (const [f, lines] of part.files) {
       const into = files.get(f) || new Map();
       for (const [n, h] of lines) into.set(n, Math.max(into.get(n) || 0, h));
       files.set(f, into);
     }
+    mergeBranches(branches, part.branches);
   }
   const from = [...new Set([...newest.values()].map(a => a.runUrl))];
-  return { files, from:from[0], runs:from, artifacts:[...newest.keys()].sort() };
+  return { files, branches, from:from[0], runs:from, artifacts:[...newest.keys()].sort() };
 }
 
-// -> [{ language, repository, commit, server: Map, local: {files, from} | null }]
+// -> [{ language, repository, commit, server: Map, serverBranches: Map, local: {files, branches, from} | null }]
 // update(list), when given, sees the list as it fills in: first with every
 // server's report and local undefined (still loading), then after each local fetch.
 async function fetchCoverage(product, run, progress, update = () => {}) {
@@ -464,14 +490,17 @@ async function fetchCoverage(product, run, progress, update = () => {}) {
     const out = [];
     for (const e of entries.filter(e => /(^|\/)coverage\/[^/]+\.json$/.test(e.name))) {
       const lcov = entries.find(x => x.name === e.name.replace(/\.json$/, ".lcov"));
-      if (lcov) out.push({ meta:JSON.parse(await zipText(zip, e)), server:parseLcov(await zipText(zip, lcov)) });
+      if (!lcov) continue;
+      const serverBranches = new Map();
+      const server = parseLcov(await zipText(zip, lcov), new Map(), serverBranches);
+      out.push({ meta:JSON.parse(await zipText(zip, e)), server, serverBranches });
     }
     return out;
-  })));
+  }, "cov3")));
   // The newest artifact comes first, so it wins when two report one language.
   const reports = [];
   for (const part of parts) for (const r of part) if (!reports.some(x => x.meta.language === r.meta.language)) reports.push(r);
-  const out = reports.map(({ meta, server }) => ({ ...meta, server, local:undefined }));
+  const out = reports.map(({ meta, server, serverBranches }) => ({ ...meta, server, serverBranches, local:undefined }));
   update(out);
   // Servers built from one repository and commit share its local coverage,
   // so it is fetched once for all of them, and every repository at once.

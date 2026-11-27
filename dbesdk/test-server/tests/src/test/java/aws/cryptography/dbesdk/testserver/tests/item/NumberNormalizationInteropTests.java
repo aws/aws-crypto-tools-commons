@@ -17,12 +17,16 @@ import aws.cryptography.dbesdk.testserver.client.model.DBESDKClientError;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemInput;
 import aws.cryptography.dbesdk.testserver.client.model.DecryptItemOutput;
 import aws.cryptography.dbesdk.testserver.client.model.EncryptItemInput;
+import aws.cryptography.testserver.tests.DynamoDbInputs;
+import aws.cryptography.testserver.tests.DynamoDbInputs.DynamoDbNumber;
+import aws.cryptography.testserver.tests.Example;
 import aws.cryptography.testserver.tests.TargetPair;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -39,7 +43,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * additionally proves both languages normalize identically: a divergent
  * normalization would sign different bytes and fail cross-decrypt.
  *
- * <p>All Number vectors are lifted verbatim from the Dafny
+ * <p>The fixed Number vectors are lifted verbatim from the Dafny
  * {@code NormalizeNumber.dfy} known-answer suite
  * ({@code TestExamples}, {@code TestExtremes}, {@code TestFailures}) and
  * {@code DynamoToStruct.dfy} ({@code TestNormalizeN*}, {@code TestSortNSAfterNormalize}).
@@ -54,6 +58,22 @@ class NumberNormalizationInteropTests {
 
     static Stream<TargetPair> testPairs() {
         return DbeTestHelpers.pairs().stream();
+    }
+
+    static Stream<Arguments> validNumbers() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.validNumbers());
+    }
+
+    static Stream<Arguments> validNumberSets() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.validNumberSets());
+    }
+
+    static Stream<Arguments> numbersOutOfRange() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.numbersOutOfRange());
+    }
+
+    static Stream<Arguments> malformedNumbers() {
+        return DbeTestHelpers.withEachPair(DynamoDbInputs.malformedNumbers());
     }
 
     private static Map<String, CryptoAction> pkPlusEncryptedValue() {
@@ -140,49 +160,42 @@ class NumberNormalizationInteropTests {
             AttributeValue.builder().m(out).build());
     }
 
-    @ParameterizedTest(name = "number set sorted after normalize {0}")
-    @MethodSource("testPairs")
-    void numberSetSortedAfterNormalize(TargetPair pair) {
+    @ParameterizedTest(name = "number set sorted after normalize {0} {1}")
+    @MethodSource("validNumberSets")
+    void numberSetSortedAfterNormalize(Example<List<DynamoDbNumber>> numbers, TargetPair pair) {
         // DynamoToStruct.dfy TestSortNSAfterNormalize: ["1","02","10"] -> canonical {"1","2","10"}
         // (compared order-independently; the canonical sort ["1","10","2"] is
         // what makes both languages agree on the signed bytes).
         assertValueNormalizesTo(pair,
-            AttributeValue.builder().ns(List.of("1", "02", "10")).build(),
-            AttributeValue.builder().ns(List.of("1", "2", "10")).build());
+            AttributeValue.builder().ns(numbers.value().stream().map(DynamoDbNumber::text).toList()).build(),
+            AttributeValue.builder().ns(numbers.value().stream().map(DynamoDbNumber::normalized).toList()).build());
     }
 
-    @ParameterizedTest(name = "canonical forms round-trip {0}")
-    @MethodSource("testPairs")
-    void canonicalFormsRoundTrip(TargetPair pair) {
+    @ParameterizedTest(name = "canonical forms round-trip {0} {1}")
+    @MethodSource("validNumbers")
+    void canonicalFormsRoundTrip(Example<DynamoDbNumber> number, TargetPair pair) {
         // NormalizeNumber.dfy TestExamples: exponent/leading-zero/negative-zero rules.
         assertValueNormalizesTo(pair,
-            AttributeValue.builder().n("00012.34").build(),
-            AttributeValue.builder().n("12.34").build());
-        assertValueNormalizesTo(pair,
-            AttributeValue.builder().n("-0").build(),
-            AttributeValue.builder().n("0").build());
-        assertValueNormalizesTo(pair,
-            AttributeValue.builder().n("123.456e-1").build(),
-            AttributeValue.builder().n("12.3456").build());
+            AttributeValue.builder().n(number.value().text()).build(),
+            AttributeValue.builder().n(number.value().normalized()).build());
     }
 
-    @ParameterizedTest(name = "extreme precision/magnitude boundary {0}")
-    @MethodSource("testPairs")
-    void extremePrecisionAndMagnitudeBoundary(TargetPair pair) {
+    @ParameterizedTest(name = "extreme precision/magnitude boundary {0} {1}")
+    @MethodSource("numbersOutOfRange")
+    void extremePrecisionAndMagnitudeBoundary(Example<String> outOfRange, TargetPair pair) {
         // NormalizeNumber.dfy TestExtremes: 38 digits of precision accepted (canonical == itself)...
         String maxPrecision = "123456789.01234567890123456789012345678"; // 38 significant digits
         assertValueNormalizesTo(pair,
             AttributeValue.builder().n(maxPrecision).build(),
             AttributeValue.builder().n(maxPrecision).build());
-        // ...39 digits rejected.
-        assertValueRejectedOnEncrypt(pair,
-            AttributeValue.builder().n("123456789.012345678901234567890123456789").build());
+        // ...and 39 digits, or a magnitude out of range, rejected.
+        assertValueRejectedOnEncrypt(pair, AttributeValue.builder().n(outOfRange.value()).build());
     }
 
-    @ParameterizedTest(name = "malformed number rejected on encrypt {0}")
-    @MethodSource("testPairs")
-    void malformedNumberRejectedOnEncrypt(TargetPair pair) {
+    @ParameterizedTest(name = "malformed number rejected on encrypt {0} {1}")
+    @MethodSource("malformedNumbers")
+    void malformedNumberRejectedOnEncrypt(Example<String> malformed, TargetPair pair) {
         // NormalizeNumber.dfy TestFailures: "1.2.3" is not a valid number.
-        assertValueRejectedOnEncrypt(pair, AttributeValue.builder().n("1.2.3").build());
+        assertValueRejectedOnEncrypt(pair, AttributeValue.builder().n(malformed.value()).build());
     }
 }

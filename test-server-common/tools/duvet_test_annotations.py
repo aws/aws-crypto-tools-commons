@@ -11,14 +11,21 @@ them to one file the language's duvet config reads as a test source.
 An annotation is dropped when:
   - its test does not reach a server call for the language (a feature-gate or
     other skip), or
-  - its test calls KnownBugGate.gateDeclared with a bug id the language lists
-    in its bug-config.json, or
+  - its test calls KnownBugGate.gateDeclared (or Mpl.knownBug) with a bug id
+    the language lists in its bug-config.json, or
   - with --spec-root, its quote is not in that section of the language's spec
     (duvet fails the whole report on such a quote).
 
 An annotation in a helper method counts for the tests in the same file that
-call that helper. An annotation outside any method, or one that is not
-`type=test`, is an error.
+call that helper. An annotation in a default test method of an interface, such
+as KeyringContract, counts for each test class that implements the interface
+and does not override that method. When the class overrides it, the override's
+annotations count, and the default method's count only if the override calls it.
+
+A `type=exception` annotation is always kept, with only the --spec-root check:
+it marks a rule that the code does not follow, so its test never runs.
+An annotation outside any method, or one that is neither `type=test` nor
+`type=exception`, is an error.
 
 Usage:
   duvet_test_annotations.py --gate-log build/test-results/feature-gate-log.jsonl \
@@ -34,16 +41,18 @@ import sys
 from pathlib import Path
 
 TEST_ANNOTATIONS = {"@Test", "@ParameterizedTest", "@RepeatedTest", "@TestFactory",
-                    "@TestTemplate", "@Property", "@Example"}
+                    "@TestTemplate", "@Property", "@Example", "@KeyringTest"}
 META_KEYS = {"type", "reason", "tracking-issue", "feature", "level", "format"}
 METHOD = re.compile(
     r"^\s*(?:(?:public|protected|private|static|final|synchronized|abstract|default)\s+)*"
     r"(?:<[^>]*>\s+)?[\w.$<>\[\],? ]+?\s+(\w+)\s*\(")
 NOT_METHOD = re.compile(r"^\s*(?:return|new|if|for|while|switch|catch|throw|else|do|try|case)\b")
-GATE_DECLARED = re.compile(r'gateDeclared\(\s*"([^"]+)"')
+GATE_DECLARED = re.compile(r'(?:gateDeclared|knownBug|unlessKnownBug)\(\s*"([^"]+)"')
 CALL = re.compile(r"\b(\w+)\s*\(")
 GATE_ID_SEGMENT = re.compile(r"\[(\w[\w-]*):([^\]]*)\]")
 TEST_SEGMENTS = {"method", "test-template", "test-factory", "property", "example"}
+CLASS = re.compile(r"\bclass\s+(\w+)\b([^{]*)\{")
+IMPLEMENTS = re.compile(r"\bimplements\s+(.*)$", re.S)
 
 
 class Block:
@@ -89,6 +98,8 @@ def parse_java(path):
     text = path.read_text(encoding="utf-8").splitlines()
     methods, blocks, stack = [], [], []
     depth, pending, block = 0, [], None
+    # Open parentheses of an annotation whose arguments continue on the next lines.
+    annotation_parens = 0
     in_block_comment = False
     for number, raw in enumerate(text, 1):
         stripped = raw.strip()
@@ -119,8 +130,14 @@ def parse_java(path):
         code = strip_code(code)
         if not code.strip():
             continue
+        if annotation_parens > 0:
+            annotation_parens += code.count("(") - code.count(")")
+            continue
         if code.strip().startswith("@"):
             pending.append(code.strip().split("(")[0])
+            annotation_parens = code.count("(") - code.count(")")
+            if annotation_parens > 0:
+                continue
         match = METHOD.match(code)
         if match and not NOT_METHOD.match(code) and "=" not in code.split("(")[0] \
                 and not code.rstrip().endswith(";"):
@@ -149,6 +166,39 @@ def parse_java(path):
                 while stack and not stack[-1][2] and depth + 1 == stack[-1][1]:
                     methods.remove(stack.pop()[0])
     return methods, blocks
+
+
+def interfaces(path):
+    """The simple names of the interfaces that the file's top-level class implements."""
+    for match in CLASS.finditer(path.read_text(encoding="utf-8")):
+        if match.group(1) != path.stem:
+            continue
+        listed = IMPLEMENTS.search(match.group(2))
+        if not listed:
+            return set()
+        names = re.sub(r"<[^<>]*>", "", listed.group(1))
+        return {name.strip().rsplit(".", 1)[-1] for name in names.split(",") if name.strip()}
+    return set()
+
+
+def with_inherited(running, files):
+    """Add (interface, method) for each run of an interface's default test method.
+
+    The run counts for the default method when the class does not override it,
+    or when the override calls it, as in `Contract.super.method(mpl)`.
+    """
+    tests = {stem: {m.name: m for m in methods if m.is_test} for stem, (methods, _, _) in files.items()}
+    inherited = set()
+    for cls, method in running:
+        if cls not in files:
+            continue
+        override = tests[cls].get(method)
+        for interface in files[cls][2]:
+            if method not in tests.get(interface, {}):
+                continue
+            if override is None or f"{interface}.super.{method}(" in "".join(override.body):
+                inherited.add((interface, method))
+    return running | inherited
 
 
 def enclosing(methods, line):
@@ -273,17 +323,26 @@ def main(argv=None):
     if args.bug_config and args.bug_config.is_file():
         bugs = set(json.loads(args.bug_config.read_text(encoding="utf-8")))
 
+    parsed = [(path, *parse_java(path)) for path in sorted(args.tests_dir.rglob("*.java"))]
+    files = {path.stem: (methods, blocks, interfaces(path)) for path, methods, blocks in parsed}
+    running = with_inherited(running, files)
+
     kept, dropped, errors, cache = [], [], [], {}
-    for path in sorted(args.tests_dir.rglob("*.java")):
-        methods, blocks = parse_java(path)
+    for path, methods, blocks in parsed:
         for block in blocks:
             where = f"{path}:{block.line}"
-            if block.kind() != "test":
-                errors.append(f"{where}: shared Tests may only hold type=test annotations")
+            if block.kind() not in ("test", "exception"):
+                errors.append(f"{where}: shared Tests may only hold type=test or type=exception annotations")
                 continue
             method = enclosing(methods, block.line)
             if method is None:
                 errors.append(f"{where}: annotation is not inside a method")
+                continue
+            if block.kind() == "exception":
+                if args.spec_root and (problem := quote_problem(block, args.spec_root, prefixes, cache)):
+                    dropped.append((where, problem))
+                else:
+                    kept.append((block, path.stem, method.name))
                 continue
             tests = tests_reaching(method, methods)
             if not tests:

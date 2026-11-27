@@ -119,4 +119,24 @@ class KnownBugDeclarationsTest {
             }, d));
         assertSame(transport, propagated, "only an AssertionError is the declared bug's signature");
     }
+
+    @Test
+    void outcomeGateMatchesTheAssertionGate() {
+        KnownBugDeclarations d =
+            KnownBugDeclarations.parse("java:3:" + REPO + "=decrypt-accepts-garbage");
+        AssertionError failure = new AssertionError("decrypt did not reject");
+
+        TestAbortedException skip = assertThrows(TestAbortedException.class,
+            () -> KnownBugGate.gateDeclaredOutcome("decrypt-accepts-garbage", target("java", 3), failure, d));
+        assertEquals("KNOWN BUG decrypt-accepts-garbage — declared for java-v3", skip.getMessage());
+        assertSame(failure, skip.getCause());
+
+        AssertionError stale = assertThrows(AssertionError.class,
+            () -> KnownBugGate.gateDeclaredOutcome("decrypt-accepts-garbage", target("java", 3), null, d));
+        assertTrue(stale.getMessage().contains("remove 'decrypt-accepts-garbage'"));
+
+        assertSame(failure, assertThrows(AssertionError.class,
+            () -> KnownBugGate.gateDeclaredOutcome("decrypt-accepts-garbage", target("rust", 1), failure, d)));
+        KnownBugGate.gateDeclaredOutcome("decrypt-accepts-garbage", target("rust", 1), null, d);
+    }
 }

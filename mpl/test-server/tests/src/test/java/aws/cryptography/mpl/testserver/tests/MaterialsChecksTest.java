@@ -1,27 +1,18 @@
 package aws.cryptography.mpl.testserver.tests;
 
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.PUBLIC_KEY_EC_KEY;
-import static aws.cryptography.mpl.testserver.tests.DefaultCmmFixture.bytes;
+import static aws.cryptography.mpl.testserver.tests.Cmm.PUBLIC_KEY_EC_KEY;
+import static aws.cryptography.mpl.testserver.tests.Materials.bytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import aws.cryptography.mpl.testserver.client.client.MPLTestServerClient;
 import aws.cryptography.mpl.testserver.client.model.AlgorithmSuiteId;
 import aws.cryptography.mpl.testserver.client.model.CommitmentPolicy;
-import aws.cryptography.mpl.testserver.client.model.CreateDefaultCmmInput;
-import aws.cryptography.mpl.testserver.client.model.CreateStaticKeyringInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsInput;
 import aws.cryptography.mpl.testserver.client.model.DecryptMaterialsOutput;
 import aws.cryptography.mpl.testserver.client.model.DecryptionMaterials;
 import aws.cryptography.mpl.testserver.client.model.EncryptedDataKey;
 import aws.cryptography.mpl.testserver.client.model.EncryptionMaterials;
-import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsInput;
 import aws.cryptography.mpl.testserver.client.model.GetEncryptionMaterialsOutput;
-import aws.cryptography.mpl.testserver.client.model.MPLClientError;
-import aws.cryptography.testserver.tests.FeatureGate;
-import aws.cryptography.testserver.tests.LanguageServerRegistry;
-import aws.cryptography.testserver.tests.LanguageServerTarget;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
@@ -32,9 +23,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * What the Default CMM does with the materials its keyring returns.
@@ -50,9 +38,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * For a signing suite on decrypt, it also hands the verification key from the
  * context.
  */
+@KeyringFeature({"static-keyring", "default-cmm"})
 public class MaterialsChecksTest {
-
-    private static final Set<String> FEATURES = Set.of("static-keyring", "default-cmm");
 
     private static final AlgorithmSuiteId SUITE = AlgorithmSuiteId.ALG_AES_256_GCM_HKDF_SHA512_COMMIT_KEY;
     private static final AlgorithmSuiteId OTHER_SUITE = AlgorithmSuiteId.ALG_AES_256_GCM_IV12_TAG16_HKDF_SHA256;
@@ -65,10 +52,6 @@ public class MaterialsChecksTest {
 
     static {
         for (int i = 0; i < DATA_KEY.length; i++) DATA_KEY[i] = (byte) (i + 1);
-    }
-
-    static List<LanguageServerTarget> targets() {
-        return LanguageServerRegistry.shared().targets();
     }
 
     // -----------------------------------------------------------------------
@@ -108,53 +91,30 @@ public class MaterialsChecksTest {
         return out;
     }
 
-    /** @return a Default CMM over a static keyring returning {@code encryption} and {@code decryption}. */
-    private static String createCmm(MPLTestServerClient client, EncryptionMaterials encryption,
-            DecryptionMaterials decryption) {
-        CreateStaticKeyringInput.Builder keyring = CreateStaticKeyringInput.builder();
-        if (encryption != null) keyring.encryptionMaterials(encryption);
-        if (decryption != null) keyring.decryptionMaterials(decryption);
-        String keyringId = MplTestServerClients.withRetry(() ->
-            client.createStaticKeyring(keyring.build())).getKeyringId();
-        return MplTestServerClients.withRetry(() ->
-            client.createDefaultCmm(CreateDefaultCmmInput.builder().keyringId(keyringId).build())).getCmmId();
+    /** A Default CMM over a static keyring that returns {@code encryption} and {@code decryption}. */
+    private static Cmm cmm(Mpl mpl, EncryptionMaterials encryption, DecryptionMaterials decryption) {
+        return mpl.defaultCmm(mpl.staticKeyring(encryption, decryption));
     }
 
-    private static GetEncryptionMaterialsInput getEncryptionMaterials(String cmmId) {
-        return GetEncryptionMaterialsInput.builder()
-            .cmmId(cmmId)
-            .encryptionContext(EC)
-            .commitmentPolicy(POLICY)
-            .algorithmSuiteId(SUITE)
-            .build();
-    }
-
-    private static DecryptMaterialsInput decryptMaterials(String cmmId, AlgorithmSuiteId suite,
+    private static DecryptMaterialsInput.Builder decryptMaterials(Cmm cmm, AlgorithmSuiteId suite,
             Map<String, String> ec) {
-        return DecryptMaterialsInput.builder()
-            .cmmId(cmmId)
+        return cmm.decryptMaterialsRequest()
             .algorithmSuiteId(suite)
             .encryptedDataKeys(List.of(edk()))
             .encryptionContext(ec)
-            .commitmentPolicy(POLICY)
-            .build();
+            .commitmentPolicy(POLICY);
     }
 
-    /** A Default CMM on {@code target} whose keyring returns {@code materials} from OnEncrypt. */
-    private static void assertEncryptRejected(LanguageServerTarget target, EncryptionMaterials materials) {
-        FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, materials, null);
-        assertThrows(MPLClientError.class, () -> client.getEncryptionMaterials(getEncryptionMaterials(cmmId)));
+    /** GetEncryptionMaterials fails on a Default CMM whose keyring returns {@code materials} from OnEncrypt. */
+    private static void assertEncryptRejected(Mpl mpl, EncryptionMaterials materials) {
+        cmm(mpl, materials, null).getEncryptionMaterialsFails(EC, POLICY, SUITE);
     }
 
-    /** A Default CMM on {@code target} whose keyring returns {@code materials} from OnDecrypt. */
-    private static void assertDecryptRejected(LanguageServerTarget target, DecryptionMaterials materials,
+    /** DecryptMaterials fails on a Default CMM whose keyring returns {@code materials} from OnDecrypt. */
+    private static void assertDecryptRejected(Mpl mpl, DecryptionMaterials materials,
             AlgorithmSuiteId suite, Map<String, String> ec) {
-        FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, null, materials);
-        assertThrows(MPLClientError.class, () -> client.decryptMaterials(decryptMaterials(cmmId, suite, ec)));
+        Cmm cmm = cmm(mpl, null, materials);
+        cmm.decryptMaterialsFails(decryptMaterials(cmm, suite, ec));
     }
 
     /** A P-384 verification key as an X9.62 compressed point, the form the context carries. */
@@ -176,53 +136,41 @@ public class MaterialsChecksTest {
     // GetEncryptionMaterials
     // -----------------------------------------------------------------------
 
-    @ParameterizedTest(name = "[materials-checks] encrypt accepts an added data key {0}")
-    @MethodSource("targets")
-    void encryptAcceptsAddedDataKey(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, encryptionMaterials().build(), null);
+    @KeyringTest(name = "[materials-checks] encrypt accepts an added data key {0}")
+    void encryptAcceptsAddedDataKey(Mpl mpl) {
+        Cmm cmm = cmm(mpl, encryptionMaterials().build(), null);
 
-        GetEncryptionMaterialsOutput out = MplTestServerClients.withRetry(() ->
-            client.getEncryptionMaterials(getEncryptionMaterials(cmmId)));
+        GetEncryptionMaterialsOutput out = cmm.getEncryptionMaterials(EC, POLICY, SUITE);
 
         assertArrayEquals(DATA_KEY, bytes(out.getPlaintextDataKey()));
         assertEquals(1, out.getEncryptedDataKeys().size());
         assertEquals("static", out.getEncryptedDataKeys().get(0).getKeyProviderId());
     }
 
-    @ParameterizedTest(name = "[materials-checks] encrypt rejects no data key {0}")
-    @MethodSource("targets")
-    void encryptRejectsNoDataKey(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, null, null);
-        assertThrows(MPLClientError.class, () -> client.getEncryptionMaterials(getEncryptionMaterials(cmmId)));
+    @KeyringTest(name = "[materials-checks] encrypt rejects no data key {0}")
+    void encryptRejectsNoDataKey(Mpl mpl) {
+        cmm(mpl, null, null).getEncryptionMaterialsFails(EC, POLICY, SUITE);
     }
 
-    @ParameterizedTest(name = "[materials-checks] encrypt rejects no encrypted data keys {0}")
-    @MethodSource("targets")
-    void encryptRejectsNoEncryptedDataKeys(LanguageServerTarget target) {
-        assertEncryptRejected(target, encryptionMaterials().encryptedDataKeys(List.of()).build());
+    @KeyringTest(name = "[materials-checks] encrypt rejects no encrypted data keys {0}")
+    void encryptRejectsNoEncryptedDataKeys(Mpl mpl) {
+        assertEncryptRejected(mpl, encryptionMaterials().encryptedDataKeys(List.of()).build());
     }
 
-    @ParameterizedTest(name = "[materials-checks] encrypt rejects a changed algorithm suite {0}")
-    @MethodSource("targets")
-    void encryptRejectsChangedSuite(LanguageServerTarget target) {
-        assertEncryptRejected(target, encryptionMaterials().algorithmSuiteId(OTHER_SUITE).build());
+    @KeyringTest(name = "[materials-checks] encrypt rejects a changed algorithm suite {0}")
+    void encryptRejectsChangedSuite(Mpl mpl) {
+        assertEncryptRejected(mpl, encryptionMaterials().algorithmSuiteId(OTHER_SUITE).build());
     }
 
-    @ParameterizedTest(name = "[materials-checks] encrypt rejects a changed encryption context {0}")
-    @MethodSource("targets")
-    void encryptRejectsChangedContext(LanguageServerTarget target) {
-        assertEncryptRejected(target,
+    @KeyringTest(name = "[materials-checks] encrypt rejects a changed encryption context {0}")
+    void encryptRejectsChangedContext(Mpl mpl) {
+        assertEncryptRejected(mpl,
             encryptionMaterials().encryptionContext(with(EC, "added", "by keyring")).build());
     }
 
-    @ParameterizedTest(name = "[materials-checks] encrypt rejects changed required context keys {0}")
-    @MethodSource("targets")
-    void encryptRejectsChangedRequiredKeys(LanguageServerTarget target) {
-        assertEncryptRejected(target,
+    @KeyringTest(name = "[materials-checks] encrypt rejects changed required context keys {0}")
+    void encryptRejectsChangedRequiredKeys(Mpl mpl) {
+        assertEncryptRejected(mpl,
             encryptionMaterials().requiredEncryptionContextKeys(List.of("purpose")).build());
     }
 
@@ -230,85 +178,69 @@ public class MaterialsChecksTest {
     // DecryptMaterials
     // -----------------------------------------------------------------------
 
-    @ParameterizedTest(name = "[materials-checks] decrypt accepts an added data key {0}")
-    @MethodSource("targets")
-    void decryptAcceptsAddedDataKey(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, null, decryptionMaterials().build());
+    @KeyringTest(name = "[materials-checks] decrypt accepts an added data key {0}")
+    void decryptAcceptsAddedDataKey(Mpl mpl) {
+        Cmm cmm = cmm(mpl, null, decryptionMaterials().build());
 
-        DecryptMaterialsOutput out = MplTestServerClients.withRetry(() ->
-            client.decryptMaterials(decryptMaterials(cmmId, SUITE, EC)));
+        DecryptMaterialsOutput out = cmm.decryptMaterials(decryptMaterials(cmm, SUITE, EC));
 
         assertArrayEquals(DATA_KEY, bytes(out.getPlaintextDataKey()));
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt rejects no data key {0}")
-    @MethodSource("targets")
-    void decryptRejectsNoDataKey(LanguageServerTarget target) {
-        FeatureGate.require(FEATURES, target);
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, null, null);
-        assertThrows(MPLClientError.class, () -> client.decryptMaterials(decryptMaterials(cmmId, SUITE, EC)));
+    @KeyringTest(name = "[materials-checks] decrypt rejects no data key {0}")
+    void decryptRejectsNoDataKey(Mpl mpl) {
+        Cmm cmm = cmm(mpl, null, null);
+        cmm.decryptMaterialsFails(decryptMaterials(cmm, SUITE, EC));
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt rejects a changed algorithm suite {0}")
-    @MethodSource("targets")
-    void decryptRejectsChangedSuite(LanguageServerTarget target) {
-        assertDecryptRejected(target, decryptionMaterials().algorithmSuiteId(OTHER_SUITE).build(), SUITE, EC);
+    @KeyringTest(name = "[materials-checks] decrypt rejects a changed algorithm suite {0}")
+    void decryptRejectsChangedSuite(Mpl mpl) {
+        assertDecryptRejected(mpl, decryptionMaterials().algorithmSuiteId(OTHER_SUITE).build(), SUITE, EC);
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt rejects a changed encryption context {0}")
-    @MethodSource("targets")
-    void decryptRejectsChangedContext(LanguageServerTarget target) {
-        assertDecryptRejected(target,
+    @KeyringTest(name = "[materials-checks] decrypt rejects a changed encryption context {0}")
+    void decryptRejectsChangedContext(Mpl mpl) {
+        assertDecryptRejected(mpl,
             decryptionMaterials().encryptionContext(with(EC, "added", "by keyring")).build(), SUITE, EC);
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt rejects changed required context keys {0}")
-    @MethodSource("targets")
-    void decryptRejectsChangedRequiredKeys(LanguageServerTarget target) {
-        assertDecryptRejected(target,
+    @KeyringTest(name = "[materials-checks] decrypt rejects changed required context keys {0}")
+    void decryptRejectsChangedRequiredKeys(Mpl mpl) {
+        assertDecryptRejected(mpl,
             decryptionMaterials().requiredEncryptionContextKeys(List.of("purpose")).build(), SUITE, EC);
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt accepts a data key for a signing suite {0}")
-    @MethodSource("targets")
-    void decryptAcceptsSigningSuiteDataKey(LanguageServerTarget target) throws GeneralSecurityException {
-        FeatureGate.require(FEATURES, target);
+    @KeyringTest(name = "[materials-checks] decrypt accepts a data key for a signing suite {0}")
+    void decryptAcceptsSigningSuiteDataKey(Mpl mpl) throws GeneralSecurityException {
         byte[] verificationKey = verificationKey();
         Map<String, String> ec = with(EC, PUBLIC_KEY_EC_KEY, Base64.getEncoder().encodeToString(verificationKey));
-        MPLTestServerClient client = MplTestServerClients.forEndpoint(target.endpoint());
-        String cmmId = createCmm(client, null, decryptionMaterials()
+        Cmm cmm = cmm(mpl, null, decryptionMaterials()
             .algorithmSuiteId(SIGNING_SUITE)
             .encryptionContext(ec)
             .verificationKey(ByteBuffer.wrap(verificationKey))
             .build());
 
-        DecryptMaterialsOutput out = MplTestServerClients.withRetry(() ->
-            client.decryptMaterials(decryptMaterials(cmmId, SIGNING_SUITE, ec)));
+        DecryptMaterialsOutput out = cmm.decryptMaterials(decryptMaterials(cmm, SIGNING_SUITE, ec));
 
         assertArrayEquals(DATA_KEY, bytes(out.getPlaintextDataKey()));
         assertArrayEquals(verificationKey, bytes(out.getVerificationKey()));
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt rejects a changed verification key {0}")
-    @MethodSource("targets")
-    void decryptRejectsChangedVerificationKey(LanguageServerTarget target) throws GeneralSecurityException {
+    @KeyringTest(name = "[materials-checks] decrypt rejects a changed verification key {0}")
+    void decryptRejectsChangedVerificationKey(Mpl mpl) throws GeneralSecurityException {
         byte[] verificationKey = verificationKey();
         Map<String, String> ec = with(EC, PUBLIC_KEY_EC_KEY, Base64.getEncoder().encodeToString(verificationKey));
-        assertDecryptRejected(target, decryptionMaterials()
+        assertDecryptRejected(mpl, decryptionMaterials()
             .algorithmSuiteId(SIGNING_SUITE)
             .encryptionContext(ec)
             .verificationKey(ByteBuffer.wrap(verificationKey()))
             .build(), SIGNING_SUITE, ec);
     }
 
-    @ParameterizedTest(name = "[materials-checks] decrypt rejects a signing suite with no verification key {0}")
-    @MethodSource("targets")
-    void decryptRejectsMissingVerificationKey(LanguageServerTarget target) throws GeneralSecurityException {
+    @KeyringTest(name = "[materials-checks] decrypt rejects a signing suite with no verification key {0}")
+    void decryptRejectsMissingVerificationKey(Mpl mpl) throws GeneralSecurityException {
         Map<String, String> ec = with(EC, PUBLIC_KEY_EC_KEY, Base64.getEncoder().encodeToString(verificationKey()));
-        assertDecryptRejected(target, decryptionMaterials()
+        assertDecryptRejected(mpl, decryptionMaterials()
             .algorithmSuiteId(SIGNING_SUITE)
             .encryptionContext(ec)
             .build(), SIGNING_SUITE, ec);

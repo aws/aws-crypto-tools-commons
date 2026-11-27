@@ -1,0 +1,76 @@
+# Every day, reads every Rust API and option on aws-crypto-tools-rust main, compiles each held type on each
+# option, runs some of those calls, and uploads the results as api-types-rust. The types page
+# (dashboard/api-examples/types.html) loads the newest successful run's artifact.
+# A pull request in aws-crypto-tools-rust reads its own API in its own CI, with these same scripts.
+
+name: API examples types
+
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "api-examples/types/**"
+      - ".github/workflows/api-examples-types.yml"
+  pull_request:
+    paths:
+      - "api-examples/types/**"
+      - ".github/workflows/api-examples-types.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: compile and run the Rust rows
+    runs-on: codebuild-CryptoToolsCI-linux-aws-crypto-tools-commons-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The Rust repo's default branch.
+      - uses: actions/checkout@v4
+        with:
+          repository: aws/aws-crypto-tools-rust
+          path: .types-rust
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # aws-lc-sys needs Go to build.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # rustdoc JSON, which rust_api.py reads, is a nightly-only output.
+      - name: Install nightly Rust
+        run: rustup toolchain install nightly --profile minimal
+
+      # No build cache: this job runs code from another repo, and a cache saved on main is read by
+      # every branch.
+      - name: Read every Rust API and option
+        working-directory: api-examples/types
+        run: python3 rust_api.py --rust-repo "$GITHUB_WORKSPACE/.types-rust"
+
+      - name: Compile and run the Rust rows
+        working-directory: api-examples/types
+        run: python3 compile_rust_types.py --rust-repo "$GITHUB_WORKSPACE/.types-rust" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-types-rust
+          path: |
+            dashboard/api-examples/types-rust.json
+            api-examples/types/rust-api.json
+            api-examples/types/rust_trials.rs
+            api-examples/types/rust_runs.rs
+          if-no-files-found: error

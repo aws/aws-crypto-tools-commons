@@ -45,6 +45,8 @@ import java.util.stream.Collectors;
  * @param dryRun         run the Tests with {@code testserver.dryRun}: no
  *                       server is reachable, and each Test stops at its first
  *                       server call
+ * @param errorChecks    source → (check → version, or {@code unsupported}),
+ *                       only for sources that declare error checks
  */
 public record TestRunInput(
     List<TestTarget> targets,
@@ -53,7 +55,8 @@ public record TestRunInput(
     Map<String, List<String>> rawRsaPaddingSchemes,
     String referenceImplementation,
     Map<String, List<String>> knownBugs,
-    boolean dryRun
+    boolean dryRun,
+    Map<String, Map<String, String>> errorChecks
 ) {
     public TestRunInput {
         targets = List.copyOf(targets);
@@ -76,6 +79,25 @@ public record TestRunInput(
                 copiedBugs.put(language, List.copyOf(ids)));
         }
         knownBugs = Collections.unmodifiableMap(copiedBugs);
+        Map<String, Map<String, String>> copiedChecks = new LinkedHashMap<>();
+        if (errorChecks != null) {
+            errorChecks.forEach((source, checks) ->
+                copiedChecks.put(source, Collections.unmodifiableMap(new LinkedHashMap<>(checks))));
+        }
+        errorChecks = Collections.unmodifiableMap(copiedChecks);
+    }
+
+    /** A run where no source declares error checks. */
+    public TestRunInput(
+            List<TestTarget> targets,
+            Map<String, Map<String, Boolean>> features,
+            List<String> featureCatalog,
+            Map<String, List<String>> rawRsaPaddingSchemes,
+            String referenceImplementation,
+            Map<String, List<String>> knownBugs,
+            boolean dryRun) {
+        this(targets, features, featureCatalog, rawRsaPaddingSchemes,
+            referenceImplementation, knownBugs, dryRun, Map.of());
     }
 
     /** A run against launched servers. */
@@ -104,6 +126,19 @@ public record TestRunInput(
             String referenceImplementation) {
         this(targets, features, featureCatalog, rawRsaPaddingSchemes,
             referenceImplementation, Map.of());
+    }
+
+    /**
+     * Format error checks as the {@code testserver.errorChecks} value:
+     * {@code <language>:<major>:<repo>:<check>=<version or unsupported>[;…]} CSV, e.g.
+     * {@code rust:1:aws-crypto-tools-rust:kind=2;message=unsupported}.
+     */
+    public static String formatErrorChecks(Map<String, Map<String, String>> errorChecks) {
+        return errorChecks.entrySet().stream()
+            .map(source -> source.getKey() + ":" + source.getValue().entrySet().stream()
+                .map(check -> check.getKey() + "=" + check.getValue())
+                .collect(Collectors.joining(";")))
+            .collect(Collectors.joining(","));
     }
 
     /**

@@ -84,6 +84,27 @@ public final class FeatureGate {
         requireForTargets(features, List.of(target), declarations);
     }
 
+    /**
+     * Skip the calling Test execution visibly with {@code message}, for a reason other than a Feature.
+     * feature-gate-log.jsonl records the skip the same way as a feature-gated skip.
+     * Call it instead of {@link #require}, before any Language_Server operation.
+     *
+     * @throws TestAbortedException always
+     */
+    public static void skip(String message, Set<String> features, LanguageServerTarget target) {
+        skipForTargets(message, features, List.of(target));
+    }
+
+    /** Pair form of {@link #skip(String, Set, LanguageServerTarget)}. */
+    public static void skip(String message, Set<String> features, TargetPair combination) {
+        skipForTargets(message, features, combinationTargets(combination));
+    }
+
+    private static void skipForTargets(String message, Set<String> features, List<LanguageServerTarget> targets) {
+        FeatureGateLog.record(targets, List.copyOf(new TreeSet<>(features)), "skipped");
+        throw new TestAbortedException(message);
+    }
+
     private static void requireForTargets(
             Set<String> features, List<LanguageServerTarget> targets, FeatureDeclarations declarations) {
         // Deterministic ordering for messages, whatever Set implementation the

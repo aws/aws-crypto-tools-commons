@@ -56,6 +56,17 @@
                             </button>
                         </li>
                         <li>
+                            <button class="nav-item" data-section="pr-review">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="7"/>
+                                    <path d="M21 21l-4.35-4.35"/>
+                                    <path d="M8 11h6"/>
+                                    <path d="M11 8v6"/>
+                                </svg>
+                                PR Review
+                            </button>
+                        </li>
+                        <li>
                             <button class="nav-item" data-section="issues">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10"/>
@@ -98,6 +109,22 @@
                                     <polyline points="10,9 9,9 8,9"/>
                                 </svg>
                                 Coverage Reports
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- API Examples Section -->
+                <div class="nav-section">
+                    <h3 class="nav-section-title">API Examples</h3>
+                    <ul class="nav-list">
+                        <li>
+                            <button class="nav-item" data-section="api-examples">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="16 18 22 12 16 6"/>
+                                    <polyline points="8 6 2 12 8 18"/>
+                                </svg>
+                                API Examples
                             </button>
                         </li>
                     </ul>
@@ -455,10 +482,21 @@
                     <iframe id="duvetFrame" class="test-servers-frame" title="Duvet Coverage"></iframe>
                 </div>
 
+                <div class="section" id="prReviewSection" style="display: none;">
+                    <iframe id="prReviewFrame" class="test-servers-frame" title="PR Review"></iframe>
+                </div>
+
+                <div class="section" id="apiExamplesSection" style="display: none;">
+                    <iframe id="apiExamplesFrame" class="test-servers-frame" title="API Examples"></iframe>
+                </div>
+
                 <div class="section" id="testServersSection" style="display: none;">
                     <div class="test-servers-tabs" id="testServersTabs">
                         <button class="active" data-page="index.html">Results</button>
                         <button data-page="coverage.html">Line coverage</button>
+                        <button data-page="fuzz.html">Fuzz</button>
+                        <button data-page="mutation.html">Mutation testing</button>
+                        <button data-page="pr-report.html">PR report</button>
                     </div>
                     <iframe id="testServersFrame" class="test-servers-frame" title="Test Server Results"></iframe>
                 </div>

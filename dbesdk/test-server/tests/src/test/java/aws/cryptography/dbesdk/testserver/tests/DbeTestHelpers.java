@@ -21,6 +21,8 @@ import aws.cryptography.testserver.tests.TargetPair;
 import aws.cryptography.testserver.tests.LanguageServerTarget;
 import aws.cryptography.testserver.tests.LanguageServerRegistry;
 import aws.cryptography.testserver.tests.FeatureDeclarations;
+import aws.cryptography.testserver.tests.Example;
+import aws.cryptography.testserver.tests.ExampleCases;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,6 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.Arguments;
 
 /**
  * General test helpers shared by every DB-ESDK cross-language test class
@@ -125,6 +129,15 @@ public final class DbeTestHelpers {
             }
         }
         return baseline;
+    }
+
+    /**
+     * One case per example and pair from {@link #pairs()}: the arguments are (example, pair).
+     * The shared {@link ExampleCases#withEachPair} would also include the pairs that {@link #pairs()} leaves out.
+     */
+    public static Stream<Arguments> withEachPair(List<? extends Example<?>> examples) {
+        List<TargetPair> pairs = pairs();
+        return examples.stream().flatMap(example -> pairs.stream().map(pair -> Arguments.of(example, pair)));
     }
 
     /**
