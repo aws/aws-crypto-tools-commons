@@ -23,6 +23,7 @@
     "beacon-partitions",
     "structured-encryption",
     "plaintext-override",
+    "edk-description",
     "legacy-ddbec"
   ]
 }

@@ -21,7 +21,12 @@
     "component (ComponentId.server:<lang>/library:<lang>, the launcher map, the effective-",
     "entry map) by language alone, so it must not collide with the Dafny 'java' entry; the",
     "token is wired to JavaLaunchPlan in TestServerOrchestratorMain, exactly as 'rust-dafny'",
-    "reuses RustLaunchPlan."
+    "reuses RustLaunchPlan.",
+    "",
+    "The java, rust and net entries point at the DB-ESDK branch",
+    "huaye/dbesdk-test-server-edk-description, which is main plus the",
+    "edk-description feature in each server's feature-config.json. Point them",
+    "back at main once that change merges there."
   ],
   "product": "dbesdk",
   "entries": [
@@ -33,13 +38,13 @@
       "libraryRepository": {
         "name": "aws-database-encryption-sdk-dynamodb",
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
-        "branch": "main",
+        "branch": "huaye/dbesdk-test-server-edk-description",
         "path": "test-server/java-v3-server"
       },
       "serverLocation": {
         "repository": "aws-database-encryption-sdk-dynamodb",
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
-        "ref": "main",
+        "ref": "huaye/dbesdk-test-server-edk-description",
         "path": "test-server/java-v3-server"
       }
     },
@@ -51,13 +56,13 @@
       "libraryRepository": {
         "name": "aws-database-encryption-sdk-dynamodb",
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
-        "branch": "main",
+        "branch": "huaye/dbesdk-test-server-edk-description",
         "path": "test-server/rust-v1-server"
       },
       "serverLocation": {
         "repository": "aws-database-encryption-sdk-dynamodb",
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
-        "ref": "main",
+        "ref": "huaye/dbesdk-test-server-edk-description",
         "path": "test-server/rust-v1-server"
       }
     },
@@ -69,13 +74,13 @@
       "libraryRepository": {
         "name": "aws-database-encryption-sdk-dynamodb",
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
-        "branch": "main",
+        "branch": "huaye/dbesdk-test-server-edk-description",
         "path": "test-server/net-v4-server"
       },
       "serverLocation": {
         "repository": "aws-database-encryption-sdk-dynamodb",
         "url": "git@github.com:aws/aws-database-encryption-sdk-dynamodb.git",
-        "ref": "main",
+        "ref": "huaye/dbesdk-test-server-edk-description",
         "path": "test-server/net-v4-server"
       }
     },

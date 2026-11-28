@@ -72,8 +72,13 @@ import org.junit.jupiter.params.provider.MethodSource;
  * suite exercises — {@code aws-kms-hierarchy}, {@code aws-kms-rsa},
  * {@code raw-rsa}, and a multi-keyring item with several EDKs — each by
  * producing a real header/item under that keyring family and describing it.
+ *
+ * <p>Every case is gated on the {@code edk-description} feature, so a server
+ * that doesn't implement the operation declares it unsupported and skips them.
  */
 class EncryptedDataKeyDescriptionTests {
+
+    private static final String EDK_DESCRIPTION = "edk-description";
 
     static Stream<LanguageServerTarget> targets() {
         return DbeTestHelpers.targets().stream();
@@ -103,6 +108,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes a header blob {0}")
     @MethodSource("targets")
     void awsKmsHeaderVariantDescribesEdk(LanguageServerTarget target) {
+        FeatureGate.require(Set.of(EDK_DESCRIPTION), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         byte[] header = bytesOf(encryptedItem(target).get(HEAD));
         List<EncryptedDataKeyDescription> descriptions = client.getEncryptedDataKeyDescription(
@@ -117,6 +123,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes an encrypted item {0}")
     @MethodSource("targets")
     void awsKmsItemVariantDescribesEdk(LanguageServerTarget target) {
+        FeatureGate.require(Set.of(EDK_DESCRIPTION), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         List<EncryptedDataKeyDescription> descriptions = client.getEncryptedDataKeyDescription(
             GetEncryptedDataKeyDescriptionInput.builder()
@@ -130,21 +137,32 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription rejects an item with no header {0}")
     @MethodSource("targets")
     void itemWithoutHeaderRejected(LanguageServerTarget target) {
+        FeatureGate.require(Set.of(EDK_DESCRIPTION), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
-        // An item that carries no aws_dbe_head attribute. The rejection error
-        // class differs by adapter (.NET surfaces DBESDKClientError; java/rust
-        // classify the header-not-found failure as GenericServerError), so the
-        // assertion is on their common supertype — the mechanism is "rejected".
+        // An item that carries no aws_dbe_head attribute. Dafny rejects it with
+        // "Header not found in the DynamoDB item." (DynamoDbEncryption
+        // GetEncryptedDataKeyDescription). The error shape differs by adapter:
+        // rust-v1 and net-v4 forward it as DBESDKClientError, while java-v3's
+        // handler doesn't wrap the library failure, so its classifier reports a
+        // GenericServerError whose message carries the library's. The assertion
+        // is on the common supertype plus that message, so a framework failure
+        // (bad request, unwired operation) can't pass for the header check.
         Map<String, AttributeValue> headerless = new LinkedHashMap<>();
         headerless.put(PK, AttributeValue.builder().s("no-header").build());
         //= specification/dynamodb-encryption-client/ddb-get-encrypted-data-key-description.md#behavior
         //= type=test
         //# If the input is an encrypted DynamoDB item, it MUST attempt to extract "aws_dbe_head" attribute from the DynamoDB item to get the binary header.
-        assertThrows(DBESDKTestServerException.class, () -> client.getEncryptedDataKeyDescription(
-            GetEncryptedDataKeyDescriptionInput.builder()
-                .input(EncryptedDataKeyDescriptionSource.builder().item(headerless).build())
-                .build()),
+        DBESDKTestServerException error = assertThrows(DBESDKTestServerException.class,
+            () -> client.getEncryptedDataKeyDescription(
+                GetEncryptedDataKeyDescriptionInput.builder()
+                    .input(EncryptedDataKeyDescriptionSource.builder().item(headerless).build())
+                    .build()),
             "an item without a header attribute must be rejected on " + target);
+        assertTrue(
+            error.getMessage() != null
+                && error.getMessage().contains("Header not found in the DynamoDB item."),
+            "the rejection must be the missing-header check; got: "
+                + error.getMessage() + " on " + target);
     }
 
     // -----------------------------------------------------------------------
@@ -202,7 +220,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription reports hierarchy branch-key fields {0}")
     @MethodSource("targets")
     void hierarchyEdkDescribesBranchKeyFields(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-hierarchical"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-hierarchical"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         DBEClientConfig config = baseConfig()
             .keyring(Keyring.builder()
@@ -234,7 +252,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "hierarchical branchKeyIdSupplier routes each item to its own branch key {0}")
     @MethodSource("targets")
     void branchKeyIdSupplierRoutesPerItemBranchKey(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-hierarchical"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-hierarchical"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         // A declarative DynamoDbKeyBranchKeyIdSupplier: route each item to a branch
         // key by the String value of its partition key — pk "route-A" -> branch key
@@ -296,7 +314,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes an AWS-KMS-RSA EDK {0}")
     @MethodSource("targets")
     void awsKmsRsaEdkDescribesProvider(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-rsa"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-rsa"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         DBEClientConfig config = baseConfig()
             .algorithmSuiteId(
@@ -317,7 +335,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes every EDK of a multi-keyring {0}")
     @MethodSource("targets")
     void multiKeyringDescribesEachEdk(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-rsa"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-rsa"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         Keyring awsKms = Keyring.builder()
             .awsKms(AwsKmsKeyringConfig.builder().kmsKeyId(resolveKmsKeyArn()).build())
@@ -356,7 +374,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription reports hierarchy fields from an item {0}")
     @MethodSource("targets")
     void hierarchyItemVariantDescribesBranchKeyFields(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-hierarchical"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-hierarchical"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         DBEClientConfig config = baseConfig()
             .keyring(Keyring.builder()
@@ -394,7 +412,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes an AWS-KMS-RSA EDK from an item {0}")
     @MethodSource("targets")
     void awsKmsRsaItemVariantDescribesProvider(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-rsa"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-rsa"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         DBEClientConfig config = baseConfig()
             .algorithmSuiteId(
@@ -419,7 +437,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes every EDK of a multi-keyring from an item {0}")
     @MethodSource("targets")
     void multiKeyringItemVariantDescribesEachEdk(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("aws-kms-rsa"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "aws-kms-rsa"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         Keyring awsKms = Keyring.builder()
             .awsKms(AwsKmsKeyringConfig.builder().kmsKeyId(resolveKmsKeyArn()).build())
@@ -521,7 +539,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes a raw-RSA EDK from a header {0}")
     @MethodSource("targets")
     void rawRsaHeaderVariantDescribesEdk(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-rsa"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "raw-rsa"), target);
         FeatureGate.requireRawRsaPaddings(Set.of("OAEP_SHA256_MGF1"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         DBEClientConfig config = baseConfig().keyring(rawRsaKeyring()).build();
@@ -533,7 +551,7 @@ class EncryptedDataKeyDescriptionTests {
     @ParameterizedTest(name = "GetEncryptedDataKeyDescription describes a raw-RSA EDK from an item {0}")
     @MethodSource("targets")
     void rawRsaItemVariantDescribesEdk(LanguageServerTarget target) {
-        FeatureGate.require(Set.of("raw-rsa"), target);
+        FeatureGate.require(Set.of(EDK_DESCRIPTION, "raw-rsa"), target);
         FeatureGate.requireRawRsaPaddings(Set.of("OAEP_SHA256_MGF1"), target);
         DBESDKTestServerClient client = DbeTestServerClients.forEndpoint(target.endpoint());
         DBEClientConfig config = baseConfig().keyring(rawRsaKeyring()).build();
